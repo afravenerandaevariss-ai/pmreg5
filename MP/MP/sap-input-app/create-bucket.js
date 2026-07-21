@@ -1,0 +1,15 @@
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = 'https://pabnvxlvrussdfhisxzn.supabase.co';
+const supabaseAnonKey = 'sb_publishable_btvgcbyES8_4w5x3dE-atg_kYfUAii4';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+async function run() {
+  const { data, error } = await supabase.storage.createBucket('excel-data', { public: true });
+  if (error) {
+    console.error('Error creating bucket:', error);
+  } else {
+    console.log('Bucket created:', data);
+  }
+}
+run();

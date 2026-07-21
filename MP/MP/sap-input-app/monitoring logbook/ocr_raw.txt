@@ -1,0 +1,299 @@
+1 Gunung Meliau Mobil Manager KB 8347 WB 2000014198 5E01CAR001 Aktif Baik Sewa
+Vibrator Roller 1 2000014800 5E01COM001 Mati Aktif Rusak Inventaris
+Dump Truck KB 8622 AY 2000021298 5E01DTR003 Aktif Baik Sewa
+Dump Truck KB 8592 AY 2000021301 5E01DTR004 Aktif Rusak Sewa
+Road Grader 1 2000014783 5E01GRA001 Aktif Baik Inventaris
+Quick Truck 02 2000021492 5E01QUT002 Aktif Baik Sewa
+Quick Truck 03 2000021493 5E01QUT003 Aktif Rusak Sewa
+Quick Truck 04 2000021494 5E01QUT004 Aktif Baik Sewa
+Quick Truck 05 2000021495 5E01QUT005 Aktif Rusak Sewa
+Quick Truck 06 2000021496 5E01QUT006 Aktif Baik Sewa
+Kioti Tractor 2000015098 5E01TRA001 Aktif Baik Inventaris
+Wheel Dump 2000023244 5E01WLD001 Aktif Baik Inventaris
+Dump Truck KB 8476 WC 2000021304 5E01DTR007 Aktif Baik Perusahaan
+Dump Truck KB 8459 WC 2000021305 5E01DTR008 Aktif Baik Perusahaan
+2 Gunung Mas Mobil Manager KB 8316 WA 2000014218 5E02CAR001 Aktif Baik Sewa
+Vibrator Roller 1 2000014801 5E02COM001 Mati Aktif RUSAK Inventaris
+Truk KB 8713 AW 2000021312 5E02DTR005 Aktif Baik Sewa
+Truk KB 8693 AY 2000021314 5E02DTR007 Mati Mati Baik Sewa
+Road Grader 1 2000014784 5E02GRA001 Aktif Baik Inventaris
+Quick Truck 1 2000014854 5E02QUT001 Aktif Baik Inventaris
+Quick Truck 2 2000021497 5E02QUT002 Aktif Baik Inventaris
+Quick Truck 5 2000021500 5E02QUT005 Aktif Baik Sewa
+Quick Truck 6 2000021501 5E02QUT006 Aktif Baik Sewa
+Truk KB 8645 WC 2000021315 5E02DTR008 Aktif
+3 Sungai Dekan Mobil Manajer KB 8125 HM 2000014388 5E03CAR001 Aktif Baik (Rusak Gardan Depan) Sewa
+Vibrator Roller SV 512 2000014802 5E03COM001 Aktif Rusak Inventaris
+Truck KB 7612 AA 2000021319 5E03DTR002 Aktif Baik Sewa
+Dump Truck KB 8463 AY 2000021323 5E03DTR006 Mati Tidak Ada BA Baik Sewa
+Dump Truck KB 8464 AY 2000021325 5E03DTR008 Mati Tidak Ada BA Perbaikan Sewa
+Dump Truck KB 8385 AY 2000021327 5E03DTR010 Aktif Perbaikan Sewa
+Road Grader MG 330 2000014785 5E03GRA001 Mati Aktif Rusak Inventaris
+Quick Truck 1 2000014869 5E03QUT001 Mati Aktif Rusak Inventaris
+Quick Truck 2 2000021502 5E03QUT002 Aktif Baik Sewa
+Quick Truck 3 2000021503 5E03QUT003 Mati Tidak Ada BA Rusak Sewa
+Quick Truck 4 2000021504 5E03QUT004 Aktif Baik Sewa
+Quick Truck 5 2000021505 5E03QUT005 Mati Tidak Ada BA Baik Sewa
+Tractor Kioti PX 9020 2000015108 5E03TRA001 Aktif Baik Inventaris
+Mobil Manager KB 8115 DM 2000022818 5E03CAR004 BK 8713 JF ganti KB 8115 DM Aktif Baik Sewa
+Dump Truck KB 8068 WD 2000021328 5E03DTR011 Aktif Baik Sewa
+Dump Truck KB 8159 WD 2000023103 5E03DTR012 Aktif Baik Sewa
+4 Rimba Belian Mobil Manajer KB 8339 WA 2000014393 5E04CAR001 Aktif Baik Sewa
+Mobil Ambulance KB 9052 AO 2000014395 5E04CAR003 Aktif Baik Sewa
+Vibrator Roller 1 2000014803 5E04COM001 Aktif Baik Inventaris
+Truck KB 8147 AW 2000021330 5E04DTR003 Aktif Baik Sewa
+Truck KB 8593 AY 2000021332 5E04DTR005 Aktif Baik Sewa
+Excavator 1 2000014825 5E04EXC001 Aktif Baik Sewa
+Road Grader 1 2000014786 5E04GRA001 Aktif Baik Inventaris
+Quick Truck 2 2000021507 5E04QUT002 Mati Aktif Rusak/Perbaikan Inventaris
+Quick Truck 3 2000021508 5E04QUT003 Aktif Rusak/Perbaikan Sewa
+Quick Truck 4 2000021509 5E04QUT004 Aktif Baik Sewa
+TRB 1 2000015113 5E04TRB001 Mati Aktif Dipinjam Kebun Parindu Sewa
+15 Sintang Mobil Manager KB 8302 HE 2000014398 5E06CAR001 Aktif Baik Sewa
+7 Ngabang Mobil Manager B 9647 NBA 2000014403 5E07CAR001 Aktif Baik Sewa
+Vibrator Roller 1 2000014805 5E07COM001 Mati Aktif Perlu dilakukan perbaikan Inventaris
+Mobil Tangki KB 9527 QL 2000021359 5E07DTR002 Aktif Perlu dilakukan perbaikan Inventaris
+Dump Truck KB 8138 AY 2000021362 5E07DTR005 Mati Tidak Ada BA Perlu dilakukan perbaikan Sewa
+Dump Truck KB 8336 AY 2000021364 5E07DTR007 Mati Tidak Ada BA Perlu dilakukan perbaikan Sewa
+Road Grader 1 2000014788 5E07GRA001 Aktif Perlu dilakukan perbaikan Inventaris
+Honda CRF 150LKB 3967 XC 2000022565 5E07MOT001 Mati Tidak Ada BA Perlu dilakukan perbaikan
+Honda CRF 150LKB 3966 XC 2000022566 5E07MOT002 Mati Tidak Ada BA Perlu dilakukan perbaikan
+Honda CRF 150L KB 5486 XD 2000022567 5E07MOT003 Mati Tidak Ada BA Baik Sewa
+Honda CRF 150L KB 5487 XD 2000022568 5E07MOT004 Mati Tidak Ada BA Baik Sewa
+Quick Truck 01 2000021522 5E07QUT002 Aktif Perlu dilakukan perbaikan Sewa
+Quick Truck 02 2000021523 5E07QUT003 Aktif Perlu dilakukan perbaikan Sewa
+Quick Truck 03 2000021524 5E07QUT004 Aktif Perlu dilakukan perbaikan Sewa
+Quick Truck 04 2000021525 5E07QUT005 Aktif Perlu dilakukan perbaikan Inventaris
+Mower 2000015123 5E07TRA001 Aktif Perlu dilakukan perbaikan Inventaris
+Dump Truck KB 8865 WC 2000021366 5E07DTR009 Aktif Baik Sewa
+Dump Truck KB 8894 WC 2000021367 5E07DTR010 Aktif Baik Sewa
+Quick Truck 05 2000022950 5E07QUT006 Aktif Baik Sewa
+Quick Truck 06 2000022951 5E07QUT007 Aktif Baik Sewa
+Mobil Pool DA 8527 WB 2000023057 5E07CAR004 KB 8261 HM berrubah DA 8527 WB Aktif Baik
+Mobil Manajer KB 8114 DM 2000023381 5E07CAR005 Aktif Baik
+Quick Truck 8 2000023460 5E07QUT008
+Quick truck 9 2000023461 5E07QUT009
+Quick truck 10 2000023463 5E07QUT010
+5 Parindu Mobil Manajer KB 8602 AW 2000014408 5E08CAR001 Mati Tidak Ada BA Baik Sewa
+Parindu Vibrator Roller 1 2000014806 5E08COM001 Mati Aktif Rusak Inventaris
+Dump Truck KB 8263 AU 2000021339 5E08DTR002 Mati Mati Baik Sewa
+Dump Truck KB 8762 AY 2000021343 5E08DTR006 Aktif Baik Sewa
+Dump Truck KB 8137 AY 2000021344 5E08DTR007 Aktif Baik Sewa
+Truck Tangki KB 9066 SFA 2000021345 5E08DTR008 Mati Tidak Ada BA Rusak Inventaris
+Road Grader 1 2000014789 5E08GRA001 Aktif Rusak Inventaris
+Honda CRF 150L KB 4962 XE 2000022570 5E08MOT001 Aktif Baik Sewa
+Honda CRF 150L KB 4963 XE 2000022571 5E08MOT002 Aktif Baik Sewa
+Quick Truck 1 2000014916 5E08QUT001 Aktif Baik Sewa
+Quick Truck 3 2000021513 5E08QUT003 Aktif Baik Inventaris
+Quick Truck 4 2000021514 5E08QUT004 Aktif Baik Sewa
+Quick Truck 5 2000021515 5E08QUT005 Mati Tidak Ada BA Baik Sewa
+MOWER 2000015128 5E08TRA001 Mati Aktif Baik Inventaris
+Mobil Manager KB 8110 DM 2000022909 5E08CAR004 BK 8711 JF berubah KB 8110 DM Aktif Baik Sewa
+Dump Truck KB 8168 WD 2000021346 5E08DTR09 Aktif Baik Sewa
+Dump Truck KB 8275 WD 2000021347 5E08DTR010 Aktif Baik Sewa
+Quick Truck 1 2000023455 5E08QUT007 Aktif Baik Sewa
+Quick Truck 5 2000023456 5E08QUT008 Aktif Baik Sewa
+6 Kembayan Mobil Manajer KT 8987 YH 2000014413 5E09CAR001 Mati Tidak Ada BA Baik Sewa
+Kembayan Vibrator Roller 1 2000014807 5E09COM001 Aktif Baik Inventaris
+Dump Truck KB 8973 AU 2000021352 5E09DTR005 Mati Tidak Ada BA Baik Sewa
+Dump Truck KB 8718 AW 2000021353 5E09DTR006 Aktif Baik Sewa
+Road Grader 1 2000014790 5E09GRA001 Mati Aktif Rusak Inventaris
+Quick Truck 1 2000014933 5E09QUT001 Mati Aktif Rusak Inventaris
+MOWER 2000015133 5E09TRA001 Mati Aktif Perbaikan Inventaris
+Mobil Manager KB 8113 DM 2000014414 5E09CAR002 BK 1870 JF berubah KB 8113 DM Aktif Baik Sewa
+Truck Tangki KB 8059 AZ 2000021354 5E09DTR007 Aktif Baik Sewa
+Dump Truck KB 8053 WD 2000021355 5E09DTR008 Aktif Baik Sewa
+14 Danau Salak Mobil Pool DA 8218 PZ 2000014418 5E11CAR001 Mati Tidak Ada BA Baik Sewa
+Danau Salak Mobil Pool DA 8636 PZ 2000014419 5E11CAR002 Aktif Baik Inventaris
+Mobil Pool DA 8647 CT 2000014420 5E11CAR003 Mati Tidak Ada BA Perbaikan Inventaris
+Vibrator Roller 1 2000014808 5E11COM001 Mati Aktif Baik Inventaris
+Truk DA 8464 JF 2000021441 5E11DTR003 Aktif Baik Inventaris
+Truk DA 8131 CV 2000021442 5E11DTR004 Aktif Baik Inventaris
+Tractor Ford/TRB1 2000015138 5E11TRA001 Aktif Perbaikan Inventaris
+Mobil Pool BK 8772 JF 2000022835 5E11CAR004 Aktif
+16 Kumai Mobil Manager KB 8847 HD 2000014493 5E12CAR001 Mati Tidak Ada BA Baik Sewa
+Mobil Pool DA 8502 WB 2000023245 5E11CAR005 Aktif Baik Inventaris
+Kumai Honda CRF 150L DA 2881 NU 2000022569 5E12MOT001 Aktif
+Mobil Manager DA 8513 WB 2000014494 5E12CAR002 Aktif
+Mobil Manager DA 8503 WB 2000014495 5E12CAR003 Aktif
+18 Batu Licin Mobil Manajer DA 8425 HC 2000014498 5E13CAR001 Mati Tidak Ada BA Baik Sewa
+Dump Truck DA 8625 CK 2000021430 5E13DTR002 Mati Tidak Ada BA Baik Sewa
+Batu Licin Honda CRF 150L DA 3283 AQ 2000022572 5E13MOT001 Aktif Baik Sewa
+Honda CRF 150L DA 3284 AQ 2000022573 5E13MOT002 Aktif Baik Sewa
+MOWER 2000015150 5E13TRA001 Aktif Baik Inventaris
+Mobil Manager BK 8776 JF 2000014499 5E13CAR002 Aktif Baik Sewa
+Dump Truck DA 8628 CK 2000021432 5E13DTR004 Aktif
+13 Pamukan Mobil Manager DA 8015 BT 2000014503 5E14CAR001 Mati Tidak Ada BA Baik Sewa
+Pamukan Vibrator Roller 1 2000014811 5E14COM001 Mati Aktif Rusak Berat Inventaris
+Truck DA 8575 PZ 2000014693 5E14DTR001 Aktif Baik Sewa
+Truck DA 8626 CK 2000021409 5E14DTR002 Aktif Baik Sewa
+Truck DA 8627 CK 2000021410 5E14DTR003 Aktif Baik Sewa
+Truck DA 8129 CV 2000021413 5E14DTR006 Aktif Baik Sewa
+Truck DA 8381 CA 2000021414 5E14DTR007 Aktif Baik Sewa
+Road Grader 1 2000014794 5E14GRA001 Aktif Baik Inventaris
+Quick Truck 2 2000021547 5E14QUT002 Aktif Baik Sewa
+Quick Truck 3 2000021548 5E14QUT003 Aktif Baik Sewa
+Quick Truck 4 2000021549 5E14QUT004 Aktif Baik Sewa
+Quick Truck 5 2000021550 5E14QUT005 Aktif Baik Sewa
+Strada Triton KB 8107 DM 2000014504 5E14CAR002 BK 8774 JF berubah KB 8107 DM Aktif Baik Sewa
+Truck KB 8720 WA 2000021416 5E14DTR009 Aktif Baik Sewa
+Quick Truck QT-16E 1 2000021551 5E14QUT006
+Quick Truck QT-16E 2 2000023496 5E14QUT007
+Quick Truck QT-16E 3 2000023497 5E14QUT008
+Quick Truck QT-16E 4 2000023498 5E14QUT009
+12 Pelaihari Mobil Dinas Manager KB 8326 WA 2000014508 5E15CAR001 Mati Mati Baik Sewa
+Compactor BAJ 2000014812 5E15COM001 Aktif Baik Inventaris
+Truck DA 8756 CY 2000021419 5E15DTR002 Aktif Baik Sewa
+Truck DA 8754 CY 2000021420 5E15DTR003 Aktif Baik Sewa
+Road Grader 1 2000014795 5E15GRA001 Aktif Baik Inventaris
+TRB MF 5355 2000015163 5E15TRB001 Aktif Baik Inventaris
+TRB FORD 046 2000015164 5E15TRB002 Aktif General Overhoul Inventaris
+Mobil Dinas Manager KB 8109 DM 2000014509 5E15CAR002 Ganti dari BK 8771 JF ke KB 8109 DM Aktif Baik Sewa
+8 Tabara Mobil Manajer DA 8261 ME 2000014513 5E16CAR001 Mati Tidak Ada BA Baik Sewa
+Tabara Alat Berat Vibro SAKAI 2000014813 5E16COM001 Mati Aktif Rusak Inventaris
+Dump Truck KB 8490 WA 2000021369 5E16DTR002 Mati Aktif Rusak Sewa
+Dump Truck KT 8944 LK 2000021371 5E16DTR004 Mati Aktif Baik Sewa
+Dump Truck DA 8290 JD 2000021372 5E16DTR005 Mati Aktif Baik Sewa
+Dump Truck KT 8044 YE 2000021373 5E16DTR006 Aktif Baik Sewa
+Dump Truck KT 8047 YE 2000021374 5E16DTR007 Mati Aktif Rusak Sewa
+Dump Truck DA 8288 JD 2000021375 5E16DTR008 Mati Tidak Ada BA Rusak Sewa
+Dump Truck DA 8515 CW 2000021376 5E16DTR009 Aktif Rusak Sewa
+Dump Truck KT 8046 YE 2000021377 5E16DTR010 Aktif Baik Sewa
+Dump Truck DA 8511 JJ 2000021378 5E16DTR011 Mati Aktif Baik Sewa
+Alat Berat Excavator SH-200 2000014835 5E16EXC001 Aktif Rusak Inventaris
+Alat Berat Grader MG-330 2000014796 5E16GRA001 Aktif Baik Inventaris
+Quick Truck AFD VII 2000021527 5E16QUT002 Aktif Baik Sewa
+Quick Truck AFD VIII 2000021528 5E16QUT003 Aktif Baik Sewa
+Quick Truck AFD V 2000021529 5E16QUT004 Aktif Baik Sewa
+Quick Truck AFD IV 2000021530 5E16QUT005 Aktif Baik Sewa
+Quick Truck AFD VI 2000021531 5E16QUT006 Aktif Baik Sewa
+Mobil Manager BK 8172 JF 2000014514 5E16CAR002 Aktif Baik Sewa
+Quick Truck AFD IV Desember 2000023247 5E16QUT007 Aktif Baik Sewa
+Quick Truck AFD V Desember 2000023248 5E16QUT008 Aktif Baik Sewa
+Quick Truck AFD VI Desember 2000023249 5E16QUT009 Aktif Baik Sewa
+Quick Truck AFD VII Desember 2000023250 5E16QUT010 Aktif Baik Sewa
+9 Tajati Ambulance KT 1263 EA 2000014519 5E17CAR002 Mati Tidak Ada BA Jalan Sewa
+Mobil Manajer KT 8396 YG 2000014520 5E17CAR003 Mati Tidak Ada BA Jalan / Double Tidak berfungsi Sewa
+Tajati Compac ( Sakai SV 512 D ) 2000014814 5E17COM001 Aktif Rusak / Hidrolik Pump Inventaris
+Dump Truck KT 8870 KE 2000021399 5E17DTR002 Mati Tidak Ada BA Jalan / Unit Sudah Tua Sewa
+Dump Truck DA 8758 CY 2000021400 5E17DTR003 Aktif Jalan / Baik Sewa
+Dump Truck DA 8289 JD 2000021401 5E17DTR004 Aktif Jalan / Baik Sewa
+Dump Truck KB 8720 WA 2000021404 5E17DTR007 Aktif Jalan / Baik Sewa
+Excavator JCB R51 2000014836 5E17EXC001 Mati Tidak Ada BA Jalan / Baik Sewa
+Mitsubishi Grader MG 330 2000014797 5E17GRA001 Aktif Jalan / Rem Tidak Berfungsi Inventaris
+Quick Truck 2 2000021542 5E17QUT002 Aktif Jalan / Baik Sewa
+Quick Truck 3 2000021543 5E17QUT003 Mati Tidak Ada BA Jalan / Baik Sewa
+Quick Truck 4 2000021544 5E17QUT004 Mati Aktif Rusak / Patah Chasis Sewa
+Quick Truck 5 2000021545 5E17QUT005 Aktif Jalan / Baik Sewa
+Quick Truck 6 2000021546 5E17QUT006 Aktif Jalan / Baik Sewa
+Quick Truck 7 Afdeling III 2000015059 5E17QUT007 Aktif Sewa KKS Sewa
+Quick Truck 8 AFdeling IV 2000022697 5E17QUT008 Aktif Sewa KKS Sewa
+Mobil Manager KB 8085 DM 2000022749 5E17CAR004 BK 8178 JE diganti KB 8085 DM Aktif Baik Sewa
+Quick Truck 9 Afdeling III 2000022827 5E17QUT009 Aktif Baik Sewa
+Dump Truck DA 8288 JD 2000021405 5E17DTR008 Aktif
+Dump Truck DA 8290 JD 2000021406 5E17DTR009 Aktif
+Dump Truck DA 8511 JJ 2000021407 5E17DTR010 Aktif
+Dump Truck KB 8490 WA 2000021408 5E17DTR011 Aktif
+n Dump Truck KT 8944 LK 2000022851 5E17DTR012 Mati Tidak Ada BA
+n Dump Truck KT 8047 YE 2000022852 5E17DTR013 Mati Tidak Ada BA
+10 Pandawa Mobil Manager KT 8434 YH 2000014523 5E18CAR001 Mati Tidak Ada BA Jalan / Rusak Garda Depan Sewa
+Pandawa Compac ( Sakai SV 525 D ) 2000014815 5E18COM001 Aktif Jalan / Vibrator tidak berfungsi Sewa
+Dump Truck DA 8291 JD 2000021389 5E18DTR002 Aktif Jalan / Baik Sewa
+Dump Truck KB 8491 WA 2000021390 5E18DTR003 Aktif Jalan / Baik Sewa
+Dump Truck KT 8869 KE 2000021392 5E18DTR005 Aktif Jalan / Baik Sewa
+Excavator CAT 320 D 2000014837 5E18EXC001 Aktif Jalan / Baik Sewa
+Mitsubishi Grader MG 330 2000014798 5E18GRA001 Aktif Patah dudukan pisau Sewa
+Quick Truck 1 2000015068 5E18QUT001 Aktif
+Quick Truck 2 2000021537 5E18QUT002 Mati Tidak Ada BA Jalan / Baik Sewa
+Quick Truck 3 2000021538 5E18QUT003 Mati Tidak Ada BA Rusak Sewa
+Tractor Kubota RD 110 DI 2T 2000015178 5E18TRA001 Mati Tidak Ada BA
+Mobil Manager KB 8087 DM 2000014524 5E18CAR002 BK 8171 JF berubah KB 8087 DM Aktif
+Dump Truck KT 8944 LK 2000021393 5E18DTR006 Aktif Jalan / Baik Sewa
+Dump Truck KT 8047 YE 2000021394 5E18DTR007 Aktif Jalan / Baik Sewa
+11 Longkali Mobil Manager KT 8476 YK 2000014528 5E19CAR001 Mati Aktif Rusak Sewa
+Vibrator Roller 1 2000014816 5E19COM001 Aktif Perbaikan Inventaris
+Dump Truck KT 8518 CW 2000021379 5E19DTR002 Aktif Baik Sewa
+Dump Truck KT 8517 CW 2000021380 5E19DTR003 Aktif Baik Sewa
+Excavator 2000014838 5E19EXC001 Aktif Baik Sewa
+Road Grader 1 2000014799 5E19GRA001 Aktif Perbaikan Inventaris
+Quick Truck 1 AFD 1.A 2000015083 5E19QUT001 Aktif Baik Sewa
+Quick Truck 2 AFD 2.A 2000021532 5E19QUT002 Aktif Baik Sewa
+Quick Truck 3 AFD 3.A 2000021533 5E19QUT003 Aktif Baik Inventaris
+Quick Truck 4 AFD 4 2000021534 5E19QUT004 Aktif Baik Sewa
+Quick Truck 5 AFD 5.A 2000021535 5E19QUT005 Aktif Baik Sewa
+Quick Truck 6 AFD 6 2000021536 5E19QUT006 Aktif Baik Sewa
+Quick Truck 7 AFD 3.B 2000015089 5E19QUT007 Mati Aktif Rusak Sewa
+Qucik Truck 9 AFD 5.B 2000015091 5E19QUT009 Mati Aktif Rusak Sewa
+Qucik Truck 10 AFD 1.B 2000022744 5E19QUT010 Mati Tidak Ada BA Rusak Sewa
+Qucik Truck 11 AFD 2.B 2000022745 5E19QUT011 Mati Tidak Ada BA Baik Sewa
+Quick 13(Quick专Afd 5.B) 2000023335 5E19QUT012 diganti ke 2000023344 karna KM Aktif Baik Sewa
+Quick 13(Quick Afd 5.B) 2000023344 5E19QUT013 Aktif
+Mobil Manager BK 8179 JE 2000014529 5E19CAR002 Aktif Baik Sewa
+Quick Afd 2.A 2000023465 5E19QUT014
+Quick Afd 2.B 2000023466 5E19QUT015
+Quick 4 2000023467 5E19QUT016
+Quick 6 2000023468 5E19QUT017
+19 PKS Gunung Meliau Wheel Loader 2000015518 5F01WLO001 Aktif Baik Sewa
+Mobil Manager DA 8471 ZL 2000022929 5F01CAR002 DA 8527 WB berubah DA 8471 ZL Tidak Ada BA Baik Sewa
+Mobil Triton KB 8292 DM 2000023042 5F01CAR003 Aktif Baik Sewa
+Wheel Loader Cabin AC HL635L (eks PKS Rimba Belian) 2000023337 5F01WLO002 Mati Mati
+Wheel Loader Cabin AC HL635L (eks PKS Rimba Belian) 2000023345 5F01WLO003 Ganti CC baru WLO002 karna KM Aktif
+Dump Truck KB 8657 WC 2000021458 5F01DTR003 Aktif
+20 PKS Rimba Belian Mobil Manager DA 8178 YD 2000015392 5F04CAR001 Mati Tidak Ada BA Baik Sewa
+Wheel Loader CHANLIN 937 H 2000022616 5F04WLO001 Aktif Baik Sewa
+Mobil Manager KB 123 XY 2000022819 5F04CAR002 Aktif Baik Sewa
+Triton BK 8712 JF 2000022932 5F04CAR003 Mati Tidak Ada BA Baik Sewa
+Dump Truck KB 711 XX 2000021465 5F04DTR005 Aktif Baik Sewa
+23 PKS Ngabang Mobil Manager KT8093EM 2000015397 5F07CAR001 Mati Tidak Ada BA Perbaikan Sewa
+Truck Tangki KB 8059 AZ 2000021473 5F07DTR003 Mati Tidak Ada BA Baik Pinjam
+PKS Ngabang Wheel Loader Hyundai HL 635L (ex. Pamukan) 2000023115 5F07WLO002 Aktif Baik Sewa
+Wheel Loader 2000022617 5F07WLO001 Aktif Baik Sewa
+Mits. Strda Triton 2.5L DC KB 8261 HM 2000022862 5F07CAR002 Mati Aktif Baik Sewa
+Mits. Strada Triton 2.5L DC KB 8293 DM 2000023043 5F07CAR003 KB 8775 FV berubah KB 8293 DM Aktif Baik Sewa
+Dump Truck Mitsubishi KB 8130 WD 2000021474 5F07DTR004 KN 700 XY berubah KB 8130 WD Aktif Baik Sewa
+21 PKS Parindu Mobil Pool KB 1508 WE 2000015403 5F08CAR001 Mati Aktif Rusak Sewa
+Mobil Manager KB 8115 HM 2000015404 5F08CAR002 Mati Aktif Rusak Sewa
+Wheel Loader Hyundai 2000022618 5F08WLO001 Aktif Baik Sewa
+Mobil Poll KB 8352 HM 2000022910 5F08CAR003 Aktif Baik Sewa
+22 PKS Kembayan Mobil Manajer KB 8624 AY 2000015535 5F09CAR001 Tidak Ada BA Baik Inventaris
+PKS Kembayan Dump Truck KB 9824 DR 2000015540 5F09DTR001 Aktif Baik Sewa
+Dump Truck KB 8379 SF 2000015541 5F09DTR002 Aktif Baik Sewa
+Exavator Liu Gog PC 75 2000015555 5F09EXC001 Aktif Baik Sewa
+Wheel Loader Liu Gong PC 200 2000015556 5F09WLO001 Aktif Baik Sewa
+Dump Truck KB 9830 DQ 2000022828 5F09DTR003 Aktif Baik Sewa
+Dump Truck KB 799 XX 2000022952 5F09DTR004 Aktif Baik Sewa
+Mobil Manager BK 8776 FV 2000023018 5F09CAR002 Aktif Baik Sewa
+27 PKS Pamukan Wheel Loader 2000022619 5F14WLO001 Aktif Aktif Sewa
+Mobil Manager DA 8528 WB 2000022911 5F14CAR002 DA 8015 BT berubah DA 8528 WB Aktif Aktif
+26 PKS Pelaihari Mobil Manager KB 8923 WA 2000015412 5F15CAR001 Mati Tidak Ada BA Baik Sewa
+PKS Pelaihari Wheel Loader Hyundai HL 635 L 2000022620 5F15WLO001 Aktif Baik Sewa
+Mobil Manager BK 8770 JF 2000022822 5F15CAR002 Aktif Baik Sewa
+17 Tambarangan Mobil Manager DA 8020CJ 2000015417 5F20CAR001 Mati Aktif Baik Sewa
+PKS Samuntai Mitsubishi Triton DA 8471 ZL 2000015423 5F21CAR001 Mati Tidak Ada BA
+24 PKS Samuntai Wheel Loader 2000022622 5F21WLO001 Aktif Baik Sewa
+25 PKS Longpinang Mobil Manajer KT 8134 YF 2000022615 5F22CAR001 Mati Tidak Ada BA Bak Sewa
+PKS Longpinang Dump Truck DA 8906 CY 2000021468 5F22DTR003 Aktif Baik Sewa
+Wheel Loader Hyundai HE 635 L 2000022623 5F22WLO001 Aktif Baik Sewa
+Mobil Manager BK 8172 JE 2000022748 5F22CAR002 Aktif Baik Sewa
+26 Distrik Kalimantan Barat Dump Truck KB 8476 WC 2000022657 5D01DTR001 Grid Mati Mati Baik
+Dump Truck KB 8459 WC 2000022658 5D01DTR002 Mati Mati Baik
+Dump Truck KB 8645 WC 2000022691 5D01DTR003 Mati Mati Baik
+Dump Truck KB 8657 WC 2000022692 5D01DTR004 Mati Mati Baik
+Pajero KB 1028 QP 2000022667 5D01CAR001 Aktif Baik
+Inova DA 1643 AY 2000022668 5D01CAR002 Mati Tidak Ada BA Baik
+Triton KB 8261 HM 2000022712 5D01CAR003 5D01AU17UG Aktif p3bb Baik Sewa P3BB
+Honda WR 155 KB 4262 XD 2000022659 5D01MOT001 Aktif Baik
+Mitsubishi Triton KT 8987 YH 2000022896 5D01CAR004 Aktif
+Triton KB 8108 DM 2000022922 5D01CAR005 Aktif Aktif p3bb 929 Beban Operasi Lain P3BB aktif dia sendiri buat logbooknya
+Mobil Pool Triton KB 8602 AW 2000022923 5D01CAR006 5D01AU17UG Sewa KKS Sewa KKS
+27 Distrik Kalimantan Timur Pajero KB 1786 QW 2000022660 5D02CAR001 Aktif
+Triton KT 8269 OR 2000022661 5D02CAR002 Mati Tidak Ada BA
+Pajero B 2476 SJI 2000022700 5D02CAR003 Aktif
+Triton KB 8086 DM 2000022747 5D02CAR004 BK 8175 JE ke KB 8086 DM Aktif
+Triton KB 8326 WA 2000022847 5D02CAR005 Aktif
+28 Distrik Kalimantan Selatan Mobil Dinas Manager B 1875 TJT 2000022662 5D03CAR001 Mati Tidak Ada BA
+Distrik Kalimantan Selatan Mobil Poll KB 1287 WZ 2000022663 5D03CAR002 Aktif
+Mobil Dinas PMO DA 8163 KJ 2000022664 5D03CAR003 Aktif
+Triton DA 8485 YC 2000022713 5D03CAR004 Mati 5F11SU0402 Tidak Ada BA Sewa Raren
+Mobil Group Manager KB 1841 DM 2000022841 5D03CAR005 BK 1179 AWA berubah KB 1841 DM Aktif
+Mobil Pool KB 8923 WA 2000022842 5D03CAR006 Aktif

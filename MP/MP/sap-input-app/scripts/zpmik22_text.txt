@@ -1,0 +1,24 @@
+CARA UPLOAD ZPMIK22
+
+BUKA TCODE ZPMIK22
+
+
+
+Pilih file yang akan diupload Jam Jalan Mesinnya
+
+
+
+Excecute
+
+
+
+Klik Upload Data
+
+
+
+
+
+Pastikan indikator telah berwarna hijau. Artinya Jam Jalam Mesin telah berhasil diupload ke ZPMIK22
+
+
+

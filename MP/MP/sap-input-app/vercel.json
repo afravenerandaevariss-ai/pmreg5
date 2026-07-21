@@ -1,0 +1,26 @@
+{
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "pmreg5.vercel.app"
+        }
+      ],
+      "destination": "https://pmreg5.afratarigan.my.id/$1",
+      "permanent": true
+    },
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "pmreg5-.*-keyusersapreg5-5782s-projects.vercel.app"
+        }
+      ],
+      "destination": "https://pmreg5.afratarigan.my.id/$1",
+      "permanent": true
+    }
+  ]
+}

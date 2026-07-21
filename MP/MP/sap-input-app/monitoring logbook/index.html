@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PM Regional 5 - Dashboard Harian & Monitoring</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        @media print {
+            body {
+                visibility: hidden;
+                background: #ffffff !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            #baPrintArea {
+                visibility: visible;
+                position: absolute;
+                left: 3%;
+                top: 25px;
+                width: 94% !important;
+                max-width: 94% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+            #baPrintArea * {
+                visibility: visible;
+            }
+            #baPrintArea > div {
+                zoom: 0.86; /* Optimized zoom to comfortably fit everything on exactly 1 page */
+                border: none !important;
+                box-shadow: none !important;
+            }
+            #baPrintArea > div > div {
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            /* Force background colors (like gold header) to print */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            @page {
+                size: portrait;
+                margin: 0; /* Forces browser headers and footers to be completely hidden */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <span class="nav-title">NAVIGATION</span>
+                <button class="menu-toggle" id="menuToggle">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
+            </div>
+            
+            <nav class="sidebar-menu">
+                <a href="#" class="menu-item active" data-tab="dashboard-harian">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z"></path></svg>
+                    <span>Dashboard Harian</span>
+                </a>
+                <a href="#" class="menu-item" data-tab="monitoring-bulanan">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2"></path></svg>
+                    <span>Monitoring Bulanan</span>
+                </a>
+                <a href="#" class="menu-item disabled">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    <span>Tabel & Ekspor SAP</span>
+                </a>
+                <a href="#" class="menu-item" data-tab="master-data">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+                    <span>Master Data Equipment</span>
+                </a>
+                <a href="#" class="menu-item" data-tab="berita-acara">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    <span>Berita Acara</span>
+                </a>
+                <a href="#" class="menu-item disabled">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>Verifikasi SAP</span>
+                </a>
+                <a href="#" class="menu-item disabled">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    <span>Pengaturan</span>
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button class="collapse-btn" id="collapseBtn">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Layout Area -->
+        <div class="main-layout">
+            <!-- Topbar Header -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <div class="db-icon">
+                        <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+                    </div>
+                    <h2>PM Regional 5</h2>
+                </div>
+                <div class="topbar-right">
+                    <span class="current-datetime" id="topbarClock">06 Juli 2026, 09:16:16</span>
+                    <div class="profile-dropdown">
+                        <div class="user-avatar">
+                            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                        </div>
+                        <span>REGIONAL V</span>
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <div class="content-container">
+                <!-- Page: Dashboard Harian -->
+                <div class="tab-content active" id="tab-dashboard-harian">
+                    <div class="harian-grid">
+                        <!-- Left Panel: Search & Calendar -->
+                        <div class="left-panel">
+                            <div class="search-box">
+                                <div class="search-input-wrapper">
+                                    <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                    <input type="text" id="logSearch" placeholder="Cari Log..">
+                                </div>
+                                <button class="filter-btn">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+                                </button>
+                            </div>
+                            
+                            <!-- Calendar Container -->
+                            <div class="calendar-card">
+                                <div class="calendar-header">
+                                    <button id="prevMonth">&lt;</button>
+                                    <span id="calendarMonthYear">Juli 2026</span>
+                                    <button id="nextMonth">&gt;</button>
+                                </div>
+                                <div class="calendar-weekdays">
+                                    <span>Min</span><span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span>Sab</span>
+                                </div>
+                                <div class="calendar-days" id="calendarDays">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Riwayat Input Jam Jalan -->
+                        <div class="right-panel">
+                            <div class="panel-header">
+                                <div class="panel-title-area">
+                                    <h3>Riwayat Input Jam Jalan</h3>
+                                    <span class="selected-date-label" id="selectedDateLabel">Senin, 06 Juli 2026</span>
+                                </div>
+                                <div class="panel-filter-area">
+                                    <select id="plantFilter" class="plant-select">
+                                        <option value="all">Semua Plant</option>
+                                        <!-- Populated dynamically -->
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="action-buttons-container">
+                                <button class="act-btn btn-template">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                    Template
+                                </button>
+                                
+                                <label for="excelUpload" class="act-btn btn-upload">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                                    Upload
+                                </label>
+                                <input type="file" id="excelUpload" accept=".xlsx, .xls" style="display:none;">
+
+                                <button class="act-btn btn-gsheet">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    GSheet
+                                </button>
+                                <button class="act-btn btn-orange">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    Perbaiki Plant
+                                </button>
+                                <button class="act-btn btn-cyan">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.79M18.79 8V3"></path></svg>
+                                    Riwayat Alat
+                                </button>
+                                <button class="act-btn btn-darkblue">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                    Export SAP
+                                </button>
+                                <button class="act-btn btn-blue">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    Verif IK17
+                                </button>
+                                <button class="act-btn btn-teal">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    Input Masal
+                                </button>
+                                <button class="act-btn btn-blue-accent">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                    Input Baru
+                                </button>
+                            </div>
+                            
+                            <span id="fileNameDisplay" style="margin-bottom: 10px; display: inline-block; font-size: 0.85rem; color: #888;">Belum ada file di-upload</span>
+
+                            <!-- Data Table -->
+                            <div class="data-table-container">
+                                <table class="dashboard-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Tanggal</th>
+                                            <th>Plant</th>
+                                            <th>Equipment Induk</th>
+                                            <th>Status</th>
+                                            <th>Durasi (Mnt)</th>
+                                            <th>Catatan</th>
+                                            <th>Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dailyTableBody">
+                                        <tr>
+                                            <td colspan="7" class="empty-state">
+                                                <div class="empty-icon">
+                                                    <svg width="48" height="48" fill="none" stroke="#ccc" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                                </div>
+                                                <p>Tidak ada data input untuk tanggal ini.</p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Page: Monitoring Bulanan (The original logbook we built) -->
+                <div class="tab-content" id="tab-monitoring-bulanan">
+                    <!-- ... original code ... -->
+                    <div class="monitoring-container">
+                        <header class="app-header-inline">
+                            <div class="header-content">
+                                <h3>Monitoring Transaksi Logbook</h3>
+                                <p class="subtitle-inline">Data Agregat Periodik | REGIONAL 5</p>
+                            </div>
+                            <div class="target-date">
+                                <span class="label">Target Input Logbook (H+1)</span>
+                                <span class="value" id="targetDateDisplay">01/07/2026</span>
+                                <div id="lastUpdated" style="margin-top: 5px; font-size: 11px; font-weight: normal; color: #555;"></div>
+                            </div>
+                        </header>
+
+                        <div class="table-container">
+                            <table id="logbookTable">
+                                <thead>
+                                    <tr>
+                                        <th rowspan="2">Wilayah</th>
+                                        <th rowspan="2">Plant</th>
+                                        <th rowspan="2">Desc</th>
+                                        <th rowspan="2">Jumlah<br>Veh. Code</th>
+                                        <th rowspan="2">Jumlah<br>Hari Kerja</th>
+                                        <th rowspan="2">Rencana<br>Transaksi</th>
+                                        <th colspan="2" class="group-header">Status</th>
+                                        <th rowspan="2">Total<br>Transaksi</th>
+                                        <th colspan="2" class="group-header">Persentase (%)</th>
+                                        <th rowspan="2">Last<br>Logbook Date</th>
+                                        <th rowspan="2">Rank</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="sub-header">Up To Date</th>
+                                        <th class="sub-header">Tidak<br>Up To Date</th>
+                                        <th class="sub-header">Up To Date</th>
+                                        <th class="sub-header">Tidak<br>Up To Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody">
+                                    <!-- Data will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="legend">
+                            <h3>Indikator Last Logbook Date</h3>
+                            <div class="legend-items">
+                                <div class="legend-item">
+                                    <div class="color-box green"></div>
+                                    <span>Inputan sesuai / lebih dari target</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="color-box yellow"></div>
+                                    <span>Inputan terlambat > 1 dan < 3 hari</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="color-box red"></div>
+                                    <span>Inputan terlambat > 3 hari</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Page: Master Data Equipment -->
+                <div class="tab-content" id="tab-master-data">
+                    <div class="monitoring-container" style="border: 1px solid var(--border-color);">
+                        <header class="app-header-inline" style="border-bottom: 1px solid var(--border-color); margin-bottom: 15px; padding-bottom: 15px;">
+                            <div class="header-content">
+                                <h3>Master Data Equipment</h3>
+                                <p class="subtitle-inline" id="masterDataSubtitle">Rekapitulasi BA Equipment Per 30 Des 2024</p>
+                            </div>
+                            <div class="target-date">
+                                <span class="label">Total Equipment</span>
+                                <span class="value" id="totalEquipmentCount">0</span>
+                            </div>
+                        </header>
+
+                        <!-- Filters for Master Data -->
+                        <div class="panel-header" style="border-bottom: none; padding-bottom: 0; margin-bottom: 15px;">
+                            <div class="search-box" style="width: 300px;">
+                                <div class="search-input-wrapper">
+                                    <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                    <input type="text" id="equipmentSearch" placeholder="Cari Equipment / No / CC..">
+                                </div>
+                            </div>
+                            
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <label for="equipmentUpload" class="act-btn btn-upload" style="margin: 0; cursor: pointer;">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                                    Upload BA Equipment
+                                </label>
+                                <input type="file" id="equipmentUpload" accept=".xlsx, .xls, .pdf" style="display: none;">
+
+                                <select id="unitFilter" class="plant-select">
+                                    <option value="all">Semua Unit/Kerja</option>
+                                    <!-- Populated dynamically -->
+                                </select>
+                                <select id="kepemilikanFilter" class="plant-select">
+                                    <option value="all">Semua Kepemilikan</option>
+                                    <option value="Sewa">Sewa</option>
+                                    <option value="Inventaris">Inventaris</option>
+                                    <option value="Perusahaan">Perusahaan</option>
+                                    <option value="Pinjam">Pinjam</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: -5px; margin-bottom: 15px; padding-left: 5px; line-height: 1.4;">
+                            <span style="color: #dd6b20; font-weight: 600;">* Petunjuk Penamaan File:</span> Pastikan nama file mengandung nama unit (misal: <strong>PKS GUNUNG MELIAU</strong>, <strong>TABARA</strong>, <strong>PAMUKAN</strong>, dll.) agar sistem otomatis mengenali dan mengunggahnya ke folder Google Drive unit terkait.
+                        </div>
+
+                        <div class="table-container" style="border: none; display: flex; justify-content: center;">
+                            <table class="dashboard-table" style="border: 1px solid var(--border-color); font-size: 11px; width: max-content; min-width: 1000px; margin: 0 auto;">
+                                <thead>
+                                    <tr style="background-color: #f7fafc;">
+                                        <th style="border: 1px solid var(--border-color); padding: 8px;">Unit / Kerja</th>
+                                        <th style="border: 1px solid var(--border-color); padding: 8px;">Nama Equipment</th>
+                                        <th style="border: 1px solid var(--border-color); padding: 8px; text-align: center;">Nomor Equipment</th>
+                                        <th style="border: 1px solid var(--border-color); padding: 8px; text-align: center;">Cost Center</th>
+                                        <th style="border: 1px solid var(--border-color); padding: 8px; text-align: center;">Ket VHC</th>
+                                        <th style="border: 1px solid var(--border-color); padding: 8px; text-align: center;">Status</th>
+                                        <th style="border: 1px solid var(--border-color); padding: 8px; text-align: center;">Kepemilikan</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="equipmentTableBody">
+                                    <!-- Equipment list populated here -->
+                                </tbody>
+                                <tfoot style="background-color: #f7fafc; font-weight: bold; border-top: 2px solid var(--border-color);">
+                                    <tr>
+                                        <td colspan="2" style="border: 1px solid var(--border-color); text-align: right; padding: 6px; font-weight: 700;">TOTAL KESELURUHAN</td>
+                                        <td id="equipmentTotalFooter" style="border: 1px solid var(--border-color); text-align: center; padding: 6px; font-family: monospace; font-weight: 700;">0</td>
+                                        <td colspan="4" style="border: 1px solid var(--border-color); background-color: #f7fafc;"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Page: Berita Acara -->
+                <div class="tab-content" id="tab-berita-acara">
+                    <div class="monitoring-container" style="border: 1px solid var(--border-color);">
+                        <header class="app-header-inline" style="border-bottom: 1px solid var(--border-color); margin-bottom: 15px; padding-bottom: 15px;">
+                            <div class="header-content">
+                                <h3>Berita Acara Inventarisasi Equipment SAP</h3>
+                                <p class="subtitle-inline">Preview & Cetak Berita Acara per Unit</p>
+                            </div>
+                        </header>
+
+                        <!-- Controls -->
+                        <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 18px; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <label style="font-size: 12px; font-weight: 600; color: var(--text-muted);">Pilih Unit:</label>
+                                <select id="baUnitSelector" class="plant-select" style="min-width: 240px; font-size: 12px;">
+                                    <option value="">-- Pilih Unit/Kebun --</option>
+                                    <optgroup label="🌿 KEBUN">
+                                        <option value="Gunung Meliau|5E01">5E01 – KEBUN GUNUNG MELIAU</option>
+                                        <option value="Gunung Mas|5E02">5E02 – KEBUN GUNUNG MAS</option>
+                                        <option value="Sungai Dekan|5E03">5E03 – KEBUN SUNGAI DEKAN</option>
+                                        <option value="Rimba Belian|5E04">5E04 – KEBUN RIMBA BELIAN</option>
+                                        <option value="Sintang|5E06">5E06 – KEBUN SINTANG</option>
+                                        <option value="Ngabang|5E07">5E07 – KEBUN NGABANG</option>
+                                        <option value="Parindu|5E08">5E08 – KEBUN PARINDU</option>
+                                        <option value="Kembayan|5E09">5E09 – KEBUN KEMBAYAN</option>
+                                        <option value="Danau Salak|5E11">5E11 – KEBUN DANAU SALAK</option>
+                                        <option value="Kumai|5E12">5E12 – KEBUN KUMAI KARET</option>
+                                        <option value="Batu Licin|5E13">5E13 – KEBUN BATULICIN</option>
+                                        <option value="Pamukan|5E14">5E14 – KEBUN PAMUKAN</option>
+                                        <option value="Pelaihari|5E15">5E15 – KEBUN PELAIHARI</option>
+                                        <option value="Tabara|5E16">5E16 – KEBUN TABARA</option>
+                                        <option value="Tajati|5E17">5E17 – KEBUN TAJATI</option>
+                                        <option value="Pandawa|5E18">5E18 – KEBUN PANDAWA</option>
+                                        <option value="Longkali|5E19">5E19 – KEBUN LONGKALI</option>
+                                    </optgroup>
+                                    <optgroup label="🏭 PABRIK / PKS">
+                                        <option value="PKS Gunung Meliau|5F01">5F01 – PABRIK GUNUNG MELIAU</option>
+                                        <option value="PKS Rimba Belian|5F04">5F04 – PABRIK RIMBA BELIAN</option>
+                                        <option value="PKS Ngabang|5F07">5F07 – PABRIK NGABANG</option>
+                                        <option value="PKS Parindu|5F08">5F08 – PABRIK PARINDU</option>
+                                        <option value="PKS Kembayan|5F09">5F09 – PABRIK KEMBAYAN</option>
+                                        <option value="Unit Proyek Batu Bara|5F11">5F11 – UNIT PROYEK BATU BARA</option>
+                                        <option value="PKS Pamukan|5F14">5F14 – PABRIK PAMUKAN</option>
+                                        <option value="PKS Pelaihari|5F15">5F15 – PABRIK PELAIHARI</option>
+                                        <option value="Tambarangan|5F20">5F20 – PKR TAMBARANGAN</option>
+                                        <option value="PKS Samuntai|5F21">5F21 – PABRIK SAMUNTAI</option>
+                                        <option value="PKS Longpinang|5F22">5F22 – PABRIK LONG PINANG</option>
+                                    </optgroup>
+                                    <optgroup label="🏢 DISTRIK">
+                                        <option value="Distrik Kalimantan Barat|5D01">5D01 – DISTRIK KALBAR</option>
+                                        <option value="Distrik Kalimantan Timur|5D02">5D02 – DISTRIK KALTIM</option>
+                                        <option value="Distrik Kalimantan Selatan|5D03">5D03 – DISTRIK KALSELTENG</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <button id="baLoadBtn" onclick="loadBeritaAcara()" class="act-btn btn-blue" style="font-size: 12px;">
+                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.79M18.79 8V3"></path></svg>
+                                Muat Data
+                            </button>
+                            <button onclick="window.print()" class="act-btn btn-gsheet" style="font-size: 12px;">
+                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                                Cetak / PDF
+                            </button>
+                            <a id="baEditLink" href="#" target="_blank" class="act-btn btn-orange" style="font-size: 12px; display: none; text-decoration: none; align-items: center; gap: 6px;">
+                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                Edit di GSheet
+                            </a>
+                            <span id="baStatusMsg" style="font-size: 11px; color: var(--text-muted);"></span>
+                        </div>
+
+                        <!-- BA Preview Area -->
+                        <div id="baPrintArea" style="background: white; border: 1px solid #cbd5e0; border-radius: 8px; padding: 32px 40px; max-width: 860px; margin: 0 auto; font-family: 'Times New Roman', serif; font-size: 13px; line-height: 1.6; color: #1a202c;">
+                            <div id="baContent" style="text-align: center; color: #a0aec0; padding: 60px 0;">
+                                <svg width="48" height="48" fill="none" stroke="#cbd5e0" viewBox="0 0 24 24" style="margin: 0 auto 12px; display: block;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                <p style="font-family: 'Inter', sans-serif; font-size: 13px;">Pilih unit dan klik <strong>Muat Data</strong> untuk menampilkan Berita Acara</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Hidden iframe for CORS-free Google Apps Script file uploads -->
+    <iframe id="uploadTarget" name="uploadTarget" style="display: none;"></iframe>
+
+    <!-- SheetJS for reading Excel files -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <!-- PDF.js for reading PDF files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <!-- Tesseract.js for OCR on scanned/photo PDFs -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <!-- Equipment Data -->
+    <script src="equipment_data.js"></script>
+    <!-- App Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
