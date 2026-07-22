@@ -232,7 +232,9 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
       color: #000000;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
-      width: 1480px;
+      width: 1400px;
+      height: 1250px;
+      box-sizing: border-box;
       overflow: hidden;
     }
     * { box-sizing: border-box; }
@@ -320,8 +322,8 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
       '--headless=new',
       '--disable-gpu',
       '--hide-scrollbars',
-      '--window-size=1500,1400',
-      '--force-device-scale-factor=2',
+      '--window-size=1400,1250',
+      '--force-device-scale-factor=3',
       `--screenshot=${imgPath}`,
       `file:///${htmlPath.replace(/\\/g, '/')}`
     ], (err) => {
