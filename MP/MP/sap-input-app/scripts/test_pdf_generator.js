@@ -232,8 +232,8 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
       color: #000000;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
-      width: max-content;
-      min-width: 1300px;
+      width: 1480px;
+      overflow: hidden;
     }
     * { box-sizing: border-box; }
     .card {
@@ -319,8 +319,9 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     execFile(chromePath, [
       '--headless=new',
       '--disable-gpu',
-      '--window-size=1350,1100',
-      '--force-device-scale-factor=3',
+      '--hide-scrollbars',
+      '--window-size=1500,1400',
+      '--force-device-scale-factor=2',
       `--screenshot=${imgPath}`,
       `file:///${htmlPath.replace(/\\/g, '/')}`
     ], (err) => {
