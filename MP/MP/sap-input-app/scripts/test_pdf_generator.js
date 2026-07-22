@@ -328,7 +328,7 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
       '--disable-gpu',
       '--hide-scrollbars',
       '--window-size=1400,1250',
-      '--force-device-scale-factor=4',
+      '--force-device-scale-factor=1.7',
       `--screenshot=${imgPath}`,
       `file:///${htmlPath.replace(/\\/g, '/')}`
     ], (err) => {
@@ -340,7 +340,7 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
   // Convert PNG to high-quality JPEG
   console.log("Converting to High Quality JPEG...");
   await sharp(imgPath)
-    .jpeg({ quality: 100, chromaSubsampling: '4:4:4' })
+    .jpeg({ quality: 90, chromaSubsampling: '4:4:4' })
     .toFile(jpgPath);
 
   const imgSize = fs.statSync(jpgPath).size;
