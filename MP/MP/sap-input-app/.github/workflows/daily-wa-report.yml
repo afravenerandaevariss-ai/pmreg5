@@ -1,16 +1,19 @@
-name: Daily WhatsApp Logbook Report (08:00 AM WIB)
+name: Daily WhatsApp Logbook Report Dispatch
 
 on:
   schedule:
-    # 01:00 UTC = 08:00 WIB (GMT+7)
+    # 08:00 AM WIB = 01:00 UTC
     - cron: '0 1 * * *'
+    # 05:15 PM WIB (17:15 WIB) = 10:15 UTC
+    - cron: '15 10 * * *'
   workflow_dispatch:
 
 jobs:
-  send-wa-report:
+  send-report:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -21,10 +24,11 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
-      - name: Execute Daily WhatsApp Report Dispatch
+      - name: Install Playwright / Chromium for PDF generation
+        run: npx playwright install --with-deps chromium || sudo apt-get update && sudo apt-get install -y chromium-browser
+
+      - name: Execute Daily WA Dispatch Script
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://pabnvxlvrussdfhisxzn.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'sb_publishable_btvgcbyES8_4w5x3dE-atg_kYfUAii4' }}
-          FONNTE_TOKEN: ${{ secrets.FONNTE_TOKEN }}
-          TARGET_PHONE: '081251334618'
-        run: npm run wa:send
+        run: node scripts/send_wa_daily.js
