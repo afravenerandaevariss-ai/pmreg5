@@ -4,8 +4,8 @@ on:
   schedule:
     # 08:00 WIB = 01:00 UTC
     - cron: '0 1 * * *'
-    # 18:33 WIB = 11:33 UTC
-    - cron: '33 11 * * *'
+    # 19:20 WIB = 12:20 UTC
+    - cron: '20 12 * * *'
   # Allow manual trigger from GitHub Actions tab
   workflow_dispatch:
 

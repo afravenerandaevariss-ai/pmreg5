@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/send-wa",
-      "schedule": "33 11 * * *"
+      "schedule": "20 12 * * *"
     }
   ],
   "redirects": [
