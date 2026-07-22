@@ -22,13 +22,15 @@ jobs:
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: MP/MP/sap-input-app/package-lock.json
 
       - name: 📦 Install dependencies
         working-directory: MP/MP/sap-input-app
-        run: npm ci --prefer-offline || npm install
+        run: |
+          rm -f package-lock.json
+          npm install
 
       - name: 🌐 Install Chrome (for PDF generation)
         run: |
