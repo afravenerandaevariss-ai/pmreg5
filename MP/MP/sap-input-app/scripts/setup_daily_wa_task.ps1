@@ -50,30 +50,33 @@ $oldTasks = @(
     "PTPN_PM_Logbook_Daily_WA_Report_1715",
     "PTPN_PM_Logbook_Daily_WA_Report_1728",
     "PTPN_PM_Logbook_Daily_WA_Report_1731",
-    "PTPN_PM_Logbook_Daily_WA_Report_1800"
+    "PTPN_PM_Logbook_Daily_WA_Report_1800",
+    "PTPN_PM_Logbook_Daily_WA_Report_1813",
+    "PTPN_PM_Logbook_Daily_WA_Report_1822",
+    "PTPN_PM_Logbook_Daily_WA_Report_1833"
 )
 foreach ($t in $oldTasks) {
     Unregister-ScheduledTask -TaskName $t -Confirm:$false -ErrorAction SilentlyContinue
 }
 
-# === Task 2: 18:13 WIB Daily ===
-$TaskName2 = "PTPN_PM_Logbook_Daily_WA_Report_1813"
+# === Task 2: 18:33 WIB Daily ===
+$TaskName2 = "PTPN_PM_Logbook_Daily_WA_Report_1833"
 # NO -WorkingDirectory to avoid path-with-spaces issue (handled by batch file)
 $Action2 = New-ScheduledTaskAction `
     -Execute $CmdPath `
     -Argument "/c `"$BatchFile`""
 
-$Trigger2 = New-ScheduledTaskTrigger -Daily -At 6:13PM
+$Trigger2 = New-ScheduledTaskTrigger -Daily -At 6:33PM
 
 Register-ScheduledTask `
     -TaskName $TaskName2 `
     -Action $Action2 `
     -Trigger $Trigger2 `
     -Settings $Settings `
-    -Description "Otomatisasi pengiriman laporan WA Logbook Regional 5 - 18:13 WIB" `
+    -Description "Otomatisasi pengiriman laporan WA Logbook Regional 5 - 18:33 WIB" `
     -Force
 
-Write-Host "Task '$TaskName2' registered for 18:13 WIB!" -ForegroundColor Green
+Write-Host "Task '$TaskName2' registered for 18:33 WIB!" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "=== Running immediate test of task 1731 ===" -ForegroundColor Cyan
