@@ -20,7 +20,23 @@ const GOWA_USER = 'admin';
 const GOWA_PASS = 'Sedap321#';
 const TARGET_GROUP_JID = '120363430505509462@g.us';
 
-const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+// Auto-detect Chrome path: Windows (local) or Linux (GitHub Actions / server)
+function getChromePath() {
+  if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
+  if (process.platform === 'linux') {
+    const linuxPaths = [
+      '/usr/bin/google-chrome-stable',
+      '/usr/bin/google-chrome',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/chromium'
+    ];
+    for (const p of linuxPaths) {
+      try { fs.accessSync(p); return p; } catch {}
+    }
+  }
+  return 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+}
+const chromePath = getChromePath();
 
 const PLANT_INFO = {
   "5E01": { desc: "KEBUN GUNUNG MELIAU",   wilayah: "Kal-Bar" },
