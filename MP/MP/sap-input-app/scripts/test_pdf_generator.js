@@ -201,20 +201,20 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     const bgClass = getIndicatorClass(item.lastLogDateRaw, targetDateStr);
     return `
       <tr>
-        <td style="font-size:6.5pt;">${item.wilayah}</td>
-        <td style="font-weight:800; font-size:7pt;">${item.plant}</td>
-        <td style="text-align:left; font-weight:700; font-size:6.5pt; white-space:nowrap;">${item.desc}</td>
-        <td style="font-size:7pt;">${item.vehicleCount || '-'}</td>
-        <td style="font-size:7pt;">${item.workDays || '-'}</td>
-        <td style="font-size:7pt;">${item.rencanaTx || 0}</td>
-        <td style="font-weight:700; font-size:7pt;">${item.utdCount}</td>
-        <td style="font-weight:700; font-size:7pt; color:${item.tutdCount > 0 ? '#dc2626' : 'inherit'};">${item.tutdCount}</td>
-        <td style="font-weight:800; font-size:7.5pt;">${item.totalTx}</td>
-        <td style="font-weight:700; font-size:7pt; color:${item.pctUtd >= 50 ? '#15803d' : '#dc2626'};">${item.pctUtd.toFixed(2)}%</td>
-        <td style="font-weight:700; font-size:7pt;">${item.pctTutd.toFixed(2)}%</td>
-        <td class="${bgClass}" style="font-size:6.5pt;">${item.lastLogDateFormatted}</td>
-        <td style="font-weight:800; font-size:7.5pt;">${item.rank}</td>
-        <td style="font-size:7pt;"><span style="color:#0284c7;">&#128065;</span></td>
+        <td style="color: #475569;">${item.wilayah}</td>
+        <td style="font-weight: 800; color: #0f172a;">${item.plant}</td>
+        <td style="text-align: left; font-weight: 700; color: #334155;">${item.desc}</td>
+        <td>${item.vehicleCount || '-'}</td>
+        <td>${item.workDays || '-'}</td>
+        <td>${item.rencanaTx || 0}</td>
+        <td style="font-weight: 700;">${item.utdCount}</td>
+        <td style="font-weight: 700; color: ${item.tutdCount > 0 ? '#dc2626' : 'inherit'};">${item.tutdCount}</td>
+        <td style="font-weight: 800; font-size: 18px;">${item.totalTx}</td>
+        <td style="font-weight: 700; color: ${item.pctUtd >= 50 ? '#15803d' : '#dc2626'};">${item.pctUtd.toFixed(2)}%</td>
+        <td style="font-weight: 700;">${item.pctTutd.toFixed(2)}%</td>
+        <td class="${bgClass}">${item.lastLogDateFormatted}</td>
+        <td style="font-weight: 800; font-size: 18px; color: #2563eb;">${item.rank}</td>
+        <td><span style="color: #0284c7; font-size: 20px;">&#128065;</span></td>
       </tr>
     `;
   }).join('');
@@ -225,44 +225,41 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
 <head>
   <meta charset="utf-8">
   <style>
-    @page {
-      size: A4 portrait;
-      margin: 5mm 6mm;
-    }
     html, body {
       margin: 0;
-      padding: 0;
-      background: #ffffff;
+      padding: 20px;
+      background: #f1f5f9;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
       color: #0f172a;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+      width: 1400px;
     }
     * { box-sizing: border-box; }
     .card {
       background: #ffffff;
-      border: 1px solid #64748b;
-      border-radius: 6px;
-      padding: 10px 12px;
+      border: none;
+      border-radius: 12px;
+      padding: 30px 40px;
       width: 100%;
-      box-sizing: border-box;
-      page-break-inside: avoid;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     }
-    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
-    .title { font-size: 10.5pt; font-weight: 800; color: #0f172a; line-height: 1.15; }
-    .subtitle { font-size: 9pt; font-weight: 800; color: #0f172a; margin-top: 1px; }
-    .target { font-size: 8pt; font-weight: 700; color: #0f172a; }
-    .h-badge { background: #ffffff; border: 1px solid #475569; padding: 1px 5px; border-radius: 3px; font-size: 7.5pt; font-weight: 800; display: inline-block; }
-    table { width: 100%; border-collapse: collapse; margin-top: 4px; }
-    th, td { border: 0.5pt solid #64748b; padding: 1.8px 3px; text-align: center; line-height: 1.15; }
-    th { background-color: #ffffff; font-weight: 800; color: #0f172a; font-size: 6.5pt; text-transform: uppercase; }
-    .th-group { background-color: #ffffff; font-weight: 800; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; }
+    .title { font-size: 26px; font-weight: 800; color: #0f172a; line-height: 1.2; }
+    .subtitle { font-size: 20px; font-weight: 700; color: #475569; margin-top: 4px; }
+    .target { font-size: 18px; font-weight: 600; color: #334155; margin-top: 8px; }
+    .h-badge { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; padding: 4px 12px; border-radius: 6px; font-size: 16px; font-weight: 800; display: inline-block; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #cbd5e1; padding: 12px 16px; text-align: center; line-height: 1.4; font-size: 16px; }
+    td { font-weight: 500; }
+    th { background-color: #f8fafc; font-weight: 700; color: #334155; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .th-group { background-color: #f1f5f9; font-weight: 800; color: #0f172a; }
     .bg-green { background-color: #10b981 !important; color: white !important; font-weight: 700; }
     .bg-yellow { background-color: #facc15 !important; color: #0f172a !important; font-weight: 700; }
     .bg-red { background-color: #ef4444 !important; color: white !important; font-weight: 700; }
     .bg-black { background-color: #0f172a !important; color: white !important; font-weight: 700; }
-    .legend { display: flex; align-items: center; gap: 14px; margin-top: 8px; font-size: 7.8pt; font-weight: 600; color: #1e293b; }
-    .legend-box { width: 22px; height: 11px; border-radius: 2px; display: inline-block; vertical-align: middle; margin-right: 4px; border: 0.5px solid #475569; }
+    .legend { display: flex; align-items: center; gap: 24px; margin-top: 24px; font-size: 15px; font-weight: 600; color: #334155; background: #f8fafc; padding: 12px 20px; border-radius: 8px; border: 1px solid #e2e8f0; }
+    .legend-box { width: 24px; height: 14px; border-radius: 4px; display: inline-block; vertical-align: middle; margin-right: 8px; border: 1px solid rgba(0,0,0,0.1); }
   </style>
 </head>
 <body>
@@ -281,24 +278,24 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     <table>
       <thead>
         <tr>
-          <th rowspan="2" style="width: 50px;">WILAYAH</th>
-          <th rowspan="2" style="width: 34px;">PLANT</th>
-          <th rowspan="2" style="width: 145px;">DESC</th>
-          <th rowspan="2" style="width: 40px;">JUMLAH<br>VEHICLE CODE</th>
-          <th rowspan="2" style="width: 38px;">JUMLAH<br>HARI KERJA</th>
-          <th rowspan="2" style="width: 44px;">RENCANA<br>TRANSAKSI</th>
+          <th rowspan="2">WILAYAH</th>
+          <th rowspan="2">PLANT</th>
+          <th rowspan="2" style="width: 250px;">DESCRIPTION</th>
+          <th rowspan="2">JUMLAH<br>VEHICLE</th>
+          <th rowspan="2">JUMLAH<br>HARI KERJA</th>
+          <th rowspan="2">RENCANA<br>TRANSAKSI</th>
           <th colspan="2" class="th-group">STATUS</th>
-          <th rowspan="2" style="width: 42px;">TOTAL<br>TRANSAKSI</th>
+          <th rowspan="2">TOTAL<br>TRANSAKSI</th>
           <th colspan="2" class="th-group">PERSENTASE (%)</th>
-          <th rowspan="2" style="width: 58px;">LAST<br>LOGBOOK DATE</th>
-          <th rowspan="2" style="width: 28px;">RANK</th>
-          <th rowspan="2" style="width: 30px;">DETAIL</th>
+          <th rowspan="2">LAST<br>LOGBOOK DATE</th>
+          <th rowspan="2">RANK</th>
+          <th rowspan="2">DETAIL</th>
         </tr>
         <tr>
-          <th class="th-group" style="width: 32px;">UP TO<br>DATE</th>
-          <th class="th-group" style="width: 32px;">TIDAK<br>UP TO DATE</th>
-          <th class="th-group" style="width: 40px;">UP TO<br>DATE</th>
-          <th class="th-group" style="width: 40px;">TIDAK<br>UP TO DATE</th>
+          <th class="th-group">UP TO<br>DATE</th>
+          <th class="th-group">TIDAK<br>UP TO DATE</th>
+          <th class="th-group">UP TO<br>DATE</th>
+          <th class="th-group">TIDAK<br>UP TO DATE</th>
         </tr>
       </thead>
       <tbody>
@@ -327,7 +324,7 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     execFile(chromePath, [
       '--headless=new',
       '--disable-gpu',
-      '--window-size=920,1100',
+      '--window-size=1440,1200',
       '--force-device-scale-factor=3',
       `--screenshot=${imgPath}`,
       `file:///${htmlPath.replace(/\\/g, '/')}`
