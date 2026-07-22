@@ -201,20 +201,19 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     const bgClass = getIndicatorClass(item.lastLogDateRaw, targetDateStr);
     return `
       <tr>
-        <td style="color: #475569;">${item.wilayah}</td>
-        <td style="font-weight: 800; color: #0f172a;">${item.plant}</td>
-        <td style="text-align: left; font-weight: 700; color: #334155;">${item.desc}</td>
+        <td style="color: #374151;">${item.wilayah}</td>
+        <td style="font-weight: 800; color: #16a34a;">${item.plant}</td>
+        <td style="text-align: left; font-weight: 700; color: #374151;">${item.desc}</td>
         <td>${item.vehicleCount || '-'}</td>
         <td>${item.workDays || '-'}</td>
         <td>${item.rencanaTx || 0}</td>
-        <td style="font-weight: 700;">${item.utdCount}</td>
-        <td style="font-weight: 700; color: ${item.tutdCount > 0 ? '#dc2626' : 'inherit'};">${item.tutdCount}</td>
-        <td style="font-weight: 800; font-size: 18px;">${item.totalTx}</td>
-        <td style="font-weight: 700; color: ${item.pctUtd >= 50 ? '#15803d' : '#dc2626'};">${item.pctUtd.toFixed(2)}%</td>
-        <td style="font-weight: 700;">${item.pctTutd.toFixed(2)}%</td>
+        <td style="font-weight: 700; color: #16a34a;">${item.utdCount}</td>
+        <td style="font-weight: 700; color: #dc2626;">${item.tutdCount}</td>
+        <td style="font-weight: 800;">${item.totalTx}</td>
+        <td style="font-weight: 700; color: #16a34a;">${item.pctUtd.toFixed(2)}%</td>
+        <td style="font-weight: 700; color: #dc2626;">${item.pctTutd.toFixed(2)}%</td>
         <td class="${bgClass}">${item.lastLogDateFormatted}</td>
-        <td style="font-weight: 800; font-size: 18px; color: #2563eb;">${item.rank}</td>
-        <td><span style="color: #0284c7; font-size: 20px;">&#128065;</span></td>
+        <td style="font-weight: 800;">${item.rank}</td>
       </tr>
     `;
   }).join('');
@@ -227,39 +226,36 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
   <style>
     html, body {
       margin: 0;
-      padding: 20px;
-      background: #f1f5f9;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-      color: #0f172a;
+      padding: 30px;
+      background: #ffffff;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      color: #000000;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
-      width: 1400px;
+      width: max-content;
+      min-width: 1300px;
     }
     * { box-sizing: border-box; }
     .card {
       background: #ffffff;
-      border: none;
-      border-radius: 12px;
-      padding: 30px 40px;
       width: 100%;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     }
-    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; }
-    .title { font-size: 26px; font-weight: 800; color: #0f172a; line-height: 1.2; }
-    .subtitle { font-size: 20px; font-weight: 700; color: #475569; margin-top: 4px; }
-    .target { font-size: 18px; font-weight: 600; color: #334155; margin-top: 8px; }
-    .h-badge { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; padding: 4px 12px; border-radius: 6px; font-size: 16px; font-weight: 800; display: inline-block; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #cbd5e1; padding: 12px 16px; text-align: center; line-height: 1.4; font-size: 16px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
+    .title { font-size: 22px; font-weight: 800; color: #000000; line-height: 1.2; }
+    .subtitle { font-size: 16px; font-weight: 800; color: #000000; margin-top: 6px; }
+    .target { font-size: 14px; color: #000000; margin-top: 8px; }
+    .h-badge { background: #ffffff; border: 1px solid #d1d5db; color: #000000; padding: 4px 16px; border-radius: 4px; font-size: 14px; font-weight: 700; display: inline-block; margin-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #d1d5db; padding: 10px 12px; text-align: center; line-height: 1.4; font-size: 14px; }
     td { font-weight: 500; }
-    th { background-color: #f8fafc; font-weight: 700; color: #334155; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; }
-    .th-group { background-color: #f1f5f9; font-weight: 800; color: #0f172a; }
+    th { background-color: #ffffff; font-weight: 800; color: #000000; font-size: 13px; text-transform: uppercase; }
+    .th-group { background-color: #ffffff; font-weight: 800; color: #000000; }
     .bg-green { background-color: #10b981 !important; color: white !important; font-weight: 700; }
-    .bg-yellow { background-color: #facc15 !important; color: #0f172a !important; font-weight: 700; }
+    .bg-yellow { background-color: #facc15 !important; color: #000000 !important; font-weight: 700; }
     .bg-red { background-color: #ef4444 !important; color: white !important; font-weight: 700; }
-    .bg-black { background-color: #0f172a !important; color: white !important; font-weight: 700; }
-    .legend { display: flex; align-items: center; gap: 24px; margin-top: 24px; font-size: 15px; font-weight: 600; color: #334155; background: #f8fafc; padding: 12px 20px; border-radius: 8px; border: 1px solid #e2e8f0; }
-    .legend-box { width: 24px; height: 14px; border-radius: 4px; display: inline-block; vertical-align: middle; margin-right: 8px; border: 1px solid rgba(0,0,0,0.1); }
+    .bg-black { background-color: #000000 !important; color: white !important; font-weight: 700; }
+    .legend { display: flex; align-items: center; gap: 24px; margin-top: 30px; font-size: 15px; font-weight: 600; color: #000000; }
+    .legend-box { width: 24px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 8px; }
   </style>
 </head>
 <body>
@@ -269,9 +265,9 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
         <div class="title">${headerTitleText}</div>
         <div class="subtitle">REGIONAL 5</div>
       </div>
-      <div style="text-align: right;">
+      <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end;">
         <div class="h-badge">H + 1</div>
-        <div class="target" style="margin-top:2px;">Target input logbook : <b>${dateTargetFormatted}</b></div>
+        <div class="target">Target input logbook : <b>${dateTargetFormatted}</b></div>
       </div>
     </div>
 
@@ -280,16 +276,15 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
         <tr>
           <th rowspan="2">WILAYAH</th>
           <th rowspan="2">PLANT</th>
-          <th rowspan="2" style="width: 250px;">DESCRIPTION</th>
-          <th rowspan="2">JUMLAH<br>VEHICLE</th>
+          <th rowspan="2" style="width: 280px;">DESC</th>
+          <th rowspan="2">JUMLAH<br>VEHICLE CODE</th>
           <th rowspan="2">JUMLAH<br>HARI KERJA</th>
           <th rowspan="2">RENCANA<br>TRANSAKSI</th>
           <th colspan="2" class="th-group">STATUS</th>
           <th rowspan="2">TOTAL<br>TRANSAKSI</th>
-          <th colspan="2" class="th-group">PERSENTASE (%)</th>
+          <th colspan="2" class="th-group">PERSENTASE ( % )</th>
           <th rowspan="2">LAST<br>LOGBOOK DATE</th>
           <th rowspan="2">RANK</th>
-          <th rowspan="2">DETAIL</th>
         </tr>
         <tr>
           <th class="th-group">UP TO<br>DATE</th>
@@ -304,10 +299,10 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     </table>
 
     <div class="legend">
-      <div style="font-weight:800;">Indikator :</div>
+      <div style="font-weight: 800;">Indikator :</div>
       <div><span class="legend-box bg-green"></span> Inputan sesuai / lebih dari target</div>
-      <div><span class="legend-box bg-yellow"></span> Inputan terlambat &gt; 1 dan &lt; 3 hari</div>
-      <div><span class="legend-box bg-red"></span> Inputan terlambat &gt; 3 hari</div>
+      <div><span class="legend-box bg-yellow"></span> Inputan terlambat > 1 dan < 3 hari</div>
+      <div><span class="legend-box bg-red"></span> Inputan terlambat > 3 hari</div>
     </div>
   </div>
 </body>
@@ -324,7 +319,7 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     execFile(chromePath, [
       '--headless=new',
       '--disable-gpu',
-      '--window-size=1440,1200',
+      '--window-size=1350,1100',
       '--force-device-scale-factor=3',
       `--screenshot=${imgPath}`,
       `file:///${htmlPath.replace(/\\/g, '/')}`
