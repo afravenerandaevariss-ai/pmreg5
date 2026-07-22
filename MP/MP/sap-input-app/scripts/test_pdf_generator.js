@@ -1,8 +1,12 @@
 import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import sharp from 'sharp';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 if (fs.existsSync('.env.local')) {
   const envConfig = dotenv.parse(fs.readFileSync('.env.local'));
@@ -312,7 +316,8 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
   `;
 
   const htmlPath = path.resolve('temp_report_clean.html');
-  const imgPath = path.resolve('Rekap_Logbook_Kendaraan_Regional5_Clean.png');
+  const imgPath = path.join(__dirname, '..', 'Rekap_Logbook_Kendaraan_Regional5_Clean.png');
+  const jpgPath = path.join(__dirname, '..', 'Rekap_Logbook_Kendaraan_Regional5_Clean.jpg');
   fs.writeFileSync(htmlPath, htmlContent);
 
   console.log("Generating Clean HD Image via Chrome headless...");
@@ -332,8 +337,14 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     });
   });
 
-  const imgSize = fs.statSync(imgPath).size;
-  console.log(`Clean HD Image generated at ${imgPath} (Size: ${imgSize} bytes)`);
+  // Convert PNG to high-quality JPEG
+  console.log("Converting to High Quality JPEG...");
+  await sharp(imgPath)
+    .jpeg({ quality: 100, chromaSubsampling: '4:4:4' })
+    .toFile(jpgPath);
+
+  const imgSize = fs.statSync(jpgPath).size;
+  console.log(`Clean HD JPEG generated at ${jpgPath} (Size: ${imgSize} bytes)`);
 
   // Send PDF via GoWA /send/file
   const authHeader = 'Basic ' + Buffer.from(`${GOWA_USER}:${GOWA_PASS}`).toString('base64');
@@ -350,14 +361,15 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     console.warn("Using default device:", deviceId);
   }
 
-  console.log(`Sending Clean HD Image to GoWA Group: ${targetGroupJid} using device ${deviceId}...`);
+  console.log(`Sending Clean HD JPEG to GoWA Group: ${targetGroupJid} using device ${deviceId}...`);
 
-  const imgBuffer = fs.readFileSync(imgPath);
+  const imgBuffer = fs.readFileSync(jpgPath);
   const formData = new FormData();
   formData.append('phone', targetGroupJid);
   formData.append('caption', headerTitleText);
-  const blob = new Blob([imgBuffer], { type: 'image/png' });
-  formData.append('image', blob, `Rekap_Logbook_Kendaraan_Regional5_${dayStr}_${monthName}_${yearStr}.png`);
+  formData.append('is_hd', 'true');
+  const blob = new Blob([imgBuffer], { type: 'image/jpeg' });
+  formData.append('image', blob, `Rekap_Logbook_Kendaraan_Regional5_${dayStr}_${monthName}_${yearStr}.jpg`);
 
   const gowaRes = await fetch(`${GOWA_URL}/send/image?device_id=${encodeURIComponent(deviceId)}`, {
     method: 'POST',
@@ -374,6 +386,7 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
   // Clean up temp files
   if (fs.existsSync(htmlPath)) fs.unlinkSync(htmlPath);
   if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+  if (fs.existsSync(jpgPath)) fs.unlinkSync(jpgPath);
 
   return gowaData;
 }
