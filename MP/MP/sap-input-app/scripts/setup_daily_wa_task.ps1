@@ -1,4 +1,4 @@
-# PowerShell Script to register 08:00 AM & 17:31 WIB Daily Task Scheduler
+# PowerShell Script to register 08:00 AM & 18:13 WIB Daily Task Scheduler
 # Uses CMD batch wrapper to avoid path-with-spaces issue in Task Scheduler
 # IMPORTANT: WorkingDirectory is NOT set in Action (handled by batch file itself)
 
@@ -56,24 +56,24 @@ foreach ($t in $oldTasks) {
     Unregister-ScheduledTask -TaskName $t -Confirm:$false -ErrorAction SilentlyContinue
 }
 
-# === Task 2: 17:31 WIB Daily ===
-$TaskName2 = "PTPN_PM_Logbook_Daily_WA_Report_1731"
+# === Task 2: 18:13 WIB Daily ===
+$TaskName2 = "PTPN_PM_Logbook_Daily_WA_Report_1813"
 # NO -WorkingDirectory to avoid path-with-spaces issue (handled by batch file)
 $Action2 = New-ScheduledTaskAction `
     -Execute $CmdPath `
     -Argument "/c `"$BatchFile`""
 
-$Trigger2 = New-ScheduledTaskTrigger -Daily -At 5:31PM
+$Trigger2 = New-ScheduledTaskTrigger -Daily -At 6:13PM
 
 Register-ScheduledTask `
     -TaskName $TaskName2 `
     -Action $Action2 `
     -Trigger $Trigger2 `
     -Settings $Settings `
-    -Description "Otomatisasi pengiriman laporan WA Logbook Regional 5 - 17:31 WIB" `
+    -Description "Otomatisasi pengiriman laporan WA Logbook Regional 5 - 18:13 WIB" `
     -Force
 
-Write-Host "Task '$TaskName2' registered for 17:31 WIB!" -ForegroundColor Green
+Write-Host "Task '$TaskName2' registered for 18:13 WIB!" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "=== Running immediate test of task 1731 ===" -ForegroundColor Cyan
