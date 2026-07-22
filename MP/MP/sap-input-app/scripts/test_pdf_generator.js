@@ -120,14 +120,13 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
 
   const masterEquipments = eqData.data || [];
   const activeLogs = (logs || []).filter(l => l.status !== 'CANCELLED');
-
   const now = new Date();
   const targetDateStr = now.toISOString().split('T')[0];
   const targetMonthStr = targetDateStr.substring(0, 7);
   const monthLogs = activeLogs.filter(l => l.date && l.date.startsWith(targetMonthStr));
 
-  const list = [];
-  Object.entries(PLANT_INFO).forEach(([plantCode, info]) => {
+  let tableData = Object.keys(PLANT_INFO).map(plantCode => {
+    const info = PLANT_INFO[plantCode];
     const plantVehicles = masterEquipments.filter(e => e.plant === plantCode && String(e.eq_num || '').startsWith('20000'));
     const vehicleCount = plantVehicles.length > 0 ? plantVehicles.length : (VEHICLE_MASTER_COUNT[plantCode] || 0);
 
@@ -137,18 +136,11 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     let utdCount = 0;
     let tutdCount = 0;
     plantLogs.forEach(l => {
-      if (!l.created_on) tutdCount++;
-      else {
-        try {
-          const diff = calculateDaysDifference(l.created_on, l.date);
-          if (diff <= 1) utdCount++;
-          else tutdCount++;
-        } catch (e) { tutdCount++; }
-      }
+      try {
+        const diff = calculateDaysDifference(l.created_on || l.date, l.date);
+        if (diff <= 1) utdCount++; else tutdCount++;
+      } catch (e) { tutdCount++; }
     });
-
-    const pctUtd = totalTx > 0 ? (utdCount / totalTx) * 100 : 0;
-    const pctTutd = totalTx > 0 ? (tutdCount / totalTx) * 100 : 0;
 
     let lastLogDateRaw = '-';
     let lastLogDateFormatted = '-';
@@ -159,62 +151,50 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
       lastLogDateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
 
-    list.push({
+    return {
       wilayah: info.wilayah,
       plant: plantCode,
       desc: info.desc,
       vehicleCount,
-      workDays: vehicleCount > 0 ? 16 : '-',
-      rencanaTx: totalTx > 0 ? totalTx : (vehicleCount * 16),
-      totalTx,
-      utdCount,
-      tutdCount,
-      pctUtd,
-      pctTutd,
+      hariKerja: vehicleCount > 0 ? 16 : '-',
+      targetTotal: vehicleCount > 0 ? (vehicleCount * 16) : 0,
+      upToDate: utdCount,
+      notUpToDate: tutdCount,
+      totalTransaksi: totalTx,
+      pctUtd: totalTx > 0 ? (utdCount / totalTx) * 100 : 0,
+      pctTutd: totalTx > 0 ? (tutdCount / totalTx) * 100 : 0,
       lastLogDateRaw,
       lastLogDateFormatted
-    });
+    };
   });
 
-  const sortedPlantsOrder = Object.keys(PLANT_INFO);
-  list.sort((a, b) => sortedPlantsOrder.indexOf(a.plant) - sortedPlantsOrder.indexOf(b.plant));
+  tableData.sort((a, b) => a.plant.localeCompare(b.plant));
 
-  const rankedList = [...list].sort((a, b) => {
-    if (b.pctUtd !== a.pctUtd) return b.pctUtd - a.pctUtd;
-    return b.totalTx - a.totalTx;
-  });
-  list.forEach(item => {
-    const rkIdx = rankedList.findIndex(r => r.plant === item.plant);
-    item.rank = rkIdx + 1;
-  });
+  const rankedList = [...tableData].sort((a, b) => (b.pctUtd - a.pctUtd) || (b.totalTransaksi - a.totalTransaksi));
+  tableData.forEach(item => item.rank = rankedList.findIndex(r => r.plant === item.plant) + 1);
 
   const monthsIndo = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
   const dayStr = String(now.getDate()).padStart(2, '0');
   const monthName = monthsIndo[now.getMonth()];
   const yearStr = now.getFullYear();
-  const dateTitleStr = `${dayStr} ${monthName} ${yearStr}`;
-  const hoursStr = String(now.getHours()).padStart(2, '0');
-  const minsStr = String(now.getMinutes()).padStart(2, '0');
-  const timeFormatted = `${hoursStr}.${minsStr}`;
   const dateTargetFormatted = `${dayStr}/${String(now.getMonth()+1).padStart(2, '0')}/${yearStr}`;
+  const headerTitleText = `Monitoring Transaksi Logbook tanggal 1 s.d ${dayStr} ${monthName} ${yearStr} ${String(now.getHours()).padStart(2, '0')}.${String(now.getMinutes()).padStart(2, '0')}`;
 
-  const headerTitleText = `Monitoring Transaksi Logbook tanggal 1 s.d ${dateTitleStr} ${timeFormatted}`;
-
-  const rowsHtml = list.map(item => {
+  const rowsHtml = tableData.map(item => {
     const bgClass = getIndicatorClass(item.lastLogDateRaw, targetDateStr);
     return `
       <tr>
         <td style="color: #374151;">${item.wilayah}</td>
         <td style="font-weight: 800; color: #16a34a;">${item.plant}</td>
-        <td style="text-align: left; font-weight: 700; color: #374151;">${item.desc}</td>
+        <td style="text-align: left; padding-left: 12px;">${item.desc}</td>
         <td>${item.vehicleCount || '-'}</td>
-        <td>${item.workDays || '-'}</td>
-        <td>${item.rencanaTx || 0}</td>
-        <td style="font-weight: 700; color: #16a34a;">${item.utdCount}</td>
-        <td style="font-weight: 700; color: #dc2626;">${item.tutdCount}</td>
-        <td style="font-weight: 800;">${item.totalTx}</td>
-        <td style="font-weight: 700; color: #16a34a;">${item.pctUtd.toFixed(2)}%</td>
-        <td style="font-weight: 700; color: #dc2626;">${item.pctTutd.toFixed(2)}%</td>
+        <td>${item.hariKerja}</td>
+        <td style="font-weight: 700;">${item.targetTotal}</td>
+        <td style="font-weight: 800; color: #16a34a;">${item.upToDate}</td>
+        <td style="font-weight: 800; color: #dc2626;">${item.notUpToDate}</td>
+        <td style="font-weight: 800;">${item.totalTransaksi}</td>
+        <td style="font-weight: 800; color: #16a34a;">${item.pctUtd.toFixed(2)}%</td>
+        <td style="font-weight: 800; color: #dc2626;">${item.pctTutd.toFixed(2)}%</td>
         <td class="${bgClass}">${item.lastLogDateFormatted}</td>
         <td style="font-weight: 800;">${item.rank}</td>
       </tr>
@@ -227,88 +207,71 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
 <head>
   <meta charset="utf-8">
   <style>
-    html, body {
-      margin: 0;
-      padding: 30px;
-      background: #ffffff;
-      font-family: "Segoe UI", Roboto, Arial, sans-serif;
-      color: #000000;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-      width: 1400px;
-      height: 1250px;
-      box-sizing: border-box;
-      overflow: hidden;
-    }
-    * { box-sizing: border-box; }
-    .card {
-      background: #ffffff;
-      width: 100%;
-    }
-    .header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
-    .title { font-size: 22px; font-weight: 800; color: #000000; line-height: 1.2; }
-    .subtitle { font-size: 16px; font-weight: 800; color: #000000; margin-top: 6px; }
-    .target { font-size: 14px; color: #000000; margin-top: 8px; }
-    .h-badge { background: #ffffff; border: 1px solid #cbd5e1; color: #000000; padding: 4px 16px; border-radius: 4px; font-size: 14px; font-weight: 700; display: inline-block; margin-bottom: 8px; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border: 0.5px solid #94a3b8; padding: 10px 12px; text-align: center; line-height: 1.4; font-size: 14px; }
-    td { font-weight: 500; }
-    th { background-color: #ffffff; font-weight: 800; color: #000000; font-size: 13px; text-transform: uppercase; }
-    .th-group { background-color: #ffffff; font-weight: 800; color: #000000; }
+    html, body { margin: 0; padding: 30px 40px; background: #ffffff; font-family: "Segoe UI", "Calibri", "Arial", sans-serif; color: #000000; width: 1600px; box-sizing: border-box; }
+    .header-container { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+    .header-left { display: flex; flex-direction: column; gap: 4px; }
+    .title { font-size: 20px; font-weight: 800; color: #000000; }
+    .subtitle { font-size: 16px; font-weight: 800; color: #000000; text-transform: uppercase; }
+    .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+    .h-badge { border: 1px solid #cbd5e1; padding: 4px 16px; font-size: 14px; font-weight: bold; }
+    .target { font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: center; font-size: 13px; }
+    th { font-weight: 800; text-transform: uppercase; background: #ffffff; }
+    .th-group { font-weight: 800; }
     .bg-green { background-color: #10b981 !important; color: white !important; font-weight: 700; }
     .bg-yellow { background-color: #facc15 !important; color: #000000 !important; font-weight: 700; }
     .bg-red { background-color: #ef4444 !important; color: white !important; font-weight: 700; }
     .bg-black { background-color: #000000 !important; color: white !important; font-weight: 700; }
-    .legend { display: flex; align-items: center; gap: 24px; margin-top: 30px; font-size: 15px; font-weight: 600; color: #000000; }
-    .legend-box { width: 24px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 8px; }
+    .legend-container { display: flex; align-items: center; gap: 20px; margin-top: 20px; font-size: 14px; font-weight: 600; }
+    .legend-item { display: flex; align-items: center; gap: 8px; }
+    .legend-box { width: 24px; height: 16px; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="header">
-      <div>
-        <div class="title">${headerTitleText}</div>
-        <div class="subtitle">REGIONAL 5</div>
-      </div>
-      <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end;">
-        <div class="h-badge">H + 1</div>
-        <div class="target">Target input logbook : <b>${dateTargetFormatted}</b></div>
-      </div>
+  <div class="header-container">
+    <div class="header-left">
+      <div class="title">${headerTitleText}</div>
+      <div class="subtitle">REGIONAL 5</div>
     </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th rowspan="2">WILAYAH</th>
-          <th rowspan="2">PLANT</th>
-          <th rowspan="2" style="width: 280px;">DESC</th>
-          <th rowspan="2">JUMLAH<br>VEHICLE CODE</th>
-          <th rowspan="2">JUMLAH<br>HARI KERJA</th>
-          <th rowspan="2">RENCANA<br>TRANSAKSI</th>
-          <th colspan="2" class="th-group">STATUS</th>
-          <th rowspan="2">TOTAL<br>TRANSAKSI</th>
-          <th colspan="2" class="th-group">PERSENTASE ( % )</th>
-          <th rowspan="2">LAST<br>LOGBOOK DATE</th>
-          <th rowspan="2">RANK</th>
-        </tr>
-        <tr>
-          <th class="th-group">UP TO<br>DATE</th>
-          <th class="th-group">TIDAK<br>UP TO DATE</th>
-          <th class="th-group">UP TO<br>DATE</th>
-          <th class="th-group">TIDAK<br>UP TO DATE</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rowsHtml}
-      </tbody>
-    </table>
-
-    <div class="legend">
-      <div style="font-weight: 800;">Indikator :</div>
-      <div><span class="legend-box bg-green"></span> Inputan sesuai / lebih dari target</div>
-      <div><span class="legend-box bg-yellow"></span> Inputan terlambat > 1 dan < 3 hari</div>
-      <div><span class="legend-box bg-red"></span> Inputan terlambat > 3 hari</div>
+    <div class="header-right">
+      <div class="h-badge">H + 1</div>
+      <div class="target">Target input logbook : <b>${dateTargetFormatted}</b></div>
     </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th rowspan="2">WILAYAH</th>
+        <th rowspan="2">PLANT</th>
+        <th rowspan="2" style="width: 280px;">DESC</th>
+        <th rowspan="2">JUMLAH<br>VEHICLE CODE</th>
+        <th rowspan="2">JUMLAH<br>HARI KERJA</th>
+        <th rowspan="2">RENCANA<br>TRANSAKSI</th>
+        <th colspan="2" class="th-group">STATUS</th>
+        <th rowspan="2">TOTAL<br>TRANSAKSI</th>
+        <th colspan="2" class="th-group">PERSENTASE ( % )</th>
+        <th rowspan="2">LAST<br>LOGBOOK DATE</th>
+        <th rowspan="2">RANK</th>
+      </tr>
+      <tr>
+        <th class="th-group">UP TO<br>DATE</th>
+        <th class="th-group">TIDAK<br>UP TO DATE</th>
+        <th class="th-group">UP TO<br>DATE</th>
+        <th class="th-group">TIDAK<br>UP TO DATE</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+    </tbody>
+  </table>
+
+  <div class="legend-container">
+    <div style="font-weight: 800; font-size: 16px;">Indikator :</div>
+    <div class="legend-item"><div class="legend-box bg-green"></div> Inputan sesuai / lebih dari target</div>
+    <div class="legend-item"><div class="legend-box bg-yellow"></div> Inputan terlambat &gt; 1 dan &lt; 3 hari</div>
+    <div class="legend-item"><div class="legend-box bg-red"></div> Inputan terlambat &gt; 3 hari</div>
   </div>
 </body>
 </html>
@@ -324,7 +287,7 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
   });
   const page = await browser.newPage();
-  await page.setViewport({ width: 1400, height: 1000, deviceScaleFactor: 2 });
+  await page.setViewport({ width: 1700, height: 1000, deviceScaleFactor: 1.5 });
   
   await page.goto(`file:///${htmlPath.replace(/\\/g, '/')}`, { waitUntil: 'networkidle0' });
   
