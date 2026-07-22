@@ -246,9 +246,9 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     .title { font-size: 22px; font-weight: 800; color: #000000; line-height: 1.2; }
     .subtitle { font-size: 16px; font-weight: 800; color: #000000; margin-top: 6px; }
     .target { font-size: 14px; color: #000000; margin-top: 8px; }
-    .h-badge { background: #ffffff; border: 1px solid #d1d5db; color: #000000; padding: 4px 16px; border-radius: 4px; font-size: 14px; font-weight: 700; display: inline-block; margin-bottom: 8px; }
+    .h-badge { background: #ffffff; border: 1px solid #cbd5e1; color: #000000; padding: 4px 16px; border-radius: 4px; font-size: 14px; font-weight: 700; display: inline-block; margin-bottom: 8px; }
     table { width: 100%; border-collapse: collapse; }
-    th, td { border: 1px solid #d1d5db; padding: 10px 12px; text-align: center; line-height: 1.4; font-size: 14px; }
+    th, td { border: 0.5px solid #94a3b8; padding: 10px 12px; text-align: center; line-height: 1.4; font-size: 14px; }
     td { font-weight: 500; }
     th { background-color: #ffffff; font-weight: 800; color: #000000; font-size: 13px; text-transform: uppercase; }
     .th-group { background-color: #ffffff; font-weight: 800; color: #000000; }
@@ -323,7 +323,7 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
       '--disable-gpu',
       '--hide-scrollbars',
       '--window-size=1400,1250',
-      '--force-device-scale-factor=3',
+      '--force-device-scale-factor=4',
       `--screenshot=${imgPath}`,
       `file:///${htmlPath.replace(/\\/g, '/')}`
     ], (err) => {
