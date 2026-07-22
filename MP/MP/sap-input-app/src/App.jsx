@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Upload, FileSpreadsheet, Download, ChevronDown, ChevronUp, ChevronRight, CheckCircle, AlertCircle, Trash2, Calendar, Clock, User, FileText, Search, Filter, LogOut, Menu, Bell, MessageSquare, Database, ClipboardList, Settings, ChevronsLeft, ChevronsRight, LayoutDashboard, Plus, Minus, Activity, Share2, Copy, ClipboardCheck, Truck, Leaf, Flame, Zap, Cog, Wind, Hammer, Wrench, BookOpen } from 'lucide-react';
+import { Upload, FileSpreadsheet, Download, ChevronDown, ChevronUp, ChevronRight, CheckCircle, AlertCircle, Trash2, Calendar, Clock, User, FileText, Search, Filter, LogOut, Menu, Bell, MessageSquare, Database, ClipboardList, Settings, ChevronsLeft, ChevronsRight, LayoutDashboard, Plus, Minus, Activity, Share2, Copy, ClipboardCheck, Truck, Leaf, Flame, Zap, Cog, Wind, Hammer, Wrench, BookOpen, Eye, EyeOff } from 'lucide-react';
 import { parseMasterEQ, parseRegionalMP, exportToSAP, parseHierarchyReference } from './utils/excel';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -10,6 +10,7 @@ import SAPVerificationView from './components/SAPVerificationView';
 import VehicleMonitoringView from './components/VehicleMonitoringView';
 import SAPTransactionGuideView from './components/SAPTransactionGuideView';
 import BeritaAcaraView from './components/BeritaAcaraView';
+import Dendrogram from './components/ui/Dendrogram';
 import AfraChatbot from './components/AfraChatbot';
 import WorkOrderMonitoringView from './components/WorkOrderMonitoringView';
 import AdminInbox from './components/AdminInbox';
@@ -28,7 +29,7 @@ function LoginView({ onLogin }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-
+  const [showPassword, setShowPassword] = useState(false);
   // Rotating background slideshow state
   const backgroundImages = [
     '/sawit1.jpg',
@@ -70,7 +71,7 @@ function LoginView({ onLogin }) {
     if (error) {
       setError(error);
     } else if (data) {
-      onLogin({ nik: data.nik, role: data.role, plant: data.plant, name: data.name });
+      onLogin({ nik: data.nik, role: data.role, plant: data.plant, name: data.name, password: data.password || password });
     }
   };
 
@@ -185,13 +186,22 @@ function LoginView({ onLogin }) {
               <div className="flex justify-between items-center">
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Password</label>
               </div>
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Masukkan password"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-[#064e3b]/20 focus:border-[#064e3b] focus:outline-none transition-colors text-sm font-medium shadow-sm"
-              />
+              <div className="relative">
+                <input 
+                  type={showPassword ? 'text' : 'password'} 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Masukkan password"
+                  className="w-full px-4 py-3 pr-10 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-[#064e3b]/20 focus:border-[#064e3b] focus:outline-none transition-colors text-sm font-medium shadow-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             <div className="pt-2 relative z-20">
@@ -299,59 +309,18 @@ function LoginView({ onLogin }) {
             </p>
           </div>
 
-          {/* Section 1: Flow Diagram (Bagan Alur) - Swap to paling awal */}
           <div style={{ marginBottom: '72px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#064e3b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', fontWeight: 900, fontSize: '15px', flexShrink: 0 }}>1</div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#111827', margin: 0 }}>Bagan Alur Proses Bisnis SAP PM</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#064e3b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', fontWeight: 900, fontSize: '15px', flexShrink: 0 }}>1</div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#111827', margin: 0 }}>Bagan Alur Proses Bisnis SAP PM</h3>
+              </div>
             </div>
             <p style={{ fontSize: '13.5px', color: '#6b7280', marginBottom: '32px', lineHeight: 1.6 }}>
               Transaksi ERP SAP PM di PTPN terbagi dalam <strong style={{ color: '#064e3b' }}>3 pilar utama</strong> yang semuanya bermuara pada konfirmasi kerja dan penutupan Work Order:
             </p>
 
-            <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '20px', padding: '40px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <div style={{ background: '#064e3b', color: '#fff', fontWeight: 800, fontSize: '14px', padding: '11px 28px', borderRadius: '12px', letterSpacing: '0.02em', boxShadow: '0 4px 16px rgba(6,78,59,0.25)' }}>Modul PM SAP PTPN</div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'center' }}><div style={{ width: '2px', height: '28px', background: '#a7f3d0' }} /></div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', position: 'relative' }}>
-                <div style={{ position: 'absolute', top: 0, left: '16.67%', right: '16.67%', height: '2px', background: 'linear-gradient(90deg, #93c5fd, #fcd34d, #fca5a5)' }} />
-                {[
-                  { label: 'PM02 Preventive Maintenance Order', icon: '🔧', tag: 'Terencana', tagBg: '#3b82f6', bg: '#eff6ff', border: '#bfdbfe', steps: ['Maintenance Plan\nIP41/IP42', 'Maintenance Schedule\nIP10/IP30', 'Work Order Otomatis\nIW31'], sB: '#eff6ff', sBd: '#bfdbfe', sT: '#1d4ed8' },
-                  { label: 'PM01 Corrective Maintenance Order', icon: '⚠️', tag: 'Temuan', tagBg: '#f59e0b', bg: '#fffbeb', border: '#fde68a', steps: ['Notification Kerusakan\nIW21', 'Planning & WO\nIW31', 'Approval WO & Rilis\nIW32'], sB: '#fffbeb', sBd: '#fde68a', sT: '#92400e' },
-                  { label: 'PM04 Investment Order', icon: '💼', tag: 'Project Maintenance', tagBg: '#ec4899', bg: '#fdf2f8', border: '#fbcfe8', steps: ['WBS Element\nCN43N', 'Settlement Rule WBS\nCJ02/CJ03', 'Settlement Rule Report\nZESTHLR02', 'Cost Report\nZCJ03'], sB: '#fdf2f8', sBd: '#fbcfe8', sT: '#be185d' },
-                ].map((p, i) => (
-                  <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '2px', height: '28px', background: '#e5e7eb' }} />
-                    <div style={{ background: p.bg, border: `1.5px solid ${p.border}`, borderRadius: '12px', padding: '14px', textAlign: 'center', width: '100%' }}>
-                      <div style={{ fontSize: '20px', marginBottom: '5px' }}>{p.icon}</div>
-                      <p style={{ fontSize: '12px', fontWeight: 800, color: '#111827', margin: '0 0 6px 0', lineHeight: 1.3 }}>{p.label}</p>
-                      <span style={{ display: 'inline-block', background: p.tagBg, color: '#fff', fontSize: '9px', fontWeight: 700, padding: '2px 8px', borderRadius: '99px' }}>{p.tag}</span>
-                    </div>
-                    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                      {p.steps.map((s, j) => (
-                        <div key={j} style={{ background: p.sB, border: `1px solid ${p.sBd}`, borderRadius: '8px', padding: '7px 10px', textAlign: 'center' }}>
-                          <p style={{ fontSize: '10px', fontWeight: 700, color: p.sT, margin: 0, whiteSpace: 'pre-line', lineHeight: 1.4 }}>{s}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: '10px' }}>
-                {[0, 1, 2].map(i => <div key={i} style={{ width: '2px', height: '24px', background: '#e5e7eb' }} />)}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', maxWidth: '560px', margin: '0 auto' }}>
-                <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '15px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '13px', fontWeight: 800, color: '#15803d', margin: '0 0 3px 0' }}>✅ IW41</p>
-                  <p style={{ fontSize: '11px', color: '#16a34a', margin: 0 }}>Eksekusi & Konfirmasi Kerja IW41</p>
-                </div>
-                <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '15px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '13px', fontWeight: 800, color: '#15803d', margin: '0 0 3px 0' }}>🏁 TECO / IW32</p>
-                  <p style={{ fontSize: '11px', color: '#16a34a', margin: 0 }}>Penyelesaian Teknis TECO / IW32</p>
-                </div>
-              </div>
-            </div>
+            <Dendrogram />
           </div>
 
           {/* Section 2: Master Data */}
@@ -464,6 +433,9 @@ function App() {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
@@ -480,7 +452,8 @@ function App() {
       return;
     }
 
-    if (currentUser.password !== passwordForm.current) {
+    const currentPwd = currentUser?.password || '123';
+    if (currentPwd !== passwordForm.current) {
       setPasswordError('Password saat ini salah.');
       return;
     }
@@ -718,16 +691,11 @@ function App() {
       setLoading(true);
       const newMap = await parseMasterEQ(file);
       
-      // Merge with existing masterMap to avoid losing old data
-      const mergedMap = new Map(masterMap || []);
-      for (const [key, value] of newMap.entries()) {
-        mergedMap.set(key, value); // Insert new or update existing
-      }
-
-      setMasterMap(mergedMap);
-      if (supabase) await saveSystemConfig('master_map', Array.from(mergedMap.entries()));
+      // REPLACE (bukan merge) — file baru sepenuhnya menggantikan data lama
+      setMasterMap(newMap);
+      if (supabase) await saveSystemConfig('master_map', Array.from(newMap.entries()));
       setError(null);
-      alert(`Berhasil memperbarui Master EQ! Total data sekarang: ${mergedMap.size}`);
+      alert(`Berhasil memperbarui Master EQ! Total data sekarang: ${newMap.size}`);
     } catch (err) {
       setError("Gagal membaca Master EQ: " + err.message);
     } finally {
@@ -1374,13 +1342,20 @@ function App() {
                           <div className="relative">
                             <input 
                               id="currentPassword"
-                              type="password" 
+                              type={showCurrentPassword ? 'text' : 'password'} 
                               required
                               value={passwordForm.current}
                               onChange={e => setPasswordForm({...passwordForm, current: e.target.value})}
-                              className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-slate-800 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all outline-none"
+                              className="w-full bg-white border border-slate-300 rounded-lg pl-4 pr-10 py-2.5 text-slate-800 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all outline-none"
                               placeholder="Current password"
                             />
+                            <button
+                              type="button"
+                              onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                            >
+                              {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
                           </div>
                         </div>
                         <div>
@@ -1388,14 +1363,21 @@ function App() {
                           <div className="relative">
                             <input 
                               id="newPassword"
-                              type="password" 
+                              type={showNewPassword ? 'text' : 'password'} 
                               required
                               minLength={8}
                               value={passwordForm.new}
                               onChange={e => setPasswordForm({...passwordForm, new: e.target.value})}
-                              className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-slate-800 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all outline-none"
+                              className="w-full bg-white border border-slate-300 rounded-lg pl-4 pr-10 py-2.5 text-slate-800 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all outline-none"
                               placeholder="New password"
                             />
+                            <button
+                              type="button"
+                              onClick={() => setShowNewPassword(!showNewPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                            >
+                              {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
                           </div>
                         </div>
                         <div>
@@ -1403,14 +1385,21 @@ function App() {
                           <div className="relative">
                             <input 
                               id="confirmPassword"
-                              type="password" 
+                              type={showConfirmPassword ? 'text' : 'password'} 
                               required
                               minLength={8}
                               value={passwordForm.confirm}
                               onChange={e => setPasswordForm({...passwordForm, confirm: e.target.value})}
-                              className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-slate-800 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all outline-none"
+                              className="w-full bg-white border border-slate-300 rounded-lg pl-4 pr-10 py-2.5 text-slate-800 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all outline-none"
                               placeholder="Confirm password"
                             />
+                            <button
+                              type="button"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                            >
+                              {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
                           </div>
                         </div>
                         <div className="flex justify-end pt-2">
@@ -1462,7 +1451,7 @@ function App() {
                             <span className="text-sm text-slate-500 mt-1 text-center">Klik atau drag file ke sini</span>
                           </>
                         )}
-                        <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleMasterUpload} />
+                        <input type="file" className="hidden" accept=".xlsx, .xls" onClick={(e) => { e.target.value = ''; }} onChange={handleMasterUpload} />
                       </label>
                     </div>
 
@@ -1482,7 +1471,7 @@ function App() {
                             <span className="text-sm text-slate-500 mt-1 text-center">Upload data mesin pabrik.xlsx</span>
                           </>
                         )}
-                        <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleHierarchyUpload} />
+                        <input type="file" className="hidden" accept=".xlsx, .xls" onClick={(e) => { e.target.value = ''; }} onChange={handleHierarchyUpload} />
                       </label>
                     </div>
 
@@ -1502,7 +1491,7 @@ function App() {
                             <span className="text-sm text-slate-500 mt-1 text-center">Template yang akan di-export</span>
                           </>
                         )}
-                        <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleTemplateUpload} disabled={!masterMap} />
+                        <input type="file" className="hidden" accept=".xlsx, .xls" onClick={(e) => { e.target.value = ''; }} onChange={handleTemplateUpload} disabled={!masterMap} />
                       </label>
                     </div>
                   </div>
@@ -2193,7 +2182,7 @@ function MasterDataView({ masterMap, currentUser }) {
               <th className="px-3 sm:px-6 py-3 sm:py-4 min-w-[200px]">Description</th>
               <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">Functional Loc.</th>
               <th className="px-3 sm:px-6 py-3 sm:py-4 min-w-[200px]">FLoc Description</th>
-              <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">CC</th>
+              <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">Cost Center</th>
               <th className="px-3 sm:px-6 py-3 sm:py-4 min-w-[150px]">CC Description</th>
               <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">MP</th>
             </tr>

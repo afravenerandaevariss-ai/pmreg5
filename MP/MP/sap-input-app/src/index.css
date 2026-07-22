@@ -98,3 +98,42 @@ a, button, input, select, textarea, .interactive, [role="button"] {
   0%   { opacity: 0; transform: scale(0.85) translateY(16px); }
   100% { opacity: 1; transform: scale(1) translateY(0); }
 }
+
+/* ─── Print Styles for A4 Portrait 1-Page Output ────────────────────────────── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 5mm 6mm;
+  }
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 8pt !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  nav, header, button, input, select, .no-print, [role="button"], iframe {
+    display: none !important;
+  }
+  .overflow-x-auto {
+    overflow: visible !important;
+  }
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 7pt !important;
+    table-layout: auto !important;
+  }
+  th, td {
+    padding: 2px 3px !important;
+    border: 0.5pt solid #94a3b8 !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+  }
+  th {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    font-weight: 800 !important;
+  }
+}
+

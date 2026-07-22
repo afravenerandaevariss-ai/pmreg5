@@ -1,4 +1,14 @@
 {
+  "crons": [
+    {
+      "path": "/api/send-wa",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/send-wa",
+      "schedule": "15 10 * * *"
+    }
+  ],
   "redirects": [
     {
       "source": "/(.*)",

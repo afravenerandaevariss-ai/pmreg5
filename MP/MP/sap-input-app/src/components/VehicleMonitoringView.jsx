@@ -6,10 +6,11 @@ import {
   CheckCircle, AlertCircle, AlertTriangle, ChevronDown, ChevronUp,
   Filter, BarChart2, Layers, TrendingUp, Activity, Truck, Calendar,
   XCircle, Info, Eye, EyeOff, FileDown, Check, X, ArrowRight,
-  Copy, Printer, Coins, ShieldAlert
+  Copy, Printer, Coins, ShieldAlert, Send
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, fetchMasterEquipment, fetchZCOData, saveZCOData } from '../lib/supabaseService';
+import WhatsAppSenderModal from './WhatsAppSenderModal';
 
 // ─── Plant Master Data ────────────────────────────────────────────────────────
 const PLANT_INFO = {
@@ -197,6 +198,7 @@ export default function VehicleMonitoringView({ currentUser }) {
   const [sortBy, setSortBy]                 = useState('plant');
   const [sortAsc, setSortAsc]               = useState(true);
   const [logPage, setLogPage]               = useState(1);
+  const [showWAModal, setShowWAModal]       = useState(false);
   const LOG_PAGE_SIZE = 50;
 
   // ── Load Data ────────────────────────────────────────────────────────────────
@@ -944,7 +946,7 @@ export default function VehicleMonitoringView({ currentUser }) {
   const handleCopyWASimple = () => {
     try {
       const targetDateObj = new Date(targetInputDate + 'T00:00:00');
-      const reportDateObj = addDays ? addDays(targetDateObj, 1) : new Date(targetDateObj.getTime() + 24 * 60 * 60 * 1000);
+      const reportDateObj = targetDateObj;
       const reportDateStr = format(reportDateObj, 'dd MMM yyyy', { locale: id });
       const targetDateStrFormatted = format(targetDateObj, 'dd/MM/yyyy');
       
@@ -978,7 +980,7 @@ export default function VehicleMonitoringView({ currentUser }) {
   const handleCopyWATable = () => {
     try {
       const targetDateObj = new Date(targetInputDate + 'T00:00:00');
-      const reportDateObj = addDays ? addDays(targetDateObj, 1) : new Date(targetDateObj.getTime() + 24 * 60 * 60 * 1000);
+      const reportDateObj = targetDateObj;
       const reportDateStr = format(reportDateObj, 'dd MMM yyyy', { locale: id });
       const targetDateStrFormatted = format(targetDateObj, 'dd/MM/yyyy');
       
@@ -1757,6 +1759,10 @@ export default function VehicleMonitoringView({ currentUser }) {
                   className="pl-9 pr-3 py-2 border border-slate-200 rounded-2xl text-xs w-56 focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b]" />
               </div>
               <div className="flex gap-2 flex-wrap">
+                <button onClick={() => setShowWAModal(true)}
+                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition">
+                  <Send size={13} /> Kirim WhatsApp 8 AM (081251334618)
+                </button>
                 <button onClick={handlePrint}
                   className="flex items-center gap-1.5 bg-[#064e3b] hover:bg-[#065f46] text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition">
                   <Printer size={13} /> Cetak / Simpan PDF
@@ -1779,7 +1785,7 @@ export default function VehicleMonitoringView({ currentUser }) {
                       try {
                         const parts = targetInputDate.split('-');
                         const targetDateObj = new Date(parts[0], parts[1] - 1, parts[2]);
-                        const reportDateObj = new Date(targetDateObj.getTime() + 24 * 60 * 60 * 1000);
+                        const reportDateObj = targetDateObj;
                         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
                         return `${String(reportDateObj.getDate()).padStart(2, '0')} ${months[reportDateObj.getMonth()]} ${reportDateObj.getFullYear()}`;
                       } catch (e) {
@@ -2376,6 +2382,12 @@ export default function VehicleMonitoringView({ currentUser }) {
         </div>
       )}
 
+        <WhatsAppSenderModal 
+          isOpen={showWAModal} 
+          onClose={() => setShowWAModal(false)} 
+          summaryData={summaryData} 
+          targetInputDate={targetInputDate} 
+        />
       </div>
     </div>
   );

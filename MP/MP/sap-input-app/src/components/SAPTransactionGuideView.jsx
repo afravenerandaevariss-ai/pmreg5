@@ -180,6 +180,22 @@ export default function SAPTransactionGuideView() {
         'Klik Upload Data',
         'Pastikan indikator telah berwarna hijau. Artinya Jam Jalan Mesin telah berhasil diupload ke ZPMIK22.'
       ]
+    },
+    ih08: {
+      name: 'IH08 - Display Equipment (List Selection)',
+      purpose: 'Membuka dan menampilkan daftar Master Data Equipment per Unit usaha / pabrik.',
+      relationToLogbook: 'Digunakan oleh Unit Usaha / Kebun untuk memeriksa daftar Equipment Code, Category (Kendaraan/Mesin), dan Maintenance Plant yang terdaftar di SAP.',
+      fields: [
+        { name: 'Equipment category', desc: 'Category 2 untuk Kendaraan, Category 1 untuk Mesin.', required: true, example: '2 (Kendaraan)' },
+        { name: 'Maintenance Plant', desc: 'Kode Unit Usaha yang ingin dibuka Master Data-nya.', required: true, example: '5E03 (Kebun Gunung Meliau)' }
+      ],
+      steps: [
+        'Buka TCODE IH08 pada SAP GUI.',
+        'Pilih Equipment category: 2 untuk kendaraan, 1 untuk mesin.',
+        'Pilih Maintenance Plant (Code Unit yang mau dibuka Master Data-nya, misal: 5E03).',
+        'Klik tombol Execute (ikon jam / F8).',
+        'List Equipment (misal: unit 5E03) sudah muncul dan siap digunakan.'
+      ]
     }
   };
 
@@ -298,6 +314,15 @@ export default function SAPTransactionGuideView() {
         { label: 'Langkah 3: Execute', src: '/tutorial/zpmik22/img_1784346160495_b68ty.png' },
         { label: 'Langkah 4: Upload Data', src: '/tutorial/zpmik22/img_1784346160502_1kgl4.png' },
         { label: 'Langkah 5: Pastikan Indikator Hijau', src: '/tutorial/zpmik22/img_1784346160509_ac75d.png' }
+      ];
+    }
+    if (selectedTcode === 'ih08') {
+      return [
+        { label: 'Langkah 1: Buka TCODE IH08', src: '/ih08/image1.png' },
+        { label: 'Langkah 2: Pilih Equipment Category (1 untuk Mesin, 2 untuk Kendaraan)', src: '/ih08/image2.png' },
+        { label: 'Langkah 3: Pilih Maintenance Plant (Code Unit)', src: '/ih08/image3.png' },
+        { label: 'Langkah 4: Klik Execute (F8)', src: '/ih08/image4.png' },
+        { label: 'Langkah 5: List Equipment Siap Digunakan', src: '/ih08/image5.png' }
       ];
     }
     return null;

@@ -1,0 +1,30 @@
+name: Daily WhatsApp Logbook Report (08:00 AM WIB)
+
+on:
+  schedule:
+    # 01:00 UTC = 08:00 WIB (GMT+7)
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+jobs:
+  send-wa-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Execute Daily WhatsApp Report Dispatch
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://pabnvxlvrussdfhisxzn.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'sb_publishable_btvgcbyES8_4w5x3dE-atg_kYfUAii4' }}
+          FONNTE_TOKEN: ${{ secrets.FONNTE_TOKEN }}
+          TARGET_PHONE: '081251334618'
+        run: npm run wa:send

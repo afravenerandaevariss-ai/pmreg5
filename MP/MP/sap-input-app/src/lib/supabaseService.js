@@ -121,6 +121,8 @@ export async function saveSystemConfig(id, dataObj) {
   else if (id === 'vehicle_logs') numericId = 9;
   else if (id === 'zco_data') numericId = 10;
   else if (id === 'live_chats') numericId = 11;
+  else if (id === 'wa_config') numericId = 12;
+  else if (id === 'wa_logs') numericId = 13;
   
   const { error } = await supabase
     .from('hierarchy_data')
@@ -139,6 +141,8 @@ export async function getSystemConfig(id) {
   else if (id === 'vehicle_logs') numericId = 9;
   else if (id === 'zco_data') numericId = 10;
   else if (id === 'live_chats') numericId = 11;
+  else if (id === 'wa_config') numericId = 12;
+  else if (id === 'wa_logs') numericId = 13;
 
   const { data, error } = await supabase
     .from('hierarchy_data')
@@ -408,4 +412,44 @@ export async function saveLiveChats(chats) {
   const { error } = await saveSystemConfig('live_chats', chats);
   return { error };
 }
+
+// ============================================================
+// WHATSAPP AUTO-SEND CONFIG & LOGS (id=12, id=13)
+// ============================================================
+
+export async function fetchWAConfig() {
+  const { data, error } = await getSystemConfig('wa_config');
+  const defaultConfig = {
+    targetPhone: '081251334618',
+    targetGroup: 'Group PM',
+    provider: 'fonnte', // 'fonnte', 'wablas', 'whacenter', 'custom'
+    apiToken: '',
+    customUrl: '',
+    autoSendEnabled: true,
+    sendTime: '08:00',
+  };
+  if (error || !data || typeof data !== 'object') {
+    return { data: defaultConfig, error: null };
+  }
+  return { data: { ...defaultConfig, ...data }, error: null };
+}
+
+export async function saveWAConfig(configObj) {
+  const { error } = await saveSystemConfig('wa_config', configObj);
+  return { error };
+}
+
+export async function fetchWALogs() {
+  const { data, error } = await getSystemConfig('wa_logs');
+  if (error || !Array.isArray(data)) return { data: [], error: null };
+  return { data, error: null };
+}
+
+export async function saveWALog(logEntry) {
+  const { data: logs } = await fetchWALogs();
+  const updatedLogs = [logEntry, ...(logs || [])].slice(0, 100);
+  const { error } = await saveSystemConfig('wa_logs', updatedLogs);
+  return { error };
+}
+
 
