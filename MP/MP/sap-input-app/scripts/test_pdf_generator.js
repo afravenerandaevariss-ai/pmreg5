@@ -1,10 +1,9 @@
-import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-import sharp from 'sharp';
+import puppeteer from 'puppeteer-core';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -316,32 +315,27 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
   `;
 
   const htmlPath = path.resolve('temp_report_clean.html');
-  const imgPath = path.join(__dirname, '..', 'Rekap_Logbook_Kendaraan_Regional5_Clean.png');
   const jpgPath = path.join(__dirname, '..', 'Rekap_Logbook_Kendaraan_Regional5_Clean.jpg');
   fs.writeFileSync(htmlPath, htmlContent);
 
-  console.log("Generating Clean HD Image via Chrome headless...");
-
-  await new Promise((resolve, reject) => {
-    execFile(chromePath, [
-      '--headless=new',
-      '--disable-gpu',
-      '--hide-scrollbars',
-      '--window-size=1400,1250',
-      '--force-device-scale-factor=1.7',
-      `--screenshot=${imgPath}`,
-      `file:///${htmlPath.replace(/\\/g, '/')}`
-    ], (err) => {
-      if (err) reject(err);
-      else resolve();
-    });
+  console.log("Generating Clean HD Image via Puppeteer...");
+  const browser = await puppeteer.launch({
+    executablePath: chromePath,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
   });
-
-  // Convert PNG to high-quality JPEG
-  console.log("Converting to High Quality JPEG...");
-  await sharp(imgPath)
-    .jpeg({ quality: 90, chromaSubsampling: '4:4:4' })
-    .toFile(jpgPath);
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1400, height: 1000, deviceScaleFactor: 2 });
+  
+  await page.goto(`file:///${htmlPath.replace(/\\/g, '/')}`, { waitUntil: 'networkidle0' });
+  
+  await page.screenshot({
+    path: jpgPath,
+    type: 'jpeg',
+    quality: 95,
+    fullPage: true
+  });
+  
+  await browser.close();
 
   const imgSize = fs.statSync(jpgPath).size;
   console.log(`Clean HD JPEG generated at ${jpgPath} (Size: ${imgSize} bytes)`);
@@ -385,7 +379,6 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
 
   // Clean up temp files
   if (fs.existsSync(htmlPath)) fs.unlinkSync(htmlPath);
-  if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
   if (fs.existsSync(jpgPath)) fs.unlinkSync(jpgPath);
 
   return gowaData;
