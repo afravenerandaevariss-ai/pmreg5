@@ -415,7 +415,7 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
                   <div className="flex items-center gap-2">
                     <Clock size={16} className="text-emerald-700" />
                     <span className="text-xs font-bold text-emerald-900">
-                      Jadwal Otomatis: 08:00 AM &amp; 05:15 PM (17:15 WIB)
+                      Jadwal Otomatis: 08:00 AM &amp; 06:00 PM (18:00 WIB)
                     </span>
                   </div>
                   <button
@@ -429,7 +429,7 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
                 </div>
 
                 <p className="text-[11px] text-emerald-800 leading-relaxed">
-                  Laporan rekap kendaraan Regional 5 secara otomatis dikirim 2x sehari (08:00 WIB &amp; 17:15 WIB) dalam format PDF 1 Halaman via GoWA Gateway (<code className="bg-emerald-100 px-1 py-0.5 rounded">https://gowa.waterflai.my.id</code>), Vercel Cron (<code className="bg-emerald-100 px-1 py-0.5 rounded">/api/send-wa</code>), dan Windows Task Scheduler (<code className="bg-emerald-100 px-1 py-0.5 rounded">PTPN_PM_Logbook_Daily_WA_Report_1715</code>).
+                  Laporan rekap kendaraan Regional 5 secara otomatis dikirim 2x sehari (08:00 WIB &amp; 18:00 WIB) dalam format PDF 1 Halaman via GoWA Gateway (<code className="bg-emerald-100 px-1 py-0.5 rounded">https://gowa.waterflai.my.id</code>), Vercel Cron (<code className="bg-emerald-100 px-1 py-0.5 rounded">/api/send-wa</code>), dan Windows Task Scheduler (<code className="bg-emerald-100 px-1 py-0.5 rounded">PTPN_PM_Logbook_Daily_WA_Report_1800</code>).
                 </p>
               </div>
 
