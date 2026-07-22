@@ -1,0 +1,53 @@
+name: 📊 WA Logbook Report - Auto Send
+
+on:
+  schedule:
+    # 08:00 WIB = 01:00 UTC
+    - cron: '0 1 * * *'
+    # 17:31 WIB = 10:31 UTC
+    - cron: '31 10 * * *'
+  # Allow manual trigger from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  send-report:
+    name: Send WA Logbook Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: MP/MP/sap-input-app/package-lock.json
+
+      - name: 📦 Install dependencies
+        working-directory: MP/MP/sap-input-app
+        run: npm ci --prefer-offline || npm install
+
+      - name: 🌐 Install Chrome (for PDF generation)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y google-chrome-stable
+          google-chrome-stable --version
+
+      - name: 📤 Send WA Logbook Report (PDF)
+        working-directory: MP/MP/sap-input-app
+        run: node scripts/send_wa_daily.js
+        env:
+          VITE_SUPABASE_URL: https://pabnvxlvrussdfhisxzn.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_btvgcbyES8_4w5x3dE-atg_kYfUAii4
+          GOWA_URL: https://gowa.waterflai.my.id
+          GOWA_USER: admin
+          GOWA_PASS: Sedap321#
+          TARGET_GROUP_JID: 120363430505509462@g.us
+          TARGET_PHONE: "081251334618"
+          CHROME_PATH: /usr/bin/google-chrome-stable
+
+      - name: ✅ Done
+        run: echo "WA Report dispatched at $(date '+%Y-%m-%d %H:%M:%S') UTC"
