@@ -213,23 +213,23 @@ async function runDailyWASend() {
       console.warn('Could not fetch GoWA device list:', e.message);
     }
 
-    // Try rendering PDF document report via Chrome headless --print-to-pdf
-    let pdfSentSuccess = false;
+    // Try rendering Image report via Chrome headless --screenshot
+    let imgSentSuccess = false;
     try {
       const { generateAndSendTablePdf } = await import('./test_pdf_generator.js');
-      console.log("Generating visual PDF document report and sending to group...");
-      const pdfRes = await generateAndSendTablePdf(targetGroupJid);
-      if (pdfRes && pdfRes.code === 'SUCCESS') {
-        pdfSentSuccess = true;
-        dispatchResult = { success: true, detail: pdfRes };
-        console.log("Visual PDF document report successfully sent to group:", targetGroupJid);
+      console.log("Generating visual HD Image report and sending to group...");
+      const imgRes = await generateAndSendTablePdf(targetGroupJid);
+      if (imgRes && imgRes.code === 'SUCCESS') {
+        imgSentSuccess = true;
+        dispatchResult = { success: true, detail: imgRes };
+        console.log("Visual HD Image report successfully sent to group:", targetGroupJid);
       }
-    } catch (pdfErr) {
-      console.warn("Could not generate or send PDF document report:", pdfErr.message);
+    } catch (imgErr) {
+      console.warn("Could not generate or send HD Image report:", imgErr.message);
     }
 
-    // Fallback or text dispatch if PDF wasn't sent
-    if (!pdfSentSuccess) {
+    // Fallback or text dispatch if Image wasn't sent
+    if (!imgSentSuccess) {
       console.log(`Sending text report via GoWA Gateway to ${targetGroupJid}...`);
       const gowaRes = await fetch(`${gowaUrl}/send/message?device_id=${encodeURIComponent(deviceId)}`, {
         method: 'POST',

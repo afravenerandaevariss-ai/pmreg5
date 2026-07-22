@@ -318,17 +318,18 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
   `;
 
   const htmlPath = path.resolve('temp_report_clean.html');
-  const pdfPath = path.resolve('Rekap_Logbook_Kendaraan_Regional5_Clean.pdf');
+  const imgPath = path.resolve('Rekap_Logbook_Kendaraan_Regional5_Clean.png');
   fs.writeFileSync(htmlPath, htmlContent);
 
-  console.log("Generating Clean PDF via Chrome headless...");
+  console.log("Generating Clean HD Image via Chrome headless...");
 
   await new Promise((resolve, reject) => {
     execFile(chromePath, [
       '--headless=new',
       '--disable-gpu',
-      '--no-pdf-header-footer',
-      `--print-to-pdf=${pdfPath}`,
+      '--window-size=920,1100',
+      '--force-device-scale-factor=3',
+      `--screenshot=${imgPath}`,
       `file:///${htmlPath.replace(/\\/g, '/')}`
     ], (err) => {
       if (err) reject(err);
@@ -336,8 +337,8 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     });
   });
 
-  const pdfSize = fs.statSync(pdfPath).size;
-  console.log(`Clean PDF generated at ${pdfPath} (Size: ${pdfSize} bytes)`);
+  const imgSize = fs.statSync(imgPath).size;
+  console.log(`Clean HD Image generated at ${imgPath} (Size: ${imgSize} bytes)`);
 
   // Send PDF via GoWA /send/file
   const authHeader = 'Basic ' + Buffer.from(`${GOWA_USER}:${GOWA_PASS}`).toString('base64');
@@ -354,14 +355,14 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     console.warn("Using default device:", deviceId);
   }
 
-  console.log(`Sending Clean PDF to GoWA Group: ${targetGroupJid} using device ${deviceId}...`);
+  console.log(`Sending Clean HD Image to GoWA Group: ${targetGroupJid} using device ${deviceId}...`);
 
-  const pdfBuffer = fs.readFileSync(pdfPath);
+  const imgBuffer = fs.readFileSync(imgPath);
   const formData = new FormData();
   formData.append('phone', targetGroupJid);
   formData.append('caption', headerTitleText);
-  const blob = new Blob([pdfBuffer], { type: 'application/pdf' });
-  formData.append('file', blob, `Rekap_Logbook_Kendaraan_Regional5_${dayStr}_${monthName}_${yearStr}.pdf`);
+  const blob = new Blob([imgBuffer], { type: 'image/png' });
+  formData.append('file', blob, `Rekap_Logbook_Kendaraan_Regional5_${dayStr}_${monthName}_${yearStr}.png`);
 
   const gowaRes = await fetch(`${GOWA_URL}/send/file?device_id=${encodeURIComponent(deviceId)}`, {
     method: 'POST',
@@ -373,11 +374,11 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
   });
 
   const gowaData = await gowaRes.json();
-  console.log("GoWA Send Clean PDF Response:", JSON.stringify(gowaData, null, 2));
+  console.log("GoWA Send Clean Image Response:", JSON.stringify(gowaData, null, 2));
 
   // Clean up temp files
   if (fs.existsSync(htmlPath)) fs.unlinkSync(htmlPath);
-  if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
+  if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
 
   return gowaData;
 }
