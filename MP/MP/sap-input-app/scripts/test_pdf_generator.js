@@ -115,17 +115,19 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
 
   const masterEquipments = eqData.data || [];
   const activeLogs = (logs || []).filter(l => !l.cancelled);
-  // Memaksa waktu ke WIB (Jakarta) secara eksplisit dari dalam kode Javascript
-  const nowStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
-  const now = new Date(nowStr);
-  const targetDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  
+  // MANUAL UTC+7 OFFSET UNTUK MENJAMIN WAKTU JAKARTA MESKIPUN SERVER GITHUB ERROR
+  const utcNow = new Date();
+  const wibNow = new Date(utcNow.getTime() + (7 * 60 * 60 * 1000));
+  
+  const targetDateStr = `${wibNow.getUTCFullYear()}-${String(wibNow.getUTCMonth() + 1).padStart(2, '0')}-${String(wibNow.getUTCDate()).padStart(2, '0')}`;
   const targetMonthStr = targetDateStr.substring(0, 7);
   const monthLogs = activeLogs.filter(l => l.date && l.date.startsWith(targetMonthStr));
 
   // Hitung jumlah hari kerja otomatis (kecuali Sabtu & Minggu) dalam bulan ini sampai hari ini
   let autoWorkingDays = 0;
-  for (let d = 1; d <= now.getDate(); d++) {
-    const checkDate = new Date(now.getFullYear(), now.getMonth(), d);
+  for (let d = 1; d <= wibNow.getUTCDate(); d++) {
+    const checkDate = new Date(wibNow.getUTCFullYear(), wibNow.getUTCMonth(), d);
     const dayOfWeek = checkDate.getDay();
     if (dayOfWeek !== 0 && dayOfWeek !== 6) autoWorkingDays++;
   }
@@ -173,11 +175,11 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
   tableData.forEach(item => item.rank = rankedList.findIndex(r => r.plant === item.plant) + 1);
 
   const monthsIndo = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
-  const dayStr = String(now.getDate()).padStart(2, '0');
-  const monthName = monthsIndo[now.getMonth()];
-  const yearStr = now.getFullYear();
-  const dateTargetFormatted = `${dayStr}/${String(now.getMonth() + 1).padStart(2, '0')}/${yearStr}`;
-  const headerTitleText = `Monitoring Transaksi Logbook tanggal 1 s.d ${dayStr} ${monthName} ${yearStr} ${String(now.getHours()).padStart(2, '0')}.${String(now.getMinutes()).padStart(2, '0')}`;
+  const dayStr = String(wibNow.getUTCDate()).padStart(2, '0');
+  const monthName = monthsIndo[wibNow.getUTCMonth()];
+  const yearStr = wibNow.getUTCFullYear();
+  const dateTargetFormatted = `${dayStr}/${String(wibNow.getUTCMonth() + 1).padStart(2, '0')}/${yearStr}`;
+  const headerTitleText = `Monitoring Transaksi Logbook tanggal 1 s.d ${dayStr} ${monthName} ${yearStr} ${String(wibNow.getUTCHours()).padStart(2, '0')}.${String(wibNow.getUTCMinutes()).padStart(2, '0')}`;
 
   const rowsHtml = tableData.map(item => {
     const bgClass = getIndicatorClass(item.lastLogDateRaw, targetDateStr);
