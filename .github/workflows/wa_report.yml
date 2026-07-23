@@ -57,15 +57,15 @@ jobs:
         working-directory: MP/MP/sap-input-app
         env:
           # Supabase (sumber data logbook)
-          VITE_SUPABASE_URL: 'https://pabnvxlvrussdfhisxzn.supabase.co'
-          VITE_SUPABASE_ANON_KEY: 'sb_publishable_btvgcbyES8_4w5x3dE-atg_kYfUAii4'
+          VITE_SUPABASE_URL: '${{ secrets.VITE_SUPABASE_URL }}'
+          VITE_SUPABASE_ANON_KEY: '${{ secrets.VITE_SUPABASE_ANON_KEY }}'
           # GoWA API (pengiriman WhatsApp)
-          GOWA_URL: 'https://gowa.waterflai.my.id'
-          GOWA_USER: 'admin'
-          GOWA_PASS: 'Sedap321#'
+          GOWA_URL: '${{ secrets.GOWA_URL }}'
+          GOWA_USER: '${{ secrets.GOWA_USER }}'
+          GOWA_PASS: '${{ secrets.GOWA_PASS }}'
           # Target: grup WhatsApp Regional 5
-          TARGET_GROUP_JID: '120363430505509462@g.us'
-          TARGET_PHONE: '081251334618'
+          TARGET_GROUP_JID: '${{ secrets.TARGET_GROUP_JID }}'
+          TARGET_PHONE: '${{ secrets.TARGET_PHONE }}'
           # Chrome path di Ubuntu runner
           CHROME_PATH: '/usr/bin/google-chrome-stable'
         run: node scripts/run_wa_report.js
