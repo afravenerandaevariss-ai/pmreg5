@@ -191,13 +191,35 @@ export default function WorkOrderMonitoringView({ currentUser }) {
 
   const convertExcelDate = (serial) => {
     if (!serial) return '-';
-    if (typeof serial === 'string') return serial;
+    if (typeof serial === 'string') {
+      const s = serial.trim();
+      if (/^\d{8}$/.test(s)) {
+        const year = s.substring(0, 4);
+        const month = s.substring(4, 6);
+        const day = s.substring(6, 8);
+        const date = new Date(`${year}-${month}-${day}`);
+        if (!isNaN(date.getTime())) {
+          return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+        }
+      }
+      return serial;
+    }
     const date = new Date((serial - 25569) * 86400 * 1000);
     return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
   const getExcelMonth = (serial) => {
-    if (!serial || typeof serial === 'string') return null;
+    if (!serial) return null;
+    if (typeof serial === 'string') {
+      const s = serial.trim();
+      if (/^\d{8}$/.test(s)) return parseInt(s.substring(4, 6), 10);
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return parseInt(s.split('-')[1], 10);
+      if (/^\d{2}\.\d{2}\.\d{4}/.test(s)) return parseInt(s.split('.')[1], 10);
+      if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) return parseInt(s.split('/')[1], 10);
+      const date = new Date(s);
+      if (!isNaN(date.getTime())) return date.getMonth() + 1;
+      return null;
+    }
     const date = new Date((serial - 25569) * 86400 * 1000);
     return date.getMonth() + 1; // 1-indexed
   };
