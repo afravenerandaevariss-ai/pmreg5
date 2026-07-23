@@ -172,6 +172,7 @@ export default function VehicleMonitoringView({ currentUser }) {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState(null);
   const [uploadInfo, setUploadInfo] = useState(null);
+  const [isSavingImage, setIsSavingImage] = useState(false);
 
   // View control
   const [activeTab, setActiveTab]           = useState('summary-regional');  // unit-checklist | summary-regional | detail-veh | log-raw
@@ -1024,16 +1025,19 @@ export default function VehicleMonitoringView({ currentUser }) {
   // Trigger print dialog
   // Trigger High-Quality Image Download
   const handlePrint = async () => {
+    if (isSavingImage) return;
+    
     const element = document.getElementById('excel-report-sheet');
     if (!element) return;
     
+    setIsSavingImage(true);
     // Add temporary styling for better image capture
     const originalStyle = element.style.cssText;
     
     try {
-      // Create high-quality canvas (pixelRatio 3 for HD)
+      // Create high-quality canvas (pixelRatio 2 for HD but avoids freezing)
       const dataUrl = await toPng(element, {
-        pixelRatio: 3,
+        pixelRatio: 2,
         backgroundColor: '#ffffff',
         style: {
           transform: 'scale(1)',
@@ -1056,6 +1060,7 @@ export default function VehicleMonitoringView({ currentUser }) {
       alert('Gagal menyimpan gambar: ' + err.message);
     } finally {
       element.style.cssText = originalStyle;
+      setIsSavingImage(false);
     }
   };
 
@@ -1803,9 +1808,19 @@ export default function VehicleMonitoringView({ currentUser }) {
                   className="pl-9 pr-3 py-2 border border-slate-200 rounded-2xl text-xs w-56 focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b]" />
               </div>
               <div className="flex gap-2 flex-wrap">
-                <button onClick={handlePrint}
-                  className="flex items-center gap-1.5 bg-[#064e3b] hover:bg-[#065f46] text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition">
-                  <Download size={13} /> Simpan Gambar HD
+                <button onClick={handlePrint} disabled={isSavingImage}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition ${
+                    isSavingImage ? 'bg-slate-400 text-slate-100 cursor-wait' : 'bg-[#064e3b] hover:bg-[#065f46] text-white'
+                  }`}>
+                  {isSavingImage ? (
+                    <>
+                      <RefreshCw size={13} className="animate-spin" /> Memproses...
+                    </>
+                  ) : (
+                    <>
+                      <Download size={13} /> Simpan Gambar HD
+                    </>
+                  )}
                 </button>
                 <button onClick={handleExportSummary}
                   className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition">
