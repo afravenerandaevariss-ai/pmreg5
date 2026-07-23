@@ -111,12 +111,23 @@ function getIndicatorClass(lastLogDateRaw, targetDateStr) {
 export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID) {
   console.log(`[${new Date().toISOString()}] Generating Clean 1-Page A4 Portrait PDF without source footer...`);
 
-  const [logs, eqData] = await Promise.all([
+  const [logs, eqDataRes] = await Promise.all([
     getSystemConfig(9),
     supabase.from('master_equipment').select('*')
   ]);
 
-  const masterEquipments = eqData.data || [];
+  const rawMasterEquipments = eqDataRes.data || [];
+  const masterEquipments = rawMasterEquipments.map(row => ({
+    eqNum: row.eq_num,
+    plant: row.plant,
+    description: row.description,
+    functionalLoc: row.functional_loc,
+    flDescription: row.fl_description,
+    costCenter: row.cost_center,
+    type: row.eq_type,
+    induk: row.induk,
+    reading: row.reading,
+  }));
   const activeLogs = (logs || []).filter(l => !l.cancelled);
   
   // MANUAL UTC+7 OFFSET UNTUK MENJAMIN WAKTU JAKARTA MESKIPUN SERVER GITHUB ERROR
@@ -137,7 +148,7 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
 
   let tableData = Object.keys(PLANT_INFO).sort().map(plantCode => {
     const info = PLANT_INFO[plantCode];
-    const plantVehicles = masterEquipments.filter(e => e.plant === plantCode && String(e.eq_num || '').startsWith('20000'));
+    const plantVehicles = masterEquipments.filter(e => e.plant === plantCode && String(e.eqNum || '').startsWith('20000'));
     const vehicleCount = plantVehicles.length > 0 ? plantVehicles.length : (VEHICLE_MASTER_COUNT[plantCode] || 0);
     const plantLogs = monthLogs.filter(l => l.plant === plantCode);
     const totalTx = plantLogs.length;
