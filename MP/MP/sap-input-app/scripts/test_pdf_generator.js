@@ -171,8 +171,26 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     };
   });
 
-  const rankedList = [...tableData].sort((a, b) => (b.pctUtd - a.pctUtd) || (b.totalTransaksi - a.totalTransaksi));
-  tableData.forEach(item => item.rank = rankedList.findIndex(r => r.plant === item.plant) + 1);
+  const rankableList = tableData
+    .filter(item => item.totalTransaksi > 0 && item.upToDate > 0)
+    .sort((a, b) => {
+      if (b.upToDate !== a.upToDate) return b.upToDate - a.upToDate;
+      if (b.totalTransaksi !== a.totalTransaksi) return b.totalTransaksi - a.totalTransaksi;
+      return a.plant.localeCompare(b.plant);
+    });
+
+  const rankMap = {};
+  rankableList.forEach((item, idx) => {
+    rankMap[item.plant] = idx + 1;
+  });
+
+  tableData.forEach(item => {
+    if (item.totalTransaksi === 0 || item.upToDate === 0) {
+      item.rank = 28;
+    } else {
+      item.rank = rankMap[item.plant] || 28;
+    }
+  });
 
   const monthsIndo = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
   const dayStr = String(wibNow.getUTCDate()).padStart(2, '0');
