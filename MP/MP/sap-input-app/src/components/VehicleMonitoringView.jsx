@@ -1802,13 +1802,6 @@ export default function VehicleMonitoringView({ currentUser }) {
                   className="pl-9 pr-3 py-2 border border-slate-200 rounded-2xl text-xs w-56 focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b]" />
               </div>
               <div className="flex gap-2 flex-wrap">
-                {/* Hanya tampil jika Admin/Developer atau disembunyikan sesuai instruksi */}
-                {currentUser?.role === 'Admin' && (
-                  <button onClick={() => setShowWAModal(true)}
-                    className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition">
-                    <Send size={13} /> Kirim WhatsApp 8 AM
-                  </button>
-                )}
                 <button onClick={handlePrint}
                   className="flex items-center gap-1.5 bg-[#064e3b] hover:bg-[#065f46] text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition">
                   <Download size={13} /> Simpan Gambar HD
@@ -1826,7 +1819,11 @@ export default function VehicleMonitoringView({ currentUser }) {
               {/* Excel Sheet Title and Header */}
               <div className="flex justify-between items-start mb-2 border-b border-slate-200 pb-2">
                 <div className="font-sans">
-                  <h1 className="text-xs font-extrabold text-slate-900 tracking-wide">
+                  <h1 
+                    onDoubleClick={() => { if(currentUser?.role === 'Admin') setShowWAModal(true); }}
+                    className="text-xs font-extrabold text-slate-900 tracking-wide select-none cursor-default"
+                    title={currentUser?.role === 'Admin' ? "Klik ganda untuk konfigurasi WA" : ""}
+                  >
                     Monitoring Transaksi Logbook tanggal 1 s.d {(() => {
                       try {
                         const parts = targetInputDate.split('-');
