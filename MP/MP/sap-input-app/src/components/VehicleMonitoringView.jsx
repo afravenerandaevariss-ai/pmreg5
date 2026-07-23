@@ -9,7 +9,7 @@ import {
   Copy, Printer, Coins, ShieldAlert, Send
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, fetchMasterEquipment, fetchZCOData, saveZCOData } from '../lib/supabaseService';
 import WhatsAppSenderModal from './WhatsAppSenderModal';
 
@@ -1027,22 +1027,23 @@ export default function VehicleMonitoringView({ currentUser }) {
     const element = document.getElementById('excel-report-sheet');
     if (!element) return;
     
-    // Add temporary styling for better image capture (optional, e.g., removing borders, adjusting scaling)
+    // Add temporary styling for better image capture
     const originalStyle = element.style.cssText;
     
     try {
-      // Create high-quality canvas (scale 3 for HD)
-      const canvas = await html2canvas(element, {
-        scale: 3,
-        useCORS: true,
+      // Create high-quality canvas (pixelRatio 3 for HD)
+      const dataUrl = await toPng(element, {
+        pixelRatio: 3,
         backgroundColor: '#ffffff',
-        logging: false,
+        style: {
+          transform: 'scale(1)',
+          transformOrigin: 'top left',
+        }
       });
       
-      // Convert to image and download
-      const imageURL = canvas.toDataURL('image/png', 1.0);
+      // Download image
       const link = document.createElement('a');
-      link.href = imageURL;
+      link.href = dataUrl;
       
       const now = new Date();
       const dateStr = `${String(now.getDate()).padStart(2, '0')}${String(now.getMonth()+1).padStart(2, '0')}${now.getFullYear()}`;
