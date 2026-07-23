@@ -836,6 +836,16 @@ function App() {
     );
   }
 
+  const isScreenshotMode = new URLSearchParams(window.location.search).get('screenshotMode') === 'true';
+
+  if (isScreenshotMode) {
+    return (
+      <div className="bg-white">
+        <VehicleMonitoringView currentUser={currentUser} screenshotMode={true} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-slate-50 font-sans overflow-hidden bg-[radial-gradient(#e2e8f0_1.5px,transparent_1.5px)] [background-size:24px_24px] print:h-auto print:overflow-visible print:bg-white">
       

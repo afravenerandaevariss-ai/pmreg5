@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     const baseUrl = req.headers.host ? `https://${req.headers.host}` : 'https://pmreg5.afratarigan.my.id';
 
     // 1. Use Microlink API to take HD screenshot
-    const targetUrl = encodeURIComponent(`${baseUrl}/?hideNav=true&tab=vehicle`);
+    const targetUrl = encodeURIComponent(`${baseUrl}/?hideNav=true&tab=vehicle&screenshotMode=true`);
     const microlinkUrl = `https://api.microlink.io/?url=${targetUrl}&screenshot=true&meta=false&waitForTimeout=5000&viewport.width=1400&viewport.height=1000&viewport.deviceScaleFactor=2&element=%23excel-report-sheet`;
     
     console.log('Fetching screenshot from Microlink...');

@@ -152,7 +152,7 @@ const StatusBadge = ({ status, text }) => {
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function VehicleMonitoringView({ currentUser }) {
+export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const isAdmin = currentUser && (
     currentUser.role === 'Admin' || 
     currentUser.role?.toUpperCase() === 'ADMIN' || 
@@ -1848,7 +1848,7 @@ export default function VehicleMonitoringView({ currentUser }) {
             </div>
 
             {/* Redesigned Excel-style Monitoring Sheet */}
-            <div id="excel-report-sheet" className="bg-white p-4 border border-slate-300 rounded-2xl shadow-sm overflow-hidden font-sans max-w-[1150px] mx-auto w-full">
+            <div id="excel-report-sheet" className={`bg-white font-sans w-full ${screenshotMode ? 'p-1' : 'p-4 border border-slate-300 rounded-2xl shadow-sm overflow-hidden max-w-[1150px] mx-auto'}`}>
               
               {/* Excel Sheet Title and Header */}
               <div className="flex justify-between items-start mb-2 border-b border-slate-200 pb-2">
