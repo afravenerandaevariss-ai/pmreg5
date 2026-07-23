@@ -207,25 +207,25 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
 <head>
   <meta charset="utf-8">
   <style>
-    html, body { margin: 0; padding: 20px 30px; background: #ffffff; font-family: "Segoe UI", "Calibri", "Arial", sans-serif; color: #000000; width: 1400px; box-sizing: border-box; }
-    .header-container { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
-    .header-left { display: flex; flex-direction: column; gap: 6px; }
-    .title { font-size: 32px; font-weight: 800; color: #000000; }
-    .subtitle { font-size: 24px; font-weight: 800; color: #000000; text-transform: uppercase; }
-    .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
-    .h-badge { border: 2px solid #cbd5e1; padding: 8px 24px; font-size: 22px; font-weight: bold; }
-    .target { font-size: 22px; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-    th, td { border: 2px solid #cbd5e1; padding: 12px 8px; text-align: center; font-size: 20px; }
-    th { font-weight: 900; text-transform: uppercase; background: #ffffff; font-size: 18px; }
+    html, body { margin: 0; padding: 24px 32px; background: #ffffff; font-family: "Segoe UI", "Calibri", "Arial", sans-serif; color: #000000; width: 1400px; box-sizing: border-box; }
+    .header-container { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+    .header-left { display: flex; flex-direction: column; gap: 4px; }
+    .title { font-size: 16px; font-weight: 800; color: #000000; }
+    .subtitle { font-size: 13px; font-weight: 800; color: #000000; text-transform: uppercase; }
+    .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+    .h-badge { border: 1.5px solid #94a3b8; padding: 4px 14px; font-size: 13px; font-weight: bold; }
+    .target { font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    th, td { border: 1.5px solid #94a3b8; padding: 7px 6px; text-align: center; font-size: 12px; }
+    th { font-weight: 800; text-transform: uppercase; background: #ffffff; font-size: 11px; line-height: 1.3; }
     .th-group { font-weight: 900; }
-    .bg-green { background-color: #10b981 !important; color: white !important; font-weight: 800; }
-    .bg-yellow { background-color: #facc15 !important; color: #000000 !important; font-weight: 800; }
-    .bg-red { background-color: #ef4444 !important; color: white !important; font-weight: 800; }
-    .bg-black { background-color: #000000 !important; color: white !important; font-weight: 800; }
-    .legend-container { display: flex; align-items: center; gap: 24px; margin-top: 24px; font-size: 22px; font-weight: 700; }
-    .legend-item { display: flex; align-items: center; gap: 12px; }
-    .legend-box { width: 36px; height: 24px; }
+    .bg-green { background-color: #10b981 !important; color: white !important; font-weight: 700; }
+    .bg-yellow { background-color: #facc15 !important; color: #000000 !important; font-weight: 700; }
+    .bg-red { background-color: #ef4444 !important; color: white !important; font-weight: 700; }
+    .bg-black { background-color: #000000 !important; color: white !important; font-weight: 700; }
+    .legend-container { display: flex; align-items: center; gap: 16px; margin-top: 16px; font-size: 12px; font-weight: 600; }
+    .legend-item { display: flex; align-items: center; gap: 8px; }
+    .legend-box { width: 20px; height: 14px; }
   </style>
 </head>
 <body>
@@ -284,10 +284,12 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
   console.log("Generating Clean HD Image via Puppeteer...");
   const browser = await puppeteer.launch({
     executablePath: chromePath,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--force-device-scale-factor=3']
   });
   const page = await browser.newPage();
-  await page.setViewport({ width: 1400, height: 1000, deviceScaleFactor: 1 });
+  // deviceScaleFactor: 3 means 1400px CSS → 4200px actual pixels
+  // Even after WhatsApp compresses, text remains razor-sharp
+  await page.setViewport({ width: 1400, height: 1000, deviceScaleFactor: 3 });
   
   await page.goto(`file:///${htmlPath.replace(/\\/g, '/')}`, { waitUntil: 'networkidle0' });
   
