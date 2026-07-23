@@ -207,25 +207,25 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
 <head>
   <meta charset="utf-8">
   <style>
-    html, body { margin: 0; padding: 24px 32px; background: #ffffff; font-family: "Segoe UI", "Calibri", "Arial", sans-serif; color: #000000; width: 1400px; box-sizing: border-box; }
-    .header-container { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
-    .header-left { display: flex; flex-direction: column; gap: 4px; }
-    .title { font-size: 16px; font-weight: 800; color: #000000; }
+    html, body { margin: 0; padding: 20px 28px; background: #ffffff; font-family: "Segoe UI", "Calibri", "Arial", sans-serif; color: #000000; width: 1350px; box-sizing: border-box; }
+    .header-container { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+    .header-left { display: flex; flex-direction: column; gap: 3px; }
+    .title { font-size: 15px; font-weight: 800; color: #000000; }
     .subtitle { font-size: 13px; font-weight: 800; color: #000000; text-transform: uppercase; }
     .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-    .h-badge { border: 1.5px solid #94a3b8; padding: 4px 14px; font-size: 13px; font-weight: bold; }
-    .target { font-size: 13px; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-    th, td { border: 1.5px solid #94a3b8; padding: 7px 6px; text-align: center; font-size: 12px; }
-    th { font-weight: 800; text-transform: uppercase; background: #ffffff; font-size: 11px; line-height: 1.3; }
+    .h-badge { border: 1px solid #94a3b8; padding: 3px 12px; font-size: 13px; font-weight: bold; }
+    .target { font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+    th, td { border: 1px solid #94a3b8; padding: 6px 5px; text-align: center; font-size: 11.5px; }
+    th { font-weight: 800; text-transform: uppercase; background: #ffffff; font-size: 10.5px; line-height: 1.3; }
     .th-group { font-weight: 900; }
     .bg-green { background-color: #10b981 !important; color: white !important; font-weight: 700; }
     .bg-yellow { background-color: #facc15 !important; color: #000000 !important; font-weight: 700; }
     .bg-red { background-color: #ef4444 !important; color: white !important; font-weight: 700; }
     .bg-black { background-color: #000000 !important; color: white !important; font-weight: 700; }
-    .legend-container { display: flex; align-items: center; gap: 16px; margin-top: 16px; font-size: 12px; font-weight: 600; }
-    .legend-item { display: flex; align-items: center; gap: 8px; }
-    .legend-box { width: 20px; height: 14px; }
+    .legend-container { display: flex; align-items: center; gap: 16px; margin-top: 14px; font-size: 11px; font-weight: 600; }
+    .legend-item { display: flex; align-items: center; gap: 7px; }
+    .legend-box { width: 18px; height: 12px; }
   </style>
 </head>
 <body>
@@ -284,19 +284,19 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
   console.log("Generating Clean HD Image via Puppeteer...");
   const browser = await puppeteer.launch({
     executablePath: chromePath,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--force-device-scale-factor=3']
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
   });
   const page = await browser.newPage();
-  // deviceScaleFactor: 3 means 1400px CSS → 4200px actual pixels
-  // Even after WhatsApp compresses, text remains razor-sharp
-  await page.setViewport({ width: 1400, height: 1000, deviceScaleFactor: 3 });
+  // 1350px matches the reference image.jpeg exactly — small enough that
+  // WhatsApp does NOT aggressively compress it (~300-400KB output)
+  await page.setViewport({ width: 1350, height: 900, deviceScaleFactor: 1 });
   
   await page.goto(`file:///${htmlPath.replace(/\\/g, '/')}`, { waitUntil: 'networkidle0' });
   
   await page.screenshot({
     path: jpgPath,
     type: 'jpeg',
-    quality: 100,
+    quality: 92,
     fullPage: true
   });
   
