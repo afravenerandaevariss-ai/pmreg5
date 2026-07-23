@@ -83,9 +83,21 @@ const VEHICLE_MASTER_COUNT = {
   "5E16": 24, "5E17": 17, "5E18": 11, "5E19": 22
 };
 
-async function getSystemConfig(numericId) {
-  const { data } = await supabase.from('hierarchy_data').select('data').eq('id', numericId).single();
-  return data?.data || null;
+async function getDailyLogs() {
+  let allData = [];
+  let from = 0;
+  const PAGE_SIZE = 1000;
+  while (true) {
+    const { data, error } = await supabase.from('daily_logs').select('*').range(from, from + PAGE_SIZE - 1);
+    if (error || !data || data.length === 0) break;
+    allData = allData.concat(data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return allData.map(row => ({
+    ...row,
+    created_on: row.timestamp // support legacy field expected by script
+  }));
 }
 
 function calculateDaysDifference(d1, d2) {
@@ -109,7 +121,7 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
   console.log(`[${new Date().toISOString()}] Generating Clean 1-Page A4 Portrait PDF without source footer...`);
 
   const [logs, eqData] = await Promise.all([
-    getSystemConfig(9),
+    getDailyLogs(),
     supabase.from('master_equipment').select('*')
   ]);
 
