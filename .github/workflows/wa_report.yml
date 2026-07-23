@@ -11,6 +11,7 @@ on:
   schedule:
     - cron: '0 2 * * *'   # 09:00 WIB setiap hari
     - cron: '0 8 * * *'   # 15:00 WIB setiap hari
+    - cron: '45 10 * * *' # 17:45 WIB (Testing)
   workflow_dispatch:       # Tombol "Run workflow" manual di GitHub Actions tab
 
 jobs:
