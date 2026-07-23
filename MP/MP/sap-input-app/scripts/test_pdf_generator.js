@@ -313,24 +313,53 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     }
   } catch { /* use default */ }
 
-  console.log(`Sending HD PNG as image to GoWA Group: ${targetGroupJid} using device ${deviceId}...`);
+  console.log(`Sending HD PNG as FILE (no WA compression) to GoWA Group: ${targetGroupJid} using device ${deviceId}...`);
 
   const pngBuffer = fs.readFileSync(pngPath);
-  const formData = new FormData();
-  formData.append('phone', targetGroupJid);
-  formData.append('caption', headerTitleText);
-  const blob = new Blob([pngBuffer], { type: 'image/png' });
-  formData.append('image', blob, `rekap.png`);
 
-  const gowaRes = await fetch(`${GOWA_URL}/send/image?device_id=${encodeURIComponent(deviceId)}`, {
+  // ── Coba kirim sebagai FILE: tidak dikompresi WhatsApp ────────────────────
+  const formDataFile = new FormData();
+  formDataFile.append('phone', targetGroupJid);
+  formDataFile.append('caption', headerTitleText);
+  const blobFile = new Blob([pngBuffer], { type: 'image/png' });
+  formDataFile.append('file', blobFile, `Rekap_Logbook_Regional5_HD.png`);
+
+  const gowaResFile = await fetch(`${GOWA_URL}/send/file?device_id=${encodeURIComponent(deviceId)}`, {
     method: 'POST',
     headers: { 'Authorization': authHeader },
-    body: formData
+    body: formDataFile
   });
 
-  const gowaData = await gowaRes.json();
-  console.log('GoWA Send Image Response:', JSON.stringify(gowaData, null, 2));
+  let gowaData;
+  if (gowaResFile.ok) {
+    gowaData = await gowaResFile.json();
+    console.log('GoWA Send File Response:', JSON.stringify(gowaData, null, 2));
+    if (!gowaData || (gowaData.code !== 'SUCCESS' && !gowaData.success)) {
+      console.log('File send belum success, fallback ke /send/image...');
+      gowaData = await sendAsImage(pngBuffer, targetGroupJid, headerTitleText, authHeader, deviceId, GOWA_URL);
+    }
+  } else {
+    console.warn(`/send/file error (${gowaResFile.status}), fallback ke /send/image...`);
+    gowaData = await sendAsImage(pngBuffer, targetGroupJid, headerTitleText, authHeader, deviceId, GOWA_URL);
+  }
+
   return gowaData;
+}
+
+async function sendAsImage(pngBuffer, targetGroupJid, caption, authHeader, deviceId, GOWA_URL) {
+  const formDataImg = new FormData();
+  formDataImg.append('phone', targetGroupJid);
+  formDataImg.append('caption', caption);
+  const blobImg = new Blob([pngBuffer], { type: 'image/png' });
+  formDataImg.append('image', blobImg, `rekap.png`);
+  const gowaResImg = await fetch(`${GOWA_URL}/send/image?device_id=${encodeURIComponent(deviceId)}`, {
+    method: 'POST',
+    headers: { 'Authorization': authHeader },
+    body: formDataImg
+  });
+  const data = await gowaResImg.json();
+  console.log('GoWA Send Image Response:', JSON.stringify(data, null, 2));
+  return data;
 }
 
 if (process.argv[1].endsWith('test_pdf_generator.js')) {
