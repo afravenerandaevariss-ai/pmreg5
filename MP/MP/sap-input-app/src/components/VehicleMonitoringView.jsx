@@ -1848,7 +1848,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             </div>
 
             {/* Redesigned Excel-style Monitoring Sheet */}
-            <div id="excel-report-sheet" className="bg-white p-4 border border-slate-300 rounded-2xl shadow-sm overflow-hidden font-sans max-w-[1150px] mx-auto w-full">
+            <div id="excel-report-sheet" className={`bg-white p-4 border border-slate-300 rounded-2xl shadow-sm font-sans ${screenshotMode ? '' : 'overflow-hidden max-w-[1150px] mx-auto w-full'}`} style={screenshotMode ? { maxWidth: 'none', width: 'fit-content', margin: '0', padding: '16px' } : {}}>
               
               {/* Excel Sheet Title and Header */}
               <div className="flex justify-between items-start mb-2 border-b border-slate-200 pb-2">
@@ -1895,7 +1895,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               </div>
 
               {/* The Grid Table */}
-              <div className="overflow-x-auto">
+              <div className={screenshotMode ? '' : 'overflow-x-auto'} style={screenshotMode ? { overflow: 'visible', width: 'max-content' } : {}}>
                 <table className="w-full text-[11px] text-center border-collapse excel-cell-border">
                   <thead>
                     <tr className="bg-slate-100 text-slate-800 font-bold">
