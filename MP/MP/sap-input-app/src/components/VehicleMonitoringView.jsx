@@ -303,6 +303,7 @@ export default function VehicleMonitoringView({ currentUser }) {
         const CREATED_ON  = col(['Created on']);
         const CHANGED_BY  = col(['Changed by']);
         const CHANGED_ON  = col(['Changed on']);
+        const COST_CENTER = col(['Cost Center', 'Cost center', 'Cctr', 'Cost Ctr']);
 
         if (!VEH_CODE || !PLANT_COL) {
           throw new Error('Kolom "Vehicle Code" atau "Plant" tidak ditemukan. Pastikan file dari ZESTHLP16PA SAP.');
@@ -310,8 +311,6 @@ export default function VehicleMonitoringView({ currentUser }) {
 
         const newLogsMap  = new Map();
         const newVehMap   = new Map();
-        vehicles.forEach(v => newVehMap.set(v.vehicle_code, v));
-        logs.forEach(l => newLogsMap.set(l.activity_number, l));
 
         let processed = 0, skipped = 0, cancelled = 0;
         const uniqueJobCodes = new Set();
@@ -359,6 +358,7 @@ export default function VehicleMonitoringView({ currentUser }) {
           const createdOn     = formatDateStr(get(CREATED_ON)) || '';
           const changedBy     = String(get(CHANGED_BY) || '').trim();
           const changedOn     = formatDateStr(get(CHANGED_ON)) || '';
+          const costCenterStr = String(get(COST_CENTER) || '').trim();
 
           if (isCancelled) cancelled++;
           uniqueJobCodes.add(jobCode);
@@ -403,6 +403,7 @@ export default function VehicleMonitoringView({ currentUser }) {
               vehicle_code: vehCode,
               description:  reference || remarks || `Kendaraan ${vehCode}`,
               plant,
+              cost_center:  costCenterStr,
               wilayah:      pInfo.wilayah,
               created_at:   new Date().toISOString(),
               updated_at:   new Date().toISOString(),
@@ -777,7 +778,7 @@ export default function VehicleMonitoringView({ currentUser }) {
       return {
         ...v,
         eqDesc: eq ? eq.description : '-',
-        costCenter: eq ? eq.costCenter : '-',
+        costCenter: v.cost_center || (eq ? eq.costCenter : '-'),
         daysFilled,
         isInputtedToday,
         todayDetails: isInputtedToday ? {
@@ -1603,7 +1604,8 @@ export default function VehicleMonitoringView({ currentUser }) {
                 <table className="w-full text-xs text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-100/60 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                      <th className="px-4 py-3 w-[200px]">No. Equipment & Deskripsi</th>
+                      <th className="px-4 py-3 w-[120px]">No. Equipment</th>
+                      <th className="px-4 py-3 min-w-[150px]">Deskripsi Kendaraan</th>
                       <th className="px-4 py-3 w-[100px]">Cost Center</th>
                       <th className="px-4 py-3 min-w-[180px]">Pekerjaan Utama (Transaksi)</th>
                       <th className="px-4 py-3 text-center w-[160px]">Status Hari Ini</th>
@@ -1615,17 +1617,15 @@ export default function VehicleMonitoringView({ currentUser }) {
                   <tbody className="divide-y divide-slate-100">
                     {unitFocusedData.vehiclesList.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-16 text-center text-slate-400 font-medium">
+                        <td colSpan={8} className="py-16 text-center text-slate-400 font-medium">
                           Tidak ada kendaraan terdaftar di Kebun/Unit ini. Silakan upload file ZESTHLP16PA SAP untuk mendaftarkan data.
                         </td>
                       </tr>
                     ) : unitFocusedData.vehiclesList.map(v => (
                       <React.Fragment key={v.vehicle_code}>
                         <tr className={`hover:bg-emerald-50/40  hover:shadow-sm transition-colors duration-200 border-b border-slate-50 group ${expandedVehicleId === v.vehicle_code ? 'bg-emerald-50/10' : ''}`}>
-                          <td className="px-4 py-3">
-                            <span className="font-bold text-slate-800 font-mono text-[13px] block">{v.vehicle_code}</span>
-                            <span className="text-[10px] text-slate-500 block truncate max-w-[180px]" title={v.eqDesc}>{v.eqDesc}</span>
-                          </td>
+                          <td className="px-4 py-3 font-bold text-slate-800 font-mono text-[13px]">{v.vehicle_code}</td>
+                          <td className="px-4 py-3 text-[10px] text-slate-500 font-medium">{v.eqDesc}</td>
                           <td className="px-4 py-3 font-mono text-[11px] font-semibold text-slate-700">{v.costCenter}</td>
                           <td className="px-4 py-3 text-slate-600">
                             <span className="font-semibold text-slate-700 block text-xs">{v.description}</span>
@@ -1684,7 +1684,7 @@ export default function VehicleMonitoringView({ currentUser }) {
                         {/* Expanded detail row showing logs for selected vehicle */}
                         {expandedVehicleId === v.vehicle_code && (
                           <tr className="bg-slate-50/50">
-                            <td colSpan={7} className="px-6 py-4">
+                            <td colSpan={8} className="px-6 py-4">
                               <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-inner max-w-4xl">
                                 <h5 className="font-bold text-slate-700 text-xs mb-3 flex items-center gap-1.5">
                                   <Truck size={14} className="text-[#064e3b]" /> 
