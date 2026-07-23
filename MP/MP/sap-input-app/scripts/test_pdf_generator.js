@@ -83,21 +83,9 @@ const VEHICLE_MASTER_COUNT = {
   "5E16": 24, "5E17": 17, "5E18": 11, "5E19": 22
 };
 
-async function getDailyLogs() {
-  let allData = [];
-  let from = 0;
-  const PAGE_SIZE = 1000;
-  while (true) {
-    const { data, error } = await supabase.from('daily_logs').select('*').range(from, from + PAGE_SIZE - 1);
-    if (error || !data || data.length === 0) break;
-    allData = allData.concat(data);
-    if (data.length < PAGE_SIZE) break;
-    from += PAGE_SIZE;
-  }
-  return allData.map(row => ({
-    ...row,
-    created_on: row.timestamp // support legacy field expected by script
-  }));
+async function getSystemConfig(numericId) {
+  const { data } = await supabase.from('hierarchy_data').select('data').eq('id', numericId).single();
+  return data?.data || null;
 }
 
 function calculateDaysDifference(d1, d2) {
@@ -121,12 +109,12 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
   console.log(`[${new Date().toISOString()}] Generating Clean 1-Page A4 Portrait PDF without source footer...`);
 
   const [logs, eqData] = await Promise.all([
-    getDailyLogs(),
+    getSystemConfig(9),
     supabase.from('master_equipment').select('*')
   ]);
 
   const masterEquipments = eqData.data || [];
-  const activeLogs = (logs || []).filter(l => l.status !== 'CANCELLED');
+  const activeLogs = (logs || []).filter(l => !l.cancelled);
   // Memaksa waktu ke WIB (Jakarta) secara eksplisit dari dalam kode Javascript
   const nowStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
   const now = new Date(nowStr);
@@ -134,19 +122,33 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
   const targetMonthStr = targetDateStr.substring(0, 7);
   const monthLogs = activeLogs.filter(l => l.date && l.date.startsWith(targetMonthStr));
 
+  // Hitung jumlah hari kerja otomatis (kecuali Sabtu & Minggu) dalam bulan ini sampai hari ini
+  let autoWorkingDays = 0;
+  for (let d = 1; d <= now.getDate(); d++) {
+    const checkDate = new Date(now.getFullYear(), now.getMonth(), d);
+    const dayOfWeek = checkDate.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) autoWorkingDays++;
+  }
+
   let tableData = Object.keys(PLANT_INFO).sort().map(plantCode => {
     const info = PLANT_INFO[plantCode];
-    const plantVehicles = masterEquipments.filter(e => e.plant === plantCode && String(e.eq_num || '').startsWith('20000'));
+    const plantVehicles = masterEquipments.filter(e => e.plant === plantCode && String(e.eqNum || '').startsWith('20000'));
     const vehicleCount = plantVehicles.length > 0 ? plantVehicles.length : (VEHICLE_MASTER_COUNT[plantCode] || 0);
     const plantLogs = monthLogs.filter(l => l.plant === plantCode);
     const totalTx = plantLogs.length;
     let utdCount = 0, tutdCount = 0;
+    
     plantLogs.forEach(l => {
-      try {
-        const diff = calculateDaysDifference(l.created_on || l.date, l.date);
-        if (diff <= 1) utdCount++; else tutdCount++;
-      } catch { tutdCount++; }
+      if (!l.created_on) {
+        tutdCount++;
+      } else {
+        try {
+          const diff = calculateDaysDifference(l.created_on, l.date);
+          if (diff <= 1) utdCount++; else tutdCount++;
+        } catch { tutdCount++; }
+      }
     });
+    
     let lastLogDateRaw = '-', lastLogDateFormatted = '-';
     if (plantLogs.length > 0) {
       const dates = plantLogs.map(l => l.date).sort();
@@ -154,10 +156,12 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
       const parts = lastLogDateRaw.split('-');
       lastLogDateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
+    
     return {
       wilayah: info.wilayah, plant: plantCode, desc: info.desc,
-      vehicleCount, hariKerja: vehicleCount > 0 ? 16 : '-',
-      targetTotal: vehicleCount > 0 ? vehicleCount * 16 : 0,
+      vehicleCount, 
+      hariKerja: (vehicleCount > 0 && totalTx > 0) ? autoWorkingDays : '-',
+      targetTotal: totalTx,
       upToDate: utdCount, notUpToDate: tutdCount, totalTransaksi: totalTx,
       pctUtd: totalTx > 0 ? (utdCount / totalTx) * 100 : 0,
       pctTutd: totalTx > 0 ? (tutdCount / totalTx) * 100 : 0,
