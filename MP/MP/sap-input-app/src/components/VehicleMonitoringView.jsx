@@ -1031,8 +1031,22 @@ export default function VehicleMonitoringView({ currentUser }) {
     if (!element) return;
     
     setIsSavingImage(true);
-    // Add temporary styling for better image capture
-    const originalStyle = element.style.cssText;
+    
+    // Find inner scrollable wrapper to prevent horizontal cropping
+    const tableWrapper = element.querySelector('.overflow-x-auto');
+    
+    // Save original styles
+    const origElementCss = element.style.cssText;
+    const origWrapperCss = tableWrapper ? tableWrapper.style.cssText : '';
+    
+    // Force element to expand fully to avoid cropping
+    element.style.setProperty('max-width', 'none', 'important');
+    element.style.setProperty('width', 'max-content', 'important');
+    element.style.setProperty('margin', '0', 'important');
+    if (tableWrapper) {
+      tableWrapper.style.setProperty('overflow', 'visible', 'important');
+      tableWrapper.style.setProperty('width', 'max-content', 'important');
+    }
     
     try {
       // Create high-quality canvas (pixelRatio 2 for HD but avoids freezing)
@@ -1059,7 +1073,11 @@ export default function VehicleMonitoringView({ currentUser }) {
     } catch (err) {
       alert('Gagal menyimpan gambar: ' + err.message);
     } finally {
-      element.style.cssText = originalStyle;
+      // Restore original styles
+      element.style.cssText = origElementCss;
+      if (tableWrapper) {
+        tableWrapper.style.cssText = origWrapperCss;
+      }
       setIsSavingImage(false);
     }
   };
