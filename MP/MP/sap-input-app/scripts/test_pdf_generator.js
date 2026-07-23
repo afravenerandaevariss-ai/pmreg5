@@ -115,8 +115,10 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
 
   const masterEquipments = eqData.data || [];
   const activeLogs = (logs || []).filter(l => l.status !== 'CANCELLED');
-  const now = new Date();
-  const targetDateStr = now.toISOString().split('T')[0];
+  // Memaksa waktu ke WIB (Jakarta) secara eksplisit dari dalam kode Javascript
+  const nowStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
+  const now = new Date(nowStr);
+  const targetDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const targetMonthStr = targetDateStr.substring(0, 7);
   const monthLogs = activeLogs.filter(l => l.date && l.date.startsWith(targetMonthStr));
 
