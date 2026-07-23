@@ -1,36 +1,81 @@
-name: Automated WhatsApp Screenshot
+name: 🚗 Kirim Rekap Logbook Kendaraan ke WhatsApp
 
+# ─────────────────────────────────────────────────────────────────────────────
+# JADWAL OTOMATIS (WIB = UTC+7)
+#   • 09:00 WIB = 02:00 UTC
+#   • 15:00 WIB = 08:00 UTC
+# Jika perangkat mati sekalipun, GitHub Actions tetap berjalan di cloud.
+# ─────────────────────────────────────────────────────────────────────────────
 on:
   schedule:
-    # 02:00 UTC = 09:00 WIB
-    # 08:00 UTC = 15:00 WIB
-    - cron: '0 2,8 * * *'
-  workflow_dispatch: # allow manual trigger
+    - cron: '0 2 * * *'   # 09:00 WIB setiap hari
+    - cron: '0 8 * * *'   # 15:00 WIB setiap hari
+  workflow_dispatch:       # Tombol "Run workflow" manual di GitHub
 
 jobs:
-  send-report:
+  send-logbook-report:
+    name: 📊 Generate & Send HD Image Report
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: MP/MP/sap-input-app
+
     steps:
-      - name: Checkout Repository
+      # ── 1. Clone repository ────────────────────────────────────────────────
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
-      
-      - name: Setup Node.js
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 2. Setup Node.js ───────────────────────────────────────────────────
+      - name: 🟢 Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-          
-      - name: Install Dependencies
+          cache-dependency-path: MP/MP/sap-input-app/package-lock.json
+
+      # ── 3. Install Google Chrome (required for Puppeteer on Ubuntu) ────────
+      - name: 🌐 Install Google Chrome Stable
+        run: |
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update -q
+          sudo apt-get install -y google-chrome-stable
+          google-chrome --version
+
+      # ── 4. Install Node dependencies ───────────────────────────────────────
+      - name: 📦 Install npm Dependencies
         run: npm ci
-        
-      - name: Run Puppeteer Script
+
+      # ── 5. Create public/ directory (for rekap.png output) ────────────────
+      - name: 📁 Ensure public/ directory exists
+        run: mkdir -p public
+
+      # ── 6. Run the automated report script ────────────────────────────────
+      - name: 📸 Generate HD Screenshot & Send via GoWA
         env:
-          # User requested full automation without manual secret setup
-          WEB_NIK: '19010048'
-          WEB_PASS: 'ikatanistripenerbanganindonesia'
+          # Supabase (data source)
+          VITE_SUPABASE_URL: 'https://pabnvxlvrussdfhisxzn.supabase.co'
+          VITE_SUPABASE_ANON_KEY: 'sb_publishable_btvgcbyES8_4w5x3dE-atg_kYfUAii4'
+          # GoWA API credentials
           GOWA_URL: 'https://gowa.waterflai.my.id'
           GOWA_USER: 'admin'
           GOWA_PASS: 'Sedap321#'
-          TARGET_PHONE: '081251334618'
-        run: node scripts/send_wa_image.js
+          # WhatsApp target group
+          TARGET_GROUP_JID: '120363430505509462@g.us'
+          # Chrome path on Ubuntu runner
+          CHROME_PATH: '/usr/bin/google-chrome-stable'
+        run: node scripts/run_wa_report.js
+
+      # ── 7. Upload screenshot as artifact (for debugging & audit trail) ─────
+      - name: 📎 Upload Screenshot Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rekap-logbook-${{ github.run_id }}
+          path: MP/MP/sap-input-app/public/rekap.png
+          retention-days: 30
+          if-no-files-found: ignore
