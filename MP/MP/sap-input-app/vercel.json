@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/send-wa-image.js": {
+    "api/**/*": {
       "maxDuration": 60
     }
   },
