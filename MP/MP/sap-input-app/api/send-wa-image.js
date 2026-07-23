@@ -25,10 +25,10 @@ export default async function handler(req, res) {
     
     console.log('Screenshot URL:', imageUrl);
 
-    // 2. Fetch the image to convert to Base64
+    // 2. Fetch the image
     const imgRes = await fetch(imageUrl);
     const arrayBuffer = await imgRes.arrayBuffer();
-    const screenshotBase64 = Buffer.from(arrayBuffer).toString('base64');
+    const blob = new Blob([arrayBuffer], { type: 'image/png' });
 
     let dispatchResult = { success: false, detail: null };
     const apiToken = req.query.token || req.body?.token || waConfig.apiToken || process.env.FONNTE_TOKEN;
@@ -59,18 +59,18 @@ export default async function handler(req, res) {
         formattedPhone = cleanPhone.startsWith('0') ? '62' + cleanPhone.substring(1) : cleanPhone;
       }
 
-      // Send Base64 Image to GoWA
+      // Send Image to GoWA using FormData
+      const formData = new FormData();
+      formData.append('phone', formattedPhone);
+      formData.append('caption', 'Laporan otomatis (HD Screenshot)');
+      formData.append('image', blob, 'screenshot.png');
+
       const gowaRes = await fetch(`${gowaUrl}/send/image?device_id=${encodeURIComponent(deviceId)}`, {
         method: 'POST',
         headers: {
-          'Authorization': authHeader,
-          'Content-Type': 'application/json'
+          'Authorization': authHeader
         },
-        body: JSON.stringify({
-          phone: formattedPhone,
-          caption: 'Laporan otomatis (HD Screenshot)',
-          image: `data:image/png;base64,${screenshotBase64}`
-        })
+        body: formData
       });
 
       const gowaData = await gowaRes.json();
