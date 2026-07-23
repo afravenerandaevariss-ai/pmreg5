@@ -39,7 +39,10 @@ export default async function handler(req, res) {
     await page.setViewport({ width: 1400, height: 1000, deviceScaleFactor: 2 });
     
     // 2. Navigate to Dashboard
-    await page.goto(`${baseUrl}/?hideNav=true`, { waitUntil: 'networkidle0', timeout: 15000 });
+    await page.goto(`${baseUrl}/?hideNav=true`, { waitUntil: 'networkidle2', timeout: 25000 });
+    
+    // Give React time to render and fetch data
+    await new Promise(r => setTimeout(r, 3000));
 
     // 3. Take Screenshot of the dashboard content
     // We crop to the specific dashboard element if it exists, otherwise full page
