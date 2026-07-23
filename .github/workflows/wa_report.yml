@@ -4,8 +4,8 @@ on:
   schedule:
     # 08:00 WIB = 01:00 UTC
     - cron: '0 1 * * *'
-    # 19:20 WIB = 12:20 UTC
-    - cron: '20 12 * * *'
+    # 17:31 WIB = 10:31 UTC
+    - cron: '31 10 * * *'
   # Allow manual trigger from GitHub Actions tab
   workflow_dispatch:
 
@@ -22,19 +22,30 @@ jobs:
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: MP/MP/sap-input-app/package-lock.json
 
       - name: 📦 Install dependencies
         working-directory: MP/MP/sap-input-app
-        run: npm ci --prefer-offline || npm install
+        run: |
+          rm -f package-lock.json
+          npm install
 
       - name: 🌐 Install Chrome (for PDF generation)
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y google-chrome-stable
+          which google-chrome-stable
           google-chrome-stable --version
+
+      - name: 🔧 Patch Chrome path for Linux
+        working-directory: MP/MP/sap-input-app
+        run: |
+          # Replace Windows Chrome path with Linux path in test_pdf_generator.js
+          sed -i "s|C:\\\\\\\\Program Files\\\\\\\\Google\\\\\\\\Chrome\\\\\\\\Application\\\\\\\\chrome.exe|/usr/bin/google-chrome-stable|g" scripts/test_pdf_generator.js
+          echo "Chrome path patched:"
+          grep -n "chromePath" scripts/test_pdf_generator.js
 
       - name: 📤 Send WA Logbook Report (PDF)
         working-directory: MP/MP/sap-input-app
@@ -47,7 +58,6 @@ jobs:
           GOWA_PASS: Sedap321#
           TARGET_GROUP_JID: 120363430505509462@g.us
           TARGET_PHONE: "081251334618"
-          CHROME_PATH: /usr/bin/google-chrome-stable
 
       - name: ✅ Done
-        run: echo "WA Report dispatched at $(date '+%Y-%m-%d %H:%M:%S') UTC"
+        run: echo "WA Report dispatched successfully at $(date '+%Y-%m-%d %H:%M:%S') UTC"
