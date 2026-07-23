@@ -771,9 +771,13 @@ export default function VehicleMonitoringView({ currentUser }) {
           desc: hmKmVal > 0 ? `${hmKmVal} ${uomVal === 'HM' || uomVal === 'KM' ? uomVal : 'HM/KM'}` : `${unitVal} ${uomVal || 'Unit'}`
         };
       });
+      // Find matching equipment from masterEquipments
+      const eq = masterEquipments.find(e => e.eqNum === v.vehicle_code);
 
       return {
         ...v,
+        eqDesc: eq ? eq.description : '-',
+        costCenter: eq ? eq.costCenter : '-',
         daysFilled,
         isInputtedToday,
         todayDetails: isInputtedToday ? {
@@ -827,7 +831,7 @@ export default function VehicleMonitoringView({ currentUser }) {
         statusText
       }
     };
-  }, [vehicles, activeMonthLogs, selectedPlant, targetMonth, targetInputDate]);
+  }, [vehicles, activeMonthLogs, selectedPlant, targetMonth, targetInputDate, masterEquipments]);
 
   // ── Per-Vehicle Detail (all plants, original tab) ───────────────────────────
   const vehicleDetailData = useMemo(() => {
@@ -1599,8 +1603,9 @@ export default function VehicleMonitoringView({ currentUser }) {
                 <table className="w-full text-xs text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-100/60 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                      <th className="px-4 py-3 w-[150px]">No. Lambung (Kode)</th>
-                      <th className="px-4 py-3 min-w-[200px]">Pekerjaan Utama / Deskripsi</th>
+                      <th className="px-4 py-3 w-[200px]">No. Equipment & Deskripsi</th>
+                      <th className="px-4 py-3 w-[100px]">Cost Center</th>
+                      <th className="px-4 py-3 min-w-[180px]">Pekerjaan Utama (Transaksi)</th>
                       <th className="px-4 py-3 text-center w-[160px]">Status Hari Ini</th>
                       <th className="px-4 py-3 text-center w-[120px]">Bulan Ini (Terisi)</th>
                       <th className="px-4 py-3">Absensi Harian (Tanggal 1 s.d. 31)</th>
@@ -1610,14 +1615,18 @@ export default function VehicleMonitoringView({ currentUser }) {
                   <tbody className="divide-y divide-slate-100">
                     {unitFocusedData.vehiclesList.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-16 text-center text-slate-400 font-medium">
+                        <td colSpan={7} className="py-16 text-center text-slate-400 font-medium">
                           Tidak ada kendaraan terdaftar di Kebun/Unit ini. Silakan upload file ZESTHLP16PA SAP untuk mendaftarkan data.
                         </td>
                       </tr>
                     ) : unitFocusedData.vehiclesList.map(v => (
                       <React.Fragment key={v.vehicle_code}>
                         <tr className={`hover:bg-emerald-50/40  hover:shadow-sm transition-colors duration-200 border-b border-slate-50 group ${expandedVehicleId === v.vehicle_code ? 'bg-emerald-50/10' : ''}`}>
-                          <td className="px-4 py-3 font-bold text-slate-800 font-mono text-[13px]">{v.vehicle_code}</td>
+                          <td className="px-4 py-3">
+                            <span className="font-bold text-slate-800 font-mono text-[13px] block">{v.vehicle_code}</span>
+                            <span className="text-[10px] text-slate-500 block truncate max-w-[180px]" title={v.eqDesc}>{v.eqDesc}</span>
+                          </td>
+                          <td className="px-4 py-3 font-mono text-[11px] font-semibold text-slate-700">{v.costCenter}</td>
                           <td className="px-4 py-3 text-slate-600">
                             <span className="font-semibold text-slate-700 block text-xs">{v.description}</span>
                             <span className="text-[10px] text-slate-400 font-medium mt-0.5 block">Tipe Pekerjaan Utama: {v.description.split(' Ke ')[0]}</span>
@@ -1675,7 +1684,7 @@ export default function VehicleMonitoringView({ currentUser }) {
                         {/* Expanded detail row showing logs for selected vehicle */}
                         {expandedVehicleId === v.vehicle_code && (
                           <tr className="bg-slate-50/50">
-                            <td colSpan={6} className="px-6 py-4">
+                            <td colSpan={7} className="px-6 py-4">
                               <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-inner max-w-4xl">
                                 <h5 className="font-bold text-slate-700 text-xs mb-3 flex items-center gap-1.5">
                                   <Truck size={14} className="text-[#064e3b]" /> 
