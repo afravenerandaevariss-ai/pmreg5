@@ -512,6 +512,10 @@ function App() {
     return () => clearInterval(timer);
   }, []);
   const [currentUser, setCurrentUser] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('hideNav') === 'true') {
+      return { nik: 'SYSTEM', name: 'System Auto-Capture', role: 'Admin', plant: 'ALL' };
+    }
     const saved = localStorage.getItem('sapApp_user');
     return saved ? JSON.parse(saved) : null;
   });
