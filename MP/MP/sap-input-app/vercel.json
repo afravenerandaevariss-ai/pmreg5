@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/send-wa-image.js": {
+      "maxDuration": 60
+    }
+  },
   "crons": [
     {
       "path": "/api/send-wa-image",
