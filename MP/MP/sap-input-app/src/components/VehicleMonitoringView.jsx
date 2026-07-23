@@ -778,8 +778,8 @@ export default function VehicleMonitoringView({ currentUser }) {
 
       return {
         ...v,
-        eqDesc: eq ? eq.description : '-',
-        costCenter: eq ? eq.costCenter : '-',
+        eqDesc: (eq && eq.description) ? eq.description : (v.description || '-'),
+        costCenter: (eq && eq.costCenter) ? eq.costCenter : (v.cost_center || '-'),
         daysFilled,
         isInputtedToday,
         todayDetails: isInputtedToday ? {
