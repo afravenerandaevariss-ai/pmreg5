@@ -137,7 +137,7 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
 
   let tableData = Object.keys(PLANT_INFO).sort().map(plantCode => {
     const info = PLANT_INFO[plantCode];
-    const plantVehicles = masterEquipments.filter(e => e.plant === plantCode && String(e.eqNum || '').startsWith('20000'));
+    const plantVehicles = masterEquipments.filter(e => e.plant === plantCode && String(e.eq_num || '').startsWith('20000'));
     const vehicleCount = plantVehicles.length > 0 ? plantVehicles.length : (VEHICLE_MASTER_COUNT[plantCode] || 0);
     const plantLogs = monthLogs.filter(l => l.plant === plantCode);
     const totalTx = plantLogs.length;
@@ -165,7 +165,7 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     return {
       wilayah: info.wilayah, plant: plantCode, desc: info.desc,
       vehicleCount, 
-      hariKerja: (vehicleCount > 0 && totalTx > 0) ? autoWorkingDays : '-',
+      hariKerja: (vehicleCount > 0 || totalTx > 0) ? autoWorkingDays : '-',
       targetTotal: totalTx,
       upToDate: utdCount, notUpToDate: tutdCount, totalTransaksi: totalTx,
       pctUtd: totalTx > 0 ? (utdCount / totalTx) * 100 : 0,
@@ -206,10 +206,10 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     const bgClass = getIndicatorClass(item.lastLogDateRaw, targetDateStr);
     return `
       <tr>
-        <td style="color:#374151">${item.wilayah}</td>
+        <td>${item.wilayah}</td>
         <td style="font-weight:800;color:#16a34a">${item.plant}</td>
         <td style="text-align:left;padding-left:8px">${item.desc}</td>
-        <td>${item.vehicleCount || '-'}</td>
+        <td>${item.vehicleCount}</td>
         <td>${item.hariKerja}</td>
         <td style="font-weight:700">${item.targetTotal || '-'}</td>
         <td style="font-weight:800;color:#16a34a">${item.upToDate}</td>
