@@ -56,6 +56,9 @@ jobs:
       - name: 📸 Generate HD Image Report & Send WhatsApp
         working-directory: MP/MP/sap-input-app
         env:
+          # Set Timezone agar jam di laporan (image) menggunakan WIB
+          TZ: 'Asia/Jakarta'
+          
           # Supabase (sumber data logbook)
           VITE_SUPABASE_URL: '${{ secrets.VITE_SUPABASE_URL }}'
           VITE_SUPABASE_ANON_KEY: '${{ secrets.VITE_SUPABASE_ANON_KEY }}'
