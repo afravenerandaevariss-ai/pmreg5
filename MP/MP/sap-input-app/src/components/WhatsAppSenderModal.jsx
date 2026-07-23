@@ -158,34 +158,6 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
     }
   };
 
-  const handleSendImageNow = async () => {
-    setSending(true);
-    setStatusMsg({ type: 'success', text: 'Sedang mengambil screenshot HD (bisa memakan waktu 10-20 detik)...' });
-    try {
-      const res = await fetch(`/api/send-wa-image?target=${encodeURIComponent(targetPhone)}&token=${encodeURIComponent(apiToken)}&provider=${encodeURIComponent(provider)}`, {
-        method: 'POST'
-      });
-      const data = await res.json();
-      if (data.success) {
-        setStatusMsg({ type: 'success', text: `Screenshot HD berhasil dikirim ke ${targetPhone}!` });
-        await saveWALog({
-          timestamp: new Date().toISOString(),
-          target: targetPhone,
-          status: data.dispatchResult?.success ? 'SUCCESS_IMAGE' : 'PROCESSED_IMAGE',
-          detail: data.dispatchResult?.detail ? JSON.stringify(data.dispatchResult.detail) : 'Gambar dikirim via API',
-          summaryCount: summaryData?.length || 0
-        });
-        loadLogs();
-      } else {
-        throw new Error(data.error || 'Gagal mengambil / mengirim screenshot');
-      }
-    } catch (err) {
-      setStatusMsg({ type: 'error', text: 'Gagal mengirim screenshot: ' + err.message });
-    } finally {
-      setSending(false);
-    }
-  };
-
   if (!isOpen) return null;
 
   const currentReportText = generateWAText();
@@ -299,13 +271,6 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
                     className="flex items-center gap-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition disabled:opacity-50"
                   >
                     <ExternalLink size={13} /> Buka di WA Web
-                  </button>
-                  <button
-                    onClick={handleSendImageNow}
-                    disabled={sending}
-                    className="flex items-center gap-1.5 bg-indigo-700 hover:bg-indigo-800 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md transition disabled:opacity-50"
-                  >
-                    <Smartphone size={13} /> {sending ? 'Sending...' : 'Kirim Screenshot HD'}
                   </button>
                   <button
                     onClick={handleSendApiNow}
