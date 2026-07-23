@@ -183,7 +183,7 @@ async function runDailyWASend() {
   });
   text += `+-------+-------------------------+------+----------+-----+-----+--------+------------+------+\n`;
   text += `\`\`\`\n`;
-  text += `\n_Laporan otomatis diproses dari https://pmreg5.afratarigan.my.id (Jadwal 08:00 WIB & 15:30 WIB)_`;
+  text += `\n_Laporan otomatis diproses dari https://pmreg5.afratarigan.my.id (Jadwal 09:00 WIB & 17:31 WIB)_`;
 
   console.log(`Generated WhatsApp text report for target: ${targetPhone}`);
 

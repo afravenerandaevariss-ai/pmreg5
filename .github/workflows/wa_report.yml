@@ -2,8 +2,8 @@ name: 📊 WA Logbook Report - Auto Send
 
 on:
   schedule:
-    # 08:00 WIB = 01:00 UTC
-    - cron: '0 1 * * *'
+    # 09:00 WIB = 02:00 UTC
+    - cron: '0 2 * * *'
     # 17:31 WIB = 10:31 UTC
     - cron: '31 10 * * *'
   # Allow manual trigger from GitHub Actions tab
