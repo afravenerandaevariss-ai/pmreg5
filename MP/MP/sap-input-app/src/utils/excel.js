@@ -115,13 +115,23 @@ export async function parseRegionalMP(file, masterMap) {
           const eqNum = String(row[eqColIdx] || '').trim();
           if (!eqNum) continue;
           
-          const masterInfo = masterMap.get(eqNum);
           let plant = 'Uncategorized';
+          let costCenter = '';
+          let masterDescription = '';
+          
+          const eqNumNorm = eqNum.replace(/^0+/, '');
+          // Try exact match first, then normalized match
+          const masterInfo = masterMap.get(eqNum) || masterMap.get(eqNumNorm);
+          
           if (masterInfo) {
             plant = typeof masterInfo === 'string' ? masterInfo : masterInfo.plant;
+            if (typeof masterInfo === 'object') {
+              costCenter = masterInfo.costCenter || '';
+              masterDescription = masterInfo.description || '';
+            }
           }
           
-          const description = String(row[descColIdx] || '').trim();
+          const description = masterDescription || String(row[descColIdx] || '').trim();
           
           // Find parent: the shortest description that is a suffix of the current description
           let parentEquipment = description;
@@ -139,6 +149,7 @@ export async function parseRegionalMP(file, masterMap) {
             description: description,
             measuringPoint: row[measuringPtIdx] || '',
             plant: plant,
+            costCenter: costCenter,
             parentEquipment: parentEquipment,
             reading: row[readingIdx] || '',
           });
