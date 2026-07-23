@@ -1,12 +1,12 @@
 {
   "crons": [
     {
-      "path": "/api/send-wa",
+      "path": "/api/send-wa-image",
       "schedule": "0 1 * * *"
     },
     {
-      "path": "/api/send-wa",
-      "schedule": "20 12 * * *"
+      "path": "/api/send-wa-image",
+      "schedule": "0 8 * * *"
     }
   ],
   "redirects": [
