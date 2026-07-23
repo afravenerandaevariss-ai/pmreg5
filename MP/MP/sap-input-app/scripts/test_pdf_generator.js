@@ -207,25 +207,25 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
 <head>
   <meta charset="utf-8">
   <style>
-    html, body { margin: 0; padding: 30px 40px; background: #ffffff; font-family: "Segoe UI", "Calibri", "Arial", sans-serif; color: #000000; width: 1600px; box-sizing: border-box; }
-    .header-container { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
-    .header-left { display: flex; flex-direction: column; gap: 4px; }
-    .title { font-size: 20px; font-weight: 800; color: #000000; }
-    .subtitle { font-size: 16px; font-weight: 800; color: #000000; text-transform: uppercase; }
-    .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-    .h-badge { border: 1px solid #cbd5e1; padding: 4px 16px; font-size: 14px; font-weight: bold; }
-    .target { font-size: 14px; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-    th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: center; font-size: 13px; }
-    th { font-weight: 800; text-transform: uppercase; background: #ffffff; }
-    .th-group { font-weight: 800; }
-    .bg-green { background-color: #10b981 !important; color: white !important; font-weight: 700; }
-    .bg-yellow { background-color: #facc15 !important; color: #000000 !important; font-weight: 700; }
-    .bg-red { background-color: #ef4444 !important; color: white !important; font-weight: 700; }
-    .bg-black { background-color: #000000 !important; color: white !important; font-weight: 700; }
-    .legend-container { display: flex; align-items: center; gap: 20px; margin-top: 20px; font-size: 14px; font-weight: 600; }
-    .legend-item { display: flex; align-items: center; gap: 8px; }
-    .legend-box { width: 24px; height: 16px; }
+    html, body { margin: 0; padding: 20px 30px; background: #ffffff; font-family: "Segoe UI", "Calibri", "Arial", sans-serif; color: #000000; width: 1400px; box-sizing: border-box; }
+    .header-container { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+    .header-left { display: flex; flex-direction: column; gap: 6px; }
+    .title { font-size: 32px; font-weight: 800; color: #000000; }
+    .subtitle { font-size: 24px; font-weight: 800; color: #000000; text-transform: uppercase; }
+    .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
+    .h-badge { border: 2px solid #cbd5e1; padding: 8px 24px; font-size: 22px; font-weight: bold; }
+    .target { font-size: 22px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    th, td { border: 2px solid #cbd5e1; padding: 12px 8px; text-align: center; font-size: 20px; }
+    th { font-weight: 900; text-transform: uppercase; background: #ffffff; font-size: 18px; }
+    .th-group { font-weight: 900; }
+    .bg-green { background-color: #10b981 !important; color: white !important; font-weight: 800; }
+    .bg-yellow { background-color: #facc15 !important; color: #000000 !important; font-weight: 800; }
+    .bg-red { background-color: #ef4444 !important; color: white !important; font-weight: 800; }
+    .bg-black { background-color: #000000 !important; color: white !important; font-weight: 800; }
+    .legend-container { display: flex; align-items: center; gap: 24px; margin-top: 24px; font-size: 22px; font-weight: 700; }
+    .legend-item { display: flex; align-items: center; gap: 12px; }
+    .legend-box { width: 36px; height: 24px; }
   </style>
 </head>
 <body>
@@ -287,14 +287,14 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
   });
   const page = await browser.newPage();
-  await page.setViewport({ width: 1700, height: 1000, deviceScaleFactor: 1.5 });
+  await page.setViewport({ width: 1400, height: 1000, deviceScaleFactor: 1 });
   
   await page.goto(`file:///${htmlPath.replace(/\\/g, '/')}`, { waitUntil: 'networkidle0' });
   
   await page.screenshot({
     path: jpgPath,
     type: 'jpeg',
-    quality: 95,
+    quality: 100,
     fullPage: true
   });
   
