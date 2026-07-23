@@ -1,63 +1,84 @@
-name: 📊 WA Logbook Report - Auto Send
+name: 🚗 Kirim Rekap Logbook Kendaraan HD ke WhatsApp
 
+# ─────────────────────────────────────────────────────────────────────────────
+# JADWAL OTOMATIS (WIB = UTC+7)
+#   • 09:00 WIB = 02:00 UTC  → cron: '0 2 * * *'
+#   • 15:00 WIB = 08:00 UTC  → cron: '0 8 * * *'
+#
+# ⚠️  Berjalan di server GitHub walaupun perangkat lokal dimatikan.
+# ─────────────────────────────────────────────────────────────────────────────
 on:
   schedule:
-    # 09:00 WIB = 02:00 UTC
-    - cron: '0 2 * * *'
-    # 17:31 WIB = 10:31 UTC
-    - cron: '31 10 * * *'
-  # Allow manual trigger from GitHub Actions tab
-  workflow_dispatch:
+    - cron: '0 2 * * *'   # 09:00 WIB setiap hari
+    - cron: '0 8 * * *'   # 15:00 WIB setiap hari
+  workflow_dispatch:       # Tombol "Run workflow" manual di GitHub Actions tab
 
 jobs:
-  send-report:
-    name: Send WA Logbook Report
+  send-logbook-hd-image:
+    name: 📊 Generate HD Image & Send via GoWA
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
+      # ── 1. Clone repository ────────────────────────────────────────────────
       - name: ⬇️ Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🟢 Setup Node.js
+      # ── 2. Setup Node.js 20 ────────────────────────────────────────────────
+      - name: 🟢 Setup Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
           cache: 'npm'
           cache-dependency-path: MP/MP/sap-input-app/package-lock.json
 
-      - name: 📦 Install dependencies
+      # ── 3. Install dependencies ────────────────────────────────────────────
+      - name: 📦 Install npm dependencies
         working-directory: MP/MP/sap-input-app
-        run: |
-          rm -f package-lock.json
-          npm install
+        run: npm ci
 
-      - name: 🌐 Install Chrome (for PDF generation)
+      # ── 4. Install Google Chrome Stable ───────────────────────────────────
+      - name: 🌐 Install Google Chrome Stable
         run: |
-          sudo apt-get update -qq
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update -q
           sudo apt-get install -y google-chrome-stable
-          which google-chrome-stable
-          google-chrome-stable --version
+          echo "Chrome version: $(google-chrome-stable --version)"
 
-      - name: 🔧 Patch Chrome path for Linux
+      # ── 5. Ensure output directories exist ────────────────────────────────
+      - name: 📁 Ensure public/ directory exists
         working-directory: MP/MP/sap-input-app
-        run: |
-          # Replace Windows Chrome path with Linux path in test_pdf_generator.js
-          sed -i "s|C:\\\\\\\\Program Files\\\\\\\\Google\\\\\\\\Chrome\\\\\\\\Application\\\\\\\\chrome.exe|/usr/bin/google-chrome-stable|g" scripts/test_pdf_generator.js
-          echo "Chrome path patched:"
-          grep -n "chromePath" scripts/test_pdf_generator.js
+        run: mkdir -p public
 
-      - name: 📤 Send WA Logbook Report (PDF)
+      # ── 6. Generate HD screenshot & Send via GoWA ─────────────────────────
+      - name: 📸 Generate HD Image Report & Send WhatsApp
         working-directory: MP/MP/sap-input-app
-        run: node scripts/send_wa_daily.js
         env:
-          VITE_SUPABASE_URL: https://pabnvxlvrussdfhisxzn.supabase.co
-          VITE_SUPABASE_ANON_KEY: sb_publishable_btvgcbyES8_4w5x3dE-atg_kYfUAii4
-          GOWA_URL: https://gowa.waterflai.my.id
-          GOWA_USER: admin
-          GOWA_PASS: Sedap321#
-          TARGET_GROUP_JID: 120363430505509462@g.us
-          TARGET_PHONE: "081251334618"
+          # Supabase (sumber data logbook)
+          VITE_SUPABASE_URL: 'https://pabnvxlvrussdfhisxzn.supabase.co'
+          VITE_SUPABASE_ANON_KEY: 'sb_publishable_btvgcbyES8_4w5x3dE-atg_kYfUAii4'
+          # GoWA API (pengiriman WhatsApp)
+          GOWA_URL: 'https://gowa.waterflai.my.id'
+          GOWA_USER: 'admin'
+          GOWA_PASS: 'Sedap321#'
+          # Target: grup WhatsApp Regional 5
+          TARGET_GROUP_JID: '120363430505509462@g.us'
+          TARGET_PHONE: '081251334618'
+          # Chrome path di Ubuntu runner
+          CHROME_PATH: '/usr/bin/google-chrome-stable'
+        run: node scripts/run_wa_report.js
 
+      # ── 7. Upload screenshot as artifact (audit trail 30 hari) ────────────
+      - name: 📎 Upload Screenshot Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rekap-logbook-${{ github.run_id }}
+          path: MP/MP/sap-input-app/public/rekap.png
+          retention-days: 30
+          if-no-files-found: ignore
+
+      # ── 8. Done ────────────────────────────────────────────────────────────
       - name: ✅ Done
-        run: echo "WA Report dispatched successfully at $(date '+%Y-%m-%d %H:%M:%S') UTC"
+        run: echo "WA HD Report dispatched at $(date '+%Y-%m-%d %H:%M:%S') UTC (= $(TZ=Asia/Jakarta date '+%H:%M') WIB)"
