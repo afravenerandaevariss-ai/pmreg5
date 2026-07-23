@@ -773,12 +773,13 @@ export default function VehicleMonitoringView({ currentUser }) {
         };
       });
       // Find matching equipment from masterEquipments
-      const eq = masterEquipments.find(e => e.eqNum === v.vehicle_code);
+      const normalizeEq = (code) => String(code || '').replace(/^0+/, '').trim();
+      const eq = masterEquipments.find(e => normalizeEq(e.eqNum) === normalizeEq(v.vehicle_code));
 
       return {
         ...v,
         eqDesc: eq ? eq.description : '-',
-        costCenter: v.cost_center || (eq ? eq.costCenter : '-'),
+        costCenter: eq ? eq.costCenter : '-',
         daysFilled,
         isInputtedToday,
         todayDetails: isInputtedToday ? {
