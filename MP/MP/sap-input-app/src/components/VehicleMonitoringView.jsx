@@ -9,6 +9,7 @@ import {
   Copy, Printer, Coins, ShieldAlert, Send
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import html2canvas from 'html2canvas';
 import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, fetchMasterEquipment, fetchZCOData, saveZCOData } from '../lib/supabaseService';
 import WhatsAppSenderModal from './WhatsAppSenderModal';
 
@@ -1021,8 +1022,40 @@ export default function VehicleMonitoringView({ currentUser }) {
   };
 
   // Trigger print dialog
-  const handlePrint = () => {
-    window.print();
+  // Trigger High-Quality Image Download
+  const handlePrint = async () => {
+    const element = document.getElementById('excel-report-sheet');
+    if (!element) return;
+    
+    // Add temporary styling for better image capture (optional, e.g., removing borders, adjusting scaling)
+    const originalStyle = element.style.cssText;
+    
+    try {
+      // Create high-quality canvas (scale 3 for HD)
+      const canvas = await html2canvas(element, {
+        scale: 3,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+      
+      // Convert to image and download
+      const imageURL = canvas.toDataURL('image/png', 1.0);
+      const link = document.createElement('a');
+      link.href = imageURL;
+      
+      const now = new Date();
+      const dateStr = `${String(now.getDate()).padStart(2, '0')}${String(now.getMonth()+1).padStart(2, '0')}${now.getFullYear()}`;
+      link.download = `Logbook_Regional5_${dateStr}.png`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      alert('Gagal menyimpan gambar: ' + err.message);
+    } finally {
+      element.style.cssText = originalStyle;
+    }
   };
 
   const handleExportZCO = () => {
@@ -1769,13 +1802,16 @@ export default function VehicleMonitoringView({ currentUser }) {
                   className="pl-9 pr-3 py-2 border border-slate-200 rounded-2xl text-xs w-56 focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b]" />
               </div>
               <div className="flex gap-2 flex-wrap">
-                <button onClick={() => setShowWAModal(true)}
-                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition">
-                  <Send size={13} /> Kirim WhatsApp 8 AM (081251334618)
-                </button>
+                {/* Hanya tampil jika Admin/Developer atau disembunyikan sesuai instruksi */}
+                {currentUser?.role === 'Admin' && (
+                  <button onClick={() => setShowWAModal(true)}
+                    className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition">
+                    <Send size={13} /> Kirim WhatsApp 8 AM
+                  </button>
+                )}
                 <button onClick={handlePrint}
                   className="flex items-center gap-1.5 bg-[#064e3b] hover:bg-[#065f46] text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition">
-                  <Printer size={13} /> Cetak / Simpan PDF
+                  <Download size={13} /> Simpan Gambar HD
                 </button>
                 <button onClick={handleExportSummary}
                   className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition">
