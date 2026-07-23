@@ -1878,7 +1878,11 @@ export default function VehicleMonitoringView({ currentUser }) {
                             </td>
                             <td className="px-2 py-0.5 font-black text-slate-800">{item.rank}</td>
                             <td className="px-2 py-0.5 no-print">
-                              <button onClick={() => setDrawerItem(item)}
+                              <button onClick={() => {
+                                setSelectedPlant(item.plant);
+                                setActiveTab('unit-checklist');
+                                window.scrollTo(0, 0);
+                              }}
                                 className="text-[#064e3b] hover:text-[#065f46] transition"><Eye size={13} /></button>
                             </td>
                           </tr>
