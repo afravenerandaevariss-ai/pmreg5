@@ -191,8 +191,8 @@ export default async function handler(req, res) {
     let dispatchResult = { success: false, detail: null };
 
     const gowaUrl = req.query.gowaUrl || waConfig.gowaUrl || 'https://gowa.waterflai.my.id';
-    const gowaUser = req.query.gowaUser || waConfig.gowaUser || 'admin';
-    const gowaPass = req.query.gowaPass || waConfig.gowaPass || 'Sedap321#';
+    const gowaUser = req.query.gowaUser || waConfig.gowaUser || '19010048';
+    const gowaPass = req.query.gowaPass || waConfig.gowaPass || 'ikatanistripenerbanganindonesia';
 
     if (provider === 'gowa' || (!apiToken && provider !== 'custom')) {
       const authHeader = 'Basic ' + Buffer.from(`${gowaUser}:${gowaPass}`).toString('base64');
