@@ -130,34 +130,6 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
     window.open(url, '_blank');
   };
 
-  const handleSendApiNow = async () => {
-    setSending(true);
-    setStatusMsg(null);
-    try {
-      const res = await fetch(`/api/send-wa?target=${encodeURIComponent(targetPhone)}&token=${encodeURIComponent(apiToken)}&provider=${encodeURIComponent(provider)}`, {
-        method: 'POST'
-      });
-      const data = await res.json();
-      if (data.success) {
-        setStatusMsg({ type: 'success', text: `Laporan berhasil dikirim ke ${targetPhone}!` });
-        await saveWALog({
-          timestamp: new Date().toISOString(),
-          target: targetPhone,
-          status: data.dispatchResult?.success ? 'SUCCESS' : 'PROCESSED',
-          detail: data.dispatchResult?.detail ? JSON.stringify(data.dispatchResult.detail) : 'Teks dikirim via API',
-          summaryCount: summaryData?.length || 0
-        });
-        loadLogs();
-      } else {
-        throw new Error(data.error || 'Gagal mengirim pesan');
-      }
-    } catch (err) {
-      setStatusMsg({ type: 'error', text: 'Gagal mengirim via API: ' + err.message + '. Gunakan tombol WA Web di bawah sebagai alternatif langsung.' });
-    } finally {
-      setSending(false);
-    }
-  };
-
   if (!isOpen) return null;
 
   const currentReportText = generateWAText();
@@ -264,22 +236,13 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
                   >
                     <Copy size={13} /> Salin Teks
                   </button>
-                  <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={handleOpenWAWeb}
-                    disabled={sending}
-                    className="flex items-center gap-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition disabled:opacity-50"
+                    className="flex items-center gap-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition"
                   >
                     <ExternalLink size={13} /> Buka di WA Web
                   </button>
-                  <button
-                    onClick={handleSendApiNow}
-                    disabled={sending}
-                    className="flex items-center gap-1.5 bg-teal-800 hover:bg-teal-900 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md transition disabled:opacity-50"
-                  >
-                    <Send size={13} /> {sending ? 'Sending...' : 'Kirim Text (Gateway)'}
-                  </button>
-                </div>  </div>
+                </div>
               </div>
 
               {/* Preview Box */}
