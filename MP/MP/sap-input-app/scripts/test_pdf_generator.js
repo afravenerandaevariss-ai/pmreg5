@@ -326,9 +326,9 @@ export async function generateAndSendTablePdf(targetGroupJid = TARGET_GROUP_JID)
   formData.append('caption', headerTitleText);
   formData.append('is_hd', 'true');
   const blob = new Blob([imgBuffer], { type: 'image/jpeg' });
-  formData.append('file', blob, `Rekap_Logbook_Kendaraan_Regional5_${dayStr}_${monthName}_${yearStr}.jpg`);
+  formData.append('image', blob, `Rekap_Logbook_Kendaraan_Regional5_${dayStr}_${monthName}_${yearStr}.jpg`);
 
-  const gowaRes = await fetch(`${GOWA_URL}/send/file?device_id=${encodeURIComponent(deviceId)}`, {
+  const gowaRes = await fetch(`${GOWA_URL}/send/image?device_id=${encodeURIComponent(deviceId)}`, {
     method: 'POST',
     headers: {
       'Authorization': authHeader,
