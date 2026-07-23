@@ -1,0 +1,36 @@
+name: Automated WhatsApp Screenshot
+
+on:
+  schedule:
+    # 02:00 UTC = 09:00 WIB
+    # 08:00 UTC = 15:00 WIB
+    - cron: '0 2,8 * * *'
+  workflow_dispatch: # allow manual trigger
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Install Dependencies
+        run: npm ci
+        
+      - name: Run Puppeteer Script
+        env:
+          # Use secrets for sensitive data
+          WEB_NIK: ${{ secrets.WEB_NIK }}
+          WEB_PASS: ${{ secrets.WEB_PASS }}
+          GOWA_URL: ${{ secrets.GOWA_URL }}
+          GOWA_USER: ${{ secrets.GOWA_USER }}
+          GOWA_PASS: ${{ secrets.GOWA_PASS }}
+          TARGET_PHONE: ${{ secrets.TARGET_PHONE }}
+        run: node scripts/send_wa_image.js
