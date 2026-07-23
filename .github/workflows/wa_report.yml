@@ -9,9 +9,11 @@ name: 🚗 Kirim Rekap Logbook Kendaraan HD ke WhatsApp
 # ─────────────────────────────────────────────────────────────────────────────
 on:
   schedule:
+    - cron: '0 23 * * *'  # 06:00 WIB setiap hari (23:00 UTC)
     - cron: '0 2 * * *'   # 09:00 WIB setiap hari
     - cron: '0 8 * * *'   # 15:00 WIB setiap hari
     - cron: '33 11 * * *' # 18:33 WIB (Testing hari ini)
+  workflow_dispatch:       # Tombol "Run workflow" manual di GitHub Actions tab
   workflow_dispatch:       # Tombol "Run workflow" manual di GitHub Actions tab
 
 jobs:
