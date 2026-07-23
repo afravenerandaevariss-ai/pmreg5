@@ -11,8 +11,10 @@
     "wa:send": "node scripts/send_wa_daily.js"
   },
   "dependencies": {
+    "@sparticuz/chromium": "^149.0.0",
     "@supabase/supabase-js": "^2.108.2",
     "@tailwindcss/vite": "^4.3.0",
+    "canvas": "^3.2.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "formidable": "^3.5.4",
@@ -41,5 +43,8 @@
     "source-map": "^0.7.6",
     "tailwindcss": "^4.3.0",
     "vite": "^8.0.12"
+  },
+  "allowScripts": {
+    "canvas@3.2.3": true
   }
 }
