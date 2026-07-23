@@ -39,13 +39,27 @@ export async function parseMasterEQ(file) {
         const jsonData = XLSX.utils.sheet_to_json(firstSheet);
         
         const map = new Map();
+        
+        const getValue = (row, aliases) => {
+          const keys = Object.keys(row);
+          for (const alias of aliases) {
+            // exact match
+            if (row[alias] !== undefined) return row[alias];
+            // case insensitive match
+            const foundKey = keys.find(k => k.toLowerCase() === alias.toLowerCase() || k.toLowerCase().trim() === alias.toLowerCase());
+            if (foundKey) return row[foundKey];
+          }
+          return undefined;
+        };
+
         jsonData.forEach(row => {
-          const eq = row['Equipment'];
-          const plant = row['MaintPlant'];
-          const description = row['Description'];
-          const functionalLoc = row['Functional Loc.'];
-          const flDescription = row['Description2'];
-          const costCenter = row['Cost Center'];
+          const eq = getValue(row, ['Equipment', 'Equipment Number', 'Eq. Number']);
+          const plant = getValue(row, ['MaintPlant', 'Maint. Plant', 'Plant', 'Maintenance Plant']);
+          const description = getValue(row, ['Description', 'Equipment Description', 'Eq. Description']);
+          const functionalLoc = getValue(row, ['Functional Loc.', 'Functional Location', 'Func. Loc.']);
+          const flDescription = getValue(row, ['Description2', 'FL Description']);
+          const costCenter = getValue(row, ['Cost Center', 'Cost center', 'Cost Ctr', 'Cost Ctr.']);
+          
           if (eq) {
             map.set(String(eq), {
               plant: String(plant || 'Unknown'),
