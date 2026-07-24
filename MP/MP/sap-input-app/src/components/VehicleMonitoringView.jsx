@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toPng } from 'html-to-image';
-import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, fetchMasterEquipment, fetchZCOData, saveZCOData } from '../lib/supabaseService';
+import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, fetchMasterEquipment, fetchZCOData, saveZCOData, getSystemConfig } from '../lib/supabaseService';
 import WhatsAppSenderModal from './WhatsAppSenderModal';
 
 // ─── Plant Master Data ────────────────────────────────────────────────────────
@@ -49,21 +49,6 @@ const PLANT_INFO = {
   "5E17": { desc: "KEBUN TAJATI",           wilayah: "Kal-Tim" },
   "5E18": { desc: "KEBUN PANDAWA",          wilayah: "Kal-Tim" },
   "5E19": { desc: "KEBUN LONGKALI",         wilayah: "Kal-Tim" },
-};
-
-// ─── Vehicle Master Count (Official Reference Data) ──────────────────────────
-const VEHICLE_MASTER_COUNT = {
-  // Kal-Bar
-  "5E01": 15, "5E02": 10, "5E03": 14, "5E04": 13, "5E06": 1, 
-  "5E07": 16, "5E08": 16, "5E09": 8, "5F01": 4, "5F04": 3, 
-  "5F07": 5, "5F08": 4, "5F09": 7, "5D01": 0,
-
-  // Kal-Sel-Teng
-  "5E11": 7, "5E12": 5, "5E13": 5, "5E14": 17, "5E15": 7, 
-  "5F11": 0, "5F14": 1, "5F15": 0, "5F20": 0, "5F21": 0, "5F22": 0, "5D03": 0,
-
-  // Kal-Tim
-  "5E16": 23, "5E17": 21, "5E18": 11, "5E19": 22, "5D02": 0
 };
 
 // ─── Job Code Master ──────────────────────────────────────────────────────────
@@ -218,16 +203,22 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     setLoading(true);
     setError(null);
     try {
-      const [vRes, lRes, eqRes, zRes] = await Promise.all([
+      const [vRes, lRes, eqRes, zRes, mapRes] = await Promise.all([
         fetchVehicleMaster(),
         fetchVehicleLogs(),
         fetchMasterEquipment(),
-        fetchZCOData()
+        fetchZCOData(),
+        getSystemConfig('master_map')
       ]);
       setVehicles(vRes.data || []);
       setLogs(lRes.data || []);
       setMasterEquipments(eqRes.data || []);
       setZcoData(zRes.data || []);
+      if (mapRes && mapRes.data) {
+        setMasterMap(new Map(mapRes.data));
+      } else {
+        setMasterMap(new Map());
+      }
     } catch (e) {
       setError('Gagal memuat data: ' + e.message);
     } finally {
@@ -614,7 +605,18 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     Object.entries(PLANT_INFO).forEach(([plantCode, info]) => {
       // 1. Jumlah Veh. Code: Prioritize hardcoded KPI targets (which exclude broken vehicles), fallback to DB
       const plantVehicles = masterEquipments.filter(e => e.plant === plantCode && String(e.eqNum || '').startsWith('20000'));
-      const vehicleCount  = VEHICLE_MASTER_COUNT[plantCode] !== undefined ? VEHICLE_MASTER_COUNT[plantCode] : (plantVehicles.length > 0 ? plantVehicles.length : 0);
+      // Calculate vehicleCount from masterMap as single source of truth
+      let vehicleCount = 0;
+      if (masterMap && masterMap.size > 0) {
+        masterMap.forEach((info, eqNum) => {
+          const p = typeof info === 'string' ? info : info.plant;
+          if (p === plantCode && String(eqNum).startsWith('20000')) {
+            vehicleCount++;
+          }
+        });
+      } else {
+        vehicleCount = plantVehicles.length;
+      }
 
       // Include cancelled logs in the main calculation since they still count as input activity KPI
       const plantLogs     = monthLogs.filter(l => l.plant === plantCode);
@@ -625,8 +627,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       // 2. Rencana Transaksi is set equal to Total Transaksi (as in Excel screenshot)
       const rencana = totalTx;
 
-      // 3. Jumlah Hari Kerja is autoWorkingDays if there are vehicles and transactions, else '-'
-      const hariKerja = (vehicleCount > 0 && totalTx > 0) ? autoWorkingDays : '-';
+      // 3. Jumlah Hari Kerja: semua unit tetap diisi walaupun tidak beroperasi (sesuai request)
+      const hariKerja = autoWorkingDays;
 
       // 4. Status Up To Date / Tidak Up To Date count per transaction
       let utdCount = 0;
@@ -737,7 +739,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     });
 
     return result;
-  }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetMonth, targetInputDate, autoWorkingDays, selectedWilayah, searchPlant, filterStatus, sortBy, sortAsc, masterEquipments]);
+  }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetMonth, targetInputDate, autoWorkingDays, selectedWilayah, searchPlant, filterStatus, sortBy, sortAsc, masterEquipments, masterMap]);
 
   // ── Unit Focused Mode calculations ──────────────────────────────────────────
   const unitFocusedData = useMemo(() => {
