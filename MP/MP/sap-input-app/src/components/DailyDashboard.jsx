@@ -89,13 +89,6 @@ export default function DailyDashboard({
   });
   const [selectedExportEqs, setSelectedExportEqs] = useState([]);
   const [selectedExportPlants, setSelectedExportPlants] = useState([]);
-  const uniquePlants = useMemo(() => {
-    const plants = new Set();
-    equipments.forEach(eq => {
-      if (eq.plant) plants.add(eq.plant);
-    });
-    return Array.from(plants).sort();
-  }, [equipments]);
   const [exportEqSearch, setExportEqSearch] = useState('');
   const [indukSearch, setIndukSearch] = useState('');
   const [showIndukDropdown, setShowIndukDropdown] = useState(false);
