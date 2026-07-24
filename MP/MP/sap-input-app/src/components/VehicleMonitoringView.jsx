@@ -609,7 +609,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       let vehicleCount = 0;
       if (masterMap && masterMap.size > 0) {
         masterMap.forEach((info, eqNum) => {
-          const p = typeof info === 'string' ? info : info.plant;
+          if (!info) return;
+          const p = typeof info === 'string' ? info : (info.plant || '');
           if (p === plantCode && String(eqNum).startsWith('20000')) {
             vehicleCount++;
           }
@@ -791,19 +792,20 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       let eqMap = null;
       if (masterMap && masterMap.size > 0) {
         // masterMap keys might be formatted differently, but usually exact match
-        eqMap = masterMap.get(v.vehicle_code);
-        if (!eqMap) {
+        const rawVal = masterMap.get(v.vehicle_code);
+        if (rawVal) {
+          eqMap = typeof rawVal === 'string' ? { description: rawVal, costCenter: '' } : rawVal;
+        } else {
           // Try to find by normalized key just in case
           const normalizeEq = (code) => String(code || '').replace(/^0+/, '').trim();
           const normVeh = normalizeEq(v.vehicle_code);
           for (let [k, val] of masterMap.entries()) {
+            if (!val) continue;
             if (normalizeEq(k) === normVeh) {
               eqMap = typeof val === 'string' ? { description: val, costCenter: '' } : val;
               break;
             }
           }
-        } else if (typeof eqMap === 'string') {
-          eqMap = { description: eqMap, costCenter: '' };
         }
       }
 
