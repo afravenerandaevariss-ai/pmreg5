@@ -590,7 +590,8 @@ function App() {
           if (masterMapResult.data) {
             const mmEntries = masterMapResult.data;
             mmEntries.forEach(([eqNum, info]) => {
-              const plant = typeof info === 'string' ? info : info.plant;
+              if (!info) return;
+              const plant = typeof info === 'string' ? info : (info.plant || '');
               const description = typeof info === 'string' ? eqNum : info.description || eqNum;
               if (mergedMap.has(eqNum)) {
                 const existing = mergedMap.get(eqNum);
@@ -2029,8 +2030,9 @@ function MasterDataView({ masterMap, currentUser }) {
     if (!masterMap) return [];
     const list = [];
     masterMap.forEach((info, eqNum) => {
-      const plant = typeof info === 'string' ? info : info.plant;
-      const desc = typeof info === 'string' ? 'Deskripsi tidak tersedia (Silakan Hapus Data & Re-upload Master EQ)' : info.description;
+      if (!info) return;
+      const plant = typeof info === 'string' ? info : (info.plant || '');
+      const desc = typeof info === 'string' ? 'Deskripsi tidak tersedia (Silakan Hapus Data & Re-upload Master EQ)' : (info.description || '');
       const functionalLoc = typeof info === 'string' ? '' : info.functionalLoc || '';
       const flDescription = typeof info === 'string' ? '' : info.flDescription || '';
       const costCenter = typeof info === 'string' ? '' : info.costCenter || '';
