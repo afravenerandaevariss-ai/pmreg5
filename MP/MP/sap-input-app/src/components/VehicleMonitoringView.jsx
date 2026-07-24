@@ -787,14 +787,30 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           desc: hmKmVal > 0 ? `${hmKmVal} ${uomVal === 'HM' || uomVal === 'KM' ? uomVal : 'HM/KM'}` : `${unitVal} ${uomVal || 'Unit'}`
         };
       });
-      // Find matching equipment from masterEquipments
-      const normalizeEq = (code) => String(code || '').replace(/^0+/, '').trim();
-      const eq = masterEquipments.find(e => normalizeEq(e.eqNum) === normalizeEq(v.vehicle_code));
+      // Find matching equipment from masterMap (true Master Data)
+      let eqMap = null;
+      if (masterMap && masterMap.size > 0) {
+        // masterMap keys might be formatted differently, but usually exact match
+        eqMap = masterMap.get(v.vehicle_code);
+        if (!eqMap) {
+          // Try to find by normalized key just in case
+          const normalizeEq = (code) => String(code || '').replace(/^0+/, '').trim();
+          const normVeh = normalizeEq(v.vehicle_code);
+          for (let [k, val] of masterMap.entries()) {
+            if (normalizeEq(k) === normVeh) {
+              eqMap = typeof val === 'string' ? { description: val, costCenter: '' } : val;
+              break;
+            }
+          }
+        } else if (typeof eqMap === 'string') {
+          eqMap = { description: eqMap, costCenter: '' };
+        }
+      }
 
       return {
         ...v,
-        eqDesc: (eq && eq.description) ? eq.description : (v.description || '-'),
-        costCenter: (eq && eq.costCenter) ? eq.costCenter : (v.cost_center || '-'),
+        eqDesc: (eqMap && eqMap.description) ? eqMap.description : (v.description || '-'),
+        costCenter: (eqMap && eqMap.costCenter) ? eqMap.costCenter : (v.cost_center || '-'),
         daysFilled,
         isInputtedToday,
         todayDetails: isInputtedToday ? {
