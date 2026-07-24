@@ -162,6 +162,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [vehicles, setVehicles] = useState([]);
   const [logs, setLogs]         = useState([]);
   const [masterEquipments, setMasterEquipments] = useState([]);
+  const [masterMap, setMasterMap]           = useState(new Map());
   const [zcoData, setZcoData]                   = useState([]);
   const [zcoUploadInfo, setZcoUploadInfo]       = useState(null);
   const [loading, setLoading]   = useState(false);
