@@ -54,13 +54,15 @@ const PLANT_INFO = {
 // ─── Vehicle Master Count (Official Reference Data) ──────────────────────────
 const VEHICLE_MASTER_COUNT = {
   // Kal-Bar
-  "5E01": 14, "5E02": 9, "5E03": 12, "5E04": 11, "5E06": 1, "5E07": 18, "5E08": 16, "5E09": 8,
+  "5E01": 14, "5E02": 10, "5E03": 16, "5E04": 13, "5E06": 1, "5E07": 18, "5E08": 16, "5E09": 17,
   "5F01": 4, "5F04": 3, "5F07": 5, "5F08": 4, "5F09": 7, "5D01": 0,
+  
   // Kal-Sel-Teng
-  "5E11": 7, "5E12": 3, "5E13": 5, "5E14": 17, "5E15": 7,
-  "5F11": 0, "5F14": 2, "5F15": 2, "5F20": 1, "5F21": 1, "5F22": 3, "5D02": 0, "5D03": 0,
+  "5E11": 7, "5E12": 5, "5E13": 2, "5E14": 17, "5E15": 7, 
+  "5F11": 0, "5F14": 1, "5F15": 0, "5F20": 0, "5F21": 0, "5F22": 0, "5D03": 0,
+
   // Kal-Tim
-  "5E16": 23, "5E17": 19, "5E18": 11, "5E19": 22
+  "5E16": 23, "5E17": 21, "5E18": 11, "5E19": 22, "5D02": 0
 };
 
 // ─── Job Code Master ──────────────────────────────────────────────────────────
@@ -609,9 +611,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     const list = [];
 
     Object.entries(PLANT_INFO).forEach(([plantCode, info]) => {
-      // 1. Jumlah Veh. Code: Count vehicles starting with 20000 from the master equipment data
+      // 1. Jumlah Veh. Code: Prioritize hardcoded KPI targets (which exclude broken vehicles), fallback to DB
       const plantVehicles = masterEquipments.filter(e => e.plant === plantCode && String(e.eqNum || '').startsWith('20000'));
-      const vehicleCount  = plantVehicles.length > 0 ? plantVehicles.length : (VEHICLE_MASTER_COUNT[plantCode] || 0);
+      const vehicleCount  = VEHICLE_MASTER_COUNT[plantCode] !== undefined ? VEHICLE_MASTER_COUNT[plantCode] : (plantVehicles.length > 0 ? plantVehicles.length : 0);
 
       const plantLogs     = activeMonthLogs.filter(l => l.plant === plantCode);
       const cancelledLogs = cancelledMonthLogs.filter(l => l.plant === plantCode);
