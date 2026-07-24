@@ -588,7 +588,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const autoWorkingDays = useMemo(() => {
     try {
       const start = startOfMonth(new Date(targetMonth + '-01T00:00:00'));
-      const end = new Date(targetInputDate + 'T00:00:00');
+      const end = subDays(new Date(targetInputDate + 'T00:00:00'), 1); // H-1 for target input
       if (end < start) return 0;
       
       let count = 0;
@@ -962,8 +962,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   // WhatsApp copy (Rankings list)
   const handleCopyWASimple = () => {
     try {
-      const targetDateObj = new Date(targetInputDate + 'T00:00:00');
-      const reportDateObj = targetDateObj;
+      const targetDateObj = subDays(new Date(targetInputDate + 'T00:00:00'), 1);
+      const reportDateObj = new Date(targetInputDate + 'T00:00:00');
       const reportDateStr = format(reportDateObj, 'dd MMM yyyy', { locale: id });
       const targetDateStrFormatted = format(targetDateObj, 'dd/MM/yyyy');
       
@@ -1871,7 +1871,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                       try {
                         const parts = targetInputDate.split('-');
                         const targetDateObj = new Date(parts[0], parts[1] - 1, parts[2]);
-                        const reportDateObj = targetDateObj;
+                        const reportDateObj = targetDateObj; // Monitoring date stays the same
                         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
                         return `${String(reportDateObj.getDate()).padStart(2, '0')} ${months[reportDateObj.getMonth()]} ${reportDateObj.getFullYear()}`;
                       } catch (e) {
@@ -1894,7 +1894,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     Target input logbook : <span className="font-extrabold">{(() => {
                       try {
                         const parts = targetInputDate.split('-');
-                        return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+                        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+                        d.setDate(d.getDate() - 1); // H-1
+                        return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
                       } catch (e) {
                         return '-';
                       }
