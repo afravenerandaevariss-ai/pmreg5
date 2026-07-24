@@ -384,6 +384,10 @@ export default function DailyDashboard({
     return Array.from(plants).sort();
   }, [indukEquipments]);
 
+  const pabrikPlants = useMemo(() => {
+    return uniquePlants.filter(p => p.startsWith('5F'));
+  }, [uniquePlants]);
+
   // Equipment filtered by plant selection in mass input modal
   const massIndukEquipments = useMemo(() => {
     if (currentUser?.role === 'Unit') return indukEquipments;
@@ -1660,10 +1664,29 @@ export default function DailyDashboard({
 
               {currentUser?.role?.toUpperCase() === 'ADMIN' && (
                 <fieldset className="border border-slate-200 rounded-2xl p-3 bg-white space-y-1">
-                  <legend className="px-2 text-xs font-bold text-slate-500 uppercase tracking-wide">Pilih Unit (Opsional)</legend>
-                  <p className="text-[11px] text-slate-400 mb-2 px-1">Biarkan kosong untuk ekspor seluruh unit</p>
+                  <div className="flex justify-between items-center mb-1.5 px-1">
+                    <legend className="text-xs font-bold text-slate-500 uppercase tracking-wide">Pilih Pabrik (Opsional)</legend>
+                    <div className="flex gap-2">
+                      <button 
+                        type="button" 
+                        onClick={() => setSelectedExportPlants(pabrikPlants)} 
+                        className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold hover:underline focus:outline-none"
+                      >
+                        Pilih Semua
+                      </button>
+                      <span className="text-[10px] text-slate-300">|</span>
+                      <button 
+                        type="button" 
+                        onClick={() => setSelectedExportPlants([])} 
+                        className="text-[10px] text-red-500 hover:text-red-600 font-bold hover:underline focus:outline-none"
+                      >
+                        Bersihkan
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mb-2 px-1">Biarkan kosong untuk ekspor seluruh Pabrik</p>
                   <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto p-1.5 border border-slate-100 rounded-xl bg-slate-50/50">
-                    {uniquePlants.map(plantCode => {
+                    {pabrikPlants.map(plantCode => {
                       const isChecked = selectedExportPlants.includes(plantCode);
                       const name = PLANT_INFO[plantCode]?.desc || `Plant ${plantCode}`;
                       return (
@@ -1798,11 +1821,16 @@ export default function DailyDashboard({
                     selectedEqs: selectedExportEqs
                   };
 
-                  // Filter equipments by selected plants if any are selected (Admin only)
+                   // Filter equipments by selected plants if any are selected (Admin only)
                   let targetEquipments = equipments;
                   const isAdmin = currentUser?.role?.toUpperCase() === 'ADMIN';
-                  if (isAdmin && selectedExportPlants.length > 0) {
-                    targetEquipments = equipments.filter(eq => selectedExportPlants.includes(eq.plant));
+                  if (isAdmin) {
+                    if (selectedExportPlants.length > 0) {
+                      targetEquipments = equipments.filter(eq => selectedExportPlants.includes(eq.plant));
+                    } else {
+                      // If empty, export all Pabrik units (5F...)
+                      targetEquipments = equipments.filter(eq => eq.plant && eq.plant.startsWith('5F'));
+                    }
                   }
 
                   if (exportSettings.isAccumulated) {
