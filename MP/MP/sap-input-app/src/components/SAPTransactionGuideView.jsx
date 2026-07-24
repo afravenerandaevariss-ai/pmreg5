@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { BookOpen, Search, Info, HelpCircle, ExternalLink, Image, Code2, AlertTriangle, PlayCircle, LogIn, FileText, Wrench, Play, Settings, Clipboard, CheckSquare, Layers, ZoomIn, ZoomOut, Plus, Minus, X, RotateCcw } from 'lucide-react';
+import { BookOpen, Search, Info, HelpCircle, ExternalLink, Image, Code2, AlertTriangle, PlayCircle, LogIn, FileText, Wrench, Play, Settings, Clipboard, CheckSquare, Layers, ZoomIn, ZoomOut, Plus, Minus, X, RotateCcw, ChevronDown } from 'lucide-react';
 import { Stepper, Step, StepIndicator, StepContent, StepTitle, StepDescription } from './ui/stepper';
 
 export default function SAPTransactionGuideView() {
@@ -7,6 +7,7 @@ export default function SAPTransactionGuideView() {
   const [iw31SubTab, setIw31SubTab] = useState('pm01');
   const [zoomedImage, setZoomedImage] = useState(null);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [isLogbookAccordionOpen, setIsLogbookAccordionOpen] = useState(false);
 
   React.useEffect(() => {
     if (!zoomedImage) return;
@@ -349,42 +350,52 @@ export default function SAPTransactionGuideView() {
 
       {/* Grid Alur Mapping */}
       <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
-        <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
-          <HelpCircle size={18} className="text-[#064e3b]" /> Dimana Posisi Logbook Harian di dalam SAP PM?
-        </h3>
-         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 relative">
-          <Stepper orientation="vertical">
-            <Step>
-              <StepIndicator index={1} active icon={<FileText size={14} />} />
-              <StepContent>
-                <StepTitle className="text-[#064e3b]">Langkah 1: Logbook Fisik</StepTitle>
-                <StepDescription className="mt-1">
-                  <span className="block font-bold text-slate-800 text-sm mb-1.5">Pencatatan Harian di Lapangan</span>
-                  Operator mencatat Jam Kerja Alat (HM), temuan kerusakan, kondisi breakdown, dan pemakaian bahan bakar secara harian pada lembar logbook fisik.
-                  <div className="bg-white p-2.5 rounded-xl border border-slate-100 text-[10.5px] text-slate-600 font-mono space-y-1 mt-3 shadow-inner max-w-sm">
-                    <p>📝 Logbook HM: 4,820.5 Hours</p>
-                    <p>⚠️ Status: Breakdown (Oli Bocor)</p>
-                  </div>
-                </StepDescription>
-              </StepContent>
-            </Step>
+        <button 
+          onClick={() => setIsLogbookAccordionOpen(!isLogbookAccordionOpen)}
+          className="w-full flex items-center justify-between text-left focus:outline-none"
+        >
+          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+            <HelpCircle size={18} className="text-[#064e3b]" /> Dimana Posisi Logbook Harian di dalam SAP PM?
+          </h3>
+          <ChevronDown 
+            size={20} 
+            className={`text-slate-400 transition-transform duration-300 ${isLogbookAccordionOpen ? 'rotate-180' : ''}`} 
+          />
+        </button>
+        
+        {isLogbookAccordionOpen && (
+          <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 relative mt-4 animate-in slide-in-from-top-2 fade-in duration-300">
+            <Stepper orientation="vertical">
+              <Step>
+                <StepIndicator index={1} active icon={<FileText size={14} />} />
+                <StepContent>
+                  <StepTitle className="text-[#064e3b]">Langkah 1: Logbook Fisik</StepTitle>
+                  <StepDescription className="mt-1">
+                    <span className="block font-bold text-slate-800 text-sm mb-1.5">Pencatatan Harian di Lapangan</span>
+                    Operator mencatat Jam Kerja Alat (HM), temuan kerusakan, kondisi breakdown, dan pemakaian bahan bakar secara harian pada lembar logbook fisik.
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-100 text-[10.5px] text-slate-600 font-mono space-y-1 mt-3 shadow-inner max-w-sm">
+                      <p>📝 Logbook HM: 4,820.5 Hours</p>
+                      <p>⚠️ Status: Breakdown (Oli Bocor)</p>
+                    </div>
+                  </StepDescription>
+                </StepContent>
+              </Step>
 
-            <Step>
-              <StepIndicator index={2} active icon={<LogIn size={14} />} />
-              <StepContent>
-                <StepTitle className="text-[#10b981]">Langkah 2: Entry SAP</StepTitle>
-                <StepDescription className="mt-1">
-                  <span className="block font-bold text-slate-800 text-sm mb-1.5">Input ke Transaksi SAP PM</span>
-                  Data jam jalan diinput ke ZESTHLC003PA (Mass) atau ZESTHLP16PA (Manual) untuk memperbarui sistem. Kerusakan dilaporkan lewat IW21 (Notification).
-                  <div className="bg-white p-2.5 rounded-xl border border-slate-100 text-[10.5px] text-slate-600 font-mono space-y-1 mt-3 shadow-inner max-w-sm">
-                    <p>⚙️ Tcode ZESTHLC003PA (Mass Upload)</p>
-                    <p>🚨 Tcode IW21 (PM Notification)</p>
-                  </div>
-                </StepDescription>
-              </StepContent>
-            </Step>
+              <Step>
+                <StepIndicator index={2} active icon={<LogIn size={14} />} />
+                <StepContent>
+                  <StepTitle className="text-[#10b981]">Langkah 2: Entry SAP</StepTitle>
+                  <StepDescription className="mt-1">
+                    <span className="block font-bold text-slate-800 text-sm mb-1.5">Input ke Transaksi SAP PM</span>
+                    Data jam jalan diinput ke ZESTHLC003PA (Mass) atau ZESTHLP16PA (Manual) untuk memperbarui sistem. Kerusakan dilaporkan lewat IW21 (Notification).
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-100 text-[10.5px] text-slate-600 font-mono space-y-1 mt-3 shadow-inner max-w-sm">
+                      <p>⚙️ Tcode ZESTHLC003PA (Mass Upload)</p>
+                      <p>🚨 Tcode IW21 (PM Notification)</p>
+                    </div>
+                  </StepDescription>
+                </StepContent>
+              </Step>
 
-            <Step>
               <Step>
                 <StepIndicator index={3} active icon={<Wrench size={14} />} />
                 <StepContent>
@@ -399,9 +410,9 @@ export default function SAPTransactionGuideView() {
                   </StepDescription>
                 </StepContent>
               </Step>
-            </Step>
-          </Stepper>
-        </div>
+            </Stepper>
+          </div>
+        )}
       </div>
 
       {/* Tcode Selector & Form Mockup */}
