@@ -399,6 +399,43 @@ const unitNamesMap = {
   '5TEP': 'TEKNIK DAN PENGOLAHAN'
 };
 
+const PLANT_INFO = {
+  // Kal-Bar
+  "5E01": { desc: "KEBUN GUNUNG MELIAU",    wilayah: "Kal-Bar" },
+  "5E02": { desc: "KEBUN GUNUNG MAS",       wilayah: "Kal-Bar" },
+  "5E03": { desc: "KEBUN SUNGAI DEKAN",     wilayah: "Kal-Bar" },
+  "5E04": { desc: "KEBUN RIMBA BELIAN",     wilayah: "Kal-Bar" },
+  "5E06": { desc: "KEBUN SINTANG",          wilayah: "Kal-Bar" },
+  "5E07": { desc: "KEBUN NGABANG",          wilayah: "Kal-Bar" },
+  "5E08": { desc: "KEBUN PARINDU",          wilayah: "Kal-Bar" },
+  "5E09": { desc: "KEBUN KEMBAYAN",         wilayah: "Kal-Bar" },
+  "5F01": { desc: "PABRIK GUNUNG MELIAU",   wilayah: "Kal-Bar" },
+  "5F04": { desc: "PABRIK RIMBA BELIAN",    wilayah: "Kal-Bar" },
+  "5F07": { desc: "PABRIK NGABANG",         wilayah: "Kal-Bar" },
+  "5F08": { desc: "PABRIK PARINDU",         wilayah: "Kal-Bar" },
+  "5F09": { desc: "PABRIK KEMBAYAN",        wilayah: "Kal-Bar" },
+  "5D01": { desc: "DISTRIK KALBAR",         wilayah: "Kal-Bar" },
+  // Kal-Sel-Teng
+  "5E11": { desc: "KEBUN DANAU SALAK",      wilayah: "Kal-Sel-Teng" },
+  "5E12": { desc: "KEBUN KUMAI KARET",      wilayah: "Kal-Sel-Teng" },
+  "5E13": { desc: "KEBUN BATULICIN",        wilayah: "Kal-Sel-Teng" },
+  "5E14": { desc: "KEBUN PAMUKAN",          wilayah: "Kal-Sel-Teng" },
+  "5E15": { desc: "KEBUN PELAIHARI",        wilayah: "Kal-Sel-Teng" },
+  "5F11": { desc: "UNIT PROYEK BATU BARA",  wilayah: "Kal-Sel-Teng" },
+  "5F14": { desc: "PABRIK PAMUKAN",         wilayah: "Kal-Sel-Teng" },
+  "5F15": { desc: "PABRIK PELAIHARI",       wilayah: "Kal-Sel-Teng" },
+  "5F20": { desc: "PKR TAMBARANGAN",        wilayah: "Kal-Sel-Teng" },
+  "5F21": { desc: "PABRIK SAMUNTAI",        wilayah: "Kal-Sel-Teng" },
+  "5F22": { desc: "PABRIK LONG PINANG",     wilayah: "Kal-Sel-Teng" },
+  "5D02": { desc: "DISTRIK KALTIM",         wilayah: "Kal-Sel-Teng" },
+  "5D03": { desc: "DISTRIK KALSELTENG",     wilayah: "Kal-Sel-Teng" },
+  // Kal-Tim
+  "5E16": { desc: "KEBUN TABARA",           wilayah: "Kal-Tim" },
+  "5E17": { desc: "KEBUN TAJATI",           wilayah: "Kal-Tim" },
+  "5E18": { desc: "KEBUN PANDAWA",          wilayah: "Kal-Tim" },
+  "5E19": { desc: "KEBUN LONGKALI",         wilayah: "Kal-Tim" },
+};
+
 const getUnitName = (plant, existingName) => {
   if (existingName && existingName !== '-') return existingName;
   return unitNamesMap[plant] || '';
@@ -2160,7 +2197,9 @@ function MasterDataView({ masterMap, currentUser }) {
             >
               <option value="">Semua Plant</option>
               {uniquePlants.map(p => (
-                <option key={p} value={p}>{p}</option>
+                <option key={p} value={p}>
+                  {p} {PLANT_INFO[p] ? PLANT_INFO[p].desc : ''}
+                </option>
               ))}
             </select>
           </div>
