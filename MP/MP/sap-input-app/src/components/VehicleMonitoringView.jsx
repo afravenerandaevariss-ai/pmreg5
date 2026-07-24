@@ -615,11 +615,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       const plantVehicles = masterEquipments.filter(e => e.plant === plantCode && String(e.eqNum || '').startsWith('20000'));
       const vehicleCount  = VEHICLE_MASTER_COUNT[plantCode] !== undefined ? VEHICLE_MASTER_COUNT[plantCode] : (plantVehicles.length > 0 ? plantVehicles.length : 0);
 
-      const plantLogs     = activeMonthLogs.filter(l => l.plant === plantCode);
-      const cancelledLogs = cancelledMonthLogs.filter(l => l.plant === plantCode);
+      // Include cancelled logs in the main calculation since they still count as input activity KPI
+      const plantLogs     = monthLogs.filter(l => l.plant === plantCode);
       const totalTx       = plantLogs.length;
-      const totalCancelled = cancelledLogs.length;
-      const totalTxAll    = totalTx + totalCancelled;
+      const totalCancelled = plantLogs.filter(l => l.cancelled).length;
 
       // 2. Rencana Transaksi is set equal to Total Transaksi (as in Excel screenshot)
       const rencana = totalTx;
@@ -928,7 +927,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   // ── Aggregate Stats ───────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const active = summaryData.filter(r => r.totalTx > 0).length;
-    const totalTx = activeMonthLogs.length;
+    const totalTx = monthLogs.length;
     const totalCancelled = cancelledMonthLogs.length;
     const totalVeh = vehicles.length;
     const upToDate = summaryData.filter(r => r.statusColor === 'green').length;
@@ -936,7 +935,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     const notUpToDate = summaryData.filter(r => r.statusColor === 'red').length;
     const avgPct   = summaryData.filter(r => r.vehicleCount > 0).reduce((s, r) => s + r.pct, 0) / Math.max(1, summaryData.filter(r => r.vehicleCount > 0).length);
     return { active, totalTx, totalCancelled, totalVeh, upToDate, late, notUpToDate, avgPct };
-  }, [summaryData, activeMonthLogs, cancelledMonthLogs, vehicles]);
+  }, [summaryData, monthLogs, cancelledMonthLogs, vehicles]);
 
   // ── Export ────────────────────────────────────────────────────────────────────
   const handleExportSummary = () => {
