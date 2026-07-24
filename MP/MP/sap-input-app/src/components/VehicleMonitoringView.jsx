@@ -110,11 +110,18 @@ function formatDateStr(rawDate) {
     const d = excelSerialToDate(rawDate);
     return format(d, 'yyyy-MM-dd');
   }
-  const s = String(rawDate).trim();
+  let s = String(rawDate).trim();
+  s = s.split(' ')[0]; // handle appended time
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  if (s.includes('/')) {
-    const parts = s.split('/');
+  
+  const sep = s.includes('/') ? '/' : s.includes('.') ? '.' : (s.includes('-') ? '-' : null);
+  if (sep) {
+    const parts = s.split(sep);
     if (parts.length === 3) {
+      // Avoid swapping if it's already yyyy-mm-dd
+      if (parts[0].length === 4) {
+        return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      }
       const day   = parts[0].padStart(2, '0');
       const month = parts[1].padStart(2, '0');
       const year  = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
