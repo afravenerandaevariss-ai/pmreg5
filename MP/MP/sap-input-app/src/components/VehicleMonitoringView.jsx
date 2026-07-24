@@ -362,7 +362,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           const company       = String(get(COMPANY)   || '').trim();
           const fiscalYear    = String(get(FISCAL_YEAR) || '').trim();
           const vehTime       = formatTimeStr(get(VEH_TIME));
-          const actNum        = String(get(ACT_NUM)   || `VEH-${plant}-${i}-${dateStr}`).trim();
+          const rawActNum     = String(get(ACT_NUM) || '').trim();
+          const actNum        = rawActNum ? `${rawActNum}-${i}` : `VEH-${plant}-${i}-${dateStr}`;
           const createdBy     = String(get(CREATED_BY) || '').trim();
           const createdOn     = formatDateStr(get(CREATED_ON)) || '';
           const changedBy     = String(get(CHANGED_BY) || '').trim();
