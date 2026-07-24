@@ -619,6 +619,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       const plantLogs     = monthLogs.filter(l => l.plant === plantCode);
       const totalTx       = plantLogs.length;
       const totalCancelled = plantLogs.filter(l => l.cancelled).length;
+      const totalTxAll    = totalTx; // Now totalTx includes all, so totalTxAll is the same
 
       // 2. Rencana Transaksi is set equal to Total Transaksi (as in Excel screenshot)
       const rencana = totalTx;
