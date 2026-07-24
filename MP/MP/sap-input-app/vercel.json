@@ -4,6 +4,16 @@
       "maxDuration": 60
     }
   },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ],
   "crons": [
     {
       "path": "/api/send-wa-image",
