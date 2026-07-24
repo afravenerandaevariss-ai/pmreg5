@@ -33,22 +33,36 @@ export async function uploadMasterEquipment(equipmentsArray) {
   return { error };
 }
 
-/**
- * Fetch all master equipment from Supabase.
- * Returns array in the app's internal format.
- */
 export async function fetchMasterEquipment() {
   if (!supabase) return { data: null, error: 'Supabase not configured' };
 
-  const { data, error } = await supabase
-    .from('master_equipment')
-    .select('*')
-    .order('plant')
-    .order('eq_num');
+  let allData = [];
+  let from = 0;
+  const PAGE_SIZE = 1000;
+  let fetchError = null;
 
-  if (error) return { data: null, error };
+  while (true) {
+    const { data, error } = await supabase
+      .from('master_equipment')
+      .select('*')
+      .order('plant')
+      .order('eq_num')
+      .range(from, from + PAGE_SIZE - 1);
 
-  const equipments = data.map(row => ({
+    if (error) {
+      fetchError = error;
+      break;
+    }
+    if (!data || data.length === 0) break;
+    
+    allData = allData.concat(data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  if (fetchError) return { data: null, error: fetchError };
+
+  const equipments = allData.map(row => ({
     eqNum: row.eq_num,
     plant: row.plant,
     description: row.description,
