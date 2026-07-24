@@ -7,6 +7,43 @@ import { exportDailyToSAP, exportCumulativeToSAP, exportAccumulatedToSAP, export
 import { supabase } from '../lib/supabase';
 import { insertDailyLog, insertDailyLogs, deleteDailyLog, fetchDailyLogs, saveGSheetHistory, getGSheetHistory, saveSystemConfig, getSystemConfig } from '../lib/supabaseService';
 
+const PLANT_INFO = {
+  // Kal-Bar
+  "5E01": { desc: "KEBUN GUNUNG MELIAU",    wilayah: "Kal-Bar" },
+  "5E02": { desc: "KEBUN GUNUNG MAS",       wilayah: "Kal-Bar" },
+  "5E03": { desc: "KEBUN SUNGAI DEKAN",     wilayah: "Kal-Bar" },
+  "5E04": { desc: "KEBUN RIMBA BELIAN",     wilayah: "Kal-Bar" },
+  "5E06": { desc: "KEBUN SINTANG",          wilayah: "Kal-Bar" },
+  "5E07": { desc: "KEBUN NGABANG",          wilayah: "Kal-Bar" },
+  "5E08": { desc: "KEBUN PARINDU",          wilayah: "Kal-Bar" },
+  "5E09": { desc: "KEBUN KEMBAYAN",         wilayah: "Kal-Bar" },
+  "5F01": { desc: "PABRIK GUNUNG MELIAU",   wilayah: "Kal-Bar" },
+  "5F04": { desc: "PABRIK RIMBA BELIAN",    wilayah: "Kal-Bar" },
+  "5F07": { desc: "PABRIK NGABANG",         wilayah: "Kal-Bar" },
+  "5F08": { desc: "PABRIK PARINDU",         wilayah: "Kal-Bar" },
+  "5F09": { desc: "PABRIK KEMBAYAN",        wilayah: "Kal-Bar" },
+  "5D01": { desc: "DISTRIK KALBAR",         wilayah: "Kal-Bar" },
+  // Kal-Sel-Teng
+  "5E11": { desc: "KEBUN DANAU SALAK",      wilayah: "Kal-Sel-Teng" },
+  "5E12": { desc: "KEBUN KUMAI KARET",      wilayah: "Kal-Sel-Teng" },
+  "5E13": { desc: "KEBUN BATULICIN",        wilayah: "Kal-Sel-Teng" },
+  "5E14": { desc: "KEBUN PAMUKAN",          wilayah: "Kal-Sel-Teng" },
+  "5E15": { desc: "KEBUN PELAIHARI",        wilayah: "Kal-Sel-Teng" },
+  "5F11": { desc: "UNIT PROYEK BATU BARA",  wilayah: "Kal-Sel-Teng" },
+  "5F14": { desc: "PABRIK PAMUKAN",         wilayah: "Kal-Sel-Teng" },
+  "5F15": { desc: "PABRIK PELAIHARI",       wilayah: "Kal-Sel-Teng" },
+  "5F20": { desc: "PKR TAMBARANGAN",        wilayah: "Kal-Sel-Teng" },
+  "5F21": { desc: "PABRIK SAMUNTAI",        wilayah: "Kal-Sel-Teng" },
+  "5F22": { desc: "PABRIK LONG PINANG",     wilayah: "Kal-Sel-Teng" },
+  "5D02": { desc: "DISTRIK KALTIM",         wilayah: "Kal-Sel-Teng" },
+  "5D03": { desc: "DISTRIK KALSELTENG",     wilayah: "Kal-Sel-Teng" },
+  // Kal-Tim
+  "5E16": { desc: "KEBUN TABARA",           wilayah: "Kal-Tim" },
+  "5E17": { desc: "KEBUN TAJATI",           wilayah: "Kal-Tim" },
+  "5E18": { desc: "KEBUN PANDAWA",          wilayah: "Kal-Tim" },
+  "5E19": { desc: "KEBUN LONGKALI",         wilayah: "Kal-Tim" },
+};
+
 export default function DailyDashboard({ 
   equipments, 
   setEquipments,
@@ -51,6 +88,14 @@ export default function DailyDashboard({
     isAccumulated: false
   });
   const [selectedExportEqs, setSelectedExportEqs] = useState([]);
+  const [selectedExportPlants, setSelectedExportPlants] = useState([]);
+  const uniquePlants = useMemo(() => {
+    const plants = new Set();
+    equipments.forEach(eq => {
+      if (eq.plant) plants.add(eq.plant);
+    });
+    return Array.from(plants).sort();
+  }, [equipments]);
   const [exportEqSearch, setExportEqSearch] = useState('');
   const [indukSearch, setIndukSearch] = useState('');
   const [showIndukDropdown, setShowIndukDropdown] = useState(false);
@@ -1620,6 +1665,36 @@ export default function DailyDashboard({
                 </div>
               </div>
 
+              {currentUser?.role?.toUpperCase() === 'ADMIN' && (
+                <fieldset className="border border-slate-200 rounded-2xl p-3 bg-white space-y-1">
+                  <legend className="px-2 text-xs font-bold text-slate-500 uppercase tracking-wide">Pilih Unit (Opsional)</legend>
+                  <p className="text-[11px] text-slate-400 mb-2 px-1">Biarkan kosong untuk ekspor seluruh unit</p>
+                  <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto p-1.5 border border-slate-100 rounded-xl bg-slate-50/50">
+                    {uniquePlants.map(plantCode => {
+                      const isChecked = selectedExportPlants.includes(plantCode);
+                      const name = PLANT_INFO[plantCode]?.desc || `Plant ${plantCode}`;
+                      return (
+                        <label key={plantCode} className="flex items-center gap-2 p-1.5 hover:bg-white rounded-lg cursor-pointer text-xs font-medium text-slate-700 transition-colors border border-transparent hover:border-slate-100">
+                          <input 
+                            type="checkbox" 
+                            checked={isChecked} 
+                            onChange={() => {
+                              if (isChecked) {
+                                setSelectedExportPlants(prev => prev.filter(p => p !== plantCode));
+                              } else {
+                                setSelectedExportPlants(prev => [...prev, plantCode]);
+                              }
+                            }}
+                            className="rounded text-emerald-600 focus:ring-emerald-500" 
+                          />
+                          <span className="truncate" title={`${plantCode} - ${name}`}>{plantCode} - {name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              )}
+
               <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
                 <div className="p-3 bg-slate-50 border-b border-slate-200">
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Pilih Equipment (Opsional)</label>
@@ -1730,10 +1805,17 @@ export default function DailyDashboard({
                     selectedEqs: selectedExportEqs
                   };
 
+                  // Filter equipments by selected plants if any are selected (Admin only)
+                  let targetEquipments = equipments;
+                  const isAdmin = currentUser?.role?.toUpperCase() === 'ADMIN';
+                  if (isAdmin && selectedExportPlants.length > 0) {
+                    targetEquipments = equipments.filter(eq => selectedExportPlants.includes(eq.plant));
+                  }
+
                   if (exportSettings.isAccumulated) {
-                    exportAccumulatedToSAP(templateData.headers, templateData.originalData, equipments, dailyLogs, exportPayload);
+                    exportAccumulatedToSAP(templateData.headers, templateData.originalData, targetEquipments, dailyLogs, exportPayload);
                   } else {
-                    exportCumulativeToSAP(templateData.headers, templateData.originalData, equipments, dailyLogs, exportPayload);
+                    exportCumulativeToSAP(templateData.headers, templateData.originalData, targetEquipments, dailyLogs, exportPayload);
                   }
                   setShowExportModal(false);
                 }}
