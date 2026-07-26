@@ -1588,7 +1588,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         )}
 
         {/* ── Tab Navigation ──────────────────────────────────────── */}
-        <div className="flex gap-1 bg-slate-200/60 p-1.5 rounded-xl w-fit">
+        <div className={`flex gap-1 bg-slate-200/60 p-1.5 rounded-xl w-fit ${screenshotMode ? 'hidden' : ''}`}>
           {[
             { key: 'unit-checklist',    label: '📋 Checklist Kebun (Unit)', icon: Calendar },
             { key: 'summary-regional',  label: '🏢 Rekap Regional 5',      icon: BarChart2 },
@@ -1604,7 +1604,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         </div>
 
         {/* ── Controls (Adapts based on active tab) ────────────────── */}
-        <div className="bg-[#fafafa]  p-5 rounded-2xl border border-emerald-100 shadow-lg shadow-emerald-900/5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 items-end sticky top-0 z-40">
+        <div className={`bg-[#fafafa]  p-5 rounded-2xl border border-emerald-100 shadow-lg shadow-emerald-900/5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 items-end sticky top-0 z-40 ${screenshotMode ? 'hidden' : ''}`}>
           <div className="flex flex-col">
             <label className="text-[10px] font-bold text-slate-400 uppercase mb-1">Pilih Bulan</label>
             <input type="month" value={targetMonth} onChange={e => setTargetMonth(e.target.value)}
