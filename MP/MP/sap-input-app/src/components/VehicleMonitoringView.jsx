@@ -1673,6 +1673,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             </div>
           )}
         </div>
+        )}
 
         {/* ─────────────────────────────────────────────────────────── */}
         {/* TAB 1: Checklist Kebun (Unit) — VERY SIMPLE & DIRECT       */}
@@ -1921,7 +1922,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 </button>
               </div>
             </div>
-          )}
 
           {/* Redesigned Excel-style Monitoring Sheet */}
             <div id="excel-report-sheet" className={`bg-white p-4 border border-slate-300 rounded-2xl shadow-sm font-sans ${screenshotMode ? '' : 'overflow-hidden max-w-[1150px] mx-auto w-full'}`} style={screenshotMode ? { maxWidth: 'none', width: 'fit-content', margin: '0', padding: '16px' } : {}}>
