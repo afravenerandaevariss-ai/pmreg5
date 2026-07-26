@@ -1,7 +1,30 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+let envSupabaseUrl;
+let envSupabaseAnonKey;
+
+// For Vercel Serverless Functions (Node.js)
+if (typeof process !== 'undefined' && process.env) {
+  envSupabaseUrl = process.env.VITE_SUPABASE_URL;
+  envSupabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+}
+
+// For Vite Client (Browser)
+// Vite replaces `import.meta.env.VITE_...` statically at build time.
+// We use a try-catch to avoid crashing in environments where import.meta is undefined.
+try {
+  if (!envSupabaseUrl && import.meta && import.meta.env) {
+    envSupabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  }
+  if (!envSupabaseAnonKey && import.meta && import.meta.env) {
+    envSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  }
+} catch (e) {
+  // Ignore
+}
+
+const supabaseUrl = envSupabaseUrl;
+const supabaseAnonKey = envSupabaseAnonKey;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase credentials not set. Running in localStorage fallback mode.');
