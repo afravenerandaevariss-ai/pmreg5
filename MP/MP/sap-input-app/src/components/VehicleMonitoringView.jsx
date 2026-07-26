@@ -207,13 +207,20 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       // In screenshotMode, we only need summary data, skip heavy paginated master_equipment
       const fetchEq = screenshotMode ? Promise.resolve({ data: [] }) : fetchMasterEquipment();
       
-      const [vRes, lRes, eqRes, zRes, mapRes] = await Promise.all([
+      const fetchPromise = Promise.all([
         fetchVehicleMaster(),
         fetchVehicleLogs(),
         fetchEq,
         fetchZCOData(),
         getSystemConfig('master_map')
       ]);
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout loading data from Supabase')), 15000)
+      );
+
+      const [vRes, lRes, eqRes, zRes, mapRes] = await Promise.race([fetchPromise, timeoutPromise]);
+
       setVehicles(vRes.data || []);
       setLogs(lRes.data || []);
       setMasterEquipments(eqRes.data || []);
@@ -228,7 +235,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [screenshotMode]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -1886,6 +1893,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             <div id="excel-report-sheet" className={`bg-white p-4 border border-slate-300 rounded-2xl shadow-sm font-sans ${screenshotMode ? '' : 'overflow-hidden max-w-[1150px] mx-auto w-full'}`} style={screenshotMode ? { maxWidth: 'none', width: 'fit-content', margin: '0', padding: '16px' } : {}}>
               
               {/* Excel Sheet Title and Header */}
+              {screenshotMode && error && (
+                <div style={{ color: 'white', backgroundColor: 'red', padding: '10px', fontSize: '14px', marginBottom: '10px', fontWeight: 'bold' }}>
+                  DEBUG ERROR: {error}
+                </div>
+              )}
               <div className="flex justify-between items-start mb-2 border-b border-slate-200 pb-2">
                 <div className="font-sans">
                   <h1 
