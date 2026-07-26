@@ -1588,7 +1588,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         )}
 
         {/* ── Tab Navigation ──────────────────────────────────────── */}
-        <div className={`flex gap-1 bg-slate-200/60 p-1.5 rounded-xl w-fit ${screenshotMode ? 'hidden' : ''}`}>
+        {!screenshotMode && (<div className="flex gap-1 bg-slate-200/60 p-1.5 rounded-xl w-fit">
           {[
             { key: 'unit-checklist',    label: '📋 Checklist Kebun (Unit)', icon: Calendar },
             { key: 'summary-regional',  label: '🏢 Rekap Regional 5',      icon: BarChart2 },
@@ -1602,9 +1602,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             </button>
           ))}
         </div>
+        )}
 
         {/* ── Controls (Adapts based on active tab) ────────────────── */}
-        <div className={`bg-[#fafafa]  p-5 rounded-2xl border border-emerald-100 shadow-lg shadow-emerald-900/5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 items-end sticky top-0 z-40 ${screenshotMode ? 'hidden' : ''}`}>
+        {!screenshotMode && (<div className="bg-[#fafafa]  p-5 rounded-2xl border border-emerald-100 shadow-lg shadow-emerald-900/5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 items-end sticky top-0 z-40">
           <div className="flex flex-col">
             <label className="text-[10px] font-bold text-slate-400 uppercase mb-1">Pilih Bulan</label>
             <input type="month" value={targetMonth} onChange={e => setTargetMonth(e.target.value)}
@@ -1920,8 +1921,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 </button>
               </div>
             </div>
+          )}
 
-            {/* Redesigned Excel-style Monitoring Sheet */}
+          {/* Redesigned Excel-style Monitoring Sheet */}
             <div id="excel-report-sheet" className={`bg-white p-4 border border-slate-300 rounded-2xl shadow-sm font-sans ${screenshotMode ? '' : 'overflow-hidden max-w-[1150px] mx-auto w-full'}`} style={screenshotMode ? { maxWidth: 'none', width: 'fit-content', margin: '0', padding: '16px' } : {}}>
               
               {/* Excel Sheet Title and Header */}
