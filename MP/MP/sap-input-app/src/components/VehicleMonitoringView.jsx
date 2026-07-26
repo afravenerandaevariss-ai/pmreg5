@@ -1893,6 +1893,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             <div id="excel-report-sheet" className={`bg-white p-4 border border-slate-300 rounded-2xl shadow-sm font-sans ${screenshotMode ? '' : 'overflow-hidden max-w-[1150px] mx-auto w-full'}`} style={screenshotMode ? { maxWidth: 'none', width: 'fit-content', margin: '0', padding: '16px' } : {}}>
               
               {/* Excel Sheet Title and Header */}
+              {screenshotMode && !loading && (
+                <div id="data-ready" style={{ display: 'none' }}></div>
+              )}
               {screenshotMode && error && (
                 <div style={{ color: 'white', backgroundColor: 'red', padding: '10px', fontSize: '14px', marginBottom: '10px', fontWeight: 'bold' }}>
                   DEBUG ERROR: {error}
