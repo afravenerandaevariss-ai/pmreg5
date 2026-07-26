@@ -230,20 +230,16 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       setMasterEquipments(eqRes.data || []);
       setZcoData(zRes.data || []);
       if (mapRes) {
-        let debugStr = `type=${typeof mapRes}`;
         if (Array.isArray(mapRes)) {
-          debugStr += ', isArr=true, len=' + mapRes.length;
           setMasterMap(new Map(mapRes));
         } else if (mapRes.data && Array.isArray(mapRes.data)) {
-          debugStr += ', hasDataArr=true, len=' + mapRes.data.length;
           setMasterMap(new Map(mapRes.data));
+        } else if (mapRes.data?.map && Array.isArray(mapRes.data.map)) {
+          setMasterMap(new Map(mapRes.data.map));
         } else {
-          debugStr += ', NOT_ARRAY. keys=' + Object.keys(mapRes).join(',');
           setMasterMap(new Map());
         }
-        setDebugMapStr(debugStr);
       } else {
-        setDebugMapStr(`mapRes=${mapRes ? 'exists' : 'null'}`);
         setMasterMap(new Map());
       }
     } catch (e) {
@@ -1909,18 +1905,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             <div id="excel-report-sheet" className={`bg-white p-4 border border-slate-300 rounded-2xl shadow-sm font-sans ${screenshotMode ? '' : 'overflow-hidden max-w-[1150px] mx-auto w-full'}`} style={screenshotMode ? { maxWidth: 'none', width: 'fit-content', margin: '0', padding: '16px' } : {}}>
               
               {/* Excel Sheet Title and Header */}
-              {screenshotMode && (
-                <div style={{ color: 'red', fontSize: '14px', marginBottom: '10px' }}>
-                  DEBUG DATA: loading={loading ? 'true' : 'false'}, 
-                  logs={logs.length}, 
-                  vehicles={vehicles.length}, 
-                  masterEq={masterEquipments.length}, 
-                  masterMapSize={masterMap ? masterMap.size : 0},
-                  targetMonth={targetMonth}, 
-                  error={error ? error.toString() : 'null'},
-                  MAP_DEBUG: {debugMapStr}
-                </div>
-              )}
+
               {screenshotMode && !loading && (
                 <div id="data-ready" style={{ display: 'none' }}></div>
               )}
