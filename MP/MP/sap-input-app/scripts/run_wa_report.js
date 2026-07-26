@@ -67,8 +67,7 @@ async function sendScreenshotAsDocument(pngBuffer, deviceId, authHeader) {
   const timeFormatted = formatterTime.format(now).replace(':', '.');
 
   let caption = `*Monitoring Transaksi Logbook tanggal 1 s.d ${dateFormatted} ${timeFormatted}*\n`;
-  caption += `*REGIONAL 5*\n`;
-  caption += `Target input logbook : *${dateFormatted}* (H-1)\n\n`;
+  caption += `*REGIONAL 5*\n\n`;
 
   const formData = new FormData();
   formData.append('phone', TARGET_GROUP_JID);
