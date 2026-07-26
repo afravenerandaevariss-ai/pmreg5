@@ -14,16 +14,6 @@
       "destination": "/index.html"
     }
   ],
-  "crons": [
-    {
-      "path": "/api/send-wa-image",
-      "schedule": "30 1 * * *"
-    },
-    {
-      "path": "/api/send-wa-image",
-      "schedule": "30 7 * * *"
-    }
-  ],
   "redirects": [
     {
       "source": "/(.*)",
