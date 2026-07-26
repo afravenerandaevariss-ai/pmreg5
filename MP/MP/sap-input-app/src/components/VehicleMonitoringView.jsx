@@ -167,6 +167,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [zcoUploadInfo, setZcoUploadInfo]       = useState(null);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState(null);
+  const [debugMapStr, setDebugMapStr] = useState('');
   const [uploadInfo, setUploadInfo] = useState(null);
   const [isSavingImage, setIsSavingImage] = useState(false);
 
@@ -232,14 +233,21 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       setMasterEquipments(eqRes.data || []);
       setZcoData(zRes.data || []);
       if (mapRes && mapRes.data) {
+        let debugStr = `type=${typeof mapRes.data}`;
         if (Array.isArray(mapRes.data)) {
+          debugStr += ', isArr=true, len=' + mapRes.data.length;
           setMasterMap(new Map(mapRes.data));
         } else if (mapRes.data.data && Array.isArray(mapRes.data.data)) {
+          debugStr += ', hasDataArr=true, len=' + mapRes.data.data.length;
           setMasterMap(new Map(mapRes.data.data));
         } else {
+          debugStr += ', NOT_ARRAY. keys=' + Object.keys(mapRes.data).join(',');
+          if (mapRes.data.data) debugStr += ' innerKeys=' + Object.keys(mapRes.data.data).join(',');
           setMasterMap(new Map());
         }
+        setDebugMapStr(debugStr);
       } else {
+        setDebugMapStr(`mapRes=${mapRes ? 'exists' : 'null'}, data=${mapRes?.data ? 'exists' : 'null'}`);
         setMasterMap(new Map());
       }
     } catch (e) {
@@ -1913,7 +1921,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   masterEq={masterEquipments.length}, 
                   masterMapSize={masterMap ? masterMap.size : 0},
                   targetMonth={targetMonth}, 
-                  error={error ? error.toString() : 'null'}
+                  error={error ? error.toString() : 'null'},
+                  MAP_DEBUG: {debugMapStr}
                 </div>
               )}
               {screenshotMode && !loading && (
