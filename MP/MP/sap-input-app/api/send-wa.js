@@ -137,17 +137,22 @@ async function buildReportText() {
     item.rank = idx + 1;
   });
 
-  const dayStr = String(now.getDate()).padStart(2, '0');
-  const monthStr = String(now.getMonth() + 1).padStart(2, '0');
-  const yearStr = now.getFullYear();
+  const optionsDate = { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric' };
+  const optionsTime = { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false };
+  const formatterDate = new Intl.DateTimeFormat('id-ID', optionsDate);
+  const formatterTime = new Intl.DateTimeFormat('id-ID', optionsTime);
+  
+  const dateParts = formatterDate.formatToParts(now);
+  const dayStr = dateParts.find(p => p.type === 'day').value;
+  const monthStr = dateParts.find(p => p.type === 'month').value;
+  const yearStr = dateParts.find(p => p.type === 'year').value;
   const dateFormatted = `${dayStr}/${monthStr}/${yearStr}`;
-  const hoursStr = String(now.getHours()).padStart(2, '0');
-  const minsStr = String(now.getMinutes()).padStart(2, '0');
-  const timeFormatted = `${hoursStr}.${minsStr}`;
+  
+  const timeFormatted = formatterTime.format(now).replace(':', '.');
 
   let text = `*Monitoring Transaksi Logbook tanggal 1 s.d ${dateFormatted} ${timeFormatted}*\n`;
   text += `*REGIONAL 5*\n`;
-  text += `Target input logbook : *${dateFormatted}*\n\n`;
+  text += `Target input logbook : *${dateFormatted}* (H-1)\n\n`;
 
   text += `\`\`\`\n`;
   text += `+-------+-------------------------+------+----------+-----+-----+--------+------------+------+\n`;
