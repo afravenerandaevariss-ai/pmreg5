@@ -625,7 +625,12 @@ function App() {
           });
           // Also add from masterMap (used by Master Data tab) and backfill missing plants
           if (masterMapResult.data) {
-            const mmEntries = masterMapResult.data;
+            let mmEntries = [];
+            if (Array.isArray(masterMapResult.data)) {
+              mmEntries = masterMapResult.data;
+            } else if (masterMapResult.data.map && Array.isArray(masterMapResult.data.map)) {
+              mmEntries = masterMapResult.data.map;
+            }
             mmEntries.forEach(([eqNum, info]) => {
               if (!info) return;
               const plant = typeof info === 'string' ? info : (info.plant || '');
