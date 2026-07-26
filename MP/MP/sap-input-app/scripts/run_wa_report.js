@@ -51,17 +51,24 @@ async function getActiveDeviceId(authHeader) {
 async function sendScreenshotAsDocument(pngBuffer, deviceId, authHeader) {
   logStep('Sending HD Document via GoWA...');
   
-  // First, fetch the caption
-  let caption = 'Laporan otomatis';
-  try {
-    const txtRes = await fetch(`https://pmreg5.afratarigan.my.id/api/send-wa?mock=true`);
-    if (txtRes.ok) {
-      const txtData = await txtRes.json();
-      if (txtData.success && txtData.text) {
-        caption = txtData.text.split('```')[0].trim();
-      }
-    }
-  } catch(e) { console.error('Failed to fetch caption', e); }
+  // First, generate the caption locally to avoid relying on the broken Vercel API
+  const now = new Date();
+  const optionsDate = { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric' };
+  const optionsTime = { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false };
+  const formatterDate = new Intl.DateTimeFormat('id-ID', optionsDate);
+  const formatterTime = new Intl.DateTimeFormat('id-ID', optionsTime);
+  
+  const dateParts = formatterDate.formatToParts(now);
+  const dayStr = dateParts.find(p => p.type === 'day').value;
+  const monthStr = dateParts.find(p => p.type === 'month').value;
+  const yearStr = dateParts.find(p => p.type === 'year').value;
+  const dateFormatted = `${dayStr}/${monthStr}/${yearStr}`;
+  
+  const timeFormatted = formatterTime.format(now).replace(':', '.');
+
+  let caption = `*Monitoring Transaksi Logbook tanggal 1 s.d ${dateFormatted} ${timeFormatted}*\n`;
+  caption += `*REGIONAL 5*\n`;
+  caption += `Target input logbook : *${dateFormatted}* (H-1)\n\n`;
 
   const formData = new FormData();
   formData.append('phone', TARGET_GROUP_JID);
@@ -197,3 +204,6 @@ async function captureScreenshotWithRetries() {
 }
 
 captureScreenshotWithRetries();
+
+
+
