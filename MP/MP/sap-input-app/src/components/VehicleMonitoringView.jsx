@@ -1916,7 +1916,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     className="text-xs font-extrabold text-slate-900 tracking-wide select-none cursor-default"
                     title={currentUser?.role === 'Admin' ? "Klik ganda untuk konfigurasi WA" : ""}
                   >
-                    Monitoring Transaksi Logbook (Logs: {logs.length}) tanggal 1 s.d {(() => {
+                    Monitoring Transaksi Logbook (Logs: {logs.length}) {error && `[ERROR: ${error}]`} tanggal 1 s.d {(() => {
                       try {
                         const parts = targetInputDate.split('-');
                         const targetDateObj = new Date(parts[0], parts[1] - 1, parts[2]);

@@ -384,13 +384,13 @@ export async function getGSheetHistory() {
 
 export async function fetchVehicleMaster() {
   const { data, error } = await getSystemConfig('vehicle_master');
-  if (error || !Array.isArray(data)) return { data: [], error: null };
+  if (error || !Array.isArray(data)) return { data: [], error: error || "Not an array" };
   return { data, error: null };
 }
 
 export async function fetchVehicleLogs() {
   const { data, error } = await getSystemConfig('vehicle_logs');
-  if (error || !Array.isArray(data)) return { data: [], error: null };
+  if (error || !Array.isArray(data)) return { data: [], error: error || "Not an array" };
   return { data, error: null };
 }
 
@@ -403,7 +403,7 @@ export async function saveVehicleData(vehicles, logs) {
 
 export async function fetchZCOData() {
   const { data, error } = await getSystemConfig('zco_data');
-  if (error || !Array.isArray(data)) return { data: [], error: null };
+  if (error || !Array.isArray(data)) return { data: [], error: error || "Not an array" };
   return { data, error: null };
 }
 
@@ -418,7 +418,7 @@ export async function saveZCOData(zcoList) {
 
 export async function fetchLiveChats() {
   const { data, error } = await getSystemConfig('live_chats');
-  if (error || !Array.isArray(data)) return { data: [], error: null };
+  if (error || !Array.isArray(data)) return { data: [], error: error || "Not an array" };
   return { data, error: null };
 }
 
@@ -455,7 +455,7 @@ export async function saveWAConfig(configObj) {
 
 export async function fetchWALogs() {
   const { data, error } = await getSystemConfig('wa_logs');
-  if (error || !Array.isArray(data)) return { data: [], error: null };
+  if (error || !Array.isArray(data)) return { data: [], error: error || "Not an array" };
   return { data, error: null };
 }
 
