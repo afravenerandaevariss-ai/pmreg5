@@ -1,19 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const getEnv = (key) => {
-  if (typeof process !== 'undefined' && process.env && process.env[key]) {
-    return process.env[key];
-  }
-  try {
-    // eslint-disable-next-line
-    return import.meta.env[key];
-  } catch (e) {
-    return undefined;
-  }
-};
+const supabaseUrl = typeof process !== 'undefined' && process.env && process.env.VITE_SUPABASE_URL
+  ? process.env.VITE_SUPABASE_URL
+  : (import.meta.env && import.meta.env.VITE_SUPABASE_URL);
 
-const supabaseUrl = getEnv('VITE_SUPABASE_URL');
-const supabaseAnonKey = getEnv('VITE_SUPABASE_ANON_KEY');
+const supabaseAnonKey = typeof process !== 'undefined' && process.env && process.env.VITE_SUPABASE_ANON_KEY
+  ? process.env.VITE_SUPABASE_ANON_KEY
+  : (import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY);
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase credentials not set. Running in localStorage fallback mode.');
