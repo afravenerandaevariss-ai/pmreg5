@@ -209,7 +209,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       
       const fetchPromise = Promise.all([
         fetchEq, // For vehicles (vRes)
-        fetchDailyLogs('ALL', targetMonth), // For logs (lRes)
+        fetchVehicleLogs(), // For logs (lRes)
         fetchEq, // For masterEquipments (eqRes)
         fetchZCOData(),
         getSystemConfig('master_map')
