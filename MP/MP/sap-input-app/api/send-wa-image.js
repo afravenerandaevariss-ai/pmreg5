@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     const arrayBuffer = await imgRes.arrayBuffer();
     const blob = new Blob([arrayBuffer], { type: 'image/png' });
 
-    let textCaption = `Laporan otomatis (HD Screenshot)\n\n${imageUrl}`;
+    let textCaption = `Laporan otomatis`;
     try {
       const txtRes = await fetch(`${baseUrl}/api/send-wa?mock=true`);
       if (txtRes.ok) {
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
         if (txtData.success && txtData.text) {
           // Remove ASCII table (everything after first backticks)
           const headerOnly = txtData.text.split('```')[0].trim();
-          textCaption = headerOnly + `\n\n_Screenshot:_ ${imageUrl}`;
+          textCaption = headerOnly;
         }
       }
     } catch(e) { console.error('Failed to get mock text', e); }
