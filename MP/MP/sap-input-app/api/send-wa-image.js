@@ -116,6 +116,7 @@ export default async function handler(req, res) {
       message: `Image Screenshot sent to ${targetPhone}`,
       dispatchResult,
       screenshotUrl: imageUrl,
+      microlinkUrl: microlinkUrl,
       target: targetPhone,
       timestamp: new Date().toISOString()
     });
