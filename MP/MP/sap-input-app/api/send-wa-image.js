@@ -38,7 +38,9 @@ export default async function handler(req, res) {
       if (txtRes.ok) {
         const txtData = await txtRes.json();
         if (txtData.success && txtData.text) {
-          textCaption = txtData.text + `\n\n_Screenshot:_ ${imageUrl}`;
+          // Remove ASCII table (everything after first backticks)
+          const headerOnly = txtData.text.split('```')[0].trim();
+          textCaption = headerOnly + `\n\n_Screenshot:_ ${imageUrl}`;
         }
       }
     } catch(e) { console.error('Failed to get mock text', e); }
@@ -77,6 +79,7 @@ export default async function handler(req, res) {
       formData.append('phone', formattedPhone);
       formData.append('caption', textCaption);
       formData.append('image', blob, 'screenshot.png');
+      formData.append('is_document', 'true'); // Flag to send as HD document
 
       const gowaRes = await fetch(`${gowaUrl}/send/image?device_id=${encodeURIComponent(deviceId)}`, {
         method: 'POST',
