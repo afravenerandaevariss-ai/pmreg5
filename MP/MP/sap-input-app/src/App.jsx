@@ -594,7 +594,13 @@ function App() {
           ]);
 
           if (masterMapResult.data) {
-            setMasterMap(new Map(masterMapResult.data));
+            if (Array.isArray(masterMapResult.data)) {
+              setMasterMap(new Map(masterMapResult.data));
+            } else if (masterMapResult.data.map && Array.isArray(masterMapResult.data.map)) {
+              setMasterMap(new Map(masterMapResult.data.map));
+            } else {
+              setMasterMap(new Map());
+            }
           }
 
           if (hResult.data) {
