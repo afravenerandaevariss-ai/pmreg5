@@ -175,6 +175,9 @@ async function captureScreenshotWithRetries() {
       }
 
       logStep(`Screenshot successfully taken! Size: ${(pngBuffer.length / 1024).toFixed(2)} KB`);
+      // Save locally to support GitHub Actions artifact retention
+      if (!fs.existsSync('public')) fs.mkdirSync('public');
+      fs.writeFileSync('public/rekap.png', pngBuffer);
       await browser.close();
       browser = null;
 
