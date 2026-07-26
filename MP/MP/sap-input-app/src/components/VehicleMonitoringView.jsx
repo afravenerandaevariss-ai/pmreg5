@@ -204,10 +204,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     setLoading(true);
     setError(null);
     try {
+      // In screenshotMode, we only need summary data, skip heavy paginated master_equipment
+      const fetchEq = screenshotMode ? Promise.resolve({ data: [] }) : fetchMasterEquipment();
+      
       const [vRes, lRes, eqRes, zRes, mapRes] = await Promise.all([
         fetchVehicleMaster(),
         fetchVehicleLogs(),
-        fetchMasterEquipment(),
+        fetchEq,
         fetchZCOData(),
         getSystemConfig('master_map')
       ]);
@@ -1883,16 +1886,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             <div id="excel-report-sheet" className={`bg-white p-4 border border-slate-300 rounded-2xl shadow-sm font-sans ${screenshotMode ? '' : 'overflow-hidden max-w-[1150px] mx-auto w-full'}`} style={screenshotMode ? { maxWidth: 'none', width: 'fit-content', margin: '0', padding: '16px' } : {}}>
               
               {/* Excel Sheet Title and Header */}
-              {screenshotMode && (
-                <div style={{ color: 'red', fontSize: '12px', marginBottom: '10px' }}>
-                  DEBUG: loading={loading ? 'true' : 'false'}, 
-                  logs={logs.length}, 
-                  vehicles={vehicles.length}, 
-                  masterEq={masterEquipments.length}, 
-                  targetMonth={targetMonth}, 
-                  targetInputDate={targetInputDate}
-                </div>
-              )}
               <div className="flex justify-between items-start mb-2 border-b border-slate-200 pb-2">
                 <div className="font-sans">
                   <h1 
