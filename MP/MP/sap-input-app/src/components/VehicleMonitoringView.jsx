@@ -1893,13 +1893,19 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             <div id="excel-report-sheet" className={`bg-white p-4 border border-slate-300 rounded-2xl shadow-sm font-sans ${screenshotMode ? '' : 'overflow-hidden max-w-[1150px] mx-auto w-full'}`} style={screenshotMode ? { maxWidth: 'none', width: 'fit-content', margin: '0', padding: '16px' } : {}}>
               
               {/* Excel Sheet Title and Header */}
+              {screenshotMode && (
+                <div style={{ color: 'red', fontSize: '14px', marginBottom: '10px' }}>
+                  DEBUG DATA: loading={loading ? 'true' : 'false'}, 
+                  logs={logs.length}, 
+                  vehicles={vehicles.length}, 
+                  masterEq={masterEquipments.length}, 
+                  masterMapSize={masterMap ? masterMap.size : 0},
+                  targetMonth={targetMonth}, 
+                  error={error ? error.toString() : 'null'}
+                </div>
+              )}
               {screenshotMode && !loading && (
                 <div id="data-ready" style={{ display: 'none' }}></div>
-              )}
-              {screenshotMode && error && (
-                <div style={{ color: 'white', backgroundColor: 'red', padding: '10px', fontSize: '14px', marginBottom: '10px', fontWeight: 'bold' }}>
-                  DEBUG ERROR: {error}
-                </div>
               )}
               <div className="flex justify-between items-start mb-2 border-b border-slate-200 pb-2">
                 <div className="font-sans">
