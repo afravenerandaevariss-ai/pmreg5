@@ -232,7 +232,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       setMasterEquipments(eqRes.data || []);
       setZcoData(zRes.data || []);
       if (mapRes && mapRes.data) {
-        setMasterMap(new Map(mapRes.data));
+        if (Array.isArray(mapRes.data)) {
+          setMasterMap(new Map(mapRes.data));
+        } else if (mapRes.data.data && Array.isArray(mapRes.data.data)) {
+          setMasterMap(new Map(mapRes.data.data));
+        } else {
+          setMasterMap(new Map());
+        }
       } else {
         setMasterMap(new Map());
       }
