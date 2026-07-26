@@ -204,12 +204,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     setLoading(true);
     setError(null);
     try {
-      // We need master equipment to calculate vehicle counts if master_map is empty.
+      // In screenshotMode, we only need summary data, skip heavy paginated master_equipment
+      const fetchEq = screenshotMode ? Promise.resolve({ data: [] }) : fetchMasterEquipment();
       
       const fetchPromise = Promise.all([
-        fetchMasterEquipment(), // For vehicles (vRes)
+        fetchEq, // For vehicles (vRes)
         fetchDailyLogs('ALL', targetMonth), // For logs (lRes)
-        Promise.resolve({ data: [] }), // eqRes (we don't need this duplicate, set to empty array)
+        fetchEq, // For masterEquipments (eqRes)
         fetchZCOData(),
         getSystemConfig('master_map')
       ]);
