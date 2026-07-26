@@ -262,7 +262,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         setTimeout(() => {
           setLoading(false);
           setDataReady(true);
-        }, 1500);
+        }, 5000);
       } else {
         setLoading(false);
       }
