@@ -208,11 +208,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       let fetchPromise;
       if (screenshotMode) {
         fetchPromise = Promise.all([
-          fetchMasterEquipment(), 
+          Promise.resolve({ data: [], error: null }), 
           fetch(`/api/vehicle-logs-slim?month=${targetMonth}`).then(r => r.json()).then(res => res.error ? { error: { message: res.error } } : { data: res.data || [], error: null }),
-          fetchMasterEquipment(), 
+          Promise.resolve({ data: [], error: null }), 
           Promise.resolve({ data: [], error: null }),
-          getSystemConfig('master_map')
+          Promise.resolve({ data: null, error: null })
         ]);
       } else {
         fetchPromise = Promise.all([
@@ -652,6 +652,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       } else {
         vehicleCount = plantVehicles.length;
       }
+      if (vehicleCount === 0) vehicleCount = VEHICLE_MASTER_COUNT[plantCode] || 0;
 
       // Include cancelled logs in the main calculation since they still count as input activity KPI
       const plantLogs     = monthLogs.filter(l => l.plant === plantCode);
