@@ -205,13 +205,24 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     setLoading(true);
     setError(null);
     try {
-      const fetchPromise = Promise.all([
-        fetchMasterEquipment(), // For vehicles (vRes)
-        fetchVehicleLogs(), // For logs (lRes)
-        fetchMasterEquipment(), // For masterEquipments (eqRes)
-        fetchZCOData(),
-        getSystemConfig('master_map')
-      ]);
+      let fetchPromise;
+      if (screenshotMode) {
+        fetchPromise = Promise.all([
+          fetchMasterEquipment(), 
+          fetch(`/api/vehicle-logs-slim?month=${targetMonth}`).then(r => r.json()).then(res => res.error ? { error: { message: res.error } } : { data: res.data || [], error: null }),
+          fetchMasterEquipment(), 
+          fetchZCOData(),
+          getSystemConfig('master_map')
+        ]);
+      } else {
+        fetchPromise = Promise.all([
+          fetchMasterEquipment(), 
+          fetchVehicleLogs(), 
+          fetchMasterEquipment(), 
+          fetchZCOData(),
+          getSystemConfig('master_map')
+        ]);
+      }
 
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Timeout loading data from Supabase')), 30000)
