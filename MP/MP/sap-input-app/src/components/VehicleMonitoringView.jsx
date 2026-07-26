@@ -170,6 +170,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [debugMapStr, setDebugMapStr] = useState('');
   const [uploadInfo, setUploadInfo] = useState(null);
   const [isSavingImage, setIsSavingImage] = useState(false);
+  const [dataReady, setDataReady] = useState(false);
 
   // View control
   const [activeTab, setActiveTab]           = useState('summary-regional');  // unit-checklist | summary-regional | detail-veh | log-raw
@@ -256,7 +257,15 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     } catch (e) {
       setError('Gagal memuat data: ' + e.message);
     } finally {
-      setLoading(false);
+      if (screenshotMode) {
+        // Wait a bit for the browser to paint the huge table before signaling Microlink
+        setTimeout(() => {
+          setLoading(false);
+          setDataReady(true);
+        }, 1500);
+      } else {
+        setLoading(false);
+      }
     }
   }, [screenshotMode]);
 
@@ -652,7 +661,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       } else {
         vehicleCount = plantVehicles.length;
       }
-      if (vehicleCount === 0) vehicleCount = VEHICLE_MASTER_COUNT[plantCode] || 0;
 
       // Include cancelled logs in the main calculation since they still count as input activity KPI
       const plantLogs     = monthLogs.filter(l => l.plant === plantCode);
@@ -1918,7 +1926,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               
               {/* Excel Sheet Title and Header */}
 
-              {screenshotMode && !loading && (
+              {screenshotMode && dataReady && (
                 <div id="data-ready" style={{ display: 'none' }}></div>
               )}
               <div className="flex justify-between items-start mb-2 border-b border-slate-200 pb-2">
