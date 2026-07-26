@@ -15,7 +15,7 @@ export default async function handler(req, res) {
     // Add timestamp to bust Microlink cache and ensure fresh data is captured
     const timestamp = Date.now();
     const targetUrl = encodeURIComponent(`${baseUrl}/?hideNav=true&tab=vehicle&screenshotMode=true&t=${timestamp}`);
-    const microlinkUrl = `https://api.microlink.io/?url=${targetUrl}&screenshot=true&meta=false&waitUntil=networkidle0&waitForTimeout=15000&viewport.width=1400&viewport.height=1000&viewport.deviceScaleFactor=2&element=%23excel-report-sheet`;
+    const microlinkUrl = `https://api.microlink.io/?url=${targetUrl}&screenshot=true&meta=false&waitForTimeout=15000&viewport.width=1400&viewport.height=1000&viewport.deviceScaleFactor=2&element=%23excel-report-sheet`;
     
     console.log('Fetching screenshot from Microlink...');
     const microRes = await fetch(microlinkUrl);
