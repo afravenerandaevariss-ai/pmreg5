@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/**/*": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   },
   "rewrites": [
@@ -17,15 +17,11 @@
   "crons": [
     {
       "path": "/api/send-wa-image",
-      "schedule": "0 2 * * *"
+      "schedule": "30 1 * * *"
     },
     {
       "path": "/api/send-wa-image",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/api/send-wa-image",
-      "schedule": "0 11 * * *"
+      "schedule": "30 7 * * *"
     }
   ],
   "redirects": [
