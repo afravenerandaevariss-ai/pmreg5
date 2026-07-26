@@ -211,7 +211,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           fetchMasterEquipment(), 
           fetch(`/api/vehicle-logs-slim?month=${targetMonth}`).then(r => r.json()).then(res => res.error ? { error: { message: res.error } } : { data: res.data || [], error: null }),
           fetchMasterEquipment(), 
-          fetchZCOData(),
+          Promise.resolve({ data: [], error: null }),
           getSystemConfig('master_map')
         ]);
       } else {
