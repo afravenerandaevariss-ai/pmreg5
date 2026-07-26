@@ -64,10 +64,12 @@ async function sendScreenshotAsDocument(pngBuffer, deviceId, authHeader) {
   } catch(e) { console.error('Failed to fetch caption', e); }
 
   const formData = new FormData();
-  formData.append('jid', TARGET_GROUP_JID);
+  formData.append('phone', TARGET_GROUP_JID);
   formData.append('caption', caption);
   const blob = new Blob([pngBuffer], { type: 'image/png' });
   formData.append('image', blob, `Rekap_Logbook_Regional5_HD.png`);
+  formData.append('is_hd', 'true');
+  formData.append('compress', 'false');
 
   const resp = await fetch(`${GOWA_URL}/send/image?device_id=${encodeURIComponent(deviceId)}`, {
     method: 'POST',
