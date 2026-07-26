@@ -1936,7 +1936,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     className="text-xs font-extrabold text-slate-900 tracking-wide select-none cursor-default"
                     title={currentUser?.role === 'Admin' ? "Klik ganda untuk konfigurasi WA" : ""}
                   >
-                    Monitoring Transaksi Logbook (Logs: {logs.length}) {error && `[ERROR: ${error}]`} tanggal 1 s.d {(() => {
+                    Monitoring Transaksi Logbook {error && `[ERROR: ${error}]`} tanggal 1 s.d {(() => {
                       try {
                         const parts = targetInputDate.split('-');
                         const targetDateObj = new Date(parts[0], parts[1] - 1, parts[2]);
@@ -1948,7 +1948,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                       }
                     })()} {(() => {
                       const now = new Date();
-                      return `${String(now.getHours()).padStart(2, '0')}.${String(now.getMinutes()).padStart(2, '0')}`;
+                      return now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' }).replace(':', '.');
                     })()}
                   </h1>
                   <h2 className="text-[10px] font-extrabold text-slate-800 tracking-wider mt-0.5">

@@ -78,9 +78,9 @@ export default async function handler(req, res) {
       const formData = new FormData();
       formData.append('phone', formattedPhone);
       formData.append('caption', textCaption);
-      formData.append('file', blob, 'screenshot.png'); // GoWA uses 'file' for documents
+      formData.append('image', blob, 'screenshot.png'); // GoWA uses 'image' for regular photos
 
-      const gowaRes = await fetch(`${gowaUrl}/send/file?device_id=${encodeURIComponent(deviceId)}`, {
+      const gowaRes = await fetch(`${gowaUrl}/send/image?device_id=${encodeURIComponent(deviceId)}`, {
         method: 'POST',
         headers: {
           'Authorization': authHeader

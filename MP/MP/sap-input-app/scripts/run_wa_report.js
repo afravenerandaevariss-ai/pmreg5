@@ -67,9 +67,9 @@ async function sendScreenshotAsDocument(pngBuffer, deviceId, authHeader) {
   formData.append('jid', TARGET_GROUP_JID);
   formData.append('caption', caption);
   const blob = new Blob([pngBuffer], { type: 'image/png' });
-  formData.append('file', blob, `Rekap_Logbook_Regional5_HD.png`);
+  formData.append('image', blob, `Rekap_Logbook_Regional5_HD.png`);
 
-  const resp = await fetch(`${GOWA_URL}/send/file?device_id=${encodeURIComponent(deviceId)}`, {
+  const resp = await fetch(`${GOWA_URL}/send/image?device_id=${encodeURIComponent(deviceId)}`, {
     method: 'POST',
     headers: { 'Authorization': authHeader },
     body: formData
