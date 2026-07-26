@@ -188,6 +188,10 @@ export default async function handler(req, res) {
 
     const { text, list } = await buildReportText();
 
+    if (req.query.mock === 'true' || req.body?.mock === true) {
+      return res.status(200).json({ success: true, text, list });
+    }
+
     let dispatchResult = { success: false, detail: null };
 
     const gowaUrl = req.query.gowaUrl || waConfig.gowaUrl || 'https://gowa.waterflai.my.id';

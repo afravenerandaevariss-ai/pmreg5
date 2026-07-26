@@ -32,6 +32,17 @@ export default async function handler(req, res) {
     const arrayBuffer = await imgRes.arrayBuffer();
     const blob = new Blob([arrayBuffer], { type: 'image/png' });
 
+    let textCaption = `Laporan otomatis (HD Screenshot)\n\n${imageUrl}`;
+    try {
+      const txtRes = await fetch(`${baseUrl}/api/send-wa?mock=true`);
+      if (txtRes.ok) {
+        const txtData = await txtRes.json();
+        if (txtData.success && txtData.text) {
+          textCaption = txtData.text + `\n\n_Screenshot:_ ${imageUrl}`;
+        }
+      }
+    } catch(e) { console.error('Failed to get mock text', e); }
+
     let dispatchResult = { success: false, detail: null };
     const apiToken = req.query.token || req.body?.token || waConfig.apiToken || process.env.FONNTE_TOKEN;
     const gowaUrl = req.query.gowaUrl || waConfig.gowaUrl || 'https://gowa.waterflai.my.id';
@@ -64,7 +75,7 @@ export default async function handler(req, res) {
       // Send Image to GoWA using FormData
       const formData = new FormData();
       formData.append('phone', formattedPhone);
-      formData.append('caption', 'Laporan otomatis (HD Screenshot)');
+      formData.append('caption', textCaption);
       formData.append('image', blob, 'screenshot.png');
 
       const gowaRes = await fetch(`${gowaUrl}/send/image?device_id=${encodeURIComponent(deviceId)}`, {
@@ -85,7 +96,7 @@ export default async function handler(req, res) {
       // Fallback to Fonnte
       const formData = new URLSearchParams();
       formData.append('target', targetPhone);
-      formData.append('message', `Laporan otomatis (HD Screenshot)\n\n${imageUrl}`);
+      formData.append('message', textCaption);
       formData.append('countryCode', '62');
       
       const apiRes = await fetch('https://api.fonnte.com/send', {
