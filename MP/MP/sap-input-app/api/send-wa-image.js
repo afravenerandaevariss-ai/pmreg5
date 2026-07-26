@@ -15,7 +15,7 @@ export default async function handler(req, res) {
     // Add timestamp to bust Microlink cache and ensure fresh data is captured
     const timestamp = Date.now();
     const targetUrl = encodeURIComponent(`${baseUrl}/?hideNav=true&tab=vehicle&screenshotMode=true&t=${timestamp}`);
-    const microlinkUrl = `https://api.microlink.io/?url=${targetUrl}&screenshot=true&meta=false&waitForSelector=%23data-ready&waitForTimeout=35000&viewport.width=1400&viewport.height=4000&viewport.deviceScaleFactor=2&element=%23excel-report-sheet`;
+    const microlinkUrl = `https://api.microlink.io/?url=${targetUrl}&force=true&screenshot=true&meta=false&waitForSelector=%23data-ready&waitForTimeout=35000&viewport.width=1400&viewport.height=4000&viewport.deviceScaleFactor=2&element=%23excel-report-sheet`;
     
     console.log('Fetching screenshot from Microlink...');
     const microRes = await fetch(microlinkUrl);
@@ -79,6 +79,8 @@ export default async function handler(req, res) {
       formData.append('phone', formattedPhone);
       formData.append('caption', textCaption);
       formData.append('image', blob, 'screenshot.png'); // GoWA uses 'image' for regular photos
+      formData.append('is_hd', 'true');
+      formData.append('compress', 'false');
 
       const gowaRes = await fetch(`${gowaUrl}/send/image?device_id=${encodeURIComponent(deviceId)}`, {
         method: 'POST',
