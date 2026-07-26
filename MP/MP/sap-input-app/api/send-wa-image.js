@@ -74,14 +74,13 @@ export default async function handler(req, res) {
         formattedPhone = cleanPhone.startsWith('0') ? '62' + cleanPhone.substring(1) : cleanPhone;
       }
 
-      // Send Image to GoWA using FormData
+      // Send Image to GoWA using FormData as a file to guarantee HD
       const formData = new FormData();
       formData.append('phone', formattedPhone);
       formData.append('caption', textCaption);
-      formData.append('image', blob, 'screenshot.png');
-      formData.append('is_document', 'true'); // Flag to send as HD document
+      formData.append('file', blob, 'screenshot.png'); // GoWA uses 'file' for documents
 
-      const gowaRes = await fetch(`${gowaUrl}/send/image?device_id=${encodeURIComponent(deviceId)}`, {
+      const gowaRes = await fetch(`${gowaUrl}/send/file?device_id=${encodeURIComponent(deviceId)}`, {
         method: 'POST',
         headers: {
           'Authorization': authHeader
