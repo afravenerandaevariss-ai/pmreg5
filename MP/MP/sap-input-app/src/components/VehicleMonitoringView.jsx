@@ -205,13 +205,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     setLoading(true);
     setError(null);
     try {
-      // In screenshotMode, we only need summary data, skip heavy paginated master_equipment
-      const fetchEq = screenshotMode ? Promise.resolve({ data: [] }) : fetchMasterEquipment();
-      
       const fetchPromise = Promise.all([
-        fetchEq, // For vehicles (vRes)
+        fetchMasterEquipment(), // For vehicles (vRes)
         fetchVehicleLogs(), // For logs (lRes)
-        fetchEq, // For masterEquipments (eqRes)
+        fetchMasterEquipment(), // For masterEquipments (eqRes)
         fetchZCOData(),
         getSystemConfig('master_map')
       ]);
@@ -232,22 +229,21 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       setLogs(lRes.data || []);
       setMasterEquipments(eqRes.data || []);
       setZcoData(zRes.data || []);
-      if (mapRes && mapRes.data) {
-        let debugStr = `type=${typeof mapRes.data}`;
-        if (Array.isArray(mapRes.data)) {
-          debugStr += ', isArr=true, len=' + mapRes.data.length;
+      if (mapRes) {
+        let debugStr = `type=${typeof mapRes}`;
+        if (Array.isArray(mapRes)) {
+          debugStr += ', isArr=true, len=' + mapRes.length;
+          setMasterMap(new Map(mapRes));
+        } else if (mapRes.data && Array.isArray(mapRes.data)) {
+          debugStr += ', hasDataArr=true, len=' + mapRes.data.length;
           setMasterMap(new Map(mapRes.data));
-        } else if (mapRes.data.data && Array.isArray(mapRes.data.data)) {
-          debugStr += ', hasDataArr=true, len=' + mapRes.data.data.length;
-          setMasterMap(new Map(mapRes.data.data));
         } else {
-          debugStr += ', NOT_ARRAY. keys=' + Object.keys(mapRes.data).join(',');
-          if (mapRes.data.data) debugStr += ' innerKeys=' + Object.keys(mapRes.data.data).join(',');
+          debugStr += ', NOT_ARRAY. keys=' + Object.keys(mapRes).join(',');
           setMasterMap(new Map());
         }
         setDebugMapStr(debugStr);
       } else {
-        setDebugMapStr(`mapRes=${mapRes ? 'exists' : 'null'}, data=${mapRes?.data ? 'exists' : 'null'}`);
+        setDebugMapStr(`mapRes=${mapRes ? 'exists' : 'null'}`);
         setMasterMap(new Map());
       }
     } catch (e) {
