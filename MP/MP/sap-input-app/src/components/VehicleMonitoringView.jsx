@@ -221,6 +221,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
       const [vRes, lRes, eqRes, zRes, mapRes] = await Promise.race([fetchPromise, timeoutPromise]);
 
+      if (vRes?.error) throw new Error('Vehicle Master Error: ' + (vRes.error.message || JSON.stringify(vRes.error)));
+      if (lRes?.error) throw new Error('Vehicle Logs Error: ' + (lRes.error.message || JSON.stringify(lRes.error)));
+      if (eqRes?.error) throw new Error('Master Eq Error: ' + (eqRes.error.message || JSON.stringify(eqRes.error)));
+      if (zRes?.error) throw new Error('ZCO Error: ' + (zRes.error.message || JSON.stringify(zRes.error)));
+      if (mapRes?.error) throw new Error('Map Error: ' + (mapRes.error.message || JSON.stringify(mapRes.error)));
+
       setVehicles(vRes.data || []);
       setLogs(lRes.data || []);
       setMasterEquipments(eqRes.data || []);
