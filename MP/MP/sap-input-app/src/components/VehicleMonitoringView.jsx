@@ -204,19 +204,18 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     setLoading(true);
     setError(null);
     try {
-      // In screenshotMode, we only need summary data, skip heavy paginated master_equipment
-      const fetchEq = screenshotMode ? Promise.resolve({ data: [] }) : fetchMasterEquipment();
+      // We need master equipment to calculate vehicle counts if master_map is empty.
       
       const fetchPromise = Promise.all([
-        fetchVehicleMaster(),
-        fetchVehicleLogs(),
-        fetchEq,
+        fetchMasterEquipment(), // For vehicles (vRes)
+        fetchDailyLogs('ALL', targetMonth), // For logs (lRes)
+        Promise.resolve({ data: [] }), // eqRes (we don't need this duplicate, set to empty array)
         fetchZCOData(),
         getSystemConfig('master_map')
       ]);
 
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout loading data from Supabase')), 15000)
+        setTimeout(() => reject(new Error('Timeout loading data from Supabase')), 30000)
       );
 
       const [vRes, lRes, eqRes, zRes, mapRes] = await Promise.race([fetchPromise, timeoutPromise]);
