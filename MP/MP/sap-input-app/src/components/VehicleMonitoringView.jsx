@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toPng } from 'html-to-image';
-import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, fetchMasterEquipment, fetchZCOData, saveZCOData, getSystemConfig } from '../lib/supabaseService';
+import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, fetchMasterEquipment, fetchZCOData, saveZCOData, getSystemConfig, fetchDailyLogs } from '../lib/supabaseService';
 import WhatsAppSenderModal from './WhatsAppSenderModal';
 
 // ─── Plant Master Data ────────────────────────────────────────────────────────
