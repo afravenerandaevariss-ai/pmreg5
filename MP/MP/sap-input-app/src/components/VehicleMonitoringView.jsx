@@ -217,7 +217,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         ]);
       } else {
         fetchPromise = Promise.all([
-          fetchMasterEquipment(), 
+          fetchVehicleMaster(), 
           fetchVehicleLogs(), 
           fetchMasterEquipment(), 
           fetchZCOData(),
