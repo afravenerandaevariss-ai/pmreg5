@@ -438,10 +438,10 @@ export default function MonitoringDashboard({
             <thead className="sticky top-0 z-30">
               {/* First Header Row: Week Groups */}
               <tr>
-                <th className="w-[40px] px-2 py-1 font-bold text-slate-700 border-b border-r border-slate-200 sticky left-0 z-40 bg-slate-100" rowSpan="2">No</th>
+                <th className="text-center w-[40px] px-2 py-1 font-bold text-slate-700 border-b border-r border-slate-200 sticky left-0 z-40 bg-slate-100" rowSpan="2">No</th>
                 <th className={`px-3 py-1 font-bold text-slate-700 border-b border-r border-slate-200 sticky left-[40px] z-40 bg-slate-100 ${activeTab === 'plant' ? 'min-w-[150px] border-r-2 border-r-slate-300 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' : 'w-[60px]'}`} rowSpan="2">Plant</th>
                 {activeTab === 'equipment' && (
-                  <th className="w-[220px] px-3 py-1 font-bold text-slate-700 border-b border-r-2 border-r-slate-300 border-b-slate-200 sticky left-[100px] z-40 bg-slate-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]" rowSpan="2">Equipment Induk</th>
+                  <th className="text-center w-[220px] px-3 py-1 font-bold text-slate-700 border-b border-r-2 border-r-slate-300 border-b-slate-200 sticky left-[100px] z-40 bg-slate-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]" rowSpan="2">Equipment Induk</th>
                 )}
                 
                 {weeks.map((week, idx) => (

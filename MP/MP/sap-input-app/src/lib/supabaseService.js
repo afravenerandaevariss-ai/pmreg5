@@ -144,6 +144,32 @@ export async function saveSystemConfig(id, dataObj) {
   return { error };
 }
 
+export async function deleteSystemConfig(id) {
+  if (!supabase) return { error: 'Supabase not configured' };
+  let numericId = 4;
+  if (id === 'master_map') numericId = 2;
+  else if (id === 'template_data') numericId = 3;
+  else if (id === 'sap_synced_dates') numericId = 5;
+  else if (id === 'ik17_raw_data') numericId = 7;
+  else if (id === 'vehicle_master') numericId = 8;
+  else if (id === 'vehicle_logs') numericId = 9;
+  else if (id === 'zco_data') numericId = 10;
+  else if (id === 'live_chats') numericId = 11;
+  else if (id === 'wa_config') numericId = 12;
+  else if (id === 'wa_logs') numericId = 13;
+  else if (id === 'iw39_data') numericId = 14;
+  else if (id === 'zvtab_data') numericId = 15;
+  else if (id === 'export046_data') numericId = 16;
+  else if (id === 'doc_details') numericId = 17;
+  else if (id === 'hierarchy_data') numericId = 0; // assuming 0 is hierarchy data based on App.jsx
+
+  const { error } = await supabase
+    .from('hierarchy_data')
+    .delete()
+    .eq('id', numericId);
+  return { error };
+}
+
 export async function getSystemConfig(id) {
   if (!supabase) return { data: null, error: 'Supabase not configured' };
   let numericId = 4;
@@ -157,6 +183,10 @@ export async function getSystemConfig(id) {
   else if (id === 'live_chats') numericId = 11;
   else if (id === 'wa_config') numericId = 12;
   else if (id === 'wa_logs') numericId = 13;
+  else if (id === 'iw39_data') numericId = 14;
+  else if (id === 'zvtab_data') numericId = 15;
+  else if (id === 'export046_data') numericId = 16;
+  else if (id === 'doc_details') numericId = 17;
 
   const { data, error } = await supabase
     .from('hierarchy_data')
@@ -296,6 +326,18 @@ export async function loginUser(nik, password) {
     return { data: null, error: 'Password salah' };
   }
   
+  return { data, error: null };
+}
+
+export async function getUserByNik(nik) {
+  if (!supabase) return { data: null, error: 'Supabase not configured' };
+  const { data, error } = await supabase
+    .from('app_users')
+    .select('*')
+    .eq('nik', nik)
+    .single();
+
+  if (error) return { data: null, error: 'NIK tidak ditemukan' };
   return { data, error: null };
 }
 
@@ -464,6 +506,38 @@ export async function saveWALog(logEntry) {
   const updatedLogs = [logEntry, ...(logs || [])].slice(0, 100);
   const { error } = await saveSystemConfig('wa_logs', updatedLogs);
   return { error };
+}
+
+// ============================================================
+// WORK ORDER DATA (IW39, ZVTAB, EXPORT046)
+// ============================================================
+
+export async function fetchIW39Data() {
+  const { data, error } = await getSystemConfig('iw39_data');
+  if (error || !Array.isArray(data)) return { data: [], error: error ? error.message : 'Not array' };
+  return { data, error: null };
+}
+
+export async function saveIW39Data(data) {
+  return await saveSystemConfig('iw39_data', data);
+}
+
+export async function fetchZvtabData() {
+  const { data, error } = await getSystemConfig('zvtab_data');
+  return { data: typeof data === 'object' ? data : {}, error: null };
+}
+
+export async function saveZvtabData(data) {
+  return await saveSystemConfig('zvtab_data', data);
+}
+
+export async function fetchExport046Data() {
+  const { data, error } = await getSystemConfig('export046_data');
+  return { data: typeof data === 'object' ? data : {}, error: null };
+}
+
+export async function saveExport046Data(data) {
+  return await saveSystemConfig('export046_data', data);
 }
 
 

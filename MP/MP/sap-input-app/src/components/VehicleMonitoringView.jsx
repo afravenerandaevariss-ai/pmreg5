@@ -1738,13 +1738,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 <table className="w-full text-xs text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-100/60 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                      <th className="px-4 py-3 w-[120px]">No. Equipment</th>
-                      <th className="px-4 py-3 min-w-[150px]">Deskripsi Kendaraan</th>
-                      <th className="px-4 py-3 w-[100px]">Cost Center</th>
-                      <th className="px-4 py-3 min-w-[180px]">Pekerjaan Utama (Transaksi)</th>
+                      <th className="text-center px-4 py-3 w-[120px]">No. Equipment</th>
+                      <th className="text-center px-4 py-3 min-w-[150px]">Deskripsi Kendaraan</th>
+                      <th className="text-center px-4 py-3 w-[100px]">Cost Center</th>
+                      <th className="text-center px-4 py-3 min-w-[180px]">Pekerjaan Utama (Transaksi)</th>
                       <th className="px-4 py-3 text-center w-[160px]">Status Hari Ini</th>
                       <th className="px-4 py-3 text-center w-[120px]">Bulan Ini (Terisi)</th>
-                      <th className="px-4 py-3">Absensi Harian (Tanggal 1 s.d. 31)</th>
+                      <th className="text-center px-4 py-3">Absensi Harian (Tanggal 1 s.d. 31)</th>
                       <th className="px-4 py-3 text-center w-[60px]">Aksi</th>
                     </tr>
                   </thead>
@@ -1829,14 +1829,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                                   <table className="w-full text-xs text-left">
                                     <thead>
                                       <tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
-                                        <th className="py-2 px-2">Tanggal</th>
-                                        <th className="py-2 px-2">Operator (Supir)</th>
-                                        <th className="py-2 px-2">Pekerjaan</th>
+                                        <th className="text-center py-2 px-2">Tanggal</th>
+                                        <th className="text-center py-2 px-2">Operator (Supir)</th>
+                                        <th className="text-center py-2 px-2">Pekerjaan</th>
                                         <th className="py-2 px-2 text-center">HM/KM</th>
                                         <th className="py-2 px-2 text-center">Hasil Angkut</th>
-                                        <th className="py-2 px-2">SPBS No.</th>
-                                        <th className="py-2 px-2">Lokasi</th>
-                                        <th className="py-2 px-2">Keterangan</th>
+                                        <th className="text-center py-2 px-2">SPBS No.</th>
+                                        <th className="text-center py-2 px-2">Lokasi</th>
+                                        <th className="text-center py-2 px-2">Keterangan</th>
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -2092,15 +2092,15 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                    <th className="px-3 py-3 text-left">Vehicle Code</th>
+                    <th className="px-3 py-3 text-center">Vehicle Code</th>
                     <th className="px-3 py-3 text-center">Plant</th>
-                    <th className="px-3 py-3 text-left">Deskripsi Plant</th>
+                    <th className="px-3 py-3 text-center">Deskripsi Plant</th>
                     <th className="px-3 py-3 text-center">Tx. Aktif</th>
                     <th className="px-3 py-3 text-center">Dibatalkan</th>
                     <th className="px-3 py-3 text-center">Total Unit</th>
                     <th className="px-3 py-3 text-center">Total HM/KM</th>
-                    <th className="px-3 py-3 text-left">Job Code</th>
-                    <th className="px-3 py-3 text-left">Operator</th>
+                    <th className="px-3 py-3 text-center">Job Code</th>
+                    <th className="px-3 py-3 text-center">Operator</th>
                     <th className="px-3 py-3 text-center">Last Input</th>
                     <th className="px-3 py-3 text-center">Status</th>
                   </tr>
@@ -2187,7 +2187,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <table className="w-full text-[11px] border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                    <th className="px-3 py-3 text-left whitespace-nowrap">Activity No.</th>
+                    <th className="px-3 py-3 text-center whitespace-nowrap">Activity No.</th>
                     <th className="px-3 py-3 text-center whitespace-nowrap">Veh. Code</th>
                     <th className="px-3 py-3 text-center">Plant</th>
                     <th className="px-3 py-3 text-center">Tanggal</th>
@@ -2196,7 +2196,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     <th className="px-3 py-3 text-center">HM/KM</th>
                     <th className="px-3 py-3 text-center">Unit</th>
                     <th className="px-3 py-3 text-center">UoM</th>
-                    <th className="px-3 py-3 text-left">Reference</th>
+                    <th className="px-3 py-3 text-center">Reference</th>
                     <th className="px-3 py-3 text-center">Lokasi</th>
                     <th className="px-3 py-3 text-center">Operator</th>
                     <th className="px-3 py-3 text-center">Helper 1</th>
@@ -2351,14 +2351,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           <table className="w-full text-[11px] border-collapse">
             <thead>
               <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 text-[10px] font-extrabold uppercase tracking-wider text-center">
-                <th className="px-3 py-2 text-left w-[220px]">Cost Center</th>
-                <th className="px-3 py-2 text-right">Cost (Biaya SAP)</th>
-                <th className="px-3 py-2 text-right">Acty (SAP)</th>
-                <th className="px-3 py-2 text-right">Rate (Tarif)</th>
-                <th className="px-3 py-2 text-right text-[#064e3b] font-bold bg-emerald-50/50">Logbook (Acty)</th>
-                <th className="px-3 py-2 text-left w-[150px]">Kebun / Unit</th>
+                <th className="px-3 py-2 text-center w-[220px]">Cost Center</th>
+                <th className="px-3 py-2 text-center">Cost (Biaya SAP)</th>
+                <th className="px-3 py-2 text-center">Acty (SAP)</th>
+                <th className="px-3 py-2 text-center">Rate (Tarif)</th>
+                <th className="px-3 py-2 text-center text-[#064e3b] font-bold bg-emerald-50/50">Logbook (Acty)</th>
+                <th className="px-3 py-2 text-center w-[150px]">Kebun / Unit</th>
                 <th className="px-3 py-2 text-center w-[90px]">Cek Status</th>
-                <th className="px-3 py-2 text-left w-[280px]">Indikator & Tindak Lanjut</th>
+                <th className="px-3 py-2 text-center w-[280px]">Indikator & Tindak Lanjut</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">

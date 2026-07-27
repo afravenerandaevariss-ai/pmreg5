@@ -1235,7 +1235,7 @@ export default function DailyDashboard({
             <thead className="bg-white/90 sticky top-0 border-b border-slate-100 z-10">
               <tr>
                 {[['Tanggal',''], ['Plant','plant'], ['Equipment Induk','equipment'], ['Status','status'], ['Durasi','duration'], ['Catatan',''], ['Aksi','']].map(([label, col]) => (
-                  <th
+                  <th className="text-center"
                     key={label}
                     onClick={() => col && handleSort(col)}
                     className={`px-4 py-3 font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap select-none ${
@@ -1544,11 +1544,11 @@ export default function DailyDashboard({
               <table className="w-full text-left text-sm text-slate-600">
                 <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 shadow-sm z-10">
                   <tr>
-                    <th className="px-6 py-3 font-semibold text-slate-700 w-16">No</th>
+                    <th className="text-center px-6 py-3 font-semibold text-slate-700 w-16">No</th>
                     {currentUser?.role !== 'Unit' && (
-                      <th className="px-4 py-3 font-semibold text-slate-700 w-24">Plant</th>
+                      <th className="text-center px-4 py-3 font-semibold text-slate-700 w-24">Plant</th>
                     )}
-                    <th className="px-6 py-3 font-semibold text-slate-700">Equipment Induk</th>
+                    <th className="text-center px-6 py-3 font-semibold text-slate-700">Equipment Induk</th>
                     <th className="px-6 py-3 font-semibold text-slate-700 w-48 text-center">Durasi Jam (Max 24)</th>
                   </tr>
                 </thead>
@@ -1967,12 +1967,12 @@ export default function DailyDashboard({
               <table className="w-full text-sm text-left">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-3 py-2 font-semibold text-slate-600">Tanggal</th>
-                    <th className="px-3 py-2 font-semibold text-slate-600">Plant</th>
-                    <th className="px-3 py-2 font-semibold text-slate-600">Equipment Induk</th>
-                    <th className="px-3 py-2 font-semibold text-slate-600">Durasi</th>
-                    <th className="px-3 py-2 font-semibold text-slate-600">Status</th>
-                    <th className="px-3 py-2 font-semibold text-slate-600">Catatan</th>
+                    <th className="text-center px-3 py-2 font-semibold text-slate-600">Tanggal</th>
+                    <th className="text-center px-3 py-2 font-semibold text-slate-600">Plant</th>
+                    <th className="text-center px-3 py-2 font-semibold text-slate-600">Equipment Induk</th>
+                    <th className="text-center px-3 py-2 font-semibold text-slate-600">Durasi</th>
+                    <th className="text-center px-3 py-2 font-semibold text-slate-600">Status</th>
+                    <th className="text-center px-3 py-2 font-semibold text-slate-600">Catatan</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -2162,10 +2162,10 @@ export default function DailyDashboard({
                   <table className="w-full text-left text-sm bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <thead className="bg-slate-100 text-slate-600 border-b border-slate-200">
                       <tr>
-                        <th className="py-2 px-3">Tanggal</th>
-                        <th className="py-2 px-3">Plant</th>
-                        <th className="py-2 px-3">Equipment</th>
-                        <th className="py-2 px-3 text-right">Durasi</th>
+                        <th className="text-center py-2 px-3">Tanggal</th>
+                        <th className="text-center py-2 px-3">Plant</th>
+                        <th className="text-center py-2 px-3">Equipment</th>
+                        <th className="py-2 px-3 text-center">Durasi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -2196,10 +2196,10 @@ export default function DailyDashboard({
                   <table className="w-full text-left text-sm bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <thead className="bg-slate-100 text-slate-600 border-b border-slate-200">
                       <tr>
-                        <th className="py-2 px-3">Tanggal</th>
-                        <th className="py-2 px-3">Equipment</th>
-                        <th className="py-2 px-3 text-right">Nilai Saat Ini</th>
-                        <th className="py-2 px-3 text-right">Nilai GSheet</th>
+                        <th className="text-center py-2 px-3">Tanggal</th>
+                        <th className="text-center py-2 px-3">Equipment</th>
+                        <th className="py-2 px-3 text-center">Nilai Saat Ini</th>
+                        <th className="py-2 px-3 text-center">Nilai GSheet</th>
                         <th className="py-2 px-3 text-center">Tindakan</th>
                       </tr>
                     </thead>
@@ -2244,9 +2244,9 @@ export default function DailyDashboard({
                   <table className="w-full text-left text-sm bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden opacity-75">
                     <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                       <tr>
-                        <th className="py-2 px-3">Tanggal</th>
-                        <th className="py-2 px-3">Equipment</th>
-                        <th className="py-2 px-3 text-right">Durasi (Sama)</th>
+                        <th className="text-center py-2 px-3">Tanggal</th>
+                        <th className="text-center py-2 px-3">Equipment</th>
+                        <th className="py-2 px-3 text-center">Durasi (Sama)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -2406,12 +2406,12 @@ export default function DailyDashboard({
                   <table className="w-full text-sm text-left">
                     <thead className="bg-slate-100 border-b border-slate-200 sticky top-0 z-10">
                       <tr>
-                        <th className="px-4 py-3 font-semibold text-slate-700 bg-slate-100 border-b border-slate-200">No</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700 bg-slate-100 border-b border-slate-200">Tanggal</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700 bg-slate-100 border-b border-slate-200 text-right">Durasi</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700 bg-slate-100 border-b border-slate-200 text-right">HM s.d.</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700 bg-slate-100 border-b border-slate-200">Status</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700 bg-slate-100 border-b border-slate-200">Catatan</th>
+                        <th className="text-center px-4 py-3 font-semibold text-slate-700 bg-slate-100 border-b border-slate-200">No</th>
+                        <th className="text-center px-4 py-3 font-semibold text-slate-700 bg-slate-100 border-b border-slate-200">Tanggal</th>
+                        <th className="px-4 py-3 font-semibold text-slate-700 bg-slate-100 border-b border-slate-200 text-center">Durasi</th>
+                        <th className="px-4 py-3 font-semibold text-slate-700 bg-slate-100 border-b border-slate-200 text-center">HM s.d.</th>
+                        <th className="text-center px-4 py-3 font-semibold text-slate-700 bg-slate-100 border-b border-slate-200">Status</th>
+                        <th className="text-center px-4 py-3 font-semibold text-slate-700 bg-slate-100 border-b border-slate-200">Catatan</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">

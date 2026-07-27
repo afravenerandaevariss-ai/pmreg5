@@ -15,13 +15,37 @@ import AfraChatbot from './components/AfraChatbot';
 import WorkOrderMonitoringView from './components/WorkOrderMonitoringView';
 import AdminInbox from './components/AdminInbox';
 import { supabase } from './lib/supabase';
-import {
-  fetchMasterEquipment, uploadMasterEquipment,
-  fetchHierarchyData, uploadHierarchyData,
-  bulkUpdateReadings, loginUser,
-  saveSystemConfig, getSystemConfig, fetchAllUsers,
-  createUser, updateUser, deleteUser
+import { 
+  uploadMasterEquipment, 
+  fetchMasterEquipment, 
+  uploadHierarchyData, 
+  fetchHierarchyData,
+  bulkUpdateReadings,
+  getSystemConfig,
+  saveSystemConfig,
+  deleteSystemConfig,
+  loginUser,
+  createUser,
+  updateUser,
+  deleteUser,
+  fetchAllUsers,
+  getUserByNik
 } from './lib/supabaseService';
+
+function HeaderClock() {
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="hidden lg:block text-xs text-slate-500 font-semibold bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
+      {format(currentTime, "dd MMMM yyyy, HH : mm : ss", { locale: id })}
+    </div>
+  );
+}
 
 function LoginView({ onLogin }) {
   const [nik, setNik] = useState('');
@@ -457,7 +481,6 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [allUsers, setAllUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -506,7 +529,6 @@ function App() {
       setPasswordForm({ current: '', new: '', confirm: '' });
       const updatedUser = { ...currentUser, password: passwordForm.new };
       setCurrentUser(updatedUser);
-      localStorage.setItem('sap_current_user', JSON.stringify(updatedUser));
     }
   };
 
@@ -544,17 +566,22 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
   const [currentUser, setCurrentUser] = useState(() => {
+    // For screenshot/automated capture mode, immediately set a system user
+    // so the page renders without going through login flow
     const params = new URLSearchParams(window.location.search);
     if (params.get('hideNav') === 'true') {
       return { nik: 'SYSTEM', name: 'System Auto-Capture', role: 'Admin', plant: 'ALL' };
     }
-    const saved = localStorage.getItem('sapApp_user');
-    return saved ? JSON.parse(saved) : null;
+    return null;
+  });
+  // True while we are checking if there is a saved session in Supabase.
+  // Prevents the login screen from flashing on every refresh for logged-in users.
+  const [isSessionLoading, setIsSessionLoading] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('hideNav') === 'true') return false;
+    // If there is a session token, we need to verify it → show loader
+    return !!localStorage.getItem('sapApp_session_nik');
   });
 
   const isAdmin = currentUser && (
@@ -571,27 +598,37 @@ function App() {
     shortText: `HM - ${format(new Date(), 'dd/MM/yyyy')}`
   });
 
-  // Load data on mount — Supabase first, fallback to localStorage
+  // Load data on mount — Supabase only
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
-        // Load doc details from localStorage (user-specific, no need for Supabase)
-        const savedDocDetails = localStorage.getItem('sapApp_docDetails');
-        if (savedDocDetails) {
-          const parsed = JSON.parse(savedDocDetails);
-          setDocDetails(prev => ({ ...prev, readBy: parsed.readBy || '' }));
-        }
-
         if (supabase) {
+          // --- Restore Session from Supabase ---
+          const sessionNik = localStorage.getItem('sapApp_session_nik');
+          if (sessionNik) {
+            const userRes = await getUserByNik(sessionNik);
+            if (userRes.data) {
+              setCurrentUser(userRes.data);
+            } else {
+              localStorage.removeItem('sapApp_session_nik'); // invalid session
+            }
+          }
+          setIsSessionLoading(false); // session check done, login screen can now render if needed
+
           // --- Load from Supabase ---
-          const [eqResult, hResult, masterMapResult, templateResult, syncResult] = await Promise.all([
+          const [eqResult, hResult, masterMapResult, templateResult, syncResult, docDetailsRes] = await Promise.all([
             fetchMasterEquipment(),
             fetchHierarchyData(),
             getSystemConfig('master_map'),
             getSystemConfig('template_data'),
-            getSystemConfig('sap_synced_dates')
+            getSystemConfig('sap_synced_dates'),
+            getSystemConfig('doc_details')
           ]);
+
+          if (docDetailsRes.data && typeof docDetailsRes.data === 'object') {
+            setDocDetails(prev => ({ ...prev, ...docDetailsRes.data }));
+          }
 
           if (masterMapResult.data) {
             if (Array.isArray(masterMapResult.data)) {
@@ -663,6 +700,7 @@ function App() {
       } catch (e) {
         console.error('Failed to load data', e);
       } finally {
+        setIsSessionLoading(false); // always mark session as done even on error
         setLoading(false);
       }
     };
@@ -688,10 +726,18 @@ function App() {
           next.shortText = `HM - ${parts[2]}/${parts[1]}/${parts[0]}`;
         }
       }
-      localStorage.setItem('sapApp_docDetails', JSON.stringify(next));
       return next;
     });
   };
+
+  // Sync doc details to Supabase (debounce 1.5s)
+  useEffect(() => {
+    if (!supabase) return;
+    const timer = setTimeout(() => {
+      saveSystemConfig('doc_details', docDetails).catch(console.error);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [docDetails]);
 
   const applyHierarchy = (eqs, hData) => {
     if (!hData || !hData.mapping) return eqs;
@@ -787,12 +833,12 @@ function App() {
   };
 
   const handleClearData = async () => {
-    if (confirm("Apakah Anda yakin ingin menghapus semua data yang tersimpan?")) {
-      localStorage.removeItem('sapApp_masterMap');
-      localStorage.removeItem('sapApp_templateData');
-      localStorage.removeItem('sapApp_hierarchyData');
-      // Clear Supabase
+    if (window.confirm('Yakin ingin menghapus semua data? Halaman akan direfresh.')) {
+      setLoading(true);
       if (supabase) {
+        await deleteSystemConfig('master_map');
+        await deleteSystemConfig('template_data');
+        await deleteSystemConfig('hierarchy_data');
         await supabase.from('master_equipment').delete().neq('id', '00000000-0000-0000-0000-000000000000');
         await supabase.from('hierarchy_data').delete().neq('id', 0);
       }
@@ -874,12 +920,24 @@ function App() {
 
   const pendingEquipmentCount = totalEquipmentCount - filledEquipmentCount;
 
+  // Show full-screen spinner while restoring session (prevents login flash)
+  if (isSessionLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-slate-500 font-medium">Memulihkan sesi...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!currentUser) {
     return (
       <LoginView 
         onLogin={(user) => {
           setCurrentUser(user);
-          localStorage.setItem('sapApp_user', JSON.stringify(user));
+          localStorage.setItem('sapApp_session_nik', user.nik);
         }} 
       />
     );
@@ -1165,7 +1223,7 @@ function App() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden print:h-auto print:overflow-visible print:w-full print:block">
         {/* Top Navbar */}
-        <header className="bg-white border-b border-slate-200 h-[64px] flex items-center justify-between px-4 sm:px-6 shrink-0 z-50 shadow-sm relative print:hidden">
+        <header className="bg-white border-b border-slate-200 h-[64px] flex items-center justify-between px-4 sm:px-6 shrink-0 z-[100] shadow-sm relative print:hidden">
           <div className="flex items-center gap-2 sm:gap-3">
             <button 
               className="md:hidden p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
@@ -1178,9 +1236,7 @@ function App() {
           </div>
           
           <div className="flex items-center gap-6">
-            <div className="hidden lg:block text-xs text-slate-500 font-semibold bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
-              {format(currentTime, "dd MMMM yyyy, HH : mm : ss", { locale: id })}
-            </div>
+            <HeaderClock />
 
             <div className="h-6 w-px bg-slate-200"></div>
             
@@ -1223,7 +1279,7 @@ function App() {
                       <button 
                         onClick={() => {
                           setCurrentUser(null);
-                          localStorage.removeItem('sapApp_user');
+                          localStorage.removeItem('sapApp_session_nik');
                           setIsProfileDropdownOpen(false);
                         }}
                         className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-red-600 font-bold hover:bg-red-50 rounded-lg transition-colors text-left"
@@ -2245,7 +2301,7 @@ function MasterDataView({ masterMap, currentUser }) {
             <tr>
               <th className="px-3 sm:px-6 py-3 sm:py-4 w-12 sm:w-16 whitespace-nowrap">No</th>
               <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">Equipment</th>
-              <th className="px-3 sm:px-6 py-3 sm:py-4 min-w-[200px]">Description</th>
+              <th className="px-3 sm:px-6 py-3 sm:py-4 min-w-[200px]">Deskripsi</th>
               <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">Functional Loc.</th>
               <th className="px-3 sm:px-6 py-3 sm:py-4 min-w-[200px]">FLoc Description</th>
               <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">Cost Center</th>
@@ -2380,7 +2436,7 @@ function PlantGroup({ plant, equipments, onReadingChange, hierarchyData, searchQ
               <tr>
                 <th className="px-6 py-3 w-16">No</th>
                 <th className="px-6 py-3 w-48">Equipment</th>
-                <th className="px-6 py-3">Description</th>
+                <th className="px-6 py-3">Deskripsi</th>
                 <th className="px-6 py-3 w-48">Measuring Pt.</th>
                 <th className="px-6 py-3 w-64">HM Induk / Komponen</th>
               </tr>

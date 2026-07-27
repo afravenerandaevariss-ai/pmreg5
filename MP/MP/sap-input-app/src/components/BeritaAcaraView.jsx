@@ -996,12 +996,12 @@ export default function BeritaAcaraView({ currentUser }) {
                       </colgroup>
                       <thead className={chunkIdx > 0 ? "hidden-on-web" : ""}>
                         <tr style={{ backgroundColor: '#ffc000', fontWeight: 'bold', color: '#000000' }}>
-                          <th style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', borderLeft: 'none', padding: '8px', textAlign: 'center', width: '45px', verticalAlign: 'middle' }}>No</th>
-                          <th style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', padding: '8px', textAlign: 'center', verticalAlign: 'middle' }}>Nama Equipment</th>
-                          <th style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', padding: '8px', textAlign: 'center', width: '125px', verticalAlign: 'middle' }}>No Equipment</th>
-                          <th style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', padding: '8px', textAlign: 'center', width: '110px', verticalAlign: 'middle' }}>Cost Center</th>
-                          <th style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', padding: '8px', textAlign: 'center', width: '100px', verticalAlign: 'middle' }}>Status Kendaraan</th>
-                          <th style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', borderRight: 'none', padding: '8px', textAlign: 'center', width: '100px', verticalAlign: 'middle' }}>Kepemilikan</th>
+                          <th className="text-center" style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', borderLeft: 'none', padding: '8px', textAlign: 'center', width: '45px', verticalAlign: 'middle' }}>No</th>
+                          <th className="text-center" style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', padding: '8px', textAlign: 'center', verticalAlign: 'middle' }}>Nama Equipment</th>
+                          <th className="text-center" style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', padding: '8px', textAlign: 'center', width: '125px', verticalAlign: 'middle' }}>No Equipment</th>
+                          <th className="text-center" style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', padding: '8px', textAlign: 'center', width: '110px', verticalAlign: 'middle' }}>Cost Center</th>
+                          <th className="text-center" style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', padding: '8px', textAlign: 'center', width: '100px', verticalAlign: 'middle' }}>Status Kendaraan</th>
+                          <th className="text-center" style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', borderRight: 'none', padding: '8px', textAlign: 'center', width: '100px', verticalAlign: 'middle' }}>Kepemilikan</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1116,12 +1116,12 @@ export default function BeritaAcaraView({ currentUser }) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', margin: '0', borderBottom: '1.5px solid #000000' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#ffc000', fontWeight: 'bold', color: '#000000' }}>
-                      <th style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', borderLeft: 'none', padding: '8px', textAlign: 'center', width: '45px', verticalAlign: 'middle' }}>No</th>
-                      <th style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', padding: '8px', textAlign: 'center', verticalAlign: 'middle' }}>Nama Equipment</th>
-                      <th style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', padding: '8px', textAlign: 'center', width: '125px', verticalAlign: 'middle' }}>No Equipment</th>
-                      <th style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', padding: '8px', textAlign: 'center', width: '110px', verticalAlign: 'middle' }}>Cost Center</th>
-                      <th style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', padding: '8px', textAlign: 'center', width: '100px', verticalAlign: 'middle' }}>Status Kendaraan</th>
-                      <th style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', borderRight: 'none', padding: '8px', textAlign: 'center', width: '100px', verticalAlign: 'middle' }}>Kepemilikan</th>
+                      <th className="text-center" style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', borderLeft: 'none', padding: '8px', textAlign: 'center', width: '45px', verticalAlign: 'middle' }}>No</th>
+                      <th className="text-center" style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', padding: '8px', textAlign: 'center', verticalAlign: 'middle' }}>Nama Equipment</th>
+                      <th className="text-center" style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', padding: '8px', textAlign: 'center', width: '125px', verticalAlign: 'middle' }}>No Equipment</th>
+                      <th className="text-center" style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', padding: '8px', textAlign: 'center', width: '110px', verticalAlign: 'middle' }}>Cost Center</th>
+                      <th className="text-center" style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', padding: '8px', textAlign: 'center', width: '100px', verticalAlign: 'middle' }}>Status Kendaraan</th>
+                      <th className="text-center" style={{ border: '1px solid #000000', borderTop: '1.5px solid #000000', borderRight: 'none', padding: '8px', textAlign: 'center', width: '100px', verticalAlign: 'middle' }}>Kepemilikan</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1264,11 +1264,11 @@ export default function BeritaAcaraView({ currentUser }) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="text-left px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide">Nama File</th>
-                    <th className="text-left px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide">Catatan</th>
-                    <th className="text-left px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide">Diupload Oleh</th>
-                    <th className="text-left px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide">Waktu Upload</th>
-                    <th className="text-left px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide">Aksi</th>
+                    <th className="text-center px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide">Nama File</th>
+                    <th className="text-center px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide">Catatan</th>
+                    <th className="text-center px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide">Diupload Oleh</th>
+                    <th className="text-center px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide">Waktu Upload</th>
+                    <th className="text-center px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">

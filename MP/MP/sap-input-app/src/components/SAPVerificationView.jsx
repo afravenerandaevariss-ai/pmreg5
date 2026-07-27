@@ -169,6 +169,9 @@ export default function SAPVerificationView({ equipments, currentUser }) {
 
   const daysInMonth = getDaysInMonth(new Date(`${targetMonth}-01`));
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  
+  const showPlantCol = groupBy === 'equipment';
+  const colPlantWidth = showPlantCol ? 60 : 0;
 
   const filteredMatrixData = useMemo(() => {
     let result = matrixData;
@@ -390,19 +393,24 @@ export default function SAPVerificationView({ equipments, currentUser }) {
             <table id="matrix-table" className="w-full text-center text-xs border-collapse">
               <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200">
                 <tr>
-                  <th style={{ width: col1Width, minWidth: col1Width, left: 0 }} className="border border-slate-200 px-2 py-2.5 font-bold text-slate-600 bg-slate-50 sticky z-20 uppercase tracking-wider text-[10px]">
+                  {showPlantCol && (
+                    <th style={{ width: colPlantWidth, minWidth: colPlantWidth, left: 0 }} className="text-center border border-slate-200 px-2 py-2.5 font-bold text-slate-600 bg-slate-50 sticky z-20 uppercase tracking-wider text-[10px]">
+                      Plant
+                    </th>
+                  )}
+                  <th style={{ width: col1Width, minWidth: col1Width, left: colPlantWidth }} className="text-center border border-slate-200 px-2 py-2.5 font-bold text-slate-600 bg-slate-50 sticky z-20 uppercase tracking-wider text-[10px]">
                     {groupBy === 'plant' ? 'Plant' : 'Equipment'}
                   </th>
-                  <th style={{ width: col2Width, minWidth: col2Width, left: col1Width }} className="border border-slate-200 px-2 py-2.5 font-bold text-slate-600 bg-slate-50 sticky z-20 uppercase tracking-wider text-[10px]">
+                  <th style={{ width: col2Width, minWidth: col2Width, left: colPlantWidth + col1Width }} className="text-center border border-slate-200 px-2 py-2.5 font-bold text-slate-600 bg-slate-50 sticky z-20 uppercase tracking-wider text-[10px]">
                     Kategori
                   </th>
-                  <th style={{ width: col3Width, minWidth: col3Width, left: col1Width + col2Width }} className="border border-slate-200 px-2 py-2.5 font-bold text-slate-600 bg-slate-50 sticky z-20 uppercase tracking-wider text-[10px]">
+                  <th style={{ width: col3Width, minWidth: col3Width, left: colPlantWidth + col1Width + col2Width }} className="text-center border border-slate-200 px-2 py-2.5 font-bold text-slate-600 bg-slate-50 sticky z-20 uppercase tracking-wider text-[10px]">
                     Data
                   </th>
                   {daysArray.map(d => (
-                    <th key={d} className="border border-slate-200 px-2 py-2.5 font-bold text-slate-500 min-w-[30px] text-[10px]">{String(d).padStart(2, '0')}</th>
+                    <th key={d} className="text-center border border-slate-200 px-2 py-2.5 font-bold text-slate-500 min-w-[30px] text-[10px]">{String(d).padStart(2, '0')}</th>
                   ))}
-                  <th className="border border-slate-200 px-2 py-2.5 font-bold text-[#064e3b] bg-emerald-50 min-w-[50px] text-[10px] uppercase tracking-wider">s.d {daysInMonth}</th>
+                  <th className="text-center border border-slate-200 px-2 py-2.5 font-bold text-[#064e3b] bg-emerald-50 min-w-[50px] text-[10px] uppercase tracking-wider">s.d {daysInMonth}</th>
                 </tr>
               </thead>
               <tbody className="bg-white">
@@ -450,13 +458,18 @@ export default function SAPVerificationView({ equipments, currentUser }) {
                       {/* --- Kategori: Per Tanggal --- */}
                       {/* Web */}
                       <tr className="border-t-[3px] border-slate-300">
-                        <td rowSpan={6} style={{ width: col1Width, minWidth: col1Width, maxWidth: col1Width, left: 0 }} className="border border-slate-200 px-2 py-1 font-bold text-slate-800 bg-slate-50 align-middle sticky z-10 whitespace-normal break-words text-left">
+                        {showPlantCol && (
+                          <td rowSpan={6} style={{ width: colPlantWidth, minWidth: colPlantWidth, maxWidth: colPlantWidth, left: 0 }} className="border border-slate-200 px-2 py-1 font-bold text-slate-700 bg-slate-50 align-middle sticky z-10 text-center">
+                            {row.plant}
+                          </td>
+                        )}
+                        <td rowSpan={6} style={{ width: col1Width, minWidth: col1Width, maxWidth: col1Width, left: colPlantWidth }} className="border border-slate-200 px-2 py-1 font-bold text-slate-800 bg-slate-50 align-middle sticky z-10 whitespace-normal break-words text-left">
                           {row.groupName}
                         </td>
-                        <td rowSpan={3} style={{ width: col2Width, minWidth: col2Width, left: col1Width }} className="border border-slate-200 px-2 py-1 text-slate-700 bg-slate-50 align-middle sticky z-10">
+                        <td rowSpan={3} style={{ width: col2Width, minWidth: col2Width, left: colPlantWidth + col1Width }} className="border border-slate-200 px-2 py-1 text-slate-700 bg-slate-50 align-middle sticky z-10">
                           Per Tanggal
                         </td>
-                        <td style={{ width: col3Width, minWidth: col3Width, left: col1Width + col2Width }} className="border border-slate-200 px-2 py-1 text-slate-600 font-medium text-left bg-white sticky z-10">
+                        <td style={{ width: col3Width, minWidth: col3Width, left: colPlantWidth + col1Width + col2Width }} className="border border-slate-200 px-2 py-1 text-slate-600 font-medium text-left bg-white sticky z-10">
                           Web
                         </td>
                         {ptWeb.map((v, i) => <td key={i} className="border border-slate-200 px-1 py-1">{v || '-'}</td>)}
@@ -464,7 +477,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
                       </tr>
                       {/* SAP */}
                       <tr>
-                        <td style={{ width: col3Width, minWidth: col3Width, left: col1Width + col2Width }} className="border border-slate-200 px-2 py-1 text-slate-600 font-medium text-left bg-white sticky z-10">
+                        <td style={{ width: col3Width, minWidth: col3Width, left: colPlantWidth + col1Width + col2Width }} className="border border-slate-200 px-2 py-1 text-slate-600 font-medium text-left bg-white sticky z-10">
                           SAP
                         </td>
                         {ptSap.map((v, i) => <td key={i} className="border border-slate-200 px-1 py-1">{v || '-'}</td>)}
@@ -472,7 +485,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
                       </tr>
                       {/* Selisih */}
                       <tr>
-                        <td style={{ width: col3Width, minWidth: col3Width, left: col1Width + col2Width }} className="border border-slate-200 px-2 py-1 text-slate-600 font-bold text-left bg-slate-50 sticky z-10">
+                        <td style={{ width: col3Width, minWidth: col3Width, left: colPlantWidth + col1Width + col2Width }} className="border border-slate-200 px-2 py-1 text-slate-600 font-bold text-left bg-slate-50 sticky z-10">
                           Selisih
                         </td>
                         {ptSelisih.map((v, i) => (
@@ -488,10 +501,10 @@ export default function SAPVerificationView({ equipments, currentUser }) {
                       {/* --- Kategori: S.d Tanggal --- */}
                       {/* Web */}
                       <tr className="border-t-2 border-slate-200">
-                        <td rowSpan={3} style={{ width: col2Width, minWidth: col2Width, left: col1Width }} className="border border-slate-200 px-2 py-1 text-slate-700 bg-slate-50 align-middle sticky z-10">
+                        <td rowSpan={3} style={{ width: col2Width, minWidth: col2Width, left: colPlantWidth + col1Width }} className="border border-slate-200 px-2 py-1 text-slate-700 bg-slate-50 align-middle sticky z-10">
                           S.d Tanggal
                         </td>
-                        <td style={{ width: col3Width, minWidth: col3Width, left: col1Width + col2Width }} className="border border-slate-200 px-2 py-1 text-slate-600 font-medium text-left bg-white sticky z-10">
+                        <td style={{ width: col3Width, minWidth: col3Width, left: colPlantWidth + col1Width + col2Width }} className="border border-slate-200 px-2 py-1 text-slate-600 font-medium text-left bg-white sticky z-10">
                           Web
                         </td>
                         {sdWeb.map((v, i) => <td key={i} className="border border-slate-200 px-1 py-1 text-slate-500 bg-slate-50/50 font-mono">{v}</td>)}
@@ -499,7 +512,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
                       </tr>
                       {/* SAP */}
                       <tr>
-                        <td style={{ width: col3Width, minWidth: col3Width, left: col1Width + col2Width }} className="border border-slate-200 px-2 py-1 text-slate-600 font-medium text-left bg-white sticky z-10">
+                        <td style={{ width: col3Width, minWidth: col3Width, left: colPlantWidth + col1Width + col2Width }} className="border border-slate-200 px-2 py-1 text-slate-600 font-medium text-left bg-white sticky z-10">
                           SAP
                         </td>
                         {sdSap.map((v, i) => <td key={i} className="border border-slate-200 px-1 py-1 text-slate-500 bg-slate-50/50 font-mono">{v}</td>)}
@@ -507,7 +520,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
                       </tr>
                       {/* Selisih */}
                       <tr>
-                        <td style={{ width: col3Width, minWidth: col3Width, left: col1Width + col2Width }} className="border border-slate-200 px-2 py-1 text-slate-600 font-bold text-left bg-slate-50 sticky z-10">
+                        <td style={{ width: col3Width, minWidth: col3Width, left: colPlantWidth + col1Width + col2Width }} className="border border-slate-200 px-2 py-1 text-slate-600 font-bold text-left bg-slate-50 sticky z-10">
                           Selisih
                         </td>
                         {sdSelisih.map((v, i) => (
@@ -556,12 +569,12 @@ export default function SAPVerificationView({ equipments, currentUser }) {
               <table className="w-full text-sm text-left border-collapse">
                 <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
                   <tr>
-                    <th className="px-4 py-3 font-semibold text-slate-600 border-b bg-slate-50">No</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 border-b bg-slate-50">Plant</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 border-b bg-slate-50">Equipment</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 border-b bg-slate-50 text-right">Web s.d (HM)</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 border-b bg-slate-50 text-right">SAP s.d (HM)</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 border-b bg-slate-50 text-right">Selisih</th>
+                    <th className="text-center px-4 py-3 font-semibold text-slate-600 border-b bg-slate-50">No</th>
+                    <th className="text-center px-4 py-3 font-semibold text-slate-600 border-b bg-slate-50">Plant</th>
+                    <th className="text-center px-4 py-3 font-semibold text-slate-600 border-b bg-slate-50">Equipment</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 border-b bg-slate-50 text-center">Web s.d (HM)</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 border-b bg-slate-50 text-center">SAP s.d (HM)</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 border-b bg-slate-50 text-center">Selisih</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
