@@ -1597,7 +1597,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         {!screenshotMode && (<div className="flex gap-1 bg-slate-200/60 p-1.5 rounded-xl w-fit">
           {[
             { key: 'unit-checklist',    label: '📋 Checklist Kebun (Unit)', icon: Calendar, show: true },
-            { key: 'summary-regional',  label: '🏢 Rekap Regional 5',      icon: BarChart2, show: isAdmin },
+            { key: 'summary-regional',  label: '🏢 Rekap Regional 5',      icon: BarChart2, show: true },
             { key: 'detail-veh',        label: '🚚 Daftar Kendaraan',      icon: Truck, show: true },
             {key: 'log-raw',           label: '📄 Log Transaksi Asli',    icon: FileSpreadsheet, show: true },
             { key: 'zco-reconciliation',  label: '💰 Verifikasi Biaya (ZCO)', icon: Coins, show: true },
@@ -2043,12 +2043,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             </td>
                             <td className="px-2 py-0.5 font-black text-slate-800">{item.rank}</td>
                             <td className="px-2 py-0.5 no-print">
-                              <button onClick={() => {
-                                setSelectedPlant(item.plant);
-                                setActiveTab('unit-checklist');
-                                window.scrollTo(0, 0);
-                              }}
-                                className="text-[#064e3b] hover:text-[#065f46] transition"><Eye size={13} /></button>
+                              {(isAdmin || item.plant === currentUser?.plant) && (
+                                <button onClick={() => {
+                                  setSelectedPlant(item.plant);
+                                  setActiveTab('unit-checklist');
+                                  window.scrollTo(0, 0);
+                                }}
+                                  className="text-[#064e3b] hover:text-[#065f46] transition"><Eye size={13} /></button>
+                              )}
                             </td>
                           </tr>
 
