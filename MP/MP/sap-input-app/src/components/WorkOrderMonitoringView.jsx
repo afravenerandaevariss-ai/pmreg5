@@ -748,15 +748,15 @@ export default function WorkOrderMonitoringView({ currentUser }) {
               ) : (
                 filteredData.map((item, idx) => (
                   <tr key={idx} className="hover:bg-slate-50 transition-colors duration-200 ease-out">
-                    <td className="px-3 py-2 print:px-1 print:py-1 text-slate-900 font-mono font-bold print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">
+                    <td className="px-3 py-2 print:px-1 print:py-1 text-slate-900 font-mono font-bold text-center print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">
                       <button 
                         onClick={() => setSelectedWoDetail(item)}
-                        className="text-[#064e3b] hover:text-[#065f46] hover:underline focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 rounded px-1 -ml-1 transition-colors duration-200 ease-out font-mono font-bold text-left print:text-black print:p-0 print:m-0 print:no-underline print:text-[7.5px]"
+                        className="text-[#064e3b] hover:text-[#065f46] hover:underline focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 rounded px-1 transition-colors duration-200 ease-out font-mono font-bold text-center print:text-black print:p-0 print:m-0 print:no-underline print:text-[7.5px]"
                       >
                         {item['Order'] || '-'}
                       </button>
                     </td>
-                    <td className="px-3 py-2 print:px-1 print:py-1 print:text-[7.5px] print:text-center print:whitespace-nowrap print:overflow-hidden">
+                    <td className="px-3 py-2 text-center print:px-1 print:py-1 print:text-[7.5px] print:text-center print:whitespace-nowrap print:overflow-hidden">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold print:bg-transparent print:border-none print:text-black print:p-0 print:text-[7.5px] ${
                         item['Order Type'] === 'PM01' ? 'bg-red-50 text-red-700 border border-red-100' :
                         item['Order Type'] === 'PM02' ? 'bg-green-50 text-green-700 border border-green-100' :
@@ -765,10 +765,10 @@ export default function WorkOrderMonitoringView({ currentUser }) {
                         {item['Order Type'] || '-'}
                       </span>
                     </td>
-                    <td className="px-3 py-2 print:px-1 print:py-1 font-mono text-slate-500 print:text-black print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{convertExcelDate(item['Reference Date'])}</td>
+                    <td className="px-3 py-2 text-center print:px-1 print:py-1 font-mono text-slate-500 print:text-black print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{convertExcelDate(item['Reference Date'])}</td>
                     <td className="px-3 py-2 print:px-1 print:py-1 max-w-[120px] truncate print:max-w-none print:whitespace-normal print:break-words print:text-[7px] print:leading-tight" title={item['System status']}>{item['System status'] || '-'}</td>
-                    <td className="px-3 py-2 print:px-1 print:py-1 font-mono text-slate-500 print:text-black print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{item['Cost Center'] || '-'}</td>
-                    <td className="px-3 py-2 print:px-1 print:py-1 font-mono print:text-black print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{item['Equipment'] || '-'}</td>
+                    <td className="px-3 py-2 text-center print:px-1 print:py-1 font-mono text-slate-500 print:text-black print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{item['Cost Center'] || '-'}</td>
+                    <td className="px-3 py-2 text-center print:px-1 print:py-1 font-mono print:text-black print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{item['Equipment'] || '-'}</td>
                     <td className="px-3 py-2 print:px-1 print:py-1 text-slate-600 truncate max-w-[120px] print:max-w-none print:whitespace-normal print:break-words print:text-[7px] print:leading-tight print:text-black" title={item['Description']}>{item['Description'] || '-'}</td>
                     <td className="px-3 py-2 print:px-1 print:py-1 text-slate-600 truncate max-w-[120px] print:max-w-none print:whitespace-normal print:break-words print:text-[7px] print:leading-tight print:text-black" title={item['Description_2']}>{item['Description_2'] || '-'}</td>
                     <td className="px-3 py-2 print:px-1 print:py-1 font-mono text-[#064e3b] font-bold print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{item.PO || '-'}</td>
