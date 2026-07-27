@@ -148,11 +148,19 @@ async function buildReportText() {
   const yearStr = dateParts.find(p => p.type === 'year').value;
   const dateFormatted = `${dayStr}/${monthStr}/${yearStr}`;
   
+  const targetDate = new Date(now);
+  targetDate.setDate(targetDate.getDate() - 1);
+  const targetDateParts = formatterDate.formatToParts(targetDate);
+  const tDayStr = targetDateParts.find(p => p.type === 'day').value;
+  const tMonthStr = targetDateParts.find(p => p.type === 'month').value;
+  const tYearStr = targetDateParts.find(p => p.type === 'year').value;
+  const targetDateFormatted = `${tDayStr}/${tMonthStr}/${tYearStr}`;
+  
   const timeFormatted = formatterTime.format(now).replace(':', '.');
 
   let text = `*Monitoring Transaksi Logbook tanggal 1 s.d ${dateFormatted} ${timeFormatted}*\n`;
   text += `*REGIONAL 5*\n`;
-  text += `Target input logbook : *${dateFormatted}* (H-1)\n\n`;
+  text += `Target input logbook : *${targetDateFormatted}* (H-1)\n\n`;
 
   text += `\`\`\`\n`;
   text += `+-------+-------------------------+------+----------+-----+-----+--------+------------+------+\n`;
