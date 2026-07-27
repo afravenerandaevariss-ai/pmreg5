@@ -720,7 +720,7 @@ export default function WorkOrderMonitoringView({ currentUser }) {
                 <th className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5 print:text-center">TIPE</th>
                 <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">TANGGAL</th>
                 <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">STATUS</th>
-                <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">CC</th>
+                <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">Cost Center</th>
                 <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">EQUIP</th>
                 <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">DESC EQ</th>
                 <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">KET WO</th>
