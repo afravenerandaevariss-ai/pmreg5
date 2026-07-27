@@ -786,10 +786,10 @@ export default function WorkOrderMonitoringView({ currentUser }) {
                     <td className="px-3 py-2 text-center print:px-1 print:py-1 font-mono print:text-black print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{item['Equipment'] || '-'}</td>
                     <td className="px-3 py-2 print:px-1 print:py-1 text-slate-600 truncate max-w-[120px] print:max-w-none print:whitespace-normal print:break-words print:text-[7px] print:leading-tight print:text-black" title={item['Description']}>{item['Description'] || '-'}</td>
                     <td className="px-3 py-2 print:px-1 print:py-1 text-slate-600 truncate max-w-[120px] print:max-w-none print:whitespace-normal print:break-words print:text-[7px] print:leading-tight print:text-black" title={item['Description_2']}>{item['Description_2'] || '-'}</td>
-                    <td className="px-3 py-2 print:px-1 print:py-1 font-mono text-[#064e3b] font-bold print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{item.PO || '-'}</td>
-                    <td className="px-3 py-2 print:px-1 print:py-1 font-mono text-blue-700 font-bold print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{item.PR || '-'}</td>
-                    <td className="px-3 py-2 print:px-1 print:py-1 font-mono text-amber-700 font-bold print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{item.SES || '-'}</td>
-                    <td className="px-3 py-2 print:px-1 print:py-1 font-mono text-rose-700 font-bold print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{item.MIR7 || '-'}</td>
+                    <td className="px-3 py-2 text-center print:px-1 print:py-1 font-mono text-[#064e3b] font-bold print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{item.PO || '-'}</td>
+                    <td className="px-3 py-2 text-center print:px-1 print:py-1 font-mono text-blue-700 font-bold print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{item.PR || '-'}</td>
+                    <td className="px-3 py-2 text-center print:px-1 print:py-1 font-mono text-amber-700 font-bold print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{item.SES || '-'}</td>
+                    <td className="px-3 py-2 text-center print:px-1 print:py-1 font-mono text-rose-700 font-bold print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{item.MIR7 || '-'}</td>
                     <td className="px-3 py-2 print:px-1 print:py-1 text-right font-mono text-slate-500 print:text-black print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{formatCurrency(item['TotalPlnndCosts'])}</td>
                     <td className="px-3 py-2 print:px-1 print:py-1 text-right font-mono text-slate-900 font-bold print:text-black print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">{formatCurrency(item['Total act.costs'])}</td>
                   </tr>
