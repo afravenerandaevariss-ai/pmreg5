@@ -248,6 +248,21 @@ export default function WorkOrderMonitoringView({ currentUser }) {
     return date.getMonth() + 1; // 1-indexed
   };
 
+  const getRawDateTimestamp = (serial) => {
+    if (!serial) return 0;
+    if (typeof serial === 'string') {
+      const s = serial.trim();
+      if (/^\d{8}$/.test(s)) {
+        const year = s.substring(0, 4);
+        const month = s.substring(4, 6);
+        const day = s.substring(6, 8);
+        return new Date(`${year}-${month}-${day}`).getTime() || 0;
+      }
+      return 0;
+    }
+    return (serial - 25569) * 86400 * 1000;
+  };
+
   const formatCurrency = (val) => {
     const num = Number(val || 0);
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
