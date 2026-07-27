@@ -310,7 +310,7 @@ export default function WorkOrderMonitoringView({ currentUser }) {
       };
     });
 
-    return joinedData.filter(item => {
+    let filtered = joinedData.filter(item => {
       const plantVal = String(item['Plant'] || item['Planning Plant'] || '').toLowerCase();
       const typeVal = String(item['Order Type'] || '').toLowerCase();
       const statusVal = String(item['System status'] || '');
