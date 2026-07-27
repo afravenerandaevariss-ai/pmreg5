@@ -301,6 +301,15 @@ export default function SAPTransactionGuideView() {
         { label: 'Langkah 5: Tampilan Display PM Order', src: '/images/iw39/step_5.png' }
       ];
     }
+    if (selectedTcode === 's_alr_87013611') {
+      return [
+        { label: 'Langkah 1: Buka TCODE S_ALR_87013611', src: '/images/zco_cctr_01/step_1.png' },
+        { label: 'Langkah 2: Isi Parameter Controlling Area, Fiscal Year, dan Range Periode', src: '/images/zco_cctr_01/step_2.png' },
+        { label: 'Langkah 3: Masukkan Cost Center Group & Execute', src: '/images/zco_cctr_01/step_2.png' },
+        { label: 'Langkah 4: Tekan F8 (Execute)', src: '/images/zco_cctr_01/step_2.png' },
+        { label: 'Langkah 5: Analisa Laporan Cost vs Activity', src: '/images/zco_cctr_01/step_3.png' }
+      ];
+    }
     if (selectedTcode === 'zco_cctr_01') {
       return [
         { label: 'Langkah 1: Buka TCODE ZCO_CCTR_01', src: '/images/zco_cctr_01/step_1.png' },
