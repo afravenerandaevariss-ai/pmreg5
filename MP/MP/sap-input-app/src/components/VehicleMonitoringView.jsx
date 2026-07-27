@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useDeferredValue } from 'react';
 import { format, differenceInCalendarDays, eachDayOfInterval, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { id } from 'date-fns/locale';
 import {
@@ -177,10 +177,16 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [selectedWilayah, setSelectedWilayah] = useState('ALL');
   const [searchPlant, setSearchPlant]       = useState('');
   const [searchVehicle, setSearchVehicle]   = useState('');
+  const deferredSearchPlant = useDeferredValue(searchPlant);
+  const deferredSearchVehicle = useDeferredValue(searchVehicle);
+  
+  // Pagination for Unit Checklist and Daftar Kendaraan
+  const [unitPage, setUnitPage]             = useState(1);
+  const [vehPage, setVehPage]               = useState(1);
   
   // Plant selected for Unit Checklist tab
   const [selectedPlant, setSelectedPlant]   = useState(() => {
-    return currentUser?.role === 'Unit' ? currentUser.plant : '5E08'; // Default Parindu for Regional
+    return !isAdmin ? currentUser.plant : '5E08'; // Default Parindu for Regional
   });
 
   const [filterStatus, setFilterStatus]     = useState('ALL');
@@ -271,12 +277,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // If role is Unit, force selectedPlant to user's plant
+  // If user is not admin, force selectedPlant to user's plant
   useEffect(() => {
-    if (currentUser?.role === 'Unit' && currentUser.plant) {
+    if (!isAdmin && currentUser.plant) {
       setSelectedPlant(currentUser.plant);
     }
-  }, [currentUser]);
+  }, [currentUser, isAdmin]);
 
   // ── Excel Upload ─────────────────────────────────────────────────────────────
   const handleFileUpload = (e) => {
@@ -769,8 +775,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
     let result = list;
     if (selectedWilayah !== 'ALL') result = result.filter(r => r.wilayah === selectedWilayah);
-    if (searchPlant.trim()) {
-      const q = searchPlant.toLowerCase();
+    if (deferredSearchPlant.trim()) {
+      const q = deferredSearchPlant.toLowerCase();
       result = result.filter(r => r.plant.toLowerCase().includes(q) || r.desc.toLowerCase().includes(q));
     }
     if (filterStatus !== 'ALL') result = result.filter(r => r.statusColor === filterStatus);
@@ -783,7 +789,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     });
 
     return result;
-  }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetMonth, targetInputDate, autoWorkingDays, selectedWilayah, searchPlant, filterStatus, sortBy, sortAsc, masterEquipments, masterMap]);
+  }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetMonth, targetInputDate, autoWorkingDays, selectedWilayah, deferredSearchPlant, filterStatus, sortBy, sortAsc, masterEquipments, masterMap]);
 
   // ── Unit Focused Mode calculations ──────────────────────────────────────────
   const unitFocusedData = useMemo(() => {
@@ -951,8 +957,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     });
 
     if (selectedWilayah !== 'ALL') result = result.filter(r => r.wilayah === selectedWilayah);
-    if (searchVehicle.trim()) {
-      const q = searchVehicle.toLowerCase();
+    if (deferredSearchVehicle.trim()) {
+      const q = deferredSearchVehicle.toLowerCase();
       result = result.filter(r =>
         r.vehicle_code.toLowerCase().includes(q) ||
         r.plant.toLowerCase().includes(q) ||
@@ -963,7 +969,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     if (filterStatus !== 'ALL') result = result.filter(r => r.statusColor === filterStatus);
 
     return result;
-  }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetInputDate, selectedWilayah, searchVehicle, filterStatus]);
+  }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetInputDate, selectedWilayah, deferredSearchVehicle, filterStatus]);
 
   // ── Filtered Log Records (Original Logs tab) ─────────────────────────────────
   const filteredLogs = useMemo(() => {
@@ -974,8 +980,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         .map(([k]) => k);
       result = result.filter(l => plantsInWilayah.includes(l.plant));
     }
-    if (searchVehicle.trim()) {
-      const q = searchVehicle.toLowerCase();
+    if (deferredSearchVehicle.trim()) {
+      const q = deferredSearchVehicle.toLowerCase();
       result = result.filter(l =>
         (l.vehicle_code || '').toLowerCase().includes(q) ||
         (l.plant || '').toLowerCase().includes(q) ||
@@ -987,7 +993,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     if (filterUoM !== 'ALL') result = result.filter(l => l.uom === filterUoM);
     if (filterJobCode !== 'ALL') result = result.filter(l => l.job_code === filterJobCode);
     return result;
-  }, [monthLogs, activeMonthLogs, showCancelled, selectedWilayah, searchVehicle, filterUoM, filterJobCode]);
+  }, [monthLogs, activeMonthLogs, showCancelled, selectedWilayah, deferredSearchVehicle, filterUoM, filterJobCode]);
 
   // ── Aggregate Stats ───────────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -1339,8 +1345,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       result = result.filter(r => r.wilayah === zcoWilayah);
     }
     
-    if (searchVehicle.trim()) {
-      const q = searchVehicle.toLowerCase();
+    if (deferredSearchVehicle.trim()) {
+      const q = deferredSearchVehicle.toLowerCase();
       result = result.filter(r => 
         r.rawCostCenter.toLowerCase().includes(q) ||
         r.costCenterCode.toLowerCase().includes(q) ||
@@ -1354,7 +1360,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
 
     return result;
-  }, [zcoReconciliationData, zcoWilayah, searchVehicle, zcoFilterStatus]);
+  }, [zcoReconciliationData, zcoWilayah, deferredSearchVehicle, zcoFilterStatus]);
 
   const totalCekRows = useMemo(() => {
     let list = zcoReconciliationData;
@@ -1625,7 +1631,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <select 
                 value={selectedPlant} 
                 onChange={e => setSelectedPlant(e.target.value)}
-                disabled={currentUser?.role === 'Unit'}
+                disabled={!isAdmin}
                 className="px-3 py-2 border border-slate-300 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-slate-50 disabled:opacity-80 font-semibold"
               >
                 {allPlantsList.map(p => (
@@ -1755,7 +1761,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           Tidak ada kendaraan terdaftar di Kebun/Unit ini. Silakan upload file ZESTHLP16PA SAP untuk mendaftarkan data.
                         </td>
                       </tr>
-                    ) : unitFocusedData.vehiclesList.map(v => (
+                    ) : unitFocusedData.vehiclesList.slice((unitPage - 1) * LOG_PAGE_SIZE, unitPage * LOG_PAGE_SIZE).map(v => (
                       <React.Fragment key={v.vehicle_code}>
                         <tr className={`hover:bg-emerald-50/40  hover:shadow-sm transition-colors duration-200 border-b border-slate-50 group ${expandedVehicleId === v.vehicle_code ? 'bg-emerald-50/10' : ''}`}>
                           <td className="px-4 py-3 font-bold text-slate-800 font-mono text-[13px]">{v.vehicle_code}</td>
@@ -2053,6 +2059,27 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 </table>
               </div>
 
+              {/* Pagination Controls Unit Checklist */}
+              {unitFocusedData.vehiclesList.length > LOG_PAGE_SIZE && (
+                <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
+                  <span className="text-xs text-slate-500 font-medium">
+                    Menampilkan {((unitPage - 1) * LOG_PAGE_SIZE) + 1} - {Math.min(unitPage * LOG_PAGE_SIZE, unitFocusedData.vehiclesList.length)} dari {unitFocusedData.vehiclesList.length} kendaraan
+                  </span>
+                  <div className="flex gap-2">
+                    <button 
+                      disabled={unitPage === 1}
+                      onClick={() => setUnitPage(p => p - 1)}
+                      className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                    >Sebelumnya</button>
+                    <button 
+                      disabled={unitPage * LOG_PAGE_SIZE >= unitFocusedData.vehiclesList.length}
+                      onClick={() => setUnitPage(p => p + 1)}
+                      className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                    >Berikutnya</button>
+                  </div>
+                </div>
+              )}
+
               {/* Legend matching Excel exactly */}
               <div className="mt-4 border-t border-slate-200 pt-3 flex flex-wrap gap-x-6 gap-y-2 items-center text-[11px] font-semibold text-slate-700">
                 <span className="font-bold text-slate-800">Indikator :</span>
@@ -2108,7 +2135,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 <tbody className="divide-y divide-slate-100">
                   {vehicleDetailData.length === 0 ? (
                     <tr><td colSpan={11} className="py-16 text-center text-slate-400">Tidak ada data kendaraan.</td></tr>
-                  ) : vehicleDetailData.map((v, idx) => (
+                  ) : vehicleDetailData.slice((vehPage - 1) * LOG_PAGE_SIZE, vehPage * LOG_PAGE_SIZE).map((v, idx) => (
                     <tr key={v.vehicle_code} className={`hover:bg-emerald-50/40 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
                       <td className="px-3 py-2.5 font-bold text-slate-800 font-mono">{v.vehicle_code}</td>
                       <td className="px-3 py-2.5 text-center font-bold text-[#064e3b]">{v.plant}</td>
@@ -2146,6 +2173,28 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Controls Daftar Kendaraan */}
+            {vehicleDetailData.length > LOG_PAGE_SIZE && (
+              <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <span className="text-xs text-slate-500 font-medium">
+                  Menampilkan {((vehPage - 1) * LOG_PAGE_SIZE) + 1} - {Math.min(vehPage * LOG_PAGE_SIZE, vehicleDetailData.length)} dari {vehicleDetailData.length} kendaraan
+                </span>
+                <div className="flex gap-2">
+                  <button 
+                    disabled={vehPage === 1}
+                    onClick={() => setVehPage(p => p - 1)}
+                    className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                  >Sebelumnya</button>
+                  <button 
+                    disabled={vehPage * LOG_PAGE_SIZE >= vehicleDetailData.length}
+                    onClick={() => setVehPage(p => p + 1)}
+                    className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                  >Berikutnya</button>
+                </div>
+              </div>
+            )}
+
           </div>
         )}
 

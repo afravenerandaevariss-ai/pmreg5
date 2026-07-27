@@ -891,7 +891,7 @@ function App() {
     });
     
     // Role-based filtering
-    if (currentUser?.role === 'Unit') {
+    if (!isAdmin) {
       const allowedPlant = currentUser.plant;
       const unitGroups = {};
       if (groups[allowedPlant]) {
@@ -2177,7 +2177,7 @@ function MasterDataView({ masterMap, currentUser }) {
 
   // Set default plantFilter for Unit role
   useEffect(() => {
-    if (currentUser?.role === 'Unit') {
+    if (!isAdmin) {
       setPlantFilter(currentUser.plant);
     }
   }, [currentUser]);
@@ -2259,7 +2259,7 @@ function MasterDataView({ masterMap, currentUser }) {
             <select 
               value={plantFilter} 
               onChange={(e) => setPlantFilter(e.target.value)}
-              disabled={currentUser?.role === 'Unit'}
+              disabled={!isAdmin}
               className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed transition-shadow hover:border-slate-400"
             >
               <option value="">Semua Plant</option>
