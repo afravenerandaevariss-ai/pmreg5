@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
-import { Search, Filter, FileSpreadsheet, RefreshCw, Layers, DollarSign, X, Info, AlertTriangle, CheckCircle, Printer, ChevronDown, Copy } from 'lucide-react';
+import { Search, Filter, FileSpreadsheet, RefreshCw, Layers, DollarSign, X, Info, AlertTriangle, CheckCircle, Printer, ChevronDown, Copy, ArrowUpDown } from 'lucide-react';
 
 export default function WorkOrderMonitoringView({ currentUser }) {
   const [data, setData] = useState([]);
@@ -31,6 +31,7 @@ export default function WorkOrderMonitoringView({ currentUser }) {
   const statusDropdownRef = useRef(null);
   const [selectedMonth, setSelectedMonth] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [dateSortOrder, setDateSortOrder] = useState(null); // 'asc' | 'desc' | null
 
   // Selected WO for Detail Modal
   const [selectedWoDetail, setSelectedWoDetail] = useState(null);
@@ -238,12 +239,9 @@ export default function WorkOrderMonitoringView({ currentUser }) {
     if (!serial) return null;
     if (typeof serial === 'string') {
       const s = serial.trim();
-      if (/^\d{8}$/.test(s)) return parseInt(s.substring(4, 6), 10);
-      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return parseInt(s.split('-')[1], 10);
-      if (/^\d{2}\.\d{2}\.\d{4}/.test(s)) return parseInt(s.split('.')[1], 10);
-      if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) return parseInt(s.split('/')[1], 10);
-      const date = new Date(s);
-      if (!isNaN(date.getTime())) return date.getMonth() + 1;
+      if (/^\d{8}$/.test(s)) {
+        return parseInt(s.substring(4, 6)); // 1-12
+      }
       return null;
     }
     const date = new Date((serial - 25569) * 86400 * 1000);
@@ -340,7 +338,18 @@ export default function WorkOrderMonitoringView({ currentUser }) {
 
       return matchesPlant && matchesType && matchesStatus && matchesMonth && matchesSearch;
     });
-  }, [data, zvtabData, export046Data, selectedPlant, selectedType, selectedStatus, selectedMonth, searchQuery]);
+
+    if (dateSortOrder) {
+      filtered.sort((a, b) => {
+        const timeA = getRawDateTimestamp(a['Reference Date']);
+        const timeB = getRawDateTimestamp(b['Reference Date']);
+        if (dateSortOrder === 'asc') return timeA - timeB;
+        return timeB - timeA;
+      });
+    }
+
+    return filtered;
+  }, [data, zvtabData, export046Data, selectedPlant, selectedType, selectedStatus, selectedMonth, searchQuery, dateSortOrder]);
 
   // Calculations
   const totals = useMemo(() => {
@@ -718,7 +727,13 @@ export default function WorkOrderMonitoringView({ currentUser }) {
               <tr>
                 <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">NO ORDER</th>
                 <th className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5 print:text-center">TIPE</th>
-                <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">TANGGAL</th>
+                <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5 cursor-pointer hover:bg-slate-50 transition-colors"
+                    onClick={() => setDateSortOrder(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')}>
+                  <div className="flex items-center justify-center gap-1">
+                    TANGGAL
+                    <ArrowUpDown size={14} className={`text-slate-400 ${dateSortOrder ? 'text-[#064e3b]' : ''}`} />
+                  </div>
+                </th>
                 <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">STATUS</th>
                 <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">Cost Center</th>
                 <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">EQUIP</th>
