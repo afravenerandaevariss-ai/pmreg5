@@ -1,51 +1,51 @@
 {
-  crons: [
+  "crons": [
     {
-      path: /api/send-wa,
-      schedule: 0 1 * * *
+      "path": "/api/send-wa",
+      "schedule": "0 1 * * *"
     },
     {
-      path: /api/send-wa,
-      schedule: 30 7 * * *
+      "path": "/api/send-wa",
+      "schedule": "30 7 * * *"
     }
   ],
-  functions: {
-    api/**/*: {
-      maxDuration: 300
+  "functions": {
+    "api/**/*": {
+      "maxDuration": 300
     }
   },
-  rewrites: [
+  "rewrites": [
     {
-      source: /api/:path*,
-      destination: /api/:path*
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
     },
     {
-      source: /((?!api/).*),
-      destination: /index.html
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
     }
   ],
-  redirects: [
+  "redirects": [
     {
-      source: /(.*),
-      has: [
+      "source": "/(.*)",
+      "has": [
         {
-          type: host,
-          value: pmreg5.vercel.app
+          "type": "host",
+          "value": "pmreg5.vercel.app"
         }
       ],
-      destination: https://pmreg5.afratarigan.my.id/,
-      permanent: true
+      "destination": "https://pmreg5.afratarigan.my.id/$1",
+      "permanent": true
     },
     {
-      source: /(.*),
-      has: [
+      "source": "/(.*)",
+      "has": [
         {
-          type: host,
-          value: pmreg5-.*-keyusersapreg5-5782s-projects.vercel.app
+          "type": "host",
+          "value": "pmreg5-.*-keyusersapreg5-5782s-projects.vercel.app"
         }
       ],
-      destination: https://pmreg5.afratarigan.my.id/,
-      permanent: true
+      "destination": "https://pmreg5.afratarigan.my.id/$1",
+      "permanent": true
     }
   ]
 }
