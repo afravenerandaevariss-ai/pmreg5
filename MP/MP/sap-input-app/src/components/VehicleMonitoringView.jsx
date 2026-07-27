@@ -173,7 +173,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [dataReady, setDataReady] = useState(false);
 
   // View control
-  const [activeTab, setActiveTab]           = useState('summary-regional');  // unit-checklist | summary-regional | detail-veh | log-raw
+  const [activeTab, setActiveTab]           = useState(() => isAdmin ? 'summary-regional' : 'unit-checklist');  // unit-checklist | summary-regional | detail-veh | log-raw
   const [selectedWilayah, setSelectedWilayah] = useState('ALL');
   const [searchPlant, setSearchPlant]       = useState('');
   const [searchVehicle, setSearchVehicle]   = useState('');
@@ -1596,12 +1596,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         {/* ── Tab Navigation ──────────────────────────────────────── */}
         {!screenshotMode && (<div className="flex gap-1 bg-slate-200/60 p-1.5 rounded-xl w-fit">
           {[
-            { key: 'unit-checklist',    label: '📋 Checklist Kebun (Unit)', icon: Calendar },
-            { key: 'summary-regional',  label: '🏢 Rekap Regional 5',      icon: BarChart2 },
-            { key: 'detail-veh',        label: '🚚 Daftar Kendaraan',      icon: Truck },
-            {key: 'log-raw',           label: '📄 Log Transaksi Asli',    icon: FileSpreadsheet },
-            { key: 'zco-reconciliation',  label: '💰 Verifikasi Biaya (ZCO)', icon: Coins },
-          ].map(({ key, label, icon: Icon }) => (
+            { key: 'unit-checklist',    label: '📋 Checklist Kebun (Unit)', icon: Calendar, show: true },
+            { key: 'summary-regional',  label: '🏢 Rekap Regional 5',      icon: BarChart2, show: isAdmin },
+            { key: 'detail-veh',        label: '🚚 Daftar Kendaraan',      icon: Truck, show: true },
+            {key: 'log-raw',           label: '📄 Log Transaksi Asli',    icon: FileSpreadsheet, show: true },
+            { key: 'zco-reconciliation',  label: '💰 Verifikasi Biaya (ZCO)', icon: Coins, show: true },
+          ].filter(t => t.show).map(({ key, label, icon: Icon }) => (
             <button key={key} onClick={() => { setActiveTab(key); setError(null); }}
               className={`flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold transition-colors duration-300 ${activeTab === key ? 'bg-gradient-to-tr from-[#064e3b] to-[#2dd4bf] text-white shadow-md shadow-emerald-900/20' : 'text-slate-500 hover:text-[#064e3b] hover:bg-emerald-50'}`}>
               <Icon size={14} /> {label}
