@@ -922,7 +922,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const vehicleDetailData = useMemo(() => {
     const tDate = new Date(targetInputDate);
     
-    let result = vehicles.map(v => {
+    let baseVehicles = vehicles;
+    if (currentUser && !isAdmin && currentUser.plant) {
+      baseVehicles = vehicles.filter(v => v.plant === currentUser.plant);
+    }
+    
+    let result = baseVehicles.map(v => {
       const vLogs    = activeMonthLogs.filter(l => l.vehicle_code === v.vehicle_code);
       const vCancel  = cancelledMonthLogs.filter(l => l.vehicle_code === v.vehicle_code);
       const totalTx  = vLogs.length;
@@ -970,11 +975,16 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     if (filterStatus !== 'ALL') result = result.filter(r => r.statusColor === filterStatus);
 
     return result;
-  }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetInputDate, selectedWilayah, searchVehicle, filterStatus]);
+  }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetInputDate, selectedWilayah, searchVehicle, filterStatus, currentUser, isAdmin]);
 
   // ── Filtered Log Records (Original Logs tab) ─────────────────────────────────
   const filteredLogs = useMemo(() => {
     let result = showCancelled ? monthLogs : activeMonthLogs;
+    
+    if (currentUser && !isAdmin && currentUser.plant) {
+      result = result.filter(l => l.plant === currentUser.plant);
+    }
+    
     if (selectedWilayah !== 'ALL') {
       const plantsInWilayah = Object.entries(PLANT_INFO)
         .filter(([, v]) => v.wilayah === selectedWilayah)
@@ -994,7 +1004,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     if (filterUoM !== 'ALL') result = result.filter(l => l.uom === filterUoM);
     if (filterJobCode !== 'ALL') result = result.filter(l => l.job_code === filterJobCode);
     return result;
-  }, [monthLogs, activeMonthLogs, showCancelled, selectedWilayah, searchVehicle, filterUoM, filterJobCode]);
+  }, [monthLogs, activeMonthLogs, showCancelled, selectedWilayah, searchVehicle, filterUoM, filterJobCode, currentUser, isAdmin]);
 
   // ── Aggregate Stats ───────────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -1342,6 +1352,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const filteredZCOData = useMemo(() => {
     let result = zcoReconciliationData;
 
+    if (currentUser && !isAdmin && currentUser.plant) {
+      result = result.filter(r => r.plantCode === currentUser.plant);
+    }
+
     if (zcoWilayah !== 'ALL') {
       result = result.filter(r => r.wilayah === zcoWilayah);
     }
@@ -1361,7 +1375,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
 
     return result;
-  }, [zcoReconciliationData, zcoWilayah, searchVehicle, zcoFilterStatus]);
+  }, [zcoReconciliationData, zcoWilayah, searchVehicle, zcoFilterStatus, currentUser, isAdmin]);
 
   const totalCekRows = useMemo(() => {
     let list = zcoReconciliationData;
