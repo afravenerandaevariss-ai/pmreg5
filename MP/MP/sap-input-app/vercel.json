@@ -1,41 +1,51 @@
 {
-  "functions": {
-    "api/**/*": {
-      "maxDuration": 300
-    }
-  },
-  "rewrites": [
+  crons: [
     {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
+      path: /api/send-wa,
+      schedule: 0 1 * * *
     },
     {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
+      path: /api/send-wa,
+      schedule: 30 7 * * *
     }
   ],
-  "redirects": [
+  functions: {
+    api/**/*: {
+      maxDuration: 300
+    }
+  },
+  rewrites: [
     {
-      "source": "/(.*)",
-      "has": [
-        {
-          "type": "host",
-          "value": "pmreg5.vercel.app"
-        }
-      ],
-      "destination": "https://pmreg5.afratarigan.my.id/$1",
-      "permanent": true
+      source: /api/:path*,
+      destination: /api/:path*
     },
     {
-      "source": "/(.*)",
-      "has": [
+      source: /((?!api/).*),
+      destination: /index.html
+    }
+  ],
+  redirects: [
+    {
+      source: /(.*),
+      has: [
         {
-          "type": "host",
-          "value": "pmreg5-.*-keyusersapreg5-5782s-projects.vercel.app"
+          type: host,
+          value: pmreg5.vercel.app
         }
       ],
-      "destination": "https://pmreg5.afratarigan.my.id/$1",
-      "permanent": true
+      destination: https://pmreg5.afratarigan.my.id/,
+      permanent: true
+    },
+    {
+      source: /(.*),
+      has: [
+        {
+          type: host,
+          value: pmreg5-.*-keyusersapreg5-5782s-projects.vercel.app
+        }
+      ],
+      destination: https://pmreg5.afratarigan.my.id/,
+      permanent: true
     }
   ]
 }
