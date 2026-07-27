@@ -394,7 +394,7 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
                 </div>
 
                 <p className="text-[11px] text-emerald-800 leading-relaxed">
-                  Laporan rekap kendaraan Regional 5 secara otomatis dikirim 2x sehari (08:00 WIB &amp; 14:30 WIB) dalam format PDF 1 Halaman via GoWA Gateway (<code className="bg-emerald-100 px-1 py-0.5 rounded">https://gowa.waterflai.my.id</code>), Vercel Cron (<code className="bg-emerald-100 px-1 py-0.5 rounded">/api/send-wa</code>), dan Windows Task Scheduler (<code className="bg-emerald-100 px-1 py-0.5 rounded">PTPN_PM_Logbook_Daily_WA_Report_1430</code>).
+                  Laporan rekap kendaraan Regional 5 secara otomatis dikirim 2x sehari (08:00 WIB &amp; 14:30 WIB) dalam format Gambar/Screenshot via GoWA Gateway (<code className="bg-emerald-100 px-1 py-0.5 rounded">https://gowa.waterflai.my.id</code>) melalui *Cloud Server* Vercel Cron (<code className="bg-emerald-100 px-1 py-0.5 rounded">/api/send-wa-image</code>). Laporan akan tetap terkirim walaupun komputer Anda dalam keadaan mati.
                 </p>
               </div>
 
