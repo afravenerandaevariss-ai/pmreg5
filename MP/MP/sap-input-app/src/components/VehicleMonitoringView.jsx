@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useDeferredValue } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { format, differenceInCalendarDays, eachDayOfInterval, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { id } from 'date-fns/locale';
 import {
@@ -177,12 +177,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [selectedWilayah, setSelectedWilayah] = useState('ALL');
   const [searchPlant, setSearchPlant]       = useState('');
   const [searchVehicle, setSearchVehicle]   = useState('');
-  const deferredSearchPlant = useDeferredValue(searchPlant);
-  const deferredSearchVehicle = useDeferredValue(searchVehicle);
+  // Removed useDeferredValue
+
   
   // Pagination for Unit Checklist and Daftar Kendaraan
   const [unitPage, setUnitPage]             = useState(1);
   const [vehPage, setVehPage]               = useState(1);
+  const [zcoPage, setZcoPage]               = useState(1);
   
   // Plant selected for Unit Checklist tab
   const [selectedPlant, setSelectedPlant]   = useState(() => {
@@ -775,8 +776,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
     let result = list;
     if (selectedWilayah !== 'ALL') result = result.filter(r => r.wilayah === selectedWilayah);
-    if (deferredSearchPlant.trim()) {
-      const q = deferredSearchPlant.toLowerCase();
+    if (searchPlant.trim()) {
+      const q = searchPlant.toLowerCase();
       result = result.filter(r => r.plant.toLowerCase().includes(q) || r.desc.toLowerCase().includes(q));
     }
     if (filterStatus !== 'ALL') result = result.filter(r => r.statusColor === filterStatus);
@@ -789,7 +790,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     });
 
     return result;
-  }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetMonth, targetInputDate, autoWorkingDays, selectedWilayah, deferredSearchPlant, filterStatus, sortBy, sortAsc, masterEquipments, masterMap]);
+  }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetMonth, targetInputDate, autoWorkingDays, selectedWilayah, searchPlant, filterStatus, sortBy, sortAsc, masterEquipments, masterMap]);
 
   // ── Unit Focused Mode calculations ──────────────────────────────────────────
   const unitFocusedData = useMemo(() => {
@@ -957,8 +958,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     });
 
     if (selectedWilayah !== 'ALL') result = result.filter(r => r.wilayah === selectedWilayah);
-    if (deferredSearchVehicle.trim()) {
-      const q = deferredSearchVehicle.toLowerCase();
+    if (searchVehicle.trim()) {
+      const q = searchVehicle.toLowerCase();
       result = result.filter(r =>
         r.vehicle_code.toLowerCase().includes(q) ||
         r.plant.toLowerCase().includes(q) ||
@@ -969,7 +970,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     if (filterStatus !== 'ALL') result = result.filter(r => r.statusColor === filterStatus);
 
     return result;
-  }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetInputDate, selectedWilayah, deferredSearchVehicle, filterStatus]);
+  }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetInputDate, selectedWilayah, searchVehicle, filterStatus]);
 
   // ── Filtered Log Records (Original Logs tab) ─────────────────────────────────
   const filteredLogs = useMemo(() => {
@@ -980,8 +981,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         .map(([k]) => k);
       result = result.filter(l => plantsInWilayah.includes(l.plant));
     }
-    if (deferredSearchVehicle.trim()) {
-      const q = deferredSearchVehicle.toLowerCase();
+    if (searchVehicle.trim()) {
+      const q = searchVehicle.toLowerCase();
       result = result.filter(l =>
         (l.vehicle_code || '').toLowerCase().includes(q) ||
         (l.plant || '').toLowerCase().includes(q) ||
@@ -993,7 +994,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     if (filterUoM !== 'ALL') result = result.filter(l => l.uom === filterUoM);
     if (filterJobCode !== 'ALL') result = result.filter(l => l.job_code === filterJobCode);
     return result;
-  }, [monthLogs, activeMonthLogs, showCancelled, selectedWilayah, deferredSearchVehicle, filterUoM, filterJobCode]);
+  }, [monthLogs, activeMonthLogs, showCancelled, selectedWilayah, searchVehicle, filterUoM, filterJobCode]);
 
   // ── Aggregate Stats ───────────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -1345,8 +1346,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       result = result.filter(r => r.wilayah === zcoWilayah);
     }
     
-    if (deferredSearchVehicle.trim()) {
-      const q = deferredSearchVehicle.toLowerCase();
+    if (searchVehicle.trim()) {
+      const q = searchVehicle.toLowerCase();
       result = result.filter(r => 
         r.rawCostCenter.toLowerCase().includes(q) ||
         r.costCenterCode.toLowerCase().includes(q) ||
@@ -1360,7 +1361,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
 
     return result;
-  }, [zcoReconciliationData, zcoWilayah, deferredSearchVehicle, zcoFilterStatus]);
+  }, [zcoReconciliationData, zcoWilayah, searchVehicle, zcoFilterStatus]);
 
   const totalCekRows = useMemo(() => {
     let list = zcoReconciliationData;
@@ -1873,8 +1874,33 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     ))}
                   </tbody>
                 </table>
-              </div>
             </div>
+
+            {/* Pagination Controls Verifikasi Biaya (ZCO) */}
+            {filteredZCOData.length > LOG_PAGE_SIZE && (
+              <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <span className="text-xs text-slate-500 font-medium">
+                  Menampilkan {((zcoPage - 1) * LOG_PAGE_SIZE) + 1} - {Math.min(zcoPage * LOG_PAGE_SIZE, filteredZCOData.length)} dari {filteredZCOData.length} baris ZCO
+                </span>
+                <div className="flex gap-2">
+                  <button 
+                    disabled={zcoPage === 1}
+                    onClick={() => setZcoPage(p => p - 1)}
+                    className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                  >
+                    Sebelumnya
+                  </button>
+                  <button 
+                    disabled={zcoPage * LOG_PAGE_SIZE >= filteredZCOData.length}
+                    onClick={() => setZcoPage(p => p + 1)}
+                    className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                  >
+                    Selanjutnya
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
             {/* Quick guide for Unit user */}
             <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex gap-3 text-xs text-emerald-800">
@@ -2043,17 +2069,20 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             </td>
                             <td className="px-2 py-0.5 font-black text-slate-800">{item.rank}</td>
                             <td className="px-2 py-0.5 no-print">
-                              {(isAdmin || item.plant === currentUser?.plant) && (
-                                <button onClick={() => {
+                              <button 
+                                onClick={() => {
                                   setSelectedPlant(item.plant);
                                   setActiveTab('unit-checklist');
                                   window.scrollTo(0, 0);
                                 }}
-                                  className="text-[#064e3b] hover:text-[#065f46] transition"><Eye size={13} /></button>
-                              )}
+                                disabled={!isAdmin && item.plant !== currentUser?.plant}
+                                title={(!isAdmin && item.plant !== currentUser?.plant) ? 'Anda hanya bisa melihat detail unit Anda sendiri' : 'Lihat Detail'}
+                                className={`transition-all duration-200 ${(isAdmin || item.plant === currentUser?.plant) ? 'text-[#064e3b] hover:text-[#065f46] hover:scale-110' : 'text-slate-200 cursor-not-allowed opacity-50'}`}
+                              >
+                                <Eye size={13} />
+                              </button>
                             </td>
                           </tr>
-
                         </React.Fragment>
                       )
                     })}
@@ -2422,7 +2451,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   </td>
                 </tr>
               ) : (
-                filteredZCOData.map((row, idx) => {
+                filteredZCOData.slice((zcoPage - 1) * LOG_PAGE_SIZE, zcoPage * LOG_PAGE_SIZE).map((row, idx) => {
                   const formattedCost = row.zcoCost > 0 
                     ? row.zcoCost.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) 
                     : '0';
