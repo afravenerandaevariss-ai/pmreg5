@@ -37,10 +37,36 @@ export default function WorkOrderMonitoringView({ currentUser }) {
 
   const fetchData = async () => {
     try {
-      const res = await fetch('/IW39.xlsx');
-      if (!res.ok) throw new Error("Gagal mengunduh file data IW39.xlsx. Pastikan file berada di folder public.");
-      const parsedData = await processFileOnBackend(await res.blob(), 'iw39');
-      setData(parsedData);
+      setLoading(true);
+      // Fetch from Supabase FIRST
+      const { data: dbData, error: dbError } = await supabase
+        .from('parsed_excel')
+        .select('session_id, data')
+        .in('session_id', ['global_iw39', 'global_zvtab', 'global_046exp']);
+        
+      let hasIw39 = false;
+      if (!dbError && dbData && dbData.length > 0) {
+        const iw39Row = dbData.find(d => d.session_id === 'global_iw39');
+        if (iw39Row) {
+          setData(iw39Row.data);
+          hasIw39 = true;
+        }
+        
+        const zvtabRow = dbData.find(d => d.session_id === 'global_zvtab');
+        if (zvtabRow) setZvtabData(zvtabRow.data);
+        
+        const expRow = dbData.find(d => d.session_id === 'global_046exp');
+        if (expRow) setExport046Data(expRow.data);
+      }
+      
+      // Fallback for IW39 if not in DB
+      if (!hasIw39) {
+        const res = await fetch('/IW39.xlsx');
+        if (res.ok) {
+          const parsedData = await processFileOnBackend(await res.blob(), 'iw39', 'local_fallback_iw39');
+          setData(parsedData);
+        }
+      }
     } catch (err) {
       console.error(err);
       setError(err.message);
@@ -49,10 +75,10 @@ export default function WorkOrderMonitoringView({ currentUser }) {
     }
   };
 
-  const processFileOnBackend = async (fileBlob, type) => {
+  const processFileOnBackend = async (fileBlob, type, customSessionId = null) => {
     return new Promise(async (resolve, reject) => {
       try {
-        const sessionId = crypto.randomUUID();
+        const sessionId = customSessionId || `global_${type}`;
         const fileName = `${sessionId}.xlsx`;
         
         // Upload directly to Supabase Storage (100% browser-native upload)
@@ -61,7 +87,7 @@ export default function WorkOrderMonitoringView({ currentUser }) {
           .from('excel_uploads')
           .upload(fileName, fileBlob, {
             cacheControl: '3600',
-            upsert: false
+            upsert: true
           });
 
         if (uploadError) {

@@ -64,11 +64,11 @@ export default async function handler(req, res) {
     // Store in parsed_excel using supabase-js
     const { error: insertError } = await supabase
       .from('parsed_excel')
-      .insert({
+      .upsert({
         session_id,
         type,
         data: result
-      });
+      }, { onConflict: 'session_id' });
 
     if (insertError) throw insertError;
 
