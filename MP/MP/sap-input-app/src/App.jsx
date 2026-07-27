@@ -891,7 +891,7 @@ function App() {
     });
     
     // Role-based filtering
-    if (!isAdmin) {
+    if (currentUser && !isAdmin) {
       const allowedPlant = currentUser.plant;
       const unitGroups = {};
       if (groups[allowedPlant]) {
@@ -2177,7 +2177,7 @@ function MasterDataView({ masterMap, currentUser }) {
 
   // Set default plantFilter for Unit role
   useEffect(() => {
-    if (!isAdmin) {
+    if (currentUser && !isAdmin) {
       setPlantFilter(currentUser.plant);
     }
   }, [currentUser]);

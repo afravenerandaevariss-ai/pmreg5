@@ -186,7 +186,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   
   // Plant selected for Unit Checklist tab
   const [selectedPlant, setSelectedPlant]   = useState(() => {
-    return !isAdmin ? currentUser.plant : '5E08'; // Default Parindu for Regional
+    return (currentUser && !isAdmin) ? currentUser.plant : '5E08'; // Default Parindu for Regional
   });
 
   const [filterStatus, setFilterStatus]     = useState('ALL');
@@ -279,7 +279,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
   // If user is not admin, force selectedPlant to user's plant
   useEffect(() => {
-    if (!isAdmin && currentUser.plant) {
+    if (currentUser && !isAdmin && currentUser.plant) {
       setSelectedPlant(currentUser.plant);
     }
   }, [currentUser, isAdmin]);
