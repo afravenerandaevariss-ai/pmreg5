@@ -609,7 +609,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const monthLogs = useMemo(() => {
     const start = `${targetMonth}-01`;
     const end   = `${targetMonth}-31`;
-    return logs.filter(l => l.date >= start && l.date <= end);
+    return logs.filter(l => l.date >= start && l.date <= end).map(l => ({
+      ...l,
+      _searchStr: `${l.vehicle_code || ''} ${l.plant || ''} ${l.operator || ''} ${l.reference || ''} ${l.activity_number || ''}`.toLowerCase()
+    }));
   }, [logs, targetMonth]);
 
   const activeMonthLogs     = useMemo(() => monthLogs.filter(l => !l.cancelled), [monthLogs]);
@@ -976,6 +979,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         lastDate,
         statusColor,
         statusText,
+        description: v.description,
+        _searchStr: `${v.vehicle_code} ${v.plant} ${pInfo.desc} ${v.description || ''}`.toLowerCase(),
         logs: vLogs,
       };
     });
@@ -984,10 +989,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     if (searchVehicle.trim()) {
       const q = searchVehicle.toLowerCase();
       result = result.filter(r =>
-        r.vehicle_code.toLowerCase().includes(q) ||
-        r.plant.toLowerCase().includes(q) ||
-        r.plantDesc.toLowerCase().includes(q) ||
-        (r.description || '').toLowerCase().includes(q)
+        r._searchStr.includes(q)
       );
     }
     if (filterStatus !== 'ALL') result = result.filter(r => r.statusColor === filterStatus);
@@ -1012,11 +1014,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     if (searchVehicle.trim()) {
       const q = searchVehicle.toLowerCase();
       result = result.filter(l =>
-        (l.vehicle_code || '').toLowerCase().includes(q) ||
-        (l.plant || '').toLowerCase().includes(q) ||
-        (l.operator || '').toLowerCase().includes(q) ||
-        (l.reference || '').toLowerCase().includes(q) ||
-        (l.activity_number || '').toLowerCase().includes(q)
+        l._searchStr.includes(q)
       );
     }
     if (filterUoM !== 'ALL') result = result.filter(l => l.uom === filterUoM);
@@ -1381,10 +1379,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     if (searchVehicle.trim()) {
       const q = searchVehicle.toLowerCase();
       result = result.filter(r => 
-        r.rawCostCenter.toLowerCase().includes(q) ||
-        r.costCenterCode.toLowerCase().includes(q) ||
-        r.plantCode.toLowerCase().includes(q) ||
-        r.plantDesc.toLowerCase().includes(q)
+        r._searchStr.includes(q)
       );
     }
 
