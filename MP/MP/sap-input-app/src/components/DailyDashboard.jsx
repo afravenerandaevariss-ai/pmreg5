@@ -653,17 +653,22 @@ export default function DailyDashboard({
 
         const parsed = [];
         const errors = [];
+        let lastSeenDate = '';
 
         rows.forEach((row, idx) => {
           const lineNum = idx + 2;
           // Flexible header matching
-          const tanggalRaw = row['Tanggal'] || row['tanggal'] || row['Date'] || '';
+          let tanggalRaw = row['Tanggal'] || row['tanggal'] || row['Date'] || '';
           const eqNumRaw  = (row['Kode Equipment Induk'] || row['Kode Equipment'] || row['Equipment ID'] || row['eqNum'] || '').toString().trim();
           const durasiRaw = row['Durasi (Jam)'] ?? row['Durasi'] ?? row['HM'] ?? row['Duration'] ?? '';
           const statusRaw = (row['Status'] || '').toString().trim();
           const catatanRaw = (row['Catatan'] || row['Notes'] || '').toString().trim();
 
           if (!tanggalRaw && !eqNumRaw) return; // skip blank rows
+
+          if (!tanggalRaw && lastSeenDate) {
+            tanggalRaw = lastSeenDate;
+          }
 
           // Parse date (accepts dd-MM-yyyy, dd/MM/yyyy, yyyy-MM-dd)
           let dateStr = '';
@@ -682,6 +687,7 @@ export default function DailyDashboard({
             errors.push(`Baris ${lineNum}: Format tanggal tidak dikenali ("${dStr}"). Gunakan dd-MM-yyyy.`);
             return;
           }
+          lastSeenDate = tanggalRaw;
 
           let durasiRawStr = String(durasiRaw).trim();
           if (durasiRawStr === '' || durasiRawStr === '-') durasiRawStr = '0';
@@ -802,6 +808,7 @@ export default function DailyDashboard({
 
       const parsed = [];
       const errors = [];
+      let lastSeenDate = '';
 
       for (let i = 1; i < lines.length; i++) {
         // Split CSV handling quoted fields
@@ -814,13 +821,17 @@ export default function DailyDashboard({
         }
         cols.push(cur.trim());
 
-        const tanggalRaw = (cols[tanggalIdx] || '').replace(/^"|"$/g, '').trim();
+        let tanggalRaw = (cols[tanggalIdx] || '').replace(/^"|"$/g, '').trim();
         const eqNumRaw   = (cols[eqIdx]      || '').replace(/^"|"$/g, '').trim();
         const jamRaw     = (cols[jamIdx]      || '').replace(/^"|"$/g, '').trim();
         const plantRaw   = plantIdx >= 0 ? (cols[plantIdx] || '').replace(/^"|"$/g, '').trim() : '';
         const descRaw    = descIdx >= 0  ? (cols[descIdx]  || '').replace(/^"|"$/g, '').trim() : '';
 
         if (!tanggalRaw && !eqNumRaw) continue;
+
+        if (!tanggalRaw && lastSeenDate) {
+          tanggalRaw = lastSeenDate;
+        }
 
         // Parse date: accepts DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD
         let dateStr = '';
@@ -834,6 +845,7 @@ export default function DailyDashboard({
           errors.push(`Baris ${i+1}: Format tanggal tidak dikenali ("${tanggalRaw}")`);
           continue;
         }
+        lastSeenDate = tanggalRaw;
 
         let jamRawStr = jamRaw.trim();
         if (jamRawStr === '' || jamRawStr === '-') jamRawStr = '0';
