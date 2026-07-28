@@ -279,8 +279,8 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     const rowIdx = eq.rowIndex;
     const duration = dailyDurations[eq.eqNum] || 0;
     
-    // Only export equipments that have a log entry on the selected date (including 0)
-    if (!(eq.eqNum in dailyDurations) || !originalData[rowIdx]) return;
+    // Export all equipments present in the SAP template. Defaults to 0 if no log entry.
+    if (!originalData[rowIdx]) return;
 
     const rowData = [...originalData[rowIdx]]; 
     
@@ -394,7 +394,6 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
 
 
   equipments.forEach(eq => {
-    if (!ranDuringPeriod.has(eq.eqNum)) return;
     const rowIdx = eq.rowIndex;
     const total = accDurations[eq.eqNum] || 0;
     if (!originalData[rowIdx]) return;
@@ -491,7 +490,7 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
     equipments.forEach(eq => {
       const rowIdx = eq.rowIndex;
       const duration = dailyDurations[eq.eqNum] || 0;
-      if (!(eq.eqNum in dailyDurations) || !originalData[rowIdx]) return;
+      if (!originalData[rowIdx]) return;
 
       const rowData = [...originalData[rowIdx]];
       const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx);
