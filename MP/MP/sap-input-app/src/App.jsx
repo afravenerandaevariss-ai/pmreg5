@@ -2141,7 +2141,8 @@ function MasterDataView({ masterMap, currentUser }) {
       const flDescription = typeof info === 'string' ? '' : info.flDescription || '';
       const costCenter = typeof info === 'string' ? '' : info.costCenter || '';
       const ccDescription = costCenter ? (COST_CENTER_DESC[costCenter] || '-') : '-';
-      list.push({ eqNum, plant, description: desc, functionalLoc, flDescription, costCenter, ccDescription });
+      const searchStr = `${eqNum} ${desc} ${functionalLoc} ${flDescription} ${costCenter} ${ccDescription}`.toLowerCase();
+      list.push({ eqNum, plant, description: desc, functionalLoc, flDescription, costCenter, ccDescription, searchStr });
     });
     return list;
   }, [masterMap]);
@@ -2163,8 +2164,7 @@ function MasterDataView({ masterMap, currentUser }) {
     if (searchQuery) {
       const words = searchQuery.toLowerCase().split(' ').filter(w => w);
       result = result.filter(item => {
-        const targetStr = `${item.eqNum} ${item.description} ${item.functionalLoc} ${item.flDescription} ${item.costCenter} ${item.ccDescription}`.toLowerCase();
-        return words.every(word => targetStr.includes(word));
+        return words.every(word => item.searchStr.includes(word));
       });
     }
     return result;
