@@ -683,7 +683,9 @@ export default function DailyDashboard({
             return;
           }
 
-          const durasi = parseFloat(String(durasiRaw).replace(',','.'));
+          let durasiRawStr = String(durasiRaw).trim();
+          if (durasiRawStr === '' || durasiRawStr === '-') durasiRawStr = '0';
+          const durasi = parseFloat(durasiRawStr.replace(',','.'));
           if (isNaN(durasi) || durasi < 0) {
             errors.push(`Baris ${lineNum}: Durasi tidak valid ("${durasiRaw}").`);
             return;
@@ -833,7 +835,9 @@ export default function DailyDashboard({
           continue;
         }
 
-        const jam = parseFloat(jamRaw.replace(',', '.'));
+        let jamRawStr = jamRaw.trim();
+        if (jamRawStr === '' || jamRawStr === '-') jamRawStr = '0';
+        const jam = parseFloat(jamRawStr.replace(',', '.'));
         if (isNaN(jam) || jam < 0) {
           errors.push(`Baris ${i+1}: Nilai Jam tidak valid ("${jamRaw}")`);
           continue;
