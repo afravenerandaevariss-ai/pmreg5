@@ -804,8 +804,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     let activeVehCount = 0;
     let totalDaysFilledSum = 0;
 
+    const logsByVehicle = new Map();
+    plantLogs.forEach(l => {
+      if (!logsByVehicle.has(l.vehicle_code)) logsByVehicle.set(l.vehicle_code, []);
+      logsByVehicle.get(l.vehicle_code).push(l);
+    });
+
     const vehiclesList = plantVehicles.map(v => {
-      const vLogs = plantLogs.filter(l => l.vehicle_code === v.vehicle_code);
+      const vLogs = logsByVehicle.get(v.vehicle_code) || [];
       const uniqueDays = new Set(vLogs.map(l => l.date));
       const daysFilled = uniqueDays.size;
 
@@ -927,9 +933,21 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       baseVehicles = vehicles.filter(v => v.plant === currentUser.plant);
     }
     
+    const activeLogsByVeh = new Map();
+    activeMonthLogs.forEach(l => {
+      if (!activeLogsByVeh.has(l.vehicle_code)) activeLogsByVeh.set(l.vehicle_code, []);
+      activeLogsByVeh.get(l.vehicle_code).push(l);
+    });
+    
+    const cancelLogsByVeh = new Map();
+    cancelledMonthLogs.forEach(l => {
+      if (!cancelLogsByVeh.has(l.vehicle_code)) cancelLogsByVeh.set(l.vehicle_code, []);
+      cancelLogsByVeh.get(l.vehicle_code).push(l);
+    });
+
     let result = baseVehicles.map(v => {
-      const vLogs    = activeMonthLogs.filter(l => l.vehicle_code === v.vehicle_code);
-      const vCancel  = cancelledMonthLogs.filter(l => l.vehicle_code === v.vehicle_code);
+      const vLogs    = activeLogsByVeh.get(v.vehicle_code) || [];
+      const vCancel  = cancelLogsByVeh.get(v.vehicle_code) || [];
       const totalTx  = vLogs.length;
       const totalUnit = vLogs.reduce((s, l) => s + (parseFloat(l.unit_value) || 0), 0);
       const totalHmKm = vLogs.reduce((s, l) => s + (parseFloat(l.hm_km) || 0), 0);
