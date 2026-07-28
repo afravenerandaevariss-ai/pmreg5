@@ -279,8 +279,8 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     const rowIdx = eq.rowIndex;
     const duration = dailyDurations[eq.eqNum] || 0;
     
-    // Only export equipments that have a log entry on the selected date
-    if (duration <= 0 || !originalData[rowIdx]) return;
+    // Only export equipments that have a log entry on the selected date (including 0)
+    if (!(eq.eqNum in dailyDurations) || !originalData[rowIdx]) return;
 
     const rowData = [...originalData[rowIdx]]; 
     
@@ -397,7 +397,7 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     if (!ranDuringPeriod.has(eq.eqNum)) return;
     const rowIdx = eq.rowIndex;
     const total = accDurations[eq.eqNum] || 0;
-    if (total <= 0 || !originalData[rowIdx]) return;
+    if (!originalData[rowIdx]) return;
 
     const rowData = [...originalData[rowIdx]];
     const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx);
@@ -491,7 +491,7 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
     equipments.forEach(eq => {
       const rowIdx = eq.rowIndex;
       const duration = dailyDurations[eq.eqNum] || 0;
-      if (duration <= 0 || !originalData[rowIdx]) return;
+      if (!(eq.eqNum in dailyDurations) || !originalData[rowIdx]) return;
 
       const rowData = [...originalData[rowIdx]];
       const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx);
@@ -574,7 +574,7 @@ export function exportMonthlyToSAP(headers, originalData, equipments, logsMap, d
       const rowIdx = eq.rowIndex;
       const duration = dailyDurations[eq.eqNum] || 0;
       
-      if (duration > 0 && originalData[rowIdx]) {
+      if ((eq.eqNum in dailyDurations) && originalData[rowIdx]) {
         const rowData = [...originalData[rowIdx]]; 
         
         const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx);
