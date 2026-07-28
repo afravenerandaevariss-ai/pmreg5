@@ -664,9 +664,9 @@ export default function DailyDashboard({
           const statusRaw = (row['Status'] || '').toString().trim();
           const catatanRaw = (row['Catatan'] || row['Notes'] || '').toString().trim();
 
-          if (!tanggalRaw && !eqNumRaw) return; // skip blank rows
+          if ((!tanggalRaw || tanggalRaw === '-') && !eqNumRaw) return; // skip blank rows
 
-          if (!tanggalRaw && lastSeenDate) {
+          if ((!tanggalRaw || tanggalRaw === '-') && lastSeenDate) {
             tanggalRaw = lastSeenDate;
           }
 
@@ -716,9 +716,15 @@ export default function DailyDashboard({
           });
         });
 
-        if (errors.length > 0 && parsed.length === 0) {
-          setUploadError(errors.join('\n'));
-          return;
+        if (errors.length > 0) {
+          if (parsed.length === 0) {
+            setUploadError(errors.join('\n'));
+            return;
+          } else {
+            setUploadError("Peringatan: Terdapat error pada beberapa baris sehingga diabaikan:\n" + errors.slice(0, 15).join('\n'));
+          }
+        } else {
+          setUploadError(null);
         }
 
         setUploadPreview({ rows: parsed, warnings: errors });
@@ -827,9 +833,9 @@ export default function DailyDashboard({
         const plantRaw   = plantIdx >= 0 ? (cols[plantIdx] || '').replace(/^"|"$/g, '').trim() : '';
         const descRaw    = descIdx >= 0  ? (cols[descIdx]  || '').replace(/^"|"$/g, '').trim() : '';
 
-        if (!tanggalRaw && !eqNumRaw) continue;
+        if ((!tanggalRaw || tanggalRaw === '-') && !eqNumRaw) continue;
 
-        if (!tanggalRaw && lastSeenDate) {
+        if ((!tanggalRaw || tanggalRaw === '-') && lastSeenDate) {
           tanggalRaw = lastSeenDate;
         }
 
@@ -873,10 +879,16 @@ export default function DailyDashboard({
         });
       }
 
-      if (errors.length > 0 && parsed.length === 0) {
-        setUploadError(errors.join('\n'));
-        setIsFetchingSheet(false);
-        return;
+      if (errors.length > 0) {
+        if (parsed.length === 0) {
+          setUploadError(errors.join('\n'));
+          setIsFetchingSheet(false);
+          return;
+        } else {
+          setUploadError("Peringatan: Terdapat error pada beberapa baris sehingga diabaikan:\n" + errors.slice(0, 15).join('\n'));
+        }
+      } else {
+        setUploadError(null);
       }
 
       // Validate that all dates match the currently active calendar month
