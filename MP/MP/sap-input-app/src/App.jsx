@@ -2124,6 +2124,10 @@ const COST_CENTER_DESC = {
 };
 
 function MasterDataView({ masterMap, currentUser }) {
+  const isAdmin = currentUser && (
+    currentUser.role === 'Admin' ||
+    ['1', '2', '3'].includes(String(currentUser.role_id))
+  );
   const [plantFilter, setPlantFilter] = useState('');
   const [vhcFilter, setVhcFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
