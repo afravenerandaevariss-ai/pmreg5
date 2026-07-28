@@ -794,7 +794,9 @@ export default function DailyDashboard({
     setIsFetchingSheet(true);
     setUploadError(null);
     try {
-      const response = await fetch(googleSheetUrl.trim());
+      const baseUrl = googleSheetUrl.trim();
+      const fetchUrl = baseUrl.includes('?') ? `${baseUrl}&_t=${Date.now()}` : `${baseUrl}?_t=${Date.now()}`;
+      const response = await fetch(fetchUrl);
       if (!response.ok) throw new Error(`HTTP ${response.status}: Gagal mengambil data`);
       const csvText = await response.text();
 
