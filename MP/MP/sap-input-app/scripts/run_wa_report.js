@@ -42,8 +42,11 @@ async function getActiveDeviceId(authHeader) {
   const devRes = await fetch(`${GOWA_URL}/devices`, { headers: { 'Authorization': authHeader } });
   if (devRes.ok) {
     const devData = await devRes.json();
-    const activeDev = (devData.results || []).find(d => d.state === 'logged_in');
-    if (activeDev) return activeDev.id;
+    const activeDevs = (devData.results || []).filter(d => d.state === 'logged_in');
+    if (activeDevs.length > 0) {
+      activeDevs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      return activeDevs[0].id;
+    }
   }
   return 'aaaa'; // fallback
 }
