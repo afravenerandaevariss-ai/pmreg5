@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     const waConfig = (await getSystemConfig(12)) || {};
     const targetPhone = req.query.target || req.body?.target || waConfig.targetPhone || '120363430505509462@g.us';
     const provider = req.query.provider || req.body?.provider || waConfig.provider || 'gowa';
-    const baseUrl = req.headers.host ? `https://${req.headers.host}` : 'https://pmreg5.afratarigan.my.id';
+    const baseUrl = 'https://pmreg5.afratarigan.my.id';
 
     // 1. Use Microlink API to take HD screenshot
     // Add timestamp to bust Microlink cache and ensure fresh data is captured
@@ -32,18 +32,18 @@ export default async function handler(req, res) {
     const arrayBuffer = await imgRes.arrayBuffer();
     const blob = new Blob([arrayBuffer], { type: 'image/png' });
 
-    let textCaption = `Laporan otomatis`;
-    try {
-      const txtRes = await fetch(`${baseUrl}/api/send-wa?mock=true`);
-      if (txtRes.ok) {
-        const txtData = await txtRes.json();
-        if (txtData.success && txtData.text) {
-          // Remove ASCII table (everything after first backticks)
-          const headerOnly = txtData.text.split('```')[0].trim();
-          textCaption = headerOnly;
-        }
-      }
-    } catch(e) { console.error('Failed to get mock text', e); }
+    // Generate caption locally to match exact requested format
+    const now = new Date();
+    const optionsDate = { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric' };
+    const optionsTime = { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false };
+    const dateParts = new Intl.DateTimeFormat('id-ID', optionsDate).formatToParts(now);
+    const dayStr = dateParts.find(p => p.type === 'day').value;
+    const monthStr = dateParts.find(p => p.type === 'month').value;
+    const yearStr = dateParts.find(p => p.type === 'year').value;
+    const dateFormatted = `${dayStr}/${monthStr}/${yearStr}`;
+    const timeFormatted = new Intl.DateTimeFormat('id-ID', optionsTime).format(now).replace(':', '.');
+    
+    let textCaption = `*Monitoring Transaksi Logbook tanggal 1 s.d ${dateFormatted} ${timeFormatted}*\n*REGIONAL 5*\n\n`;
 
     let dispatchResult = { success: false, detail: null };
     const apiToken = req.query.token || req.body?.token || waConfig.apiToken || process.env.FONNTE_TOKEN;
