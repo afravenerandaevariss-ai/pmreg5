@@ -157,14 +157,16 @@ export default function SAPTransactionGuideView() {
         { name: 'Controlling Area', desc: 'Area Pengendalian Biaya.', required: true, example: 'PTPN' },
         { name: 'Fiscal Year', desc: 'Tahun anggaran.', required: true, example: '2026' },
         { name: 'From Period / To Period', desc: 'Bulan awal dan akhir penarikan laporan.', required: true, example: '1 to 12' },
-        { name: 'Cost Center Group', desc: 'Grup Cost Center (misal: grup mesin pabrik / kendaraan).', required: false, example: 'FK01_VHC' }
+        { name: 'Cost Center Group', desc: 'Grup Cost Center. Untuk melihat khusus logbook, isi "Reg5_log".', required: false, example: 'Reg5_log' },
+        { name: 'Cost Center / Unit', desc: 'Apabila mau melihat semua biaya per masing-masing unit, masukkan kode Unit di sini.', required: false, example: 'FK01' }
       ],
       steps: [
-        'Masuk ke t-code S_ALR_87013611 di SAP.',
+        'Buka tcode S_ALR_87013611 di SAP.',
         'Lengkapi Controlling Area, Fiscal Year, dan Range Periode.',
-        'Masukkan kode Cost Center Group atau nomor Cost Center spesifik.',
-        'Tekan F8 atau klik Execute.',
-        'Menganalisis kolom "Actual" (Realisasi), "Plan" (RKAP), dan "Variance" (Selisih Biaya).'
+        'Untuk melihat khusus logbook, mengisi Cost Center Group: Reg5_log',
+        'Apabila mau melihat semua biaya per masing masing unit, masukan kode Unit',
+        'Execute atau klik F8 di keyboard',
+        'Sistem akan menampilkan laporan Cost Centers: Actual/Plan/Variance.'
       ]
     },
     zpmik22: {
@@ -303,11 +305,12 @@ export default function SAPTransactionGuideView() {
     }
     if (selectedTcode === 's_alr_87013611') {
       return [
-        { label: 'Langkah 1: Buka TCODE S_ALR_87013611', src: '/images/zco_cctr_01/step_1.png' },
-        { label: 'Langkah 2: Isi Parameter Controlling Area, Fiscal Year, dan Range Periode', src: '/images/zco_cctr_01/step_2.png' },
-        { label: 'Langkah 3: Masukkan Cost Center Group & Execute', src: '/images/zco_cctr_01/step_2.png' },
-        { label: 'Langkah 4: Tekan F8 (Execute)', src: '/images/zco_cctr_01/step_2.png' },
-        { label: 'Langkah 5: Analisa Laporan Cost vs Activity', src: '/images/zco_cctr_01/step_3.png' }
+        { label: 'Langkah 1: Buka tcode S_ALR_87013611', src: '/salr_1.png' },
+        { label: 'Langkah 2: Lengkapi Parameter', src: '/salr_2.png' },
+        { label: 'Langkah 3: Cost Center Group', src: '/salr_2.png' },
+        { label: 'Langkah 4: Kode Unit (Opsional)', src: '/salr_4.png' },
+        { label: 'Langkah 5: Execute / F8', src: '/salr_3.png' },
+        { label: 'Langkah 6: Laporan Ditampilkan', src: '/salr_5.png' }
       ];
     }
     if (selectedTcode === 'zco_cctr_01') {

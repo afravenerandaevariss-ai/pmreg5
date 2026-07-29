@@ -22,7 +22,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const GOWA_URL = process.env.GOWA_URL || 'https://gowa.waterflai.my.id';
 const GOWA_USER = process.env.GOWA_USER || 'admin';
 const GOWA_PASS = process.env.GOWA_PASS || 'Sedap321#';
-const TARGET_GROUP_JID = process.env.TARGET_GROUP_JID || '120363430505509462@g.us';
+const TARGET_GROUP_JID = process.env.TARGET_GROUP_JID || '120363041780234935@g.us';
 
 // Auto-detect Chrome path: Windows (local) or Linux (GitHub Actions / server)
 function getChromePath() {
