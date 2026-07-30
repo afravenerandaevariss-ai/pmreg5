@@ -1,14 +1,4 @@
 {
-  "crons": [
-    {
-      "path": "/api/send-wa-image",
-      "schedule": "0 1 * * *"
-    },
-    {
-      "path": "/api/send-wa-image",
-      "schedule": "30 7 * * *"
-    }
-  ],
   "functions": {
     "api/**/*": {
       "maxDuration": 300

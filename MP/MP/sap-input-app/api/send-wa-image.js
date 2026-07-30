@@ -7,7 +7,7 @@ export default async function handler(req, res) {
 
   try {
     const waConfig = (await getSystemConfig(12)) || {};
-    const targetPhone = req.query.target || req.body?.target || waConfig.targetPhone || '120363430505509462@g.us';
+    const targetPhone = req.query.target || req.body?.target || waConfig.targetPhone || '120363041780234935@g.us';
     const provider = req.query.provider || req.body?.provider || waConfig.provider || 'gowa';
     const baseUrl = 'https://pmreg5.afratarigan.my.id';
 
