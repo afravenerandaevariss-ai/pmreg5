@@ -19,6 +19,9 @@ export default function SAPVerificationView({ equipments, currentUser }) {
   const [showOnlySelisih, setShowOnlySelisih] = useState(false);
   const [showRekapModal, setShowRekapModal] = useState(false);
   const [copiedEqs, setCopiedEqs] = useState(false);
+  const [rawWebLogs, setRawWebLogs] = useState([]);
+  const [rawSapLogs, setRawSapLogs] = useState([]);
+  const [detailModal, setDetailModal] = useState(null); // { plant, dateKey, selisihTotal }
 
   const uniquePlants = useMemo(() => {
     return ['5F01', '5F04', '5F07', '5F08', '5F09', '5F14', '5F15', '5F21', '5F22'];
@@ -78,6 +81,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
        } else {
          setDebugMsg(`(Debug: rawIK17 is ${typeof rawIK17})`);
        }
+       setRawSapLogs(rawIK17 && Array.isArray(rawIK17) ? rawIK17 : []);
 
        // 2. Fetch daily_logs
        let allLogs = [];
@@ -102,6 +106,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
             }
           }
        }
+       setRawWebLogs(allLogs);
        
        const webHmMap = new Map();
        allLogs.forEach(log => {
@@ -488,11 +493,21 @@ export default function SAPVerificationView({ equipments, currentUser }) {
                         <td style={{ width: col3Width, minWidth: col3Width, left: colPlantWidth + col1Width + col2Width }} className="border border-slate-200 px-2 py-1 text-slate-600 font-bold text-left bg-slate-50 sticky z-10">
                           Selisih
                         </td>
-                        {ptSelisih.map((v, i) => (
-                          <td key={i} className={`border border-slate-200 px-1 py-1 font-black ${v > 0 ? 'bg-amber-50 text-amber-600 shadow-[inset_0_0_0_1px_rgba(217,119,6,0.2)]' : (v < 0 ? 'bg-rose-50 text-rose-600 shadow-[inset_0_0_0_1px_rgba(225,29,72,0.2)]' : 'text-slate-300 font-medium')}`}>
-                            {v || 0}
-                          </td>
-                        ))}
+                        {ptSelisih.map((v, i) => {
+                          const dateKey = `${targetMonth}-${String(i + 1).padStart(2, '0')}`;
+                          const isClickable = groupBy === 'plant' && v !== 0;
+                          return (
+                            <td 
+                              key={i} 
+                              onClick={() => {
+                                if (isClickable) setDetailModal({ plant: row.groupKey || row.groupName, dateKey, selisihTotal: v });
+                              }}
+                              className={`border border-slate-200 px-1 py-1 font-black ${v > 0 ? 'bg-amber-50 text-amber-600 shadow-[inset_0_0_0_1px_rgba(217,119,6,0.2)]' : (v < 0 ? 'bg-rose-50 text-rose-600 shadow-[inset_0_0_0_1px_rgba(225,29,72,0.2)]' : 'text-slate-300 font-medium')} ${isClickable ? 'cursor-pointer hover:opacity-80 underline decoration-dashed underline-offset-2' : ''}`}
+                            >
+                              {v || 0}
+                            </td>
+                          );
+                        })}
                         <td className={`border border-slate-200 px-2 py-1 font-black ${Math.round((cumWeb - cumSap) * 100) / 100 !== 0 ? 'bg-rose-100 text-rose-700 shadow-[inset_0_0_0_1px_rgba(225,29,72,0.3)]' : 'bg-emerald-50 text-slate-400'}`}>
                            {Math.round((cumWeb - cumSap) * 100) / 100}
                         </td>
@@ -622,6 +637,87 @@ export default function SAPVerificationView({ equipments, currentUser }) {
               <button onClick={() => setShowRekapModal(false)} className="px-4 py-2 bg-[#064e3b] hover:bg-[#065f46] text-white rounded-2xl font-bold transition-colors text-xs">
                 Tutup
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Detail Selisih Modal */}
+      {detailModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] border border-slate-200">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+                  <List size={16} className="text-[#064e3b]" />
+                  Detail Selisih Equipment (Plant {detailModal.plant})
+                </h3>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">Tanggal: {detailModal.dateKey} | Total Selisih: {detailModal.selisihTotal}</p>
+              </div>
+              <button onClick={() => setDetailModal(null)} className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-100 rounded-2xl transition-colors"><X size={18}/></button>
+            </div>
+            <div className="p-0 overflow-auto flex-1">
+              <table className="w-full text-sm text-left border-collapse">
+                <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                  <tr>
+                    <th className="text-center px-4 py-3 font-semibold text-slate-600 border-b bg-slate-50 w-12">No</th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-600 border-b bg-slate-50">Equipment</th>
+                    <th className="text-right px-4 py-3 font-semibold text-slate-600 border-b bg-slate-50">Web (HM)</th>
+                    <th className="text-right px-4 py-3 font-semibold text-slate-600 border-b bg-slate-50">SAP (HM)</th>
+                    <th className="text-right px-4 py-3 font-semibold text-slate-600 border-b bg-slate-50">Selisih</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(() => {
+                    const eqMap = new Map();
+                    // map names
+                    equipments.forEach(eq => {
+                       if (eq.plant === detailModal.plant && eq.type === 'Induk') {
+                          eqMap.set(eq.eqNum, { name: `${eq.description} [${eq.eqNum}]`, web: 0, sap: 0 });
+                       }
+                    });
+
+                    // Aggregate web
+                    rawWebLogs.forEach(log => {
+                       if (log.plant === detailModal.plant && log.date === detailModal.dateKey && eqMap.has(log.induk_eq_num)) {
+                          eqMap.get(log.induk_eq_num).web += (log.duration_minutes || 0) / 60;
+                       }
+                    });
+
+                    // Aggregate SAP
+                    rawSapLogs.forEach(row => {
+                       if (row.d === detailModal.dateKey && eqMap.has(row.e)) {
+                          eqMap.get(row.e).sap += (row.h || 0);
+                       }
+                    });
+
+                    let counter = 1;
+                    const rows = [];
+                    eqMap.forEach((data, eqNum) => {
+                       const web = Math.round(data.web * 100) / 100;
+                       const sap = Math.round(data.sap * 100) / 100;
+                       const diff = Math.round((web - sap) * 100) / 100;
+                       
+                       if (diff !== 0) {
+                          rows.push(
+                            <tr key={eqNum} className="hover:bg-slate-50">
+                              <td className="px-4 py-2 text-center">{counter++}</td>
+                              <td className="px-4 py-2 font-medium">{data.name}</td>
+                              <td className="px-4 py-2 text-right">{web}</td>
+                              <td className="px-4 py-2 text-right">{sap}</td>
+                              <td className={`px-4 py-2 text-right font-bold ${diff > 0 ? 'text-amber-600' : 'text-rose-600'}`}>{diff}</td>
+                            </tr>
+                          );
+                       }
+                    });
+
+                    if (rows.length === 0) {
+                      return <tr><td colSpan="5" className="px-4 py-8 text-center text-slate-500">Tidak ada selisih detail di level equipment pada tanggal ini.</td></tr>;
+                    }
+                    return rows;
+                  })()}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
