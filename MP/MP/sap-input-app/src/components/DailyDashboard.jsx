@@ -802,7 +802,19 @@ export default function DailyDashboard({
     setUploadError(null);
     try {
       const baseUrl = googleSheetUrl.trim();
-      const fetchUrl = baseUrl.includes('?') ? `${baseUrl}&_t=${Date.now()}` : `${baseUrl}?_t=${Date.now()}`;
+      let fetchUrl = baseUrl;
+      
+      // Auto-convert Google Sheets URLs to /export to bypass Google's 5-minute cache for published CSVs
+      const match = baseUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (match) {
+        const docId = match[1];
+        const gidMatch = baseUrl.match(/gid=([0-9]+)/);
+        const gidParam = gidMatch ? `&gid=${gidMatch[1]}` : '';
+        fetchUrl = `https://docs.google.com/spreadsheets/d/${docId}/export?format=csv${gidParam}`;
+      }
+      
+      fetchUrl = fetchUrl.includes('?') ? `${fetchUrl}&_t=${Date.now()}` : `${fetchUrl}?_t=${Date.now()}`;
+      
       const response = await fetch(fetchUrl);
       if (!response.ok) throw new Error(`HTTP ${response.status}: Gagal mengambil data`);
       const csvText = await response.text();
