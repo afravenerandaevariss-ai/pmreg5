@@ -523,7 +523,7 @@ export async function saveIW39Data(data) {
 }
 
 export async function fetchZvtabData() {
-  const { data, error } = await getSystemConfig('zvtab_data');
+  const { data } = await getSystemConfig('zvtab_data');
   return { data: typeof data === 'object' ? data : {}, error: null };
 }
 
@@ -532,7 +532,7 @@ export async function saveZvtabData(data) {
 }
 
 export async function fetchExport046Data() {
-  const { data, error } = await getSystemConfig('export046_data');
+  const { data } = await getSystemConfig('export046_data');
   return { data: typeof data === 'object' ? data : {}, error: null };
 }
 

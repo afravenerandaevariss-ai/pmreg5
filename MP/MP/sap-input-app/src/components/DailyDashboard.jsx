@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { format, startOfWeek, addDays, startOfMonth, endOfMonth, isSameDay, subMonths, addMonths } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Search, Plus, Minus, X, Save, Clock, AlertTriangle, CheckCircle, ClipboardList, Download, FileDown, Trash2, Eye, Upload, History, Flag, Bot } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Search, Plus, Minus, X, Save, Clock, AlertTriangle, CheckCircle, ClipboardList, Download, FileDown, Trash2, Eye, Upload, History, Flag } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { exportDailyToSAP, exportCumulativeToSAP, exportAccumulatedToSAP, exportMonthlyToSAP, validateDailyHours } from '../utils/excel';
+import { exportCumulativeToSAP, exportAccumulatedToSAP, validateDailyHours } from '../utils/excel';
 import { supabase } from '../lib/supabase';
 import { insertDailyLog, insertDailyLogs, deleteDailyLog, fetchDailyLogs, saveGSheetHistory, getGSheetHistory, saveSystemConfig, getSystemConfig, saveImportLog } from '../lib/supabaseService';
 
@@ -47,7 +47,6 @@ const PLANT_INFO = {
 export default function DailyDashboard({ 
   equipments, 
   setEquipments,
-  hierarchyData,
   currentUser,
   templateData,
   sapSyncedDates = [],
@@ -80,7 +79,7 @@ export default function DailyDashboard({
   const [syncTab, setSyncTab] = useState('new'); // 'new'|'conflict'|'skip'
   const [isSyncing, setIsSyncing] = useState(false);
   // Import summary notification state
-  const [importSummary, setImportSummary] = useState(null); // { total, added, updated, changes: [{date,eq,old,new}] }
+  const [importSummary, setImportSummary] = useState(null);
   const [showImportSummary, setShowImportSummary] = useState(false);
   const [isRefreshingForExport, setIsRefreshingForExport] = useState(false);
   const [massData, setMassData] = useState({});
@@ -193,7 +192,7 @@ export default function DailyDashboard({
   
   // dailyLogs: { 'yyyy-MM-dd': [ { id, indukEqNum, indukDesc, durationHours, durationMins, status, notes, damagedSubs: [] } ] }
   const [dailyLogs, setDailyLogs] = useState({});
-  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsLoading, setLogsLoading] = useState(false); // eslint-disable-line no-unused-vars
   const [isUploadingIK17, setIsUploadingIK17] = useState(false);
 
   // Riwayat Alat State
@@ -230,7 +229,7 @@ export default function DailyDashboard({
             baseDate = matchingRaw[0].d;
           }
         }
-      } catch (e) {}
+      } catch (_e) { /* ik17 base HM not available */ }
 
       if (baseDate) {
         processed = logs.map(log => {
@@ -681,7 +680,7 @@ export default function DailyDashboard({
           // Parse date (accepts dd-MM-yyyy, dd/MM/yyyy, yyyy-MM-dd)
           let dateStr = '';
           const dStr = tanggalRaw.toString().trim();
-          const dmyMatch = dStr.match(/^(\d{1,2})[\-\/](\d{1,2})[\-\/](\d{4})$/);
+          const dmyMatch = dStr.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
           const isoMatch = dStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
           if (dmyMatch) {
             dateStr = `${dmyMatch[3]}-${dmyMatch[2].padStart(2,'0')}-${dmyMatch[1].padStart(2,'0')}`;
@@ -851,7 +850,7 @@ export default function DailyDashboard({
 
         // Parse date: accepts DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD
         let dateStr = '';
-        const dmyMatch = tanggalRaw.match(/^(\d{1,2})[\-\/](\d{1,2})[\-\/](\d{4})$/);
+        const dmyMatch = tanggalRaw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
         const isoMatch = tanggalRaw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
         if (dmyMatch) {
           dateStr = `${dmyMatch[3]}-${dmyMatch[2].padStart(2,'0')}-${dmyMatch[1].padStart(2,'0')}`;
@@ -1040,8 +1039,7 @@ export default function DailyDashboard({
             console.error("Supabase insert error:", error);
             alert("Gagal menyimpan ke database tanggal " + dateStr + ": " + error.message);
           } else {
-            inserted += addedItems.filter(a => a.date === dateStr).length;
-            updated += updatedItems.filter(u => u.date === dateStr).length;
+            // count tracking (reflected in addedItems/updatedItems arrays)
           }
         }
         if (hasError) {
@@ -1158,12 +1156,10 @@ export default function DailyDashboard({
   // Calendar rendering logic
   const renderCalendar = () => {
     const monthStart = startOfMonth(currentMonth);
-    const monthEnd = endOfMonth(monthStart);
     const startDate = startOfWeek(monthStart);
     
     const days = [];
     let day = startDate;
-    let formattedDate = '';
 
     for (let i = 0; i < 42; i++) {
       const cloneDay = day;

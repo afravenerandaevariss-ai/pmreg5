@@ -459,7 +459,6 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     if (readingIdx !== -1) rowData[readingIdx] = readingStr;
     if (readByIdx !== -1) rowData[readByIdx] = docDetails.readBy;
     if (shortTextIdx !== -1) {
-      const plantStr = eq.plant ? ` ${eq.plant}` : '';
       const formatShortDate = (d) => { const p = d.split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0].substring(2)}` : d; };
       const sDate = formatShortDate(startDate);
       const eDate = formatShortDate(endDate);
