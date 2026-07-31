@@ -806,7 +806,7 @@ export default function DailyDashboard({
       
       // Auto-convert Google Sheets URLs to /export to bypass Google's 5-minute cache for published CSVs
       const match = baseUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-      if (match) {
+      if (match && match[1] !== 'e') {
         const docId = match[1];
         const gidMatch = baseUrl.match(/gid=([0-9]+)/);
         const gidParam = gidMatch ? `&gid=${gidMatch[1]}` : '';
