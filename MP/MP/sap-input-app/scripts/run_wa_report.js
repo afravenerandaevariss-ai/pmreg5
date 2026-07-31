@@ -158,7 +158,7 @@ async function captureScreenshotWithRetries() {
         const els = Array.from(document.querySelectorAll('*')).reverse();
         for (let el of els) {
           const text = (el.textContent || '').trim();
-          if (text === 'Monitoring Penginputan Jam Jalan') {
+          if (text === 'Monitoring Penginputan Jam Jalan' || text === 'Running Hour Submission Monitoring') {
             const rect = el.getBoundingClientRect();
             const pageY = rect.top + window.scrollY;
             if (pageY > 500) return pageY;
@@ -178,6 +178,29 @@ async function captureScreenshotWithRetries() {
       }, absoluteY);
       
       await new Promise(r => setTimeout(r, 2000));
+
+      logStep('Searching for "Reg 5" to click...');
+      const clicked = await page.evaluate((headingY) => {
+        const els = Array.from(document.querySelectorAll('*')).reverse();
+        for (let el of els) {
+          if ((el.textContent || '').trim() === 'Reg 5') {
+            const rect = el.getBoundingClientRect();
+            const pageY = rect.top + window.scrollY;
+            if (pageY > headingY && pageY < headingY + 800) {
+              el.click();
+              return true;
+            }
+          }
+        }
+        return false;
+      }, absoluteY);
+
+      if (clicked) {
+        logStep('Clicked "Reg 5"! Waiting 6 seconds for drill-down to load...');
+        await new Promise(r => setTimeout(r, 6000));
+      } else {
+        logStep('WARNING: "Reg 5" not found! Taking screenshot of original view.');
+      }
 
       logStep('Taking normal viewport screenshot...');
       const viewportBuffer = await page.screenshot({ type: 'png' });

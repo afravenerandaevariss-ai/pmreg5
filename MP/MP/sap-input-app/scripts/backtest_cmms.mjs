@@ -90,7 +90,7 @@ async function main() {
     const els = Array.from(document.querySelectorAll('*')).reverse();
     for (let el of els) {
       const text = (el.textContent || '').trim();
-      if (text === 'Monitoring Penginputan Jam Jalan') {
+      if (text === 'Monitoring Penginputan Jam Jalan' || text === 'Running Hour Submission Monitoring') {
         const rect = el.getBoundingClientRect();
         const pageY = rect.top + window.scrollY;
         // Ignore header menu items
@@ -117,6 +117,30 @@ async function main() {
   
   // Wait for any fixed headers or scroll-linked animations to settle
   await new Promise(r => setTimeout(r, 2000));
+
+  console.log('[8.15] Searching for "Reg 5" to click...');
+  const clicked = await page.evaluate((headingY) => {
+    const els = Array.from(document.querySelectorAll('*')).reverse();
+    for (let el of els) {
+      if ((el.textContent || '').trim() === 'Reg 5') {
+        const rect = el.getBoundingClientRect();
+        const pageY = rect.top + window.scrollY;
+        // Ensure the "Reg 5" is part of this table (below heading, but not far below)
+        if (pageY > headingY && pageY < headingY + 800) {
+          el.click();
+          return true;
+        }
+      }
+    }
+    return false;
+  }, absoluteY);
+
+  if (clicked) {
+    console.log('[8.16] Clicked "Reg 5"! Waiting 6 seconds for drill-down to load...');
+    await new Promise(r => setTimeout(r, 6000));
+  } else {
+    console.log('[8.16] WARNING: "Reg 5" not found! Taking screenshot of original view.');
+  }
 
   console.log('[8.2] Taking normal viewport screenshot...');
   // Normal screenshot captures only the viewport. Since we just scrolled exactly there,
