@@ -14,7 +14,7 @@ if (fs.existsSync('.env.local')) {
 const GOWA_URL = process.env.GOWA_URL || 'https://gowa.waterflai.my.id';
 const GOWA_USER = process.env.GOWA_USER || 'admin';
 const GOWA_PASS = process.env.GOWA_PASS || 'Sedap321#';
-const TARGET_GROUP_JID = process.env.TARGET_GROUP_JID || '120363041780234935@g.us';
+const TARGET_GROUP_JIDS = process.env.TARGET_GROUP_JIDS ? process.env.TARGET_GROUP_JIDS.split(',') : ['120363041780234935@g.us', '120363427768510358@g.us'];
 const MAX_RETRIES = 3;
 
 // Auto-detect Chrome path
@@ -73,23 +73,28 @@ async function sendScreenshotAsDocument(pngBuffer, deviceId, authHeader) {
   caption += `*REGIONAL 5*\n\n`;
   caption += `_Mohon kerjasamanya kepada seluruh unit untuk selalu disiplin melakukan *input* Logbook dan *update* Jam Jalan Mesin Pabrik secara rutin dan tepat waktu. Terima kasih!_\n\n`;
 
-  const formData = new FormData();
-  formData.append('phone', TARGET_GROUP_JID);
-  formData.append('caption', caption);
-  const blob = new Blob([pngBuffer], { type: 'image/png' });
-  formData.append('image', blob, `Rekap_Logbook_Regional5_HD.png`);
-  formData.append('is_hd', 'true');
-  formData.append('compress', 'false');
+  let overallSuccess = true;
+  for (const groupId of TARGET_GROUP_JIDS) {
+    const formData = new FormData();
+    formData.append('phone', groupId.trim());
+    formData.append('caption', caption);
+    const blob = new Blob([pngBuffer], { type: 'image/png' });
+    formData.append('image', blob, `Rekap_Logbook_Regional5_HD.png`);
+    formData.append('is_hd', 'true');
+    formData.append('compress', 'false');
 
-  const resp = await fetch(`${GOWA_URL}/send/image?device_id=${encodeURIComponent(deviceId)}`, {
-    method: 'POST',
-    headers: { 'Authorization': authHeader },
-    body: formData
-  });
+    console.log(`\n[+] Sending HD Document to ${groupId.trim()}...`);
+    const resp = await fetch(`${GOWA_URL}/send/image?device_id=${encodeURIComponent(deviceId)}`, {
+      method: 'POST',
+      headers: { 'Authorization': authHeader },
+      body: formData
+    });
 
-  const data = await resp.json();
-  console.log('GoWA Response:', JSON.stringify(data, null, 2));
-  return data;
+    const data = await resp.json();
+    console.log(`GoWA Response for ${groupId.trim()}:`, JSON.stringify(data, null, 2));
+    if (data.code !== 'SUCCESS') overallSuccess = false;
+  }
+  return { success: overallSuccess };
 }
 
 async function captureScreenshotWithRetries() {
