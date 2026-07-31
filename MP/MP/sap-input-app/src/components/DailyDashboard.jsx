@@ -3,7 +3,7 @@ import { format, startOfWeek, addDays, startOfMonth, endOfMonth, isSameDay, subM
 import { id } from 'date-fns/locale';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Search, Plus, Minus, X, Save, Clock, AlertTriangle, CheckCircle, ClipboardList, Download, FileDown, Trash2, Eye, Upload, History, Flag, Bot } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { exportDailyToSAP, exportCumulativeToSAP, exportAccumulatedToSAP, exportMonthlyToSAP } from '../utils/excel';
+import { exportDailyToSAP, exportCumulativeToSAP, exportAccumulatedToSAP, exportMonthlyToSAP, validateDailyHours } from '../utils/excel';
 import { supabase } from '../lib/supabase';
 import { insertDailyLog, insertDailyLogs, deleteDailyLog, fetchDailyLogs, saveGSheetHistory, getGSheetHistory, saveSystemConfig, getSystemConfig } from '../lib/supabaseService';
 
@@ -90,6 +90,10 @@ export default function DailyDashboard({
   const [selectedExportEqs, setSelectedExportEqs] = useState([]);
   const [selectedExportPlants, setSelectedExportPlants] = useState([]);
   const [exportEqSearch, setExportEqSearch] = useState('');
+  // Export validation error state
+  const [showExportHourError, setShowExportHourError] = useState(false);
+  const [exportHourViolations, setExportHourViolations] = useState([]);
+
   const [indukSearch, setIndukSearch] = useState('');
   const [showIndukDropdown, setShowIndukDropdown] = useState(false);
   const indukDropdownRef = useRef(null);
@@ -1845,6 +1849,19 @@ export default function DailyDashboard({
                     return;
                   }
 
+                  // ── Validasi: total jam jalan per induk per hari tidak boleh > 24 jam ──
+                  const validation = validateDailyHours(
+                    dailyLogs,
+                    exportSettings.startDate,
+                    exportSettings.endDate,
+                    selectedExportEqs
+                  );
+                  if (!validation.valid) {
+                    setExportHourViolations(validation.violations);
+                    setShowExportHourError(true);
+                    return;
+                  }
+
                   const exportPayload = {
                     date: exportSettings.endDate, // for compatibility
                     startDate: exportSettings.startDate,
@@ -1882,7 +1899,94 @@ export default function DailyDashboard({
           </div>
         </div>
       )}
+      {/* Export Hour Validation Error Modal */}
+      {showExportHourError && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh]">
+            {/* Header */}
+            <div className="bg-red-600 text-white p-4 rounded-t-2xl flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center flex-none">
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base leading-tight">EXPORT DIBLOKIR</h3>
+                  <p className="text-xs text-red-100 mt-0.5">Jam jalan melebihi batas maksimum 24 jam/hari</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowExportHourError(false)}
+                className="text-white/70 hover:text-white p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 overflow-y-auto flex-1 space-y-4">
+              {/* Explanation */}
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 flex gap-3 items-start">
+                <AlertTriangle size={16} className="text-red-500 flex-none mt-0.5" />
+                <p className="text-sm text-red-700 leading-relaxed">
+                  Ditemukan <strong>{exportHourViolations.length} pelanggaran</strong> data jam jalan.
+                  Total jam jalan per alat induk dalam satu hari <strong>tidak boleh melebihi 24 jam (1.440 menit)</strong>.
+                  Silakan periksa dan perbaiki data berikut sebelum mengekspor ke Excel.
+                </p>
+              </div>
+
+              {/* Violations list */}
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide px-1">
+                  Daftar Pelanggaran ({exportHourViolations.length} item)
+                </p>
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                  {exportHourViolations.map((v, idx) => {
+                    const totalHours = (v.totalMinutes / 60).toFixed(2);
+                    const excessMinutes = v.totalMinutes - 1440;
+                    const excessHours = (excessMinutes / 60).toFixed(2);
+                    const dateParts = v.date.split('-');
+                    const displayDate = dateParts.length === 3
+                      ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`
+                      : v.date;
+                    return (
+                      <div key={idx} className="flex items-start gap-3 p-3 bg-white hover:bg-red-50 transition-colors">
+                        {/* Date badge */}
+                        <div className="bg-red-100 text-red-700 rounded-lg px-2.5 py-1.5 text-center flex-none min-w-[70px]">
+                          <p className="text-[11px] font-bold leading-tight">{displayDate}</p>
+                        </div>
+                        {/* Equipment info */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-800 truncate" title={v.indukDesc}>
+                            {v.indukDesc}
+                          </p>
+                          <p className="text-[11px] text-slate-500 font-mono mt-0.5">{v.indukEqNum}</p>
+                        </div>
+                        {/* Hours info */}
+                        <div className="text-right flex-none">
+                          <p className="text-sm font-bold text-red-600">{totalHours} jam</p>
+                          <p className="text-[11px] text-red-400">+{excessHours} jam lebih</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex gap-3">
+              <button
+                onClick={() => setShowExportHourError(false)}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
+              >
+                <X size={16} /> Tutup & Perbaiki Data
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Modal View Details */}
+
       {viewLog && (() => {
         const actualPlant = viewLog.plant || equipments.find(e => e.eqNum === viewLog.indukEqNum)?.plant || 'Unknown';
         return (

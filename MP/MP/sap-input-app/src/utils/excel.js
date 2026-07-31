@@ -180,6 +180,54 @@ export async function parseRegionalMP(file, masterMap) {
 }
 
 /**
+ * Validate that no single induk equipment has total running hours > 24 in any single date.
+ *
+ * @param {Object} dailyLogsMap  - { 'yyyy-MM-dd': [ { indukEqNum, indukDesc, durationMinutes, plant, ... } ] }
+ * @param {string} startDate     - 'yyyy-MM-dd' (inclusive)
+ * @param {string} endDate       - 'yyyy-MM-dd' (inclusive)
+ * @param {string[]} [selectedEqs] - optional filter by indukEqNum
+ *
+ * @returns {{ valid: boolean, violations: Array<{ date: string, indukEqNum: string, indukDesc: string, totalMinutes: number }> }}
+ */
+export function validateDailyHours(dailyLogsMap, startDate, endDate, selectedEqs) {
+  const MAX_MINUTES_PER_DAY = 24 * 60; // 1440 minutes
+  const violations = [];
+
+  const dates = Object.keys(dailyLogsMap).sort();
+  dates.forEach(dateStr => {
+    if (dateStr < startDate || dateStr > endDate) return;
+
+    const logs = dailyLogsMap[dateStr];
+    if (!logs || logs.length === 0) return;
+
+    // Accumulate minutes per induk for this date
+    const minutesPerInduk = {}; // indukEqNum -> { totalMinutes, indukDesc }
+    logs.forEach(log => {
+      if (selectedEqs && selectedEqs.length > 0 && !selectedEqs.includes(log.indukEqNum)) return;
+      const key = log.indukEqNum || log.indukDesc || 'UNKNOWN';
+      if (!minutesPerInduk[key]) {
+        minutesPerInduk[key] = { totalMinutes: 0, indukDesc: log.indukDesc || log.indukEqNum || 'Unknown' };
+      }
+      minutesPerInduk[key].totalMinutes += (log.durationMinutes || 0);
+    });
+
+    // Check each induk
+    Object.entries(minutesPerInduk).forEach(([indukKey, data]) => {
+      if (data.totalMinutes > MAX_MINUTES_PER_DAY) {
+        violations.push({
+          date: dateStr,
+          indukEqNum: indukKey,
+          indukDesc: data.indukDesc,
+          totalMinutes: data.totalMinutes,
+        });
+      }
+    });
+  });
+
+  return { valid: violations.length === 0, violations };
+}
+
+/**
  * Generate Export Excel file
  */
 export function exportToSAP(headers, originalData, updatedEquipments, docDetails) {

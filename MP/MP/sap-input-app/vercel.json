@@ -7,6 +7,14 @@
     {
       "path": "/api/send-wa",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/trigger-github",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/trigger-github",
+      "schedule": "0 8 * * *"
     }
   ],
   "functions": {
