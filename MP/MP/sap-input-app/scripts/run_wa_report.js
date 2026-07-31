@@ -51,21 +51,133 @@ async function getActiveDeviceId(authHeader) {
   return 'aaaa'; // fallback
 }
 
-async function sendScreenshotAsDocument(pngBuffer, deviceId, authHeader) {
-  logStep('Sending HD Document via GoWA...');
-  
+// ---------------------------------------------------------
+// LOGBOOK PMREG5 LOGIC
+// ---------------------------------------------------------
+async function sendPmreg5Screenshot(pngBuffer, deviceId, authHeader) {
+  logStep('Sending PMReg5 HD Document via GoWA...');
   const now = new Date();
   const optionsDate = { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric' };
   const optionsTime = { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false };
   const formatterDate = new Intl.DateTimeFormat('id-ID', optionsDate);
   const formatterTime = new Intl.DateTimeFormat('id-ID', optionsTime);
-  
   const dateParts = formatterDate.formatToParts(now);
   const dayStr = dateParts.find(p => p.type === 'day').value;
   const monthStr = dateParts.find(p => p.type === 'month').value;
   const yearStr = dateParts.find(p => p.type === 'year').value;
   const dateFormatted = `${dayStr}/${monthStr}/${yearStr}`;
-  
+  const timeFormatted = formatterTime.format(now).replace(':', '.');
+
+  let caption = `*Monitoring Transaksi Logbook tanggal 1 s.d ${dateFormatted} ${timeFormatted}*\n`;
+  caption += `*REGIONAL 5*\n\n`;
+
+  let overallSuccess = true;
+  for (const groupId of TARGET_GROUP_JIDS) {
+    const formData = new FormData();
+    formData.append('phone', groupId.trim());
+    formData.append('caption', caption);
+    const blob = new Blob([pngBuffer], { type: 'image/png' });
+    formData.append('image', blob, `Rekap_Logbook_Regional5_HD.png`);
+    formData.append('is_hd', 'true');
+    formData.append('compress', 'false');
+
+    console.log(`\n[+] Sending PMReg5 Image to ${groupId.trim()}...`);
+    const resp = await fetch(`${GOWA_URL}/send/image?device_id=${encodeURIComponent(deviceId)}`, {
+      method: 'POST',
+      headers: { 'Authorization': authHeader },
+      body: formData
+    });
+    const data = await resp.json();
+    if (data.code !== 'SUCCESS') overallSuccess = false;
+  }
+  return { success: overallSuccess };
+}
+
+async function capturePmreg5Screenshot() {
+  const targetUrl = `https://pmreg5.afratarigan.my.id/?hideNav=true&tab=vehicle&screenshotMode=true&t=${Date.now()}`;
+  let attempt = 1;
+  let browser = null;
+
+  while (attempt <= MAX_RETRIES) {
+    try {
+      logStep(`[PMReg5] Attempt ${attempt}/${MAX_RETRIES}...`);
+      browser = await puppeteer.launch({
+        executablePath: getChromePath(),
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
+      });
+
+      const page = await browser.newPage();
+      await page.setViewport({ width: 1400, height: 900, deviceScaleFactor: 2 });
+      
+      await page.goto(targetUrl, { waitUntil: 'networkidle0', timeout: 45000 });
+      await page.waitForSelector('#excel-report-sheet', { visible: true, timeout: 30000 });
+
+      const isReady = await page.waitForFunction(() => {
+        const table = document.querySelector('#excel-report-sheet table');
+        if (!table) return false;
+        const rect = table.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return false;
+        const rows = table.querySelectorAll('tr');
+        if (rows.length < 5) {
+          const emptyState = document.querySelector('.text-slate-500');
+          if (emptyState && emptyState.innerText.includes('Tidak ada data')) return true; 
+          return false;
+        }
+        if (document.fonts.status !== 'loaded') return false;
+        return true;
+      }, { timeout: 30000, polling: 'raf' });
+
+      if (!isReady) throw new Error('Robust rendering checks timed out or failed.');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const element = await page.$('#excel-report-sheet');
+      const boundingBox = await element.boundingBox();
+      
+      await page.setViewport({ width: 1400, height: Math.ceil(boundingBox.height) + 100, deviceScaleFactor: 2 });
+      const uint8Array = await element.screenshot({ type: 'png' });
+      const pngBuffer = Buffer.from(uint8Array);
+      
+      if (pngBuffer.length < 50000) throw new Error(`Screenshot size is too small.`);
+
+      logStep(`[PMReg5] Screenshot successfully taken! Size: ${(pngBuffer.length / 1024).toFixed(2)} KB`);
+      if (!fs.existsSync('public')) fs.mkdirSync('public');
+      fs.writeFileSync('public/rekap.png', pngBuffer);
+      await browser.close();
+      browser = null;
+
+      const authHeader = 'Basic ' + Buffer.from(`${GOWA_USER}:${GOWA_PASS}`).toString('base64');
+      const deviceId = await getActiveDeviceId(authHeader);
+      await sendPmreg5Screenshot(pngBuffer, deviceId, authHeader);
+      return; 
+    } catch (error) {
+      console.error(`[PMReg5] ❌ Attempt ${attempt} failed:`, error.message);
+      if (browser) await browser.close().catch(()=> {});
+      if (attempt >= MAX_RETRIES) {
+        console.error('[PMReg5] 🚨 Max retries reached.');
+        break; // Continue to next script instead of exiting
+      }
+      attempt++;
+      await new Promise(res => setTimeout(res, 5000));
+    }
+  }
+}
+
+
+// ---------------------------------------------------------
+// CMMS LOGIC
+// ---------------------------------------------------------
+async function sendCmmsScreenshot(pngBuffer, deviceId, authHeader) {
+  logStep('Sending CMMS HD Document via GoWA...');
+  const now = new Date();
+  const optionsDate = { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric' };
+  const optionsTime = { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false };
+  const formatterDate = new Intl.DateTimeFormat('id-ID', optionsDate);
+  const formatterTime = new Intl.DateTimeFormat('id-ID', optionsTime);
+  const dateParts = formatterDate.formatToParts(now);
+  const dayStr = dateParts.find(p => p.type === 'day').value;
+  const monthStr = dateParts.find(p => p.type === 'month').value;
+  const yearStr = dateParts.find(p => p.type === 'year').value;
+  const dateFormatted = `${dayStr}/${monthStr}/${yearStr}`;
   const timeFormatted = formatterTime.format(now).replace(':', '.');
 
   const caption = `*Update Running Hour Submission Monitoring*\n🗓️ ${dateFormatted} ⏰ ${timeFormatted} WIB`;
@@ -80,28 +192,25 @@ async function sendScreenshotAsDocument(pngBuffer, deviceId, authHeader) {
     formData.append('is_hd', 'true');
     formData.append('compress', 'false');
 
-    console.log(`\n[+] Sending HD Document to ${groupId.trim()}...`);
+    console.log(`\n[+] Sending CMMS Image to ${groupId.trim()}...`);
     const resp = await fetch(`${GOWA_URL}/send/image?device_id=${encodeURIComponent(deviceId)}`, {
       method: 'POST',
       headers: { 'Authorization': authHeader },
       body: formData
     });
-
     const data = await resp.json();
-    console.log(`GoWA Response for ${groupId.trim()}:`, JSON.stringify(data, null, 2));
     if (data.code !== 'SUCCESS') overallSuccess = false;
   }
   return { success: overallSuccess };
 }
 
-async function captureScreenshotWithRetries() {
+async function captureCmmsScreenshot() {
   let attempt = 1;
   let browser = null;
 
   while (attempt <= MAX_RETRIES) {
     try {
-      logStep(`Attempt ${attempt}/${MAX_RETRIES}: Starting screenshot capture process...`);
-      
+      logStep(`[CMMS] Attempt ${attempt}/${MAX_RETRIES}...`);
       browser = await puppeteer.launch({
         executablePath: getChromePath(),
         headless: true,
@@ -111,33 +220,25 @@ async function captureScreenshotWithRetries() {
       const page = await browser.newPage();
       await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1.5 });
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
-      page.on('console', msg => console.log(`[PAGE LOG]: ${msg.text()}`));
-
+      
       logStep('Navigating to CMMS login page...');
       await page.goto('https://cmms.ptpn4.co.id/dashboard', { waitUntil: 'networkidle2', timeout: 60000 });
 
       const currentUrl = page.url();
       if (currentUrl.includes('login') || currentUrl.includes('signin') || currentUrl.includes('auth')) {
-        logStep('Login page detected, filling credentials...');
         await page.waitForSelector('input[type="text"], input[name="nik"], input[name="username"], input[id="nik"], input[id="username"]', { timeout: 15000 });
-        
         const nikField = await page.$('input[name="nik"]') || await page.$('input[id="nik"]') || await page.$('input[type="text"]');
         const passField = await page.$('input[type="password"]');
-        
         if (nikField) await nikField.type('19010048', { delay: 50 });
         if (passField) await passField.type('123', { delay: 50 });
         
-        logStep('Submitting login form...');
         await Promise.all([
           page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }),
           page.keyboard.press('Enter')
         ]);
       }
 
-      logStep('Waiting for dashboard to fully load...');
       await new Promise(r => setTimeout(r, 6000));
-      
-      logStep('Scrolling page to load all lazy sections...');
       await page.evaluate(async () => {
         await new Promise(resolve => {
           let total = 0;
@@ -149,11 +250,8 @@ async function captureScreenshotWithRetries() {
           }, 300);
         });
       });
-      
-      logStep('Waiting for charts to render...');
       await new Promise(r => setTimeout(r, 6000));
 
-      logStep('Searching for "Monitoring Penginputan Jam Jalan" heading...');
       const absoluteY = await page.evaluate(() => {
         const els = Array.from(document.querySelectorAll('*')).reverse();
         for (let el of els) {
@@ -167,16 +265,11 @@ async function captureScreenshotWithRetries() {
         return null;
       });
 
-      if (!absoluteY) {
-        throw new Error('Heading "Monitoring Penginputan Jam Jalan" NOT FOUND in the main content area.');
-      }
+      if (!absoluteY) throw new Error('Heading "Monitoring Penginputan Jam Jalan" NOT FOUND');
 
-      logStep(`Real heading found at absolute page Y: ${absoluteY}`);
-      logStep('Scrolling exactly to the target area...');
       await page.evaluate((y) => {
         window.scrollTo({ top: Math.max(0, y - 120), behavior: 'instant' });
       }, absoluteY);
-      
       await new Promise(r => setTimeout(r, 2000));
 
       logStep('Searching for "Reg 5" to click...');
@@ -196,21 +289,15 @@ async function captureScreenshotWithRetries() {
       }, absoluteY);
 
       if (clicked) {
-        logStep('Clicked "Reg 5"! Waiting 6 seconds for drill-down to load...');
+        logStep('Clicked "Reg 5"! Waiting for drill-down to load...');
         await new Promise(r => setTimeout(r, 6000));
-      } else {
-        logStep('WARNING: "Reg 5" not found! Taking screenshot of original view.');
       }
 
-      logStep('Taking normal viewport screenshot...');
       const viewportBuffer = await page.screenshot({ type: 'png' });
-      
-      logStep('Cropping viewport screenshot using Sharp (adjusting for deviceScaleFactor = 1.5)...');
       const scale = 1.5;
       const cropTop = Math.floor(100 * scale);
       const cropLeft = Math.floor(90 * scale);
       const cropWidth = Math.floor(1740 * scale);
-      // Mengurangi cropHeight agar "Traceability" tidak terpotret
       const cropHeight = Math.floor(600 * scale);
       
       let pngBuffer;
@@ -219,37 +306,31 @@ async function captureScreenshotWithRetries() {
         .extract({ left: cropLeft, top: cropTop, width: cropWidth, height: cropHeight })
         .toBuffer();
 
-      logStep(`Screenshot successfully taken! Size: ${(pngBuffer.length / 1024).toFixed(2)} KB`);
       if (!fs.existsSync('public')) fs.mkdirSync('public');
-      fs.writeFileSync('public/rekap.png', pngBuffer);
-      
+      fs.writeFileSync('public/cmms_screenshot.png', pngBuffer);
       await browser.close();
       browser = null;
 
-      // Send via GoWA
       const authHeader = 'Basic ' + Buffer.from(`${GOWA_USER}:${GOWA_PASS}`).toString('base64');
       const deviceId = await getActiveDeviceId(authHeader);
-      await sendScreenshotAsDocument(pngBuffer, deviceId, authHeader);
-
-      logStep('✅ Process completed successfully!');
+      await sendCmmsScreenshot(pngBuffer, deviceId, authHeader);
       return; 
-
     } catch (error) {
-      console.error(`❌ Attempt ${attempt} failed:`, error.message);
+      console.error(`[CMMS] ❌ Attempt ${attempt} failed:`, error.message);
       if (browser) await browser.close().catch(()=> {});
-      
       if (attempt >= MAX_RETRIES) {
-        console.error('🚨 Max retries reached. Failing permanently.');
-        process.exit(1);
+        console.error('[CMMS] 🚨 Max retries reached.');
+        break;
       }
-      
       attempt++;
-      logStep(`Waiting 5 seconds before retrying...`);
       await new Promise(res => setTimeout(res, 5000));
     }
   }
 }
 
+// ---------------------------------------------------------
+// MAIN
+// ---------------------------------------------------------
 async function main() {
   const now = new Date();
   const currentHourWIB = parseInt(new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', hour12: false }).format(now));
@@ -281,15 +362,14 @@ async function main() {
       console.log(`GoWA Response for ${groupId.trim()}:`, JSON.stringify(data, null, 2));
       if (data.code !== 'SUCCESS') overallSuccess = false;
     }
-    
-    if (overallSuccess) console.log('✅ Text reminder sent successfully!');
-    else { console.error('❌ Failed to send text reminder to some groups.'); process.exit(1); }
   } else {
-    // 08:00 or 15:00
-    await captureScreenshotWithRetries();
+    // 08:00 or 15:00 - RUN BOTH REPORTS SEQUENTIALLY
+    console.log('\n--- STARTING PMREG5 REPORT ---');
+    await capturePmreg5Screenshot();
+    
+    console.log('\n--- STARTING CMMS REPORT ---');
+    await captureCmmsScreenshot();
   }
 }
 
 main();
-
-
