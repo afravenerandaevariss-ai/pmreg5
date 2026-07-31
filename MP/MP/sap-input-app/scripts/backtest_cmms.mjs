@@ -9,7 +9,7 @@ const TEMP_PATH = path.join(__dirname, '..', 'public', 'cmms_screenshot.png');
 const GOWA_URL = 'https://gowa.waterflai.my.id';
 const GOWA_USER = 'admin';
 const GOWA_PASS = 'Sedap321#';
-const TARGET_JID = '120363430505509462@g.us';
+const TARGET_JID = '120363427768510358@g.us';
 const CAPTION = 'Update Running Hour Submission Monitoring';
 
 function getChromePath() {

@@ -9,7 +9,7 @@ async function test() {
   
   try {
     const fd1 = new FormData();
-    fd1.append('phone', '120363430505509462@g.us');
+    fd1.append('phone', '120363427768510358@g.us');
     fd1.append('caption', 'Test as document');
     fd1.append('document', fs.createReadStream('screenshot_final3.png'));
     
@@ -23,7 +23,7 @@ async function test() {
   
   try {
     const fd2 = new FormData();
-    fd2.append('phone', '120363430505509462@g.us');
+    fd2.append('phone', '120363427768510358@g.us');
     fd2.append('caption', 'Test with is_document flag');
     fd2.append('image', fs.createReadStream('screenshot_final3.png'));
     fd2.append('is_document', 'true');
@@ -38,7 +38,7 @@ async function test() {
 
   try {
     const fd3 = new FormData();
-    fd3.append('phone', '120363430505509462@g.us');
+    fd3.append('phone', '120363427768510358@g.us');
     fd3.append('caption', 'Test with asDocument flag');
     fd3.append('image', fs.createReadStream('screenshot_final3.png'));
     fd3.append('asDocument', 'true');

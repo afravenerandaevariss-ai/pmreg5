@@ -19,7 +19,7 @@ async function test() {
   // Test 4: /send/file
   try {
     const fd4 = new FormData();
-    fd4.append('phone', '120363430505509462@g.us');
+    fd4.append('phone', '120363427768510358@g.us');
     fd4.append('caption', 'Test 4: /send/file endpoint');
     fd4.append('file', new Blob([fileBuffer], { type: 'image/png' }), 'screenshot.png');
     
@@ -34,7 +34,7 @@ async function test() {
   // Test 5: /send/image with send_as_document
   try {
     const fd5 = new FormData();
-    fd5.append('phone', '120363430505509462@g.us');
+    fd5.append('phone', '120363427768510358@g.us');
     fd5.append('caption', 'Test 5: /send/image with send_as_document=true');
     fd5.append('image', new Blob([fileBuffer], { type: 'image/png' }), 'screenshot.png');
     fd5.append('send_as_document', 'true');
