@@ -540,4 +540,29 @@ export async function saveExport046Data(data) {
   return await saveSystemConfig('export046_data', data);
 }
 
+// ============================================================
+// IMPORT LOG HISTORY (id=14)
+// Stores GSheet import audit trail for debugging sync issues.
+// ============================================================
 
+/**
+ * Append a new entry to the import log.
+ * Entry: { id, timestamp, user, sourceUrl, totalRecords, inserted, updated, failed, durationMs }
+ */
+export async function saveImportLog(logEntry) {
+  const { data: existing } = await getSystemConfig('import_logs');
+  const logs = Array.isArray(existing) ? existing : [];
+  const updated = [logEntry, ...logs].slice(0, 50); // keep last 50
+  const { error } = await saveSystemConfig('import_logs', updated);
+  return { error };
+}
+
+/**
+ * Fetch the import log history.
+ * Returns array of log entries sorted newest first.
+ */
+export async function getImportLogs() {
+  const { data, error } = await getSystemConfig('import_logs');
+  if (error || !Array.isArray(data)) return { data: [], error: null };
+  return { data, error: null };
+}

@@ -5,7 +5,7 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Search, Pl
 import * as XLSX from 'xlsx';
 import { exportDailyToSAP, exportCumulativeToSAP, exportAccumulatedToSAP, exportMonthlyToSAP, validateDailyHours } from '../utils/excel';
 import { supabase } from '../lib/supabase';
-import { insertDailyLog, insertDailyLogs, deleteDailyLog, fetchDailyLogs, saveGSheetHistory, getGSheetHistory, saveSystemConfig, getSystemConfig } from '../lib/supabaseService';
+import { insertDailyLog, insertDailyLogs, deleteDailyLog, fetchDailyLogs, saveGSheetHistory, getGSheetHistory, saveSystemConfig, getSystemConfig, saveImportLog } from '../lib/supabaseService';
 
 const PLANT_INFO = {
   // Kal-Bar
@@ -933,8 +933,12 @@ export default function DailyDashboard({
   };
 
   const processImport = async (rows) => {
+    const importStartTime = Date.now();
     setIsImporting(true);
     setImportProgress('Mempersiapkan data...');
+    let inserted = 0;
+    let updated = 0;
+    let failed = 0;
     try {
       const updatedLogs = { ...dailyLogs };
       let newEquipments = [...equipments];
@@ -994,6 +998,7 @@ export default function DailyDashboard({
         }
       });
 
+      // Update local state optimistically (immediate UI refresh)
       saveDailyLogs(updatedLogs);
       setEquipments(newEquipments);
 
@@ -1008,7 +1013,7 @@ export default function DailyDashboard({
         const total = Object.keys(byDate).length;
         for (const [dateStr, logs] of Object.entries(byDate)) {
           processed++;
-          setImportProgress(`Menyimpan ${processed}/${total} tanggal...`);
+          setImportProgress(`Menyimpan ${processed}/${total} tanggal ke database...`);
           // Delete existing rows for same date+equipment to prevent duplicates
           const eqNums = [...new Set(logs.map(l => l.indukEqNum))];
           if (eqNums.length > 0) {
@@ -1031,8 +1036,12 @@ export default function DailyDashboard({
           const { error } = await insertDailyLogs('', dateStr, logs);
           if (error) {
             hasError = true;
+            failed += logs.length;
             console.error("Supabase insert error:", error);
             alert("Gagal menyimpan ke database tanggal " + dateStr + ": " + error.message);
+          } else {
+            inserted += addedItems.filter(a => a.date === dateStr).length;
+            updated += updatedItems.filter(u => u.date === dateStr).length;
           }
         }
         if (hasError) {
@@ -1040,6 +1049,33 @@ export default function DailyDashboard({
           setIsSyncing(false);
           return;
         }
+
+        // ── Re-fetch fresh data from Supabase to guarantee full sync ──
+        setImportProgress('Menyinkronkan data terbaru...');
+        try {
+          const yearMonth = format(currentMonth, 'yyyy-MM');
+          const plant = currentUser?.role === 'Unit' ? currentUser.plant : null;
+          const { data: freshData, error: fetchErr } = await fetchDailyLogs(plant, yearMonth);
+          if (!fetchErr && freshData) {
+            saveDailyLogs(freshData); // update state + localStorage with authoritative DB data
+          }
+        } catch(e) {
+          console.warn('Re-fetch after import failed, using optimistic data:', e);
+        }
+
+        // ── Save import audit log ──
+        const durationMs = Date.now() - importStartTime;
+        saveImportLog({
+          id: Date.now().toString(),
+          timestamp: new Date().toISOString(),
+          user: currentUser?.name || currentUser?.nik || 'unknown',
+          sourceUrl: googleSheetUrl || '',
+          totalRecords: rows.length,
+          inserted: addedItems.length,
+          updated: updatedItems.length,
+          failed,
+          durationMs,
+        }).catch(e => console.warn('Failed to save import log:', e));
       }
 
       setIsImporting(false);
