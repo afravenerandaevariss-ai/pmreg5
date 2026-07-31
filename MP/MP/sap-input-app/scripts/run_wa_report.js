@@ -186,7 +186,8 @@ async function captureScreenshotWithRetries() {
       const cropTop = 100;
       const cropLeft = 90;
       const cropWidth = 1740;
-      const cropHeight = 650;
+      // Memperbesar cropHeight agar Regional 6 dan Regional 7 tidak terpotong
+      const cropHeight = 950;
       
       let pngBuffer;
       const sharp = (await import('sharp')).default;
