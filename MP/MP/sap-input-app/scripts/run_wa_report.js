@@ -54,7 +54,6 @@ async function getActiveDeviceId(authHeader) {
 async function sendScreenshotAsDocument(pngBuffer, deviceId, authHeader) {
   logStep('Sending HD Document via GoWA...');
   
-  // First, generate the caption locally to avoid relying on the broken Vercel API
   const now = new Date();
   const optionsDate = { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric' };
   const optionsTime = { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false };
@@ -69,8 +68,7 @@ async function sendScreenshotAsDocument(pngBuffer, deviceId, authHeader) {
   
   const timeFormatted = formatterTime.format(now).replace(':', '.');
 
-  let caption = `*Monitoring Transaksi Logbook tanggal 1 s.d ${dateFormatted} ${timeFormatted}*\n`;
-  caption += `*REGIONAL 5*\n\n`;
+  const caption = `*Update Running Hour Submission Monitoring*\n🗓️ ${dateFormatted} ⏰ ${timeFormatted} WIB`;
 
   let overallSuccess = true;
   for (const groupId of TARGET_GROUP_JIDS) {
@@ -78,7 +76,7 @@ async function sendScreenshotAsDocument(pngBuffer, deviceId, authHeader) {
     formData.append('phone', groupId.trim());
     formData.append('caption', caption);
     const blob = new Blob([pngBuffer], { type: 'image/png' });
-    formData.append('image', blob, `Rekap_Logbook_Regional5_HD.png`);
+    formData.append('image', blob, `Running_Hour_Monitoring_HD.png`);
     formData.append('is_hd', 'true');
     formData.append('compress', 'false');
 
@@ -97,7 +95,6 @@ async function sendScreenshotAsDocument(pngBuffer, deviceId, authHeader) {
 }
 
 async function captureScreenshotWithRetries() {
-  const targetUrl = `https://pmreg5.afratarigan.my.id/?hideNav=true&tab=vehicle&screenshotMode=true&t=${Date.now()}`;
   let attempt = 1;
   let browser = null;
 
@@ -107,85 +104,100 @@ async function captureScreenshotWithRetries() {
       
       browser = await puppeteer.launch({
         executablePath: getChromePath(),
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--window-size=1920,1080']
       });
 
       const page = await browser.newPage();
-      await page.setViewport({ width: 1400, height: 900, deviceScaleFactor: 2 });
-      
-      // Route all page console logs to terminal for debugging
+      await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1.5 });
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
       page.on('console', msg => console.log(`[PAGE LOG]: ${msg.text()}`));
 
-      logStep(`Navigating to ${targetUrl} and waiting for network idle...`);
-      // Wait for network connections to drop to 0 for at least 500ms
-      await page.goto(targetUrl, { waitUntil: 'networkidle0', timeout: 45000 });
-      logStep('Network is idle.');
+      logStep('Navigating to CMMS login page...');
+      await page.goto('https://cmms.ptpn4.co.id/dashboard', { waitUntil: 'networkidle2', timeout: 60000 });
 
-      logStep('Waiting for #excel-report-sheet to appear in DOM...');
-      await page.waitForSelector('#excel-report-sheet', { visible: true, timeout: 30000 });
-      logStep('#excel-report-sheet is visible.');
+      const currentUrl = page.url();
+      if (currentUrl.includes('login') || currentUrl.includes('signin') || currentUrl.includes('auth')) {
+        logStep('Login page detected, filling credentials...');
+        await page.waitForSelector('input[type="text"], input[name="nik"], input[name="username"], input[id="nik"], input[id="username"]', { timeout: 15000 });
+        
+        const nikField = await page.$('input[name="nik"]') || await page.$('input[id="nik"]') || await page.$('input[type="text"]');
+        const passField = await page.$('input[type="password"]');
+        
+        if (nikField) await nikField.type('19010048', { delay: 50 });
+        if (passField) await passField.type('123', { delay: 50 });
+        
+        logStep('Submitting login form...');
+        await Promise.all([
+          page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }),
+          page.keyboard.press('Enter')
+        ]);
+      }
 
-      logStep('Performing robust rendering checks (fonts, rows, bounding box)...');
-      // Execute robust checks inside the browser context
-      const isReady = await page.waitForFunction(() => {
-        const table = document.querySelector('#excel-report-sheet table');
-        if (!table) {
-          console.log('Table not found yet.');
-          return false;
-        }
+      logStep('Waiting for dashboard to fully load...');
+      await new Promise(r => setTimeout(r, 6000));
+      
+      logStep('Scrolling page to load all lazy sections...');
+      await page.evaluate(async () => {
+        await new Promise(resolve => {
+          let total = 0;
+          const dist = 400;
+          const timer = setInterval(() => {
+            window.scrollBy(0, dist);
+            total += dist;
+            if (total >= document.body.scrollHeight) { clearInterval(timer); resolve(); }
+          }, 300);
+        });
+      });
+      
+      logStep('Waiting for charts to render...');
+      await new Promise(r => setTimeout(r, 6000));
 
-        const rect = table.getBoundingClientRect();
-        if (rect.width === 0 || rect.height === 0) {
-          console.log('Table width/height is 0.');
-          return false;
-        }
-
-        const rows = table.querySelectorAll('tr');
-        if (rows.length < 5) { // Ensure actual data rows exist
-          const emptyState = document.querySelector('.text-slate-500'); // the "Tidak ada data" text
-          if (emptyState && emptyState.innerText.includes('Tidak ada data')) {
-            console.log('Empty state detected. Returning true to capture it.');
-            return true; 
+      logStep('Searching for "Monitoring Penginputan Jam Jalan" heading...');
+      const absoluteY = await page.evaluate(() => {
+        const els = Array.from(document.querySelectorAll('*')).reverse();
+        for (let el of els) {
+          const text = (el.textContent || '').trim();
+          if (text === 'Monitoring Penginputan Jam Jalan') {
+            const rect = el.getBoundingClientRect();
+            const pageY = rect.top + window.scrollY;
+            if (pageY > 500) return pageY;
           }
-          console.log(`Only ${rows.length} rows found, waiting for more...`);
-          return false;
         }
+        return null;
+      });
 
-        if (document.fonts.status !== 'loaded') {
-          console.log('Fonts not fully loaded yet.');
-          return false;
-        }
-
-        console.log('All rendering checks passed!');
-        return true;
-      }, { timeout: 30000, polling: 'raf' }); // Check every requestAnimationFrame
-
-      if (!isReady) {
-        throw new Error('Robust rendering checks timed out or failed.');
+      if (!absoluteY) {
+        throw new Error('Heading "Monitoring Penginputan Jam Jalan" NOT FOUND in the main content area.');
       }
 
-      logStep('Rendering checks passed! Taking a deep breath (waiting 1 extra second for final layout shift)...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const element = await page.$('#excel-report-sheet');
-      const boundingBox = await element.boundingBox();
+      logStep(`Real heading found at absolute page Y: ${absoluteY}`);
+      logStep('Scrolling exactly to the target area...');
+      await page.evaluate((y) => {
+        window.scrollTo({ top: Math.max(0, y - 120), behavior: 'instant' });
+      }, absoluteY);
       
-      logStep(`Adjusting viewport to fit element height: ${boundingBox.height}px`);
-      await page.setViewport({ width: 1400, height: Math.ceil(boundingBox.height) + 100, deviceScaleFactor: 2 });
+      await new Promise(r => setTimeout(r, 2000));
 
-      logStep('Taking screenshot of the element...');
-      const uint8Array = await element.screenshot({ type: 'png' });
-      // Puppeteer returns a Uint8Array, we can pass it directly to our helper function
-      const pngBuffer = Buffer.from(uint8Array);
+      logStep('Taking normal viewport screenshot...');
+      const viewportBuffer = await page.screenshot({ type: 'png' });
       
-      if (pngBuffer.length < 50000) { // Less than 50KB usually means a blank/error page
-        throw new Error(`Screenshot size is too small (${pngBuffer.length} bytes). Likely a blank page.`);
-      }
+      logStep('Cropping viewport screenshot using Sharp...');
+      const cropTop = 100;
+      const cropLeft = 90;
+      const cropWidth = 1740;
+      const cropHeight = 650;
+      
+      let pngBuffer;
+      const sharp = (await import('sharp')).default;
+      pngBuffer = await sharp(viewportBuffer)
+        .extract({ left: cropLeft, top: cropTop, width: cropWidth, height: cropHeight })
+        .toBuffer();
 
       logStep(`Screenshot successfully taken! Size: ${(pngBuffer.length / 1024).toFixed(2)} KB`);
-      // Save locally to support GitHub Actions artifact retention
       if (!fs.existsSync('public')) fs.mkdirSync('public');
       fs.writeFileSync('public/rekap.png', pngBuffer);
+      
       await browser.close();
       browser = null;
 
@@ -195,7 +207,7 @@ async function captureScreenshotWithRetries() {
       await sendScreenshotAsDocument(pngBuffer, deviceId, authHeader);
 
       logStep('✅ Process completed successfully!');
-      return; // Exit success!
+      return; 
 
     } catch (error) {
       console.error(`❌ Attempt ${attempt} failed:`, error.message);
