@@ -71,7 +71,15 @@ async function sendScreenshotAsDocument(pngBuffer, deviceId, authHeader) {
 
   let caption = `*Monitoring Transaksi Logbook tanggal 1 s.d ${dateFormatted} ${timeFormatted}*\n`;
   caption += `*REGIONAL 5*\n\n`;
-  caption += `_Mohon kerjasamanya kepada seluruh unit untuk selalu disiplin melakukan *input* Logbook dan *update* Jam Jalan Mesin Pabrik secara rutin dan tepat waktu. Terima kasih!_\n\n`;
+
+  // Cek apakah ini pengiriman pagi (jam 08:00 WIB)
+  const currentHourWIB = parseInt(new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', hour12: false }).format(now));
+  if (currentHourWIB < 12) {
+    caption += `💪 *PTPN Tumbuh Juara Bangun Negeri!*\n`;
+    caption += `_Bapak/Ibu sekalian, mohon segera selesaikan inputan Plant Maintenance (PM) unit masing-masing, karena hasil monitoring harian akan segera di-update secara berkala di grup ini._\n\n`;
+  } else {
+    caption += `_Mohon kerjasamanya kepada seluruh unit untuk selalu disiplin melakukan *input* Logbook dan *update* Jam Jalan Mesin Pabrik secara rutin dan tepat waktu. Terima kasih!_\n\n`;
+  }
 
   let overallSuccess = true;
   for (const groupId of TARGET_GROUP_JIDS) {
