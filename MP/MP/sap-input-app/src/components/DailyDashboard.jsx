@@ -79,6 +79,10 @@ export default function DailyDashboard({
   const [conflictResolutions, setConflictResolutions] = useState({}); // { 'dateStr_eqNum': 'timpa'|'skip' }
   const [syncTab, setSyncTab] = useState('new'); // 'new'|'conflict'|'skip'
   const [isSyncing, setIsSyncing] = useState(false);
+  // Import summary notification state
+  const [importSummary, setImportSummary] = useState(null); // { total, added, updated, changes: [{date,eq,old,new}] }
+  const [showImportSummary, setShowImportSummary] = useState(false);
+  const [isRefreshingForExport, setIsRefreshingForExport] = useState(false);
   const [massData, setMassData] = useState({});
   const [exportSettings, setExportSettings] = useState({ 
     time: '08:00', 
@@ -936,6 +940,10 @@ export default function DailyDashboard({
       let newEquipments = [...equipments];
       const supabaseLogs = [];
 
+      // Track changes for summary notification
+      const addedItems = [];
+      const updatedItems = [];
+
       rows.forEach(row => {
         const { dateStr, durationMinutes, ...rest } = row;
         const newLog = {
@@ -948,6 +956,27 @@ export default function DailyDashboard({
         };
 
         if (!updatedLogs[dateStr]) updatedLogs[dateStr] = [];
+        // Check if existing log for this equipment exists on this date
+        const existingLog = updatedLogs[dateStr].find(l => l.indukEqNum === newLog.indukEqNum);
+        if (existingLog) {
+          if (existingLog.durationMinutes !== durationMinutes) {
+            updatedItems.push({
+              date: dateStr,
+              eq: row.indukDesc || row.indukEqNum,
+              eqNum: row.indukEqNum,
+              oldMinutes: existingLog.durationMinutes,
+              newMinutes: durationMinutes,
+            });
+          }
+        } else {
+          addedItems.push({
+            date: dateStr,
+            eq: row.indukDesc || row.indukEqNum,
+            eqNum: row.indukEqNum,
+            newMinutes: durationMinutes,
+          });
+        }
+
         // Remove old log for same equipment on same date (prevent local duplicate)
         updatedLogs[dateStr] = updatedLogs[dateStr].filter(l => l.indukEqNum !== newLog.indukEqNum);
         updatedLogs[dateStr].push(newLog);
@@ -1019,7 +1048,16 @@ export default function DailyDashboard({
       setShowSmartSyncModal(false);
       setUploadPreview(null);
       setSmartSyncResult(null);
-      alert(`✅ ${rows.length} data berhasil diupload!`);
+
+      // Show detailed import summary notification
+      setImportSummary({
+        total: rows.length,
+        added: addedItems.length,
+        updated: updatedItems.length,
+        addedItems,
+        updatedItems,
+      });
+      setShowImportSummary(true);
     } catch (err) {
       console.error("Unhandled error in processImport:", err);
       // Ensure we can see the stack trace if it still throws
@@ -1838,7 +1876,7 @@ export default function DailyDashboard({
             </div>
             <div className="p-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex flex-col gap-3">
               <button 
-                onClick={() => {
+                onClick={async () => {
                   if (!templateData) {
                     alert("Template belum diupload. Silakan upload di Pengaturan.");
                     return;
@@ -1849,9 +1887,27 @@ export default function DailyDashboard({
                     return;
                   }
 
+                  // ── Re-fetch latest data from Supabase before export ──
+                  let freshLogs = dailyLogs;
+                  if (supabase) {
+                    setIsRefreshingForExport(true);
+                    try {
+                      const yearMonth = format(currentMonth, 'yyyy-MM');
+                      const plant = currentUser?.role === 'Unit' ? currentUser.plant : null;
+                      const { data, error } = await fetchDailyLogs(plant, yearMonth);
+                      if (!error && data) {
+                        freshLogs = data;
+                        setDailyLogs(data); // update state too
+                      }
+                    } catch(e) {
+                      console.warn('Re-fetch before export failed, using cached data:', e);
+                    }
+                    setIsRefreshingForExport(false);
+                  }
+
                   // ── Validasi: total jam jalan per induk per hari tidak boleh > 24 jam ──
                   const validation = validateDailyHours(
-                    dailyLogs,
+                    freshLogs,
                     exportSettings.startDate,
                     exportSettings.endDate,
                     selectedExportEqs
@@ -1885,9 +1941,9 @@ export default function DailyDashboard({
                   }
 
                   if (exportSettings.isAccumulated) {
-                    exportAccumulatedToSAP(templateData.headers, templateData.originalData, targetEquipments, dailyLogs, exportPayload);
+                    exportAccumulatedToSAP(templateData.headers, templateData.originalData, targetEquipments, freshLogs, exportPayload);
                   } else {
-                    exportCumulativeToSAP(templateData.headers, templateData.originalData, targetEquipments, dailyLogs, exportPayload);
+                    exportCumulativeToSAP(templateData.headers, templateData.originalData, targetEquipments, freshLogs, exportPayload);
                   }
                   setShowExportModal(false);
                 }}
@@ -1980,6 +2036,109 @@ export default function DailyDashboard({
                 className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
               >
                 <X size={16} /> Tutup & Perbaiki Data
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Import Summary Notification Modal */}
+      {showImportSummary && importSummary && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[70]">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl flex flex-col max-h-[85vh]">
+            {/* Header */}
+            <div className="bg-emerald-600 text-white p-4 rounded-t-2xl flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center flex-none">
+                  <CheckCircle size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base leading-tight">Import Selesai & Tersinkronisasi</h3>
+                  <p className="text-xs text-emerald-100 mt-0.5">{importSummary.total} data berhasil diperbarui dari Google Sheet</p>
+                </div>
+              </div>
+              <button onClick={() => setShowImportSummary(false)} className="text-white/70 hover:text-white p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            {/* Summary Stats */}
+            <div className="p-4 border-b border-slate-100 grid grid-cols-3 gap-3">
+              <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-200">
+                <p className="text-2xl font-bold text-slate-800">{importSummary.total}</p>
+                <p className="text-xs text-slate-500 mt-0.5">Total Data</p>
+              </div>
+              <div className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-200">
+                <p className="text-2xl font-bold text-emerald-700">{importSummary.added}</p>
+                <p className="text-xs text-emerald-600 mt-0.5">Data Baru Ditambahkan</p>
+              </div>
+              <div className="bg-amber-50 rounded-xl p-3 text-center border border-amber-200">
+                <p className="text-2xl font-bold text-amber-700">{importSummary.updated}</p>
+                <p className="text-xs text-amber-600 mt-0.5">Data Diperbarui</p>
+              </div>
+            </div>
+            {/* Change Details */}
+            <div className="overflow-y-auto flex-1 p-4 space-y-4">
+              {importSummary.updatedItems.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
+                    Perubahan Nilai Jam Jalan ({importSummary.updatedItems.length})
+                  </p>
+                  <div className="space-y-2">
+                    {importSummary.updatedItems.map((item, i) => (
+                      <div key={i} className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-slate-800 truncate">{item.eq}</p>
+                          <p className="text-[10px] text-slate-500 font-mono">{item.eqNum} • {item.date}</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-none text-xs font-bold">
+                          <span className="bg-red-100 text-red-700 px-2 py-1 rounded-lg line-through">
+                            {Math.floor(item.oldMinutes/60)}j {item.oldMinutes%60}m
+                          </span>
+                          <span className="text-slate-400">→</span>
+                          <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg">
+                            {Math.floor(item.newMinutes/60)}j {item.newMinutes%60}m
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {importSummary.addedItems.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                    Data Baru Ditambahkan ({importSummary.addedItems.length})
+                  </p>
+                  <div className="space-y-1.5">
+                    {importSummary.addedItems.slice(0, 20).map((item, i) => (
+                      <div key={i} className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-slate-800 truncate">{item.eq}</p>
+                          <p className="text-[10px] text-slate-500 font-mono">{item.eqNum} • {item.date}</p>
+                        </div>
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-lg flex-none">
+                          {Math.floor(item.newMinutes/60)}j {item.newMinutes%60}m
+                        </span>
+                      </div>
+                    ))}
+                    {importSummary.addedItems.length > 20 && (
+                      <p className="text-xs text-center text-slate-500 py-1">...dan {importSummary.addedItems.length - 20} data baru lainnya</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              {importSummary.updated === 0 && importSummary.added === 0 && (
+                <p className="text-sm text-center text-slate-500 py-4">Tidak ada perubahan — semua data sudah sinkron.</p>
+              )}
+            </div>
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl">
+              <button
+                onClick={() => setShowImportSummary(false)}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
+              >
+                <CheckCircle size={16} /> Mengerti, Tutup
               </button>
             </div>
           </div>
