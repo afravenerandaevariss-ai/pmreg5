@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   const GITHUB_TOKEN = process.env.GITHUB_PAT || '';
   const REPO_OWNER = 'afravenerandaevariss-ai';
   const REPO_NAME = 'pmreg5';
-  const WORKFLOW_ID = 'wa_report.yml';
+  const WORKFLOW_ID = 'whatsapp-bot.yml';
 
   try {
     const response = await fetch(
