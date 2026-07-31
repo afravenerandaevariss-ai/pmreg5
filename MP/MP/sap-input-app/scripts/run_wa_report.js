@@ -182,12 +182,12 @@ async function captureScreenshotWithRetries() {
       logStep('Taking normal viewport screenshot...');
       const viewportBuffer = await page.screenshot({ type: 'png' });
       
-      logStep('Cropping viewport screenshot using Sharp...');
-      const cropTop = 100;
-      const cropLeft = 90;
-      const cropWidth = 1740;
-      // Memperbesar cropHeight agar Regional 6 dan Regional 7 tidak terpotong
-      const cropHeight = 950;
+      logStep('Cropping viewport screenshot using Sharp (adjusting for deviceScaleFactor = 1.5)...');
+      const scale = 1.5;
+      const cropTop = Math.floor(100 * scale);
+      const cropLeft = Math.floor(90 * scale);
+      const cropWidth = Math.floor(1740 * scale);
+      const cropHeight = Math.floor(650 * scale);
       
       let pngBuffer;
       const sharp = (await import('sharp')).default;
