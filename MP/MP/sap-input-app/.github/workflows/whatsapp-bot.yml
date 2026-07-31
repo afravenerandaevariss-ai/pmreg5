@@ -65,7 +65,7 @@ jobs:
           GOWA_USER: 'admin'
           GOWA_PASS: 'Sedap321#'
           # WhatsApp target group
-          TARGET_GROUP_JIDS: '120363430505509462@g.us'
+          TARGET_GROUP_JIDS: '120363427768510358@g.us,120363041780234935@g.us'
           # Chrome path on Ubuntu runner
           CHROME_PATH: '/usr/bin/google-chrome-stable'
         run: node scripts/run_wa_report.js
