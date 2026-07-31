@@ -187,7 +187,8 @@ async function captureScreenshotWithRetries() {
       const cropTop = Math.floor(100 * scale);
       const cropLeft = Math.floor(90 * scale);
       const cropWidth = Math.floor(1740 * scale);
-      const cropHeight = Math.floor(650 * scale);
+      // Mengurangi cropHeight agar "Traceability" tidak terpotret
+      const cropHeight = Math.floor(600 * scale);
       
       let pngBuffer;
       const sharp = (await import('sharp')).default;

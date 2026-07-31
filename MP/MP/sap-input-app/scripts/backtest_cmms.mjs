@@ -123,14 +123,12 @@ async function main() {
   // the target is now clearly visible below the header!
   const viewportBuffer = await page.screenshot({ type: 'png' });
   
-  console.log('[8.3] Cropping viewport screenshot using Sharp (adjusting for deviceScaleFactor = 1.5)...');
-  // Since we scrolled to (absoluteY - 120), the heading is at y=120 logical px in the screenshot.
-  // We extract from y=100 logical px.
   const scale = 1.5;
   const cropTop = Math.floor(100 * scale);
   const cropLeft = Math.floor(90 * scale);
   const cropWidth = Math.floor(1740 * scale);
-  const cropHeight = Math.floor(650 * scale); // 650 logical pixels is enough to capture Reg 7
+  // Mengurangi cropHeight (logical px) agar tulisan "Traceability" tidak ikut terpotret
+  const cropHeight = Math.floor(600 * scale);
   
   let pngBuffer;
   try {
