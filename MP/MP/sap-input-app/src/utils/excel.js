@@ -351,7 +351,7 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     if (readingIdx !== -1) rowData[readingIdx] = readingStr;
     if (readByIdx !== -1) rowData[readByIdx] = docDetails.readBy;
     
-    const plantCodeStr = eq.plant || (docDetails.plant && docDetails.plant !== 'ALL' ? docDetails.plant : '') || '5F01';
+    const plantCodeStr = eq.plant || '5F01';
     let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
     if (note.length > 30) note = note.substring(0, 30);
     rowData[shortTextIdx] = note;
@@ -465,7 +465,7 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     if (readingIdx !== -1) rowData[readingIdx] = readingStr;
     if (readByIdx !== -1) rowData[readByIdx] = docDetails.readBy;
 
-    const plantCodeStr = eq.plant || (docDetails.plant && docDetails.plant !== 'ALL' ? docDetails.plant : '') || '5F01';
+    const plantCodeStr = eq.plant || '5F01';
     let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
     if (note.length > 30) note = note.substring(0, 30);
     rowData[shortTextIdx] = note;
@@ -561,7 +561,7 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       if (readingIdx !== -1) rowData[readingIdx] = readingStr;
       if (readByIdx !== -1) rowData[readByIdx] = docDetails.readBy;
       
-      const plantCodeStr = eq.plant || (docDetails.plant && docDetails.plant !== 'ALL' ? docDetails.plant : '') || '5F01';
+      const plantCodeStr = eq.plant || '5F01';
       let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
       if (note.length > 30) note = note.substring(0, 30);
       rowData[shortTextIdx] = note;
