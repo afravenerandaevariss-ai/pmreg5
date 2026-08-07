@@ -741,6 +741,8 @@ function App() {
 
   const applyHierarchy = (eqs, hData) => {
     if (!hData || !hData.mapping) return eqs;
+    const subKeywords = ['ACCESSORIES', 'PANEL', 'GEARBOX', 'PIPE', 'ELECTROMOTOR', 'ELMOT', 'HYDRAULIC', 'STRUCTURE', 'BODY', 'WHEEL', 'CONTROLLERS', 'AUTOMATIC', 'ACC ', 'ACC_', 'EXHAUST'];
+
     return eqs.map(eq => {
       const hInfo = hData.mapping[eq.description];
       if (hInfo) {
@@ -751,11 +753,27 @@ function App() {
           type: hInfo.type || 'Sub',
         };
       }
+
+      const descUpper = (eq.description || '').toUpperCase();
+      const parentName = (eq.parentEquipment || eq.induk || '').toUpperCase();
+      const eqNumStr = String(eq.eqNum || '').toUpperCase();
+
+      let isSub = false;
+      for (const kw of subKeywords) {
+        if (descUpper.includes(kw)) {
+          isSub = true;
+          break;
+        }
+      }
+      if (parentName && parentName !== descUpper && parentName !== eqNumStr) {
+        isSub = true;
+      }
+
       return {
         ...eq,
-        induk: eq.parentEquipment || eq.description,
+        induk: eq.parentEquipment || eq.induk || eq.description,
         sInduk: null,
-        type: 'Induk'
+        type: isSub ? 'Sub' : 'Induk'
       };
     });
   };

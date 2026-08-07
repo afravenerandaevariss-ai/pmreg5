@@ -38,12 +38,31 @@ export default function SAPVerificationView({ equipments, currentUser }) {
        const sapHmMap = new Map(); // key: 'plant_date', value: HM
        const sapSaldoAwalMap = new Map(); // key: 'plant', value: HM Saldo Awal
        
+       const subKeywords = ['ACCESSORIES', 'PANEL', 'GEARBOX', 'PIPE', 'ELECTROMOTOR', 'ELMOT', 'HYDRAULIC', 'STRUCTURE', 'BODY', 'WHEEL', 'CONTROLLERS', 'AUTOMATIC', 'ACC ', 'ACC_', 'EXHAUST'];
+
        // map eq to plant
        const eqToPlant = new Map();
        const isIndukMap = new Map();
        const eqNameMap = new Map();
        equipments.forEach(eq => {
-         isIndukMap.set(eq.eqNum, eq.type === 'Induk');
+         const descUpper = (eq.description || '').toUpperCase();
+         const indukUpper = (eq.induk || '').toUpperCase();
+         const eqNumStr = String(eq.eqNum || '').toUpperCase();
+
+         let isSub = false;
+         for (const kw of subKeywords) {
+           if (descUpper.includes(kw)) {
+             isSub = true;
+             break;
+           }
+         }
+         if (indukUpper && indukUpper !== descUpper && indukUpper !== eqNumStr) {
+           isSub = true;
+         }
+
+         const isInduk = (eq.type === 'Induk' || eq.type === 'parent') && !isSub;
+
+         isIndukMap.set(eq.eqNum, isInduk);
          eqNameMap.set(eq.eqNum, `${eq.description} [${eq.eqNum}]`);
          if (eq.plant) eqToPlant.set(eq.eqNum, eq.plant);
        });
