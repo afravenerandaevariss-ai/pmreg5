@@ -648,7 +648,8 @@ function App() {
             setHierarchyData(hResult.data);
           }
 
-          if (templateResult.data) {
+          const hasValidTemplate = templateResult.data && Array.isArray(templateResult.data.equipments) && templateResult.data.equipments.length > 0;
+          if (hasValidTemplate) {
             setTemplateData(templateResult.data);
           }
 
@@ -657,7 +658,7 @@ function App() {
           }
 
           // Merge template equipments with master_equipment from Supabase AND masterMap
-          const templateEqs = templateResult.data?.equipments || [];
+          const templateEqs = hasValidTemplate ? (templateResult.data?.equipments || []) : [];
           const masterEqs = eqResult.data || [];
           const mergedMap = new Map();
 
@@ -707,9 +708,14 @@ function App() {
               }
             });
           }
-          setEquipments(Array.from(mergedMap.values()));
 
-          if (!templateResult.data && eqResult.data && eqResult.data.length > 0) {
+          const mergedEquipments = Array.from(mergedMap.values());
+          if (mergedEquipments.length > 0) {
+            setEquipments(mergedEquipments);
+            if (!hasValidTemplate) {
+              setTemplateData({ headers: {}, originalData: [], equipments: mergedEquipments });
+            }
+          } else if (!hasValidTemplate && eqResult.data && eqResult.data.length > 0) {
             // Fallback: if no template data but master_equipment exists
             const eqs = eqResult.data;
             const hData = hResult.data || null;
@@ -2628,4 +2634,56 @@ function EquipmentRow({ eq, idx, isSub }) {
   );
 }
 
-export default App;
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("React Error Boundary Caught Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6 text-center font-sans">
+          <div className="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full space-y-4 border border-slate-200">
+            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
+              <AlertCircle size={36} />
+            </div>
+            <h2 className="text-xl font-bold text-slate-800">Pembaruan Tampilan Aplikasi</h2>
+            <p className="text-xs text-red-600 bg-red-50 p-3 rounded-xl font-mono text-left overflow-auto max-h-32">
+              {this.state.error?.toString() || 'React Render Initialization Issue'}
+            </p>
+            <p className="text-xs text-slate-500">
+              Sistem telah mengamankan UI dari crash. Silakan klik tombol di bawah untuk memuat ulang versi terbaru.
+            </p>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                window.location.reload();
+              }}
+              className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition-colors"
+            >
+              🔄 Refresh Tampilan
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function AppWithBoundary() {
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
+}
