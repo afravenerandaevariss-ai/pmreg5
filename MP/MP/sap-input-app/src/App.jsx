@@ -1371,7 +1371,18 @@ function App() {
           {/* TAB: DASHBOARD */}
           {activeTab === 'dashboard' && (
             <div className="-mx-3 -my-3 sm:-mx-6 sm:-my-6 lg:-mx-8 lg:-my-8 h-[calc(100vh-100px)]">
-              {!templateData ? (
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-28 bg-white rounded-2xl shadow-sm border border-slate-200 m-8 space-y-4">
+                  <div className="relative flex items-center justify-center">
+                    <div className="w-16 h-16 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin"></div>
+                    <RefreshCw size={24} className="absolute text-emerald-600 animate-pulse" />
+                  </div>
+                  <div className="text-center space-y-1">
+                    <h3 className="text-lg font-bold text-slate-800">Memuat Data PM Regional 5...</h3>
+                    <p className="text-xs text-slate-500 font-medium">Mohon tunggu sebentar, sedang mengunduh master data & logbook dari server.</p>
+                  </div>
+                </div>
+              ) : !templateData ? (
                 <div className="text-center py-24 bg-white rounded-xl shadow-sm border border-slate-200 m-8">
                   <LayoutDashboard size={64} className="mx-auto text-slate-300 mb-4" />
                   <h2 className="text-2xl font-bold text-slate-700">Data Belum Siap</h2>

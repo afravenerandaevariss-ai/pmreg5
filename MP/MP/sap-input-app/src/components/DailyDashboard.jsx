@@ -1638,8 +1638,18 @@ export default function DailyDashboard({
               <span>Bulan: <strong className="text-slate-800">{matrixMonth}</strong> ({matrixDaysInMonth.length} Hari)</span>
             </div>
 
-            <div className="flex-1 overflow-auto relative">
-              <table className="w-full text-xs text-left border-collapse">
+            {isMatrixLoading ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-20 space-y-3 bg-white">
+                <div className="relative flex items-center justify-center">
+                  <div className="w-12 h-12 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin"></div>
+                  <RefreshCw size={18} className="absolute text-emerald-600 animate-pulse" />
+                </div>
+                <p className="text-xs font-bold text-slate-700">Memuat Data Jam Jalan Mesin Pabrik...</p>
+                <p className="text-[11px] text-slate-400 font-medium">Mengambil logbook dari Supabase untuk {matrixMonth}</p>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-auto relative">
+                <table className="w-full text-xs text-left border-collapse">
                 <thead className="bg-slate-800 text-white font-bold sticky top-0 z-30 shadow-sm">
                   <tr>
                     <th className="p-2.5 text-center border-r border-slate-700 w-10 sticky left-0 bg-slate-800 z-40">No</th>
@@ -1713,6 +1723,7 @@ export default function DailyDashboard({
                 </tbody>
               </table>
             </div>
+          )}
 
             {/* Pagination Controls */}
             <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-xs font-semibold text-slate-700 flex-wrap gap-2">
