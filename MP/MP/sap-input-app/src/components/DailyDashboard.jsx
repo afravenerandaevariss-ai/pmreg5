@@ -214,16 +214,17 @@ export default function DailyDashboard({
     }
   };
 
-  // Filter Parent Equipments for Isi Jam Jalan matrix
+  // Filter Parent Equipments strictly for Isi Jam Jalan matrix (ONLY Parent/Induk equipments)
   const parentEquipments = useMemo(() => {
     return equipments.filter(eq => {
-      const isParent = eq.type === 'Induk' || eq.eq_type === 'Induk' || !eq.parentEquipment || eq.parentEquipment === eq.description;
-      if (!isParent) return false;
+      const typeStr = String(eq.type || eq.eq_type || '').trim();
+      const isInduk = typeStr === 'Induk';
+      if (!isInduk) return false;
       
       if (matrixPlantFilter && eq.plant !== matrixPlantFilter) return false;
       if (matrixSearch.trim()) {
         const query = matrixSearch.toLowerCase();
-        const numMatch = String(eq.eqNum || '').toLowerCase().includes(query);
+        const numMatch = String(eq.eqNum || eq.eq_num || '').toLowerCase().includes(query);
         const descMatch = String(eq.description || '').toLowerCase().includes(query);
         if (!numMatch && !descMatch) return false;
       }
