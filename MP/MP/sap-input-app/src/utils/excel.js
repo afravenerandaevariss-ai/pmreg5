@@ -301,18 +301,26 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   const todaysLogs = dailyLogsMap[selectedDate] || [];
 
   todaysLogs.forEach(log => {
-    if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(log.indukEqNum)) return;
+    const logEqNum = String(log.indukEqNum || log.induk_eq_num || '').trim();
+    if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(logEqNum)) return;
 
     const durationHours = log.durationMinutes / 60;
-    const actualPlant = log.plant || equipments.find(e => e.eqNum === log.indukEqNum)?.plant;
+    const actualPlant = log.plant || equipments.find(e => String(e.eqNum || e.eq_num || '').trim() === logEqNum)?.plant;
+    const logDesc = String(log.indukDesc || log.induk_desc || '').trim().toLowerCase();
     
     equipments.forEach(eq => {
+      const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
       const isPlantMatch = !actualPlant || !eq.plant || eq.plant === actualPlant;
-      const isEqMatch = eq.eqNum === log.indukEqNum || (eq.induk && log.indukDesc && eq.induk.trim().toLowerCase() === log.indukDesc.trim().toLowerCase());
+      const eqInduk = String(eq.induk || '').trim().toLowerCase();
+      const isEqMatch = eqKey === logEqNum || (eqInduk && logDesc && (eqInduk === logDesc || logDesc.includes(eqInduk) || eqInduk.includes(logDesc)));
       if (isPlantMatch && isEqMatch) {
-        dailyDurations[eq.eqNum] = Math.min(24, (dailyDurations[eq.eqNum] || 0) + durationHours);
+        dailyDurations[eqKey] = Math.min(24, (dailyDurations[eqKey] || 0) + durationHours);
       }
     });
+
+    if (logEqNum) {
+      dailyDurations[logEqNum] = Math.min(24, (dailyDurations[logEqNum] || 0) + durationHours);
+    }
   });
 
   const dateParts = docDetails.date.split('-');
@@ -327,14 +335,18 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   if (shortTextIdx === -1) shortTextIdx = 10;
 
   const processedRowIndices = new Set();
+  const exportedEqKeys = new Set();
 
-  equipments.forEach((eq, idx) => {
+  equipments.forEach((eq) => {
     const rowIdx = eq.rowIndex;
     if (rowIdx === undefined || !originalData[rowIdx]) return;
     if (processedRowIndices.has(rowIdx)) return;
     processedRowIndices.add(rowIdx);
 
-    const duration = dailyDurations[eq.eqNum || eq.eq_num] || 0;
+    const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+    if (eqKey) exportedEqKeys.add(eqKey);
+
+    const duration = dailyDurations[eqKey] || 0;
     const rowData = [...originalData[rowIdx]]; 
     
     const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx);
@@ -366,6 +378,39 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     }
     
     wsData.push(rowData);
+  });
+
+  // FALLBACK: Include logged equipments that were NOT present in the template originalData
+  todaysLogs.forEach(log => {
+    const logEqNum = String(log.indukEqNum || log.induk_eq_num || '').trim();
+    if (!logEqNum || exportedEqKeys.has(logEqNum)) return;
+    exportedEqKeys.add(logEqNum);
+
+    const duration = dailyDurations[logEqNum] || (log.durationMinutes / 60) || 0;
+    const newRow = new Array(cleanHeaders.length).fill('');
+
+    const eqColIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Equipment Number'));
+    const descColIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Equipment Description'));
+
+    if (eqColIdx !== -1) newRow[eqColIdx] = logEqNum;
+    if (descColIdx !== -1) newRow[descColIdx] = log.indukDesc || log.induk_desc || logEqNum;
+    if (dateIdx !== -1) newRow[dateIdx] = sapDate;
+    if (timeIdx !== -1) newRow[timeIdx] = sapTime;
+
+    let readingStr = duration.toString();
+    if (!Number.isInteger(duration)) readingStr = duration.toFixed(2);
+    readingStr = readingStr.replace('.', ',');
+    if (readingIdx !== -1) newRow[readingIdx] = readingStr;
+
+    const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
+    if (readByIdx !== -1) newRow[readByIdx] = readByVal;
+
+    const plantCodeStr = log.plant || '5F01';
+    let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
+    if (note.length > 30) note = note.substring(0, 30);
+    if (shortTextIdx !== -1) newRow[shortTextIdx] = note;
+
+    wsData.push(newRow);
   });
 
   const ws = XLSX.utils.aoa_to_sheet(wsData);
@@ -404,20 +449,30 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
   const endDate = docDetails.endDate || docDetails.date;
   const accDurations = {};
   const eqNotes = {};
+  const loggedEquipmentsMap = {};
 
   // Sum all logs within the date range
   Object.entries(dailyLogsMap).forEach(([dateStr, logs]) => {
     if (dateStr < startDate || dateStr > endDate) return;
     logs.forEach(log => {
-      // If selectedEqs is provided and not empty, skip logs for Induks not selected
-      if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(log.indukEqNum)) return;
+      const logEqNum = String(log.indukEqNum || log.induk_eq_num || '').trim();
+      if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(logEqNum)) return;
       
       const durationHours = log.durationMinutes / 60;
-      const actualPlant = log.plant || equipments.find(e => e.eqNum === log.indukEqNum)?.plant;
+      const actualPlant = log.plant || equipments.find(e => String(e.eqNum || e.eq_num || '').trim() === logEqNum)?.plant;
+      const logDesc = String(log.indukDesc || log.induk_desc || '').trim().toLowerCase();
+
+      if (logEqNum) {
+        accDurations[logEqNum] = (accDurations[logEqNum] || 0) + durationHours;
+        loggedEquipmentsMap[logEqNum] = log;
+      }
+
       equipments.forEach(eq => {
-        if (eq.eqNum === log.indukEqNum || (eq.induk === log.indukDesc && eq.plant === actualPlant)) {
-          accDurations[eq.eqNum] = (accDurations[eq.eqNum] || 0) + durationHours;
-          if (dateStr === endDate && log.notes) eqNotes[eq.eqNum] = log.notes;
+        const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+        const eqInduk = String(eq.induk || '').trim().toLowerCase();
+        if (eqKey === logEqNum || (eqInduk && logDesc && (eqInduk === logDesc || logDesc.includes(eqInduk) || eqInduk.includes(logDesc)))) {
+          accDurations[eqKey] = (accDurations[eqKey] || 0) + durationHours;
+          if (dateStr === endDate && log.notes) eqNotes[eqKey] = log.notes;
         }
       });
     });
@@ -434,31 +489,19 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
   let shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
   if (shortTextIdx === -1) shortTextIdx = 10;
 
-  // Only export equipments that have at least one log on the end date, OR within the range if accumulated
-  // To be safe and show all accumulated HM in the period, we should check if they ran *at all* during the period
-  const ranDuringPeriod = new Set();
-  Object.entries(dailyLogsMap).forEach(([dateStr, logs]) => {
-    if (dateStr < startDate || dateStr > endDate) return;
-    logs.forEach(log => {
-      const actualPlant = log.plant || equipments.find(e => e.eqNum === log.indukEqNum)?.plant;
-      equipments.forEach(eq => {
-        if (eq.eqNum === log.indukEqNum || (eq.induk === log.indukDesc && eq.plant === actualPlant)) {
-          ranDuringPeriod.add(eq.eqNum);
-        }
-      });
-    });
-  });
-
-
   const processedRowIndices = new Set();
+  const exportedEqKeys = new Set();
 
-  equipments.forEach((eq, idx) => {
+  equipments.forEach((eq) => {
     const rowIdx = eq.rowIndex;
     if (rowIdx === undefined || !originalData[rowIdx]) return;
     if (processedRowIndices.has(rowIdx)) return;
     processedRowIndices.add(rowIdx);
 
-    const total = accDurations[eq.eqNum || eq.eq_num] || 0;
+    const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+    if (eqKey) exportedEqKeys.add(eqKey);
+
+    const total = accDurations[eqKey] || 0;
     const rowData = [...originalData[rowIdx]];
     const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx);
     while (rowData.length <= maxColIdx) rowData.push('');
@@ -484,6 +527,41 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     }
 
     wsData.push(rowData);
+  });
+
+  // FALLBACK: Include logged equipments missing from originalData template
+  Object.keys(loggedEquipmentsMap).forEach(eqKey => {
+    if (exportedEqKeys.has(eqKey)) return;
+    exportedEqKeys.add(eqKey);
+
+    const total = accDurations[eqKey] || 0;
+    if (total <= 0) return;
+
+    const log = loggedEquipmentsMap[eqKey];
+    const newRow = new Array(cleanHeaders.length).fill('');
+
+    const eqColIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Equipment Number'));
+    const descColIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Equipment Description'));
+
+    if (eqColIdx !== -1) newRow[eqColIdx] = eqKey;
+    if (descColIdx !== -1) newRow[descColIdx] = log.indukDesc || log.induk_desc || eqKey;
+    if (dateIdx !== -1) newRow[dateIdx] = sapDate;
+    if (timeIdx !== -1) newRow[timeIdx] = sapTime;
+
+    let readingStr = total.toString();
+    if (!Number.isInteger(total)) readingStr = total.toFixed(2);
+    readingStr = readingStr.replace('.', ',');
+    if (readingIdx !== -1) newRow[readingIdx] = readingStr;
+
+    const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
+    if (readByIdx !== -1) newRow[readByIdx] = readByVal;
+
+    const plantCodeStr = log.plant || '5F01';
+    let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
+    if (note.length > 30) note = note.substring(0, 30);
+    if (shortTextIdx !== -1) newRow[shortTextIdx] = note;
+
+    wsData.push(newRow);
   });
 
   // Renumber No. Urut
@@ -533,16 +611,26 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
     if (!logsForDate || logsForDate.length === 0) return;
 
     const dailyDurations = {};
+    const loggedEquipmentsMap = {};
 
     logsForDate.forEach(log => {
-      // If selectedEqs is provided and not empty, skip logs for Induks not selected
-      if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(log.indukEqNum)) return;
+      const logEqNum = String(log.indukEqNum || log.induk_eq_num || '').trim();
+      if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(logEqNum)) return;
       
       const durationHours = log.durationMinutes / 60;
-      const actualPlant = log.plant || equipments.find(e => e.eqNum === log.indukEqNum)?.plant;
+      const actualPlant = log.plant || equipments.find(e => String(e.eqNum || e.eq_num || '').trim() === logEqNum)?.plant;
+      const logDesc = String(log.indukDesc || log.induk_desc || '').trim().toLowerCase();
+
+      if (logEqNum) {
+        dailyDurations[logEqNum] = (dailyDurations[logEqNum] || 0) + durationHours;
+        loggedEquipmentsMap[logEqNum] = log;
+      }
+
       equipments.forEach(eq => {
-        if (eq.eqNum === log.indukEqNum || (eq.induk === log.indukDesc && eq.plant === actualPlant)) {
-          dailyDurations[eq.eqNum] = (dailyDurations[eq.eqNum] || 0) + durationHours;
+        const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+        const eqInduk = String(eq.induk || '').trim().toLowerCase();
+        if (eqKey === logEqNum || (eqInduk && logDesc && (eqInduk === logDesc || logDesc.includes(eqInduk) || eqInduk.includes(logDesc)))) {
+          dailyDurations[eqKey] = (dailyDurations[eqKey] || 0) + durationHours;
         }
       });
     });
@@ -551,14 +639,18 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
     const sapDate = dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` : dateStr;
 
     const processedRowIndices = new Set();
+    const exportedEqKeys = new Set();
 
-    equipments.forEach((eq, idx) => {
+    equipments.forEach((eq) => {
       const rowIdx = eq.rowIndex;
       if (rowIdx === undefined || !originalData[rowIdx]) return;
       if (processedRowIndices.has(rowIdx)) return;
       processedRowIndices.add(rowIdx);
 
-      const duration = dailyDurations[eq.eqNum || eq.eq_num] || 0;
+      const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+      if (eqKey) exportedEqKeys.add(eqKey);
+
+      const duration = dailyDurations[eqKey] || 0;
       const rowData = [...originalData[rowIdx]];
       const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx);
       while (rowData.length <= maxColIdx) rowData.push('');
@@ -584,6 +676,41 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       }
 
       wsData.push(rowData);
+    });
+
+    // FALLBACK: Include logged equipments missing from template originalData
+    Object.keys(loggedEquipmentsMap).forEach(eqKey => {
+      if (exportedEqKeys.has(eqKey)) return;
+      exportedEqKeys.add(eqKey);
+
+      const duration = dailyDurations[eqKey] || 0;
+      if (duration <= 0) return;
+
+      const log = loggedEquipmentsMap[eqKey];
+      const newRow = new Array(cleanHeaders.length).fill('');
+
+      const eqColIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Equipment Number'));
+      const descColIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Equipment Description'));
+
+      if (eqColIdx !== -1) newRow[eqColIdx] = eqKey;
+      if (descColIdx !== -1) newRow[descColIdx] = log.indukDesc || log.induk_desc || eqKey;
+      if (dateIdx !== -1) newRow[dateIdx] = sapDate;
+      if (timeIdx !== -1) newRow[timeIdx] = sapTime;
+
+      let readingStr = duration.toString();
+      if (!Number.isInteger(duration)) readingStr = duration.toFixed(2);
+      readingStr = readingStr.replace('.', ',');
+      if (readingIdx !== -1) newRow[readingIdx] = readingStr;
+
+      const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
+      if (readByIdx !== -1) newRow[readByIdx] = readByVal;
+
+      const plantCodeStr = log.plant || '5F01';
+      let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
+      if (note.length > 30) note = note.substring(0, 30);
+      if (shortTextIdx !== -1) newRow[shortTextIdx] = note;
+
+      wsData.push(newRow);
     });
   });
 
