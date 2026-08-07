@@ -55,9 +55,11 @@ export default function SAPVerificationView({ equipments, currentUser }) {
        const isIndukMap = new Map();
        const eqNameMap = new Map();
        equipments.forEach(eq => {
+         const eqNum = eq.eqNum || eq.eq_num;
+         const eqType = eq.type || eq.eq_type;
          const descUpper = (eq.description || '').toUpperCase();
          const indukUpper = (eq.induk || '').toUpperCase();
-         const eqNumStr = String(eq.eqNum || '').toUpperCase();
+         const eqNumStr = String(eqNum || '').toUpperCase();
 
          let isSub = false;
          for (const kw of subKeywords) {
@@ -70,11 +72,13 @@ export default function SAPVerificationView({ equipments, currentUser }) {
            isSub = true;
          }
 
-         const isInduk = (eq.type === 'Induk' || eq.type === 'parent') && !isSub;
+         const isInduk = (eqType === 'Induk' || eqType === 'parent') && !isSub;
 
-         isIndukMap.set(eq.eqNum, isInduk);
-         eqNameMap.set(eq.eqNum, `${eq.description} [${eq.eqNum}]`);
-         if (eq.plant) eqToPlant.set(eq.eqNum, eq.plant);
+         if (eqNum) {
+           isIndukMap.set(eqNum, isInduk);
+           eqNameMap.set(eqNum, `${eq.description} [${eqNum}]`);
+           if (eq.plant) eqToPlant.set(eqNum, eq.plant);
+         }
        });
 
        if (Array.isArray(rawIK17)) {

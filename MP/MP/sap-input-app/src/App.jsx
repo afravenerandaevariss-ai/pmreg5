@@ -655,15 +655,32 @@ function App() {
           // Merge template equipments with master_equipment from Supabase AND masterMap
           const templateEqs = templateResult.data?.equipments || [];
           const masterEqs = eqResult.data || [];
-          // Build a map from template equipments (they have rowIndex needed for SAP export)
-          const mergedMap = new Map(templateEqs.map(e => [e.eqNum, { ...e }]));
-          // Add from master_equipment table and backfill missing plants
+          const mergedMap = new Map();
+
+          templateEqs.forEach(e => {
+            const key = e.eqNum || e.eq_num;
+            if (key) {
+              mergedMap.set(key, { ...e, eqNum: key, eq_num: key, type: e.type || e.eq_type || 'Sub', eq_type: e.type || e.eq_type || 'Sub' });
+            }
+          });
+
           masterEqs.forEach(e => {
-            if (mergedMap.has(e.eqNum)) {
-              const existing = mergedMap.get(e.eqNum);
-              if (!existing.plant && e.plant) existing.plant = e.plant;
-            } else {
-              mergedMap.set(e.eqNum, e);
+            const key = e.eqNum || e.eq_num;
+            if (key) {
+              if (mergedMap.has(key)) {
+                const existing = mergedMap.get(key);
+                if (!existing.plant && e.plant) existing.plant = e.plant;
+                if (!existing.description && e.description) existing.description = e.description;
+                if (!existing.induk && e.induk) existing.induk = e.induk;
+              } else {
+                mergedMap.set(key, {
+                  ...e,
+                  eqNum: key,
+                  eq_num: key,
+                  type: e.type || e.eq_type || 'Sub',
+                  eq_type: e.type || e.eq_type || 'Sub'
+                });
+              }
             }
           });
           // Also add from masterMap (used by Master Data tab) and backfill missing plants
