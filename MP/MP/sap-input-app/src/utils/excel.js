@@ -354,7 +354,7 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     
     if (shortTextIdx !== -1) {
       const plantStr = eq.plant ? ` ${eq.plant}` : '';
-      let note = eqNotes[eq.eqNum] || `HM Mesin${plantStr} tgl ${sapDate.replace(/\./g, '-')}`;
+      let note = `HM Mesin${plantStr} tgl ${sapDate.replace(/\./g, '-')}`;
       if (note.length > 30) note = note.substring(0, 30);
       rowData[shortTextIdx] = note;
     }
@@ -461,10 +461,8 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     if (readingIdx !== -1) rowData[readingIdx] = readingStr;
     if (readByIdx !== -1) rowData[readByIdx] = docDetails.readBy;
     if (shortTextIdx !== -1) {
-      const formatShortDate = (d) => { const p = d.split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0].substring(2)}` : d; };
-      const sDate = formatShortDate(startDate);
-      const eDate = formatShortDate(endDate);
-      let note = eqNotes[eq.eqNum] || `HM ${startDate === endDate ? sDate : `${sDate}-${eDate}`}`;
+      const plantStr = eq.plant ? ` ${eq.plant}` : '';
+      let note = `HM Mesin${plantStr} tgl ${sapDate.replace(/\./g, '-')}`;
       if (note.length > 30) note = note.substring(0, 30);
       rowData[shortTextIdx] = note;
     }
@@ -555,7 +553,7 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       if (readByIdx !== -1) rowData[readByIdx] = docDetails.readBy;
       if (shortTextIdx !== -1) {
         const plantStr = eq.plant ? ` ${eq.plant}` : '';
-        let note = eqNotes[eq.eqNum] || `HM Mesin${plantStr} tgl ${sapDate.replace(/\./g, '-')}`;
+        let note = `HM Mesin${plantStr} tgl ${sapDate.replace(/\./g, '-')}`;
         if (note.length > 30) note = note.substring(0, 30);
         rowData[shortTextIdx] = note;
       }
@@ -637,7 +635,7 @@ export function exportMonthlyToSAP(headers, originalData, equipments, logsMap, d
         
         if (shortTextIdx !== -1) {
           const plantStr = eq.plant ? ` ${eq.plant}` : '';
-          let note = eqNotes[eq.eqNum] || `HM Mesin${plantStr} tgl ${sapDate.replace(/\./g, '-')}`;
+          let note = `HM Mesin${plantStr} tgl ${sapDate.replace(/\./g, '-')}`;
           if (note.length > 30) note = note.substring(0, 30);
           rowData[shortTextIdx] = note;
         }
