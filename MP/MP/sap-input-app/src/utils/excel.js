@@ -263,7 +263,8 @@ export function exportToSAP(headers, originalData, updatedEquipments, docDetails
       if (dateIdx !== -1) dataToExport[rowIdx][dateIdx] = sapDate;
       if (timeIdx !== -1) dataToExport[rowIdx][timeIdx] = sapTime;
       if (readingIdx !== -1) dataToExport[rowIdx][readingIdx] = eq.reading ? String(eq.reading).replace('.', ',') : eq.reading;
-      if (readByIdx !== -1) dataToExport[rowIdx][readByIdx] = docDetails.readBy;
+      const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
+      if (readByIdx !== -1) dataToExport[rowIdx][readByIdx] = readByVal;
       if (shortTextIdx !== -1) dataToExport[rowIdx][shortTextIdx] = docDetails.shortText;
       // You might want to update diffIdx if needed.
     }
@@ -351,13 +352,13 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     if (dateIdx !== -1) rowData[dateIdx] = sapDate;
     if (timeIdx !== -1) rowData[timeIdx] = sapTime;
     if (readingIdx !== -1) rowData[readingIdx] = readingStr;
-    if (readByIdx !== -1) rowData[readByIdx] = docDetails.readBy;
+    const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
+    if (readByIdx !== -1) rowData[readByIdx] = readByVal;
     
     const plantCodeStr = eq.plant || '5F01';
     let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
     if (note.length > 30) note = note.substring(0, 30);
-    rowData[shortTextIdx] = note;
-    if (shortTextIdx !== 9 && rowData.length > 9) rowData[9] = note;
+    if (shortTextIdx !== -1) rowData[shortTextIdx] = note;
     for (let c = 0; c < rowData.length; c++) {
       if (typeof rowData[c] === 'string' && rowData[c].toLowerCase().includes('import gsheet')) {
         rowData[c] = note;
@@ -469,13 +470,13 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     if (dateIdx !== -1) rowData[dateIdx] = sapDate;
     if (timeIdx !== -1) rowData[timeIdx] = sapTime;
     if (readingIdx !== -1) rowData[readingIdx] = readingStr;
-    if (readByIdx !== -1) rowData[readByIdx] = docDetails.readBy;
+    const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
+    if (readByIdx !== -1) rowData[readByIdx] = readByVal;
 
     const plantCodeStr = eq.plant || '5F01';
     let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
     if (note.length > 30) note = note.substring(0, 30);
-    rowData[shortTextIdx] = note;
-    if (shortTextIdx !== 9 && rowData.length > 9) rowData[9] = note;
+    if (shortTextIdx !== -1) rowData[shortTextIdx] = note;
     for (let c = 0; c < rowData.length; c++) {
       if (typeof rowData[c] === 'string' && rowData[c].toLowerCase().includes('import gsheet')) {
         rowData[c] = note;
@@ -569,13 +570,13 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       if (dateIdx !== -1) rowData[dateIdx] = sapDate;
       if (timeIdx !== -1) rowData[timeIdx] = sapTime;
       if (readingIdx !== -1) rowData[readingIdx] = readingStr;
-      if (readByIdx !== -1) rowData[readByIdx] = docDetails.readBy;
+      const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
+      if (readByIdx !== -1) rowData[readByIdx] = readByVal;
       
       const plantCodeStr = eq.plant || '5F01';
       let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
       if (note.length > 30) note = note.substring(0, 30);
-      rowData[shortTextIdx] = note;
-      if (shortTextIdx !== 9 && rowData.length > 9) rowData[9] = note;
+      if (shortTextIdx !== -1) rowData[shortTextIdx] = note;
       for (let c = 0; c < rowData.length; c++) {
         if (typeof rowData[c] === 'string' && rowData[c].toLowerCase().includes('import gsheet')) {
           rowData[c] = note;
