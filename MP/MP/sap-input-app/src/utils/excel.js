@@ -325,13 +325,15 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   let shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
   if (shortTextIdx === -1) shortTextIdx = 10;
 
-  equipments.forEach((eq, idx) => {
-    const rowIdx = eq.rowIndex !== undefined ? eq.rowIndex : (idx + 1);
-    const duration = dailyDurations[eq.eqNum] || 0;
-    
-    // Export all equipments present in the SAP template. Defaults to 0 if no log entry.
-    if (!originalData[rowIdx]) return;
+  const processedRowIndices = new Set();
 
+  equipments.forEach((eq, idx) => {
+    const rowIdx = eq.rowIndex;
+    if (rowIdx === undefined || !originalData[rowIdx]) return;
+    if (processedRowIndices.has(rowIdx)) return;
+    processedRowIndices.add(rowIdx);
+
+    const duration = dailyDurations[eq.eqNum || eq.eq_num] || 0;
     const rowData = [...originalData[rowIdx]]; 
     
     const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx);
@@ -447,11 +449,15 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
   });
 
 
-  equipments.forEach((eq, idx) => {
-    const rowIdx = eq.rowIndex !== undefined ? eq.rowIndex : (idx + 1);
-    const total = accDurations[eq.eqNum] || 0;
-    if (!originalData[rowIdx]) return;
+  const processedRowIndices = new Set();
 
+  equipments.forEach((eq, idx) => {
+    const rowIdx = eq.rowIndex;
+    if (rowIdx === undefined || !originalData[rowIdx]) return;
+    if (processedRowIndices.has(rowIdx)) return;
+    processedRowIndices.add(rowIdx);
+
+    const total = accDurations[eq.eqNum || eq.eq_num] || 0;
     const rowData = [...originalData[rowIdx]];
     const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx);
     while (rowData.length <= maxColIdx) rowData.push('');
@@ -543,11 +549,15 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
     const dateParts = dateStr.split('-');
     const sapDate = dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` : dateStr;
 
-    equipments.forEach((eq, idx) => {
-      const rowIdx = eq.rowIndex !== undefined ? eq.rowIndex : (idx + 1);
-      const duration = dailyDurations[eq.eqNum] || 0;
-      if (!originalData[rowIdx]) return;
+    const processedRowIndices = new Set();
 
+    equipments.forEach((eq, idx) => {
+      const rowIdx = eq.rowIndex;
+      if (rowIdx === undefined || !originalData[rowIdx]) return;
+      if (processedRowIndices.has(rowIdx)) return;
+      processedRowIndices.add(rowIdx);
+
+      const duration = dailyDurations[eq.eqNum || eq.eq_num] || 0;
       const rowData = [...originalData[rowIdx]];
       const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx);
       while (rowData.length <= maxColIdx) rowData.push('');
