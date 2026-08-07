@@ -2056,16 +2056,10 @@ export default function DailyDashboard({
                     selectedEqs: selectedExportEqs
                   };
 
-                   // Filter equipments by selected plants if any are selected (Admin only)
                   let targetEquipments = equipments;
                   const isAdmin = currentUser?.role?.toUpperCase() === 'ADMIN';
-                  if (isAdmin) {
-                    if (selectedExportPlants.length > 0) {
-                      targetEquipments = equipments.filter(eq => selectedExportPlants.includes(eq.plant));
-                    } else {
-                      // If empty, export all Pabrik units (5F...)
-                      targetEquipments = equipments.filter(eq => eq.plant && eq.plant.startsWith('5F'));
-                    }
+                  if (isAdmin && selectedExportPlants.length > 0) {
+                    targetEquipments = equipments.filter(eq => !eq.plant || selectedExportPlants.includes(eq.plant));
                   }
 
                   if (exportSettings.startDate === exportSettings.endDate && !exportSettings.isAccumulated) {

@@ -306,11 +306,10 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     const actualPlant = log.plant || equipments.find(e => e.eqNum === log.indukEqNum)?.plant;
     
     equipments.forEach(eq => {
-      if (eq.plant === actualPlant && (eq.eqNum === log.indukEqNum || eq.induk === log.indukDesc)) {
+      const isPlantMatch = !actualPlant || !eq.plant || eq.plant === actualPlant;
+      const isEqMatch = eq.eqNum === log.indukEqNum || (eq.induk && log.indukDesc && eq.induk.trim().toLowerCase() === log.indukDesc.trim().toLowerCase());
+      if (isPlantMatch && isEqMatch) {
         dailyDurations[eq.eqNum] = Math.min(24, (dailyDurations[eq.eqNum] || 0) + durationHours);
-        if (log.notes) {
-          eqNotes[eq.eqNum] = log.notes;
-        }
       }
     });
   });
@@ -326,8 +325,8 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   let shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
   if (shortTextIdx === -1) shortTextIdx = 10;
 
-  equipments.forEach(eq => {
-    const rowIdx = eq.rowIndex;
+  equipments.forEach((eq, idx) => {
+    const rowIdx = eq.rowIndex !== undefined ? eq.rowIndex : (idx + 1);
     const duration = dailyDurations[eq.eqNum] || 0;
     
     // Export all equipments present in the SAP template. Defaults to 0 if no log entry.
@@ -448,8 +447,8 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
   });
 
 
-  equipments.forEach(eq => {
-    const rowIdx = eq.rowIndex;
+  equipments.forEach((eq, idx) => {
+    const rowIdx = eq.rowIndex !== undefined ? eq.rowIndex : (idx + 1);
     const total = accDurations[eq.eqNum] || 0;
     if (!originalData[rowIdx]) return;
 
@@ -544,8 +543,8 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
     const dateParts = dateStr.split('-');
     const sapDate = dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` : dateStr;
 
-    equipments.forEach(eq => {
-      const rowIdx = eq.rowIndex;
+    equipments.forEach((eq, idx) => {
+      const rowIdx = eq.rowIndex !== undefined ? eq.rowIndex : (idx + 1);
       const duration = dailyDurations[eq.eqNum] || 0;
       if (!originalData[rowIdx]) return;
 
