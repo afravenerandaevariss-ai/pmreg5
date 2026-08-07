@@ -38,7 +38,17 @@ export default function SAPVerificationView({ equipments, currentUser }) {
        const sapHmMap = new Map(); // key: 'plant_date', value: HM
        const sapSaldoAwalMap = new Map(); // key: 'plant', value: HM Saldo Awal
        
-       const subKeywords = ['ACCESSORIES', 'PANEL', 'GEARBOX', 'PIPE', 'ELECTROMOTOR', 'ELMOT', 'HYDRAULIC', 'STRUCTURE', 'BODY', 'WHEEL', 'CONTROLLERS', 'AUTOMATIC', 'ACC ', 'ACC_', 'EXHAUST'];
+       const subKeywords = [
+         'ACCESSORIES', 'ACCESSORY', 'ACC ', 'ACC_', 'ACC.',
+         'PANEL', 'GEARBOX', 'GEAR BOX', 'G/BOX', 'PIPE', 'PIPING',
+         'ELECTROMOTOR', 'ELECTRO MOTOR', 'ELMOT', 'EL. MOTOR', 'E/M',
+         'HYDRAULIC', 'HIDROLIK', 'HPU', 'STRUCTURE', 'STRUKTUR',
+         'BODY', 'WHEEL', 'RODA', 'CONTROLLERS', 'CONTROLLER', 'KONTROL',
+         'AUTOMATIC', 'EXHAUST', 'VALVE', 'CHAIN', 'RANTAI', 'BEARING',
+         'SHAFT', 'POROS', 'COUPLING', 'KOPLING', 'CHUTE', 'CORONG',
+         'IMPELLER', 'NOZZLE', 'GAUGE', 'METER', 'SENSOR', 'SWITCH',
+         'BREAKER', 'KABEL', 'CABLE', 'DUCTING', 'DUCT', 'SILENCER'
+       ];
 
        // map eq to plant
        const eqToPlant = new Map();

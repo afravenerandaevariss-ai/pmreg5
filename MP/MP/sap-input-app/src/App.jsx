@@ -741,7 +741,17 @@ function App() {
 
   const applyHierarchy = (eqs, hData) => {
     if (!hData || !hData.mapping) return eqs;
-    const subKeywords = ['ACCESSORIES', 'PANEL', 'GEARBOX', 'PIPE', 'ELECTROMOTOR', 'ELMOT', 'HYDRAULIC', 'STRUCTURE', 'BODY', 'WHEEL', 'CONTROLLERS', 'AUTOMATIC', 'ACC ', 'ACC_', 'EXHAUST'];
+    const subKeywords = [
+      'ACCESSORIES', 'ACCESSORY', 'ACC ', 'ACC_', 'ACC.',
+      'PANEL', 'GEARBOX', 'GEAR BOX', 'G/BOX', 'PIPE', 'PIPING',
+      'ELECTROMOTOR', 'ELECTRO MOTOR', 'ELMOT', 'EL. MOTOR', 'E/M',
+      'HYDRAULIC', 'HIDROLIK', 'HPU', 'STRUCTURE', 'STRUKTUR',
+      'BODY', 'WHEEL', 'RODA', 'CONTROLLERS', 'CONTROLLER', 'KONTROL',
+      'AUTOMATIC', 'EXHAUST', 'VALVE', 'CHAIN', 'RANTAI', 'BEARING',
+      'SHAFT', 'POROS', 'COUPLING', 'KOPLING', 'CHUTE', 'CORONG',
+      'IMPELLER', 'NOZZLE', 'GAUGE', 'METER', 'SENSOR', 'SWITCH',
+      'BREAKER', 'KABEL', 'CABLE', 'DUCTING', 'DUCT', 'SILENCER'
+    ];
 
     return eqs.map(eq => {
       const hInfo = hData.mapping[eq.description];
