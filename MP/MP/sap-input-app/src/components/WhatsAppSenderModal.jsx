@@ -3,8 +3,8 @@ import { Send, CheckCircle2, AlertCircle, Copy, ExternalLink, Settings, Clock, S
 import { fetchWAConfig, saveWAConfig, fetchWALogs, saveWALog } from '../lib/supabaseService';
 
 export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targetInputDate }) {
-  const [targetPhone, setTargetPhone] = useState('081251334618');
-  const [targetGroup, setTargetGroup] = useState('Group PM');
+  const [targetPhone, setTargetPhone] = useState('120363430505509462');
+  const [targetGroup, setTargetGroup] = useState('Group PM (120363430505509462)');
   const [provider, setProvider] = useState('gowa');
   const [apiToken, setApiToken] = useState('');
   const [gowaUrl, setGowaUrl] = useState('https://gowa.waterflai.my.id');

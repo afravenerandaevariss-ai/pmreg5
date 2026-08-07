@@ -476,13 +476,15 @@ export async function saveLiveChats(chats) {
 export async function fetchWAConfig() {
   const { data, error } = await getSystemConfig('wa_config');
   const defaultConfig = {
-    targetPhone: '081251334618',
-    targetGroup: 'Group PM',
-    provider: 'fonnte', // 'fonnte', 'wablas', 'whacenter', 'custom'
-    apiToken: '',
-    customUrl: '',
+    targetPhone: '120363430505509462',
+    targetGroup: 'Group PM (120363430505509462)',
+    provider: 'gowa',
+    gowaUrl: 'https://gowa.waterflai.my.id',
+    gowaUser: 'admin',
+    gowaPass: 'Sedap321#',
+    gowaDevice: '黄玲玲',
     autoSendEnabled: true,
-    sendTime: '08:00',
+    sendTime: '08:00 & 15:30',
   };
   if (error || !data || typeof data !== 'object') {
     return { data: defaultConfig, error: null };

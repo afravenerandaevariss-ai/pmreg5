@@ -216,7 +216,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       let fetchPromise;
       if (screenshotMode) {
         fetchPromise = Promise.all([
-          Promise.resolve({ data: [], error: null }), 
+          fetchVehicleMaster(), 
           fetch(`/api/vehicle-logs-slim?month=${targetMonth}`).then(r => r.json()).then(res => res.error ? { error: { message: res.error } } : { data: res.data || [], error: null }),
           fetchMasterEquipment(), 
           Promise.resolve({ data: [], error: null }),
