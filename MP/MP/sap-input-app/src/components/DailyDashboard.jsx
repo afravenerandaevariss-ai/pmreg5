@@ -3,7 +3,7 @@ import { format, startOfWeek, addDays, startOfMonth, endOfMonth, isSameDay, subM
 import { id } from 'date-fns/locale';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Search, Plus, Minus, X, Save, Clock, AlertTriangle, CheckCircle, ClipboardList, Download, FileDown, Trash2, Eye, Upload, History, Flag } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { exportCumulativeToSAP, exportAccumulatedToSAP, validateDailyHours } from '../utils/excel';
+import { exportDailyToSAP, exportCumulativeToSAP, exportAccumulatedToSAP, validateDailyHours } from '../utils/excel';
 import { supabase } from '../lib/supabase';
 import { insertDailyLog, insertDailyLogs, deleteDailyLog, fetchDailyLogs, saveGSheetHistory, getGSheetHistory, saveSystemConfig, getSystemConfig, saveImportLog } from '../lib/supabaseService';
 
@@ -1386,7 +1386,13 @@ export default function DailyDashboard({
             </button>
             <button 
               onClick={() => {
-                setExportSettings(prev => ({ ...prev, time: '08:00' }));
+                const selDateStr = format(selectedDate, 'yyyy-MM-dd');
+                setExportSettings(prev => ({ 
+                  ...prev, 
+                  startDate: selDateStr,
+                  endDate: selDateStr,
+                  time: '08:00' 
+                }));
                 setShowExportModal(true);
               }}
               className="bg-[#0f172a] hover:bg-slate-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
@@ -2062,7 +2068,9 @@ export default function DailyDashboard({
                     }
                   }
 
-                  if (exportSettings.isAccumulated) {
+                  if (exportSettings.startDate === exportSettings.endDate && !exportSettings.isAccumulated) {
+                    exportDailyToSAP(templateData.headers, templateData.originalData, targetEquipments, freshLogs, exportPayload);
+                  } else if (exportSettings.isAccumulated) {
                     exportAccumulatedToSAP(templateData.headers, templateData.originalData, targetEquipments, freshLogs, exportPayload);
                   } else {
                     exportCumulativeToSAP(templateData.headers, templateData.originalData, targetEquipments, freshLogs, exportPayload);

@@ -300,12 +300,14 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   const todaysLogs = dailyLogsMap[selectedDate] || [];
 
   todaysLogs.forEach(log => {
+    if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(log.indukEqNum)) return;
+
     const durationHours = log.durationMinutes / 60;
     const actualPlant = log.plant || equipments.find(e => e.eqNum === log.indukEqNum)?.plant;
     
     equipments.forEach(eq => {
-      if (eq.eqNum === log.indukEqNum || (eq.induk === log.indukDesc && eq.plant === actualPlant)) {
-        dailyDurations[eq.eqNum] = (dailyDurations[eq.eqNum] || 0) + durationHours;
+      if (eq.plant === actualPlant && (eq.eqNum === log.indukEqNum || eq.induk === log.indukDesc)) {
+        dailyDurations[eq.eqNum] = Math.min(24, (dailyDurations[eq.eqNum] || 0) + durationHours);
         if (log.notes) {
           eqNotes[eq.eqNum] = log.notes;
         }
@@ -506,7 +508,7 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
   const shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Short Text'));
 
   // Iterate each date in sorted order, up to and including selected date
-  const dates = Object.keys(dailyLogsMap).sort();
+  const dates = (startDate === endDate) ? [endDate] : Object.keys(dailyLogsMap).sort();
 
   dates.forEach(dateStr => {
     if (dateStr < startDate || dateStr > endDate) return; // only within range
