@@ -61,13 +61,19 @@ export default function DailyDashboard({
   // Sub-Tab State for Jam Jalan Mesin Pabrik: 'isi' (Isi Jam Jalan Web Matrix) vs 'riwayat' (Calendar & History)
   const [dashboardSubTab, setDashboardSubTab] = useState('isi');
   const [matrixMonth, setMatrixMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const [matrixPlantFilter, setMatrixPlantFilter] = useState(currentUser?.role === 'Unit' && currentUser?.plant ? currentUser.plant : '');
+  const [matrixPlantFilter, setMatrixPlantFilter] = useState(currentUser?.plant || '5F07');
   const [matrixSearch, setMatrixSearch] = useState('');
+  const [matrixPage, setMatrixPage] = useState(1);
+  const matrixPageSize = 35;
   const [matrixData, setMatrixData] = useState({});
   const [initialMatrixData, setInitialMatrixData] = useState({});
   const [isMatrixLoading, setIsMatrixLoading] = useState(false);
   const [isSavingMatrix, setIsSavingMatrix] = useState(false);
   const [unsavedMatrixCount, setUnsavedMatrixCount] = useState(0);
+
+  useEffect(() => {
+    setMatrixPage(1);
+  }, [matrixMonth, matrixPlantFilter, matrixSearch]);
 
   // Load matrix data from Supabase dev_daily_logs
   const loadMatrixFromDB = async () => {
@@ -224,6 +230,12 @@ export default function DailyDashboard({
       return true;
     });
   }, [equipments, matrixPlantFilter, matrixSearch]);
+
+  const totalMatrixPages = Math.ceil(parentEquipments.length / matrixPageSize) || 1;
+  const paginatedParentEquipments = useMemo(() => {
+    const start = (matrixPage - 1) * matrixPageSize;
+    return parentEquipments.slice(start, start + matrixPageSize);
+  }, [parentEquipments, matrixPage, matrixPageSize]);
 
   // Matrix Days in month
   const matrixDaysInMonth = useMemo(() => {
@@ -1621,7 +1633,7 @@ export default function DailyDashboard({
           {/* Matrix Spreadsheet Table */}
           <div className="flex-1 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-lg shadow-emerald-900/5 flex flex-col">
             <div className="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center text-xs font-semibold text-slate-600 flex-wrap gap-2">
-              <span>Menampilkan <strong className="text-emerald-700">{parentEquipments.length}</strong> Parent Equipment (Induk)</span>
+              <span>Menampilkan <strong className="text-emerald-700">{parentEquipments.length}</strong> Parent Equipment (Induk) • Plant: <strong className="text-slate-800">{matrixPlantFilter || 'Semua Plant'}</strong></span>
               <span>Bulan: <strong className="text-slate-800">{matrixMonth}</strong> ({matrixDaysInMonth.length} Hari)</span>
             </div>
 
@@ -1642,14 +1654,14 @@ export default function DailyDashboard({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {parentEquipments.length === 0 ? (
+                  {paginatedParentEquipments.length === 0 ? (
                     <tr>
                       <td colSpan={5 + matrixDaysInMonth.length} className="text-center py-16 text-slate-400 font-medium">
                         Tidak ada parent equipment yang sesuai filter.
                       </td>
                     </tr>
                   ) : (
-                    parentEquipments.map((eq, idx) => {
+                    paginatedParentEquipments.map((eq, idx) => {
                       let rowTotal = 0;
                       matrixDaysInMonth.forEach(d => {
                         const dateStr = `${matrixMonth}-${d}`;
@@ -1657,9 +1669,11 @@ export default function DailyDashboard({
                         rowTotal += val;
                       });
 
+                      const rowNum = (matrixPage - 1) * matrixPageSize + idx + 1;
+
                       return (
                         <tr key={eq.eqNum} className="hover:bg-emerald-50/50 transition-colors">
-                          <td className="p-2 text-center text-slate-500 font-mono border-r border-slate-200 sticky left-0 bg-white z-20">{idx + 1}</td>
+                          <td className="p-2 text-center text-slate-500 font-mono border-r border-slate-200 sticky left-0 bg-white z-20">{rowNum}</td>
                           <td className="p-2 text-center font-bold text-slate-700 border-r border-slate-200 sticky left-10 bg-white z-20">{eq.plant}</td>
                           <td className="p-2 font-mono font-bold text-emerald-800 border-r border-slate-200 sticky left-26 bg-white z-20">{eq.eqNum}</td>
                           <td className="p-2 font-semibold text-slate-800 border-r border-slate-200 truncate max-w-[200px]" title={eq.description}>{eq.description}</td>
@@ -1697,6 +1711,30 @@ export default function DailyDashboard({
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-xs font-semibold text-slate-700 flex-wrap gap-2">
+              <div>
+                Menampilkan {parentEquipments.length === 0 ? 0 : (matrixPage - 1) * matrixPageSize + 1} - {Math.min(matrixPage * matrixPageSize, parentEquipments.length)} dari {parentEquipments.length} Equipment Induk
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setMatrixPage(p => Math.max(1, p - 1))}
+                  disabled={matrixPage === 1}
+                  className="px-3 py-1 bg-white border border-slate-300 hover:bg-slate-100 disabled:opacity-40 rounded-lg shadow-xs transition-colors font-bold text-slate-700"
+                >
+                  ◄ Sebelum
+                </button>
+                <span className="font-mono text-slate-600">Halaman {matrixPage} / {totalMatrixPages}</span>
+                <button
+                  onClick={() => setMatrixPage(p => Math.min(totalMatrixPages, p + 1))}
+                  disabled={matrixPage >= totalMatrixPages}
+                  className="px-3 py-1 bg-white border border-slate-300 hover:bg-slate-100 disabled:opacity-40 rounded-lg shadow-xs transition-colors font-bold text-slate-700"
+                >
+                  Selanjutnya ►
+                </button>
+              </div>
             </div>
           </div>
         </div>
