@@ -913,20 +913,23 @@ export default function DailyDashboard({
 
               const jam = parseFloat((jamRaw || '0').replace(',', '.')) || 0;
               const eqClean = String(eqNumRaw).trim();
-              const induk = equipments.find(eq => String(eq.eqNum || eq.eq_num).trim() === eqClean && eq.type === 'Induk')
+              const induk = equipments.find(eq => String(eq.eqNum || eq.eq_num).trim() === eqClean && (eq.type === 'Induk' || eq.eq_type === 'Induk'))
                          || equipments.find(eq => String(eq.eqNum || eq.eq_num).trim() === eqClean);
               if (!induk) continue;
+              const eqNumKey = induk.eqNum || induk.eq_num;
 
-              const key = `${dateStr}_${induk.eqNum}`;
-              allParsedMap.set(key, {
-                dateStr,
-                indukEqNum: induk.eqNum,
-                indukDesc: induk.description || descRaw,
-                plant: induk.plant || plantRaw,
-                durationMinutes: Math.round(jam * 60),
-                status: 'Normal',
-                notes: '',
-              });
+              if (jam > 0) {
+                const key = `${dateStr}_${eqNumKey}`;
+                allParsedMap.set(key, {
+                  dateStr,
+                  indukEqNum: eqNumKey,
+                  indukDesc: induk.description || descRaw,
+                  plant: induk.plant || plantRaw,
+                  durationMinutes: Math.round(jam * 60),
+                  status: 'Normal',
+                  notes: '',
+                });
+              }
             }
           } else {
             // HORIZONTAL MATRIX FORMAT: Equipment, Description, ..., Plant, Total, 01, 02, 03, ...
@@ -951,21 +954,22 @@ export default function DailyDashboard({
               const plantRaw = plantIdx >= 0 ? cols[plantIdx] : '';
 
               const eqClean = String(eqNumRaw).trim();
-              const induk = equipments.find(eq => String(eq.eqNum || eq.eq_num).trim() === eqClean && eq.type === 'Induk')
+              const induk = equipments.find(eq => String(eq.eqNum || eq.eq_num).trim() === eqClean && (eq.type === 'Induk' || eq.eq_type === 'Induk'))
                          || equipments.find(eq => String(eq.eqNum || eq.eq_num).trim() === eqClean);
               if (!induk) continue;
+              const eqNumKey = induk.eqNum || induk.eq_num;
 
               dateCols.forEach(({ dayStr, colIdx }) => {
                 const jamRaw = cols[colIdx] || '0';
                 const jam = parseFloat((jamRaw || '0').replace(',', '.')) || 0;
                 const dateStr = `${activeMonthStr}-${dayStr}`;
 
-                const key = `${dateStr}_${induk.eqNum}`;
-                // Only overwrite if not set or if duration is greater than 0
-                if (!allParsedMap.has(key) || jam > 0) {
+                // Only import rows that have positive running hours (jam > 0)
+                if (jam > 0) {
+                  const key = `${dateStr}_${eqNumKey}`;
                   allParsedMap.set(key, {
                     dateStr,
-                    indukEqNum: induk.eqNum,
+                    indukEqNum: eqNumKey,
                     indukDesc: induk.description || descRaw,
                     plant: induk.plant || plantRaw,
                     durationMinutes: Math.round(jam * 60),
