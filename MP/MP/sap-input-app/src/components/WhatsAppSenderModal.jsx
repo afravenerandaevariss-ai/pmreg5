@@ -10,7 +10,7 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
   const [gowaUrl, setGowaUrl] = useState('https://gowa.waterflai.my.id');
   const [gowaUser, setGowaUser] = useState('admin');
   const [gowaPass, setGowaPass] = useState('Sedap321#');
-  const [gowaDevice, setGowaDevice] = useState('黄玲玲');
+  const [gowaDevice, setGowaDevice] = useState('aaaa');
   const [autoSendEnabled, setAutoSendEnabled] = useState(true);
   const [sendTime, setSendTime] = useState('08:00 & 15:30');
   const [sending, setSending] = useState(false);
