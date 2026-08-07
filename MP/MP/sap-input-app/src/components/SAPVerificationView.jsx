@@ -33,129 +33,136 @@ export default function SAPVerificationView({ equipments, currentUser }) {
        const startDate = `${targetMonth}-01`;
        const endDate = format(endOfMonth(new Date(startDate)), 'yyyy-MM-dd');
 
-       // 1. Fetch ik17_raw_data
-       const { data: rawIK17 } = await getSystemConfig('ik17_raw_data');
-       const sapHmMap = new Map(); // key: 'plant_date', value: HM
-       const sapSaldoAwalMap = new Map(); // key: 'plant', value: HM Saldo Awal
-       
-       const subKeywords = [
-         'ACCESSORIES', 'ACCESSORY', 'ACC ', 'ACC_', 'ACC.',
-         'PANEL', 'GEARBOX', 'GEAR BOX', 'G/BOX', 'PIPE', 'PIPING',
-         'ELECTROMOTOR', 'ELECTRO MOTOR', 'ELMOT', 'EL. MOTOR', 'E/M',
-         'HYDRAULIC', 'HIDROLIK', 'HPU', 'STRUCTURE', 'STRUKTUR',
-         'BODY', 'WHEEL', 'RODA', 'CONTROLLERS', 'CONTROLLER', 'KONTROL',
-         'AUTOMATIC', 'EXHAUST', 'VALVE', 'CHAIN', 'RANTAI', 'BEARING',
-         'SHAFT', 'POROS', 'COUPLING', 'KOPLING', 'CHUTE', 'CORONG',
-         'IMPELLER', 'NOZZLE', 'GAUGE', 'METER', 'SENSOR', 'SWITCH',
-         'BREAKER', 'KABEL', 'CABLE', 'DUCTING', 'DUCT', 'SILENCER'
-       ];
+        // 1. Fetch daily_logs & hMapping first to establish monitored equipments
+        const { data: h1Data } = await getSystemConfig('hierarchy_mapping');
+        const hMapping = h1Data?.mapping || {};
 
-       // map eq to plant
-       const eqToPlant = new Map();
-       const isIndukMap = new Map();
-       const eqNameMap = new Map();
-       equipments.forEach(eq => {
-         const eqNum = eq.eqNum || eq.eq_num;
-         const eqType = eq.type || eq.eq_type;
-         const descUpper = (eq.description || '').toUpperCase();
-         const indukUpper = (eq.induk || '').toUpperCase();
-         const eqNumStr = String(eqNum || '').toUpperCase();
-
-         let isSub = false;
-         for (const kw of subKeywords) {
-           if (descUpper.includes(kw)) {
-             isSub = true;
-             break;
-           }
-         }
-         if (indukUpper && indukUpper !== descUpper && indukUpper !== eqNumStr) {
-           isSub = true;
-         }
-
-         const isInduk = (eqType === 'Induk' || eqType === 'parent') && !isSub;
-
-         if (eqNum) {
-           isIndukMap.set(eqNum, isInduk);
-           eqNameMap.set(eqNum, `${eq.description} [${eqNum}]`);
-           if (eq.plant) eqToPlant.set(eqNum, eq.plant);
-         }
-       });
-
-       if (Array.isArray(rawIK17)) {
-         rawIK17.forEach(row => {
-           if (row.d >= startDate && row.d <= endDate) {
-             // Only process if it is an Induk!
-             if (isIndukMap.get(row.e)) {
-               if (filterJenis && !String(row.e).startsWith(filterJenis)) return;
-               const plant = eqToPlant.get(row.e) || 'Unknown';
-               if (currentUser?.role === 'Unit' && currentUser?.plant !== plant) return;
-
-               const groupKey = groupBy === 'plant' ? plant : row.e;
-
-               if (row.s) { // is Saldo Awal
-                 sapSaldoAwalMap.set(groupKey, (sapSaldoAwalMap.get(groupKey) || 0) + (row.h || 0));
-               } else {
-                 const key = `${groupKey}_${row.d}`;
-                 if (!sapHmMap.has(key)) sapHmMap.set(key, 0);
-                 sapHmMap.set(key, sapHmMap.get(key) + (row.h || 0));
-               }
+        let allLogs = [];
+        if (supabase) {
+           let from = 0;
+           const PAGE_SIZE = 1000;
+           while (true) {
+             const { data, error } = await supabase
+               .from('daily_logs')
+               .select('plant, date, duration_minutes, induk_eq_num')
+               .gte('date', startDate)
+               .lte('date', endDate)
+               .range(from, from + PAGE_SIZE - 1);
+               
+             if (error) throw error;
+             if (data && data.length > 0) {
+               allLogs = allLogs.concat(data);
+               if (data.length < PAGE_SIZE) break;
+               from += PAGE_SIZE;
+             } else {
+               break;
              }
            }
-         });
-         
-         // try to get updated_at for info, if possible. Since we don't return updated_at from getSystemConfig, we just leave it out or add a new field in future.
-         setLastUpdated('Data terakhir yang tersimpan di server');
-         
-         let matched = 0;
-         rawIK17.forEach(r => {
-           if (eqToPlant.has(r.e)) matched++;
-         });
-         setDebugMsg(`(Debug: ${rawIK17.length} rows IK17, ${matched} matched eq, ${eqToPlant.size} eq mapping)`);
-       } else {
-         setDebugMsg(`(Debug: rawIK17 is ${typeof rawIK17})`);
-       }
-       setRawSapLogs(rawIK17 && Array.isArray(rawIK17) ? rawIK17 : []);
+        }
+        setRawWebLogs(allLogs);
 
-       // 2. Fetch daily_logs
-       let allLogs = [];
-       if (supabase) {
-          let from = 0;
-          const PAGE_SIZE = 1000;
-          while (true) {
-            const { data, error } = await supabase
-              .from('daily_logs')
-              .select('plant, date, duration_minutes, induk_eq_num')
-              .gte('date', startDate)
-              .lte('date', endDate)
-              .range(from, from + PAGE_SIZE - 1);
-              
-            if (error) throw error;
-            if (data && data.length > 0) {
-              allLogs = allLogs.concat(data);
-              if (data.length < PAGE_SIZE) break;
-              from += PAGE_SIZE;
-            } else {
+        const monitoredEqNums = new Set(allLogs.map(l => String(l.induk_eq_num)));
+
+        const subKeywords = [
+          'ACCESSORIES', 'ACCESSORY', 'ACC ', 'ACC_', 'ACC.',
+          'PANEL', 'GEARBOX', 'GEAR BOX', 'G/BOX', 'PIPE', 'PIPING',
+          'ELECTROMOTOR', 'ELECTRO MOTOR', 'ELMOT', 'EL. MOTOR', 'E/M',
+          'HYDRAULIC', 'HIDROLIK', 'HPU', 'STRUCTURE', 'STRUKTUR',
+          'BODY', 'WHEEL', 'RODA', 'CONTROLLERS', 'CONTROLLER', 'KONTROL',
+          'AUTOMATIC', 'EXHAUST', 'VALVE', 'CHAIN', 'RANTAI', 'BEARING',
+          'SHAFT', 'POROS', 'COUPLING', 'KOPLING', 'CHUTE', 'CORONG',
+          'IMPELLER', 'NOZZLE', 'GAUGE', 'METER', 'SENSOR', 'SWITCH',
+          'BREAKER', 'KABEL', 'CABLE', 'DUCTING', 'DUCT', 'SILENCER'
+        ];
+
+        // map eq to plant
+        const eqToPlant = new Map();
+        const isIndukMap = new Map();
+        const eqNameMap = new Map();
+        equipments.forEach(eq => {
+          const eqNum = String(eq.eqNum || eq.eq_num || '');
+          if (!eqNum) return;
+
+          const eqType = eq.type || eq.eq_type;
+          const desc = eq.description || '';
+          const descUpper = desc.toUpperCase();
+          const indukUpper = (eq.induk || '').toUpperCase();
+          const eqNumStr = eqNum.toUpperCase();
+
+          let isSub = false;
+          for (const kw of subKeywords) {
+            if (descUpper.includes(kw)) {
+              isSub = true;
               break;
             }
           }
-       }
-       setRawWebLogs(allLogs);
-       
-       const webHmMap = new Map();
-       allLogs.forEach(log => {
-          if (filterJenis && !String(log.induk_eq_num).startsWith(filterJenis)) return;
-          const hm = (log.duration_minutes || 0) / 60;
-          const plant = log.plant || 'Unknown';
-          if (currentUser?.role === 'Unit' && currentUser?.plant !== plant) return;
+          if (indukUpper && indukUpper !== descUpper && indukUpper !== eqNumStr) {
+            isSub = true;
+          }
+
+          const isGenuineParent = (eqType === 'Induk' || eqType === 'parent') && !isSub;
+          const isMonitored = monitoredEqNums.has(eqNum) || hMapping[desc] !== undefined;
+
+          isIndukMap.set(eqNum, isGenuineParent && isMonitored);
+          eqNameMap.set(eqNum, `${desc} [${eqNum}]`);
+          if (eq.plant) eqToPlant.set(eqNum, eq.plant);
+        });
+
+        // 2. Fetch ik17_raw_data
+        const { data: rawIK17 } = await getSystemConfig('ik17_raw_data');
+        const sapHmMap = new Map(); // key: 'plant_date', value: HM
+        const sapSaldoAwalMap = new Map(); // key: 'plant', value: HM Saldo Awal
+
+        if (Array.isArray(rawIK17)) {
+          rawIK17.forEach(row => {
+            if (row.d >= startDate && row.d <= endDate) {
+              const eqStr = String(row.e);
+              // Only process if it is a genuine monitored Induk!
+              if (isIndukMap.get(eqStr)) {
+                if (filterJenis && !eqStr.startsWith(filterJenis)) return;
+                const plant = eqToPlant.get(eqStr) || 'Unknown';
+                if (currentUser?.role === 'Unit' && currentUser?.plant !== plant) return;
+
+                const groupKey = groupBy === 'plant' ? plant : eqStr;
+
+                if (row.s) { // is Saldo Awal
+                  sapSaldoAwalMap.set(groupKey, (sapSaldoAwalMap.get(groupKey) || 0) + (row.h || 0));
+                } else {
+                  const key = `${groupKey}_${row.d}`;
+                  if (!sapHmMap.has(key)) sapHmMap.set(key, 0);
+                  sapHmMap.set(key, sapHmMap.get(key) + (row.h || 0));
+                }
+              }
+            }
+          });
           
-          const groupKey = groupBy === 'plant' ? plant : log.induk_eq_num;
-          if (!groupKey) return; // skip if induk_eq_num missing
+          setLastUpdated('Data terakhir yang tersimpan di server');
           
-          const date = log.date;
-          const key = `${groupKey}_${date}`;
-          if (!webHmMap.has(key)) webHmMap.set(key, 0);
-          webHmMap.set(key, webHmMap.get(key) + hm);
-       });
+          let matched = 0;
+          rawIK17.forEach(r => {
+            if (eqToPlant.has(String(r.e))) matched++;
+          });
+          setDebugMsg(`(Debug: ${rawIK17.length} rows IK17, ${matched} matched eq, ${eqToPlant.size} eq mapping)`);
+        } else {
+          setDebugMsg(`(Debug: rawIK17 is ${typeof rawIK17})`);
+        }
+        setRawSapLogs(rawIK17 && Array.isArray(rawIK17) ? rawIK17 : []);
+
+        const webHmMap = new Map();
+        allLogs.forEach(log => {
+           if (filterJenis && !String(log.induk_eq_num).startsWith(filterJenis)) return;
+           const hm = (log.duration_minutes || 0) / 60;
+           const plant = log.plant || 'Unknown';
+           if (currentUser?.role === 'Unit' && currentUser?.plant !== plant) return;
+           
+           const groupKey = groupBy === 'plant' ? plant : log.induk_eq_num;
+           if (!groupKey) return; // skip if induk_eq_num missing
+           
+           const date = log.date;
+           const key = `${groupKey}_${date}`;
+           if (!webHmMap.has(key)) webHmMap.set(key, 0);
+           webHmMap.set(key, webHmMap.get(key) + hm);
+        });
 
        // 3. Combine into matrix
        const groupsToInclude = new Set([...Array.from(sapHmMap.keys()).map(k => k.split('_')[0]), ...Array.from(webHmMap.keys()).map(k => k.split('_')[0])]);
