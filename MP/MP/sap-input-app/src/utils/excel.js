@@ -356,6 +356,12 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
     if (note.length > 30) note = note.substring(0, 30);
     rowData[shortTextIdx] = note;
+    if (shortTextIdx !== 9 && rowData.length > 9) rowData[9] = note;
+    for (let c = 0; c < rowData.length; c++) {
+      if (typeof rowData[c] === 'string' && rowData[c].toLowerCase().includes('import gsheet')) {
+        rowData[c] = note;
+      }
+    }
     
     wsData.push(rowData);
   });
@@ -464,6 +470,12 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
     if (note.length > 30) note = note.substring(0, 30);
     rowData[shortTextIdx] = note;
+    if (shortTextIdx !== 9 && rowData.length > 9) rowData[9] = note;
+    for (let c = 0; c < rowData.length; c++) {
+      if (typeof rowData[c] === 'string' && rowData[c].toLowerCase().includes('import gsheet')) {
+        rowData[c] = note;
+      }
+    }
 
     wsData.push(rowData);
   });
@@ -554,6 +566,12 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
       if (note.length > 30) note = note.substring(0, 30);
       rowData[shortTextIdx] = note;
+      if (shortTextIdx !== 9 && rowData.length > 9) rowData[9] = note;
+      for (let c = 0; c < rowData.length; c++) {
+        if (typeof rowData[c] === 'string' && rowData[c].toLowerCase().includes('import gsheet')) {
+          rowData[c] = note;
+        }
+      }
 
       wsData.push(rowData);
     });

@@ -131,7 +131,7 @@ async function run() {
             induk_desc: eqDesc || (matchedEq ? matchedEq.description : eqNum),
             duration_minutes: Math.round(hours * 60),
             status: 'Normal',
-            notes: 'Import GSheet Agustus 2026',
+            notes: null,
             timestamp: new Date().toISOString(),
             did_run: true,
             damaged_subs: []
