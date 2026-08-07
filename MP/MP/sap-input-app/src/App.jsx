@@ -729,14 +729,8 @@ function App() {
     loadData();
   }, []);
 
-  // Sync equipment readings to Supabase when they change
-  useEffect(() => {
-    if (!supabase || !templateData || equipments.length === 0) return;
-    const timer = setTimeout(() => {
-      bulkUpdateReadings(equipments).catch(console.error);
-    }, 2000); // debounce 2 seconds
-    return () => clearTimeout(timer);
-  }, [equipments]);
+  // Sync equipment readings to Supabase only when modified explicitly
+  // (Do not run automatic 17,000 HTTP update loop on page load)
 
   const handleDocDetailsChange = (field, value) => {
     setDocDetails(prev => {

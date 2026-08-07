@@ -105,12 +105,19 @@ export async function updateEquipmentReading(eqNum, reading) {
  * Bulk update readings for multiple equipments.
  */
 export async function bulkUpdateReadings(equipmentsArray) {
-  if (!supabase) return;
-  for (const eq of equipmentsArray) {
-    await supabase
-      .from(T.master_equipment)
-      .update({ reading: parseFloat(eq.reading) || 0, updated_at: new Date().toISOString() })
-      .eq('eq_num', eq.eqNum);
+  if (!supabase || !Array.isArray(equipmentsArray) || equipmentsArray.length === 0) return;
+  const modified = equipmentsArray.filter(e => parseFloat(e.reading) > 0);
+  if (modified.length === 0) return;
+  
+  const CHUNK_SIZE = 50;
+  for (let i = 0; i < modified.length; i += CHUNK_SIZE) {
+    const chunk = modified.slice(i, i + CHUNK_SIZE);
+    await Promise.all(chunk.map(eq => 
+      supabase
+        .from(T.master_equipment)
+        .update({ reading: parseFloat(eq.reading) || 0, updated_at: new Date().toISOString() })
+        .eq('eq_num', eq.eqNum)
+    ));
   }
 }
 
