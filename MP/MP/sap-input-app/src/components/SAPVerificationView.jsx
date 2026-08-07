@@ -2,7 +2,10 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { format, endOfMonth, getDaysInMonth } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { RefreshCw, Download, Calendar, List, X, Copy, Check } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, IS_DEV_ENV } from '../lib/supabase';
+
+const T_DAILY_LOGS = IS_DEV_ENV ? 'dev_daily_logs' : 'daily_logs';
+
 import { getSystemConfig } from '../lib/supabaseService';
 import * as XLSX from 'xlsx';
 
@@ -43,7 +46,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
            const PAGE_SIZE = 1000;
            while (true) {
              const { data, error } = await supabase
-               .from('daily_logs')
+               .from(T_DAILY_LOGS)
                .select('plant, date, duration_minutes, induk_eq_num')
                .gte('date', startDate)
                .lte('date', endDate)

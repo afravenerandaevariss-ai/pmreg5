@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FileText, RefreshCw, Printer, ExternalLink, AlertTriangle, Upload, X, FolderOpen, Trash2, Clock, CheckCircle2, Loader2, FileUp } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, IS_DEV_ENV } from '../lib/supabase';
+
+const T_BA_EDITS      = IS_DEV_ENV ? 'dev_ba_edits'      : 'ba_edits';
+const T_BA_UNIT_EDITS = IS_DEV_ENV ? 'dev_ba_unit_edits' : 'ba_unit_edits';
+const T_PDF_UPLOADS   = IS_DEV_ENV ? 'dev_pdf_uploads'   : 'pdf_uploads';
+
 
 // ============================================================
 // GOOGLE APPS SCRIPT WEB APP URL untuk Upload ke Google Drive
@@ -169,12 +174,12 @@ export default function BeritaAcaraView({ currentUser }) {
         throw new Error("Data Google Sheets kosong atau tidak valid.");
       }
       
-      const { data: overrides, error: sbError } = await supabase.from('ba_edits').select('*');
+      const { data: overrides, error: sbError } = await supabase.from(T_BA_EDITS).select('*');
       if (sbError) {
         console.warn("Gagal memuat perubahan lokal dari Supabase:", sbError);
       }
       
-      const { data: unitOverrides } = await supabase.from('ba_unit_edits').select('*').eq('unit_code', plantCode).maybeSingle();
+      const { data: unitOverrides } = await supabase.from(T_BA_UNIT_EDITS).select('*').eq('unit_code', plantCode).maybeSingle();
       
       parseAndSetData(data, unitName, plantCode, overrides || [], unitOverrides || {});
       setStatusMsg(`Data Berita Acara ${plantCode ? '[' + plantCode + '] ' : ''}${unitName} berhasil dimuat.`);
@@ -200,7 +205,7 @@ export default function BeritaAcaraView({ currentUser }) {
     setLoadingHistory(true);
     try {
       const { data, error } = await supabase
-        .from('pdf_uploads')
+        .from(T_PDF_UPLOADS)
         .select('*')
         .eq('unit_code', plantCode)
         .order('uploaded_at', { ascending: false })
@@ -318,7 +323,7 @@ export default function BeritaAcaraView({ currentUser }) {
       }
 
       // Save record to Supabase
-      const { error: sbError } = await supabase.from('pdf_uploads').insert({
+      const { error: sbError } = await supabase.from(T_PDF_UPLOADS).insert({
         unit_code: baData.plantCode,
         file_name: fileName,
         notes: uploadNotes || null,
@@ -360,7 +365,7 @@ export default function BeritaAcaraView({ currentUser }) {
     if (!window.confirm('Hapus riwayat upload ini? (File di Google Drive tidak akan terhapus dari sini)')) return;
     setIsDeletingId(id);
     try {
-      await supabase.from('pdf_uploads').delete().eq('id', id);
+      await supabase.from(T_PDF_UPLOADS).delete().eq('id', id);
       setUploadHistory(prev => prev.filter(r => r.id !== id));
     } catch (e) {
       console.error(e);
@@ -371,7 +376,7 @@ export default function BeritaAcaraView({ currentUser }) {
 
   const handleAutoSaveEquipment = async (originalNoEq, row) => {
     try {
-      await supabase.from('ba_edits').upsert({
+      await supabase.from(T_BA_EDITS).upsert({
         no_eq: originalNoEq,
         new_no_eq: row.noEq,
         no_urut: row.no,
@@ -410,7 +415,7 @@ export default function BeritaAcaraView({ currentUser }) {
     // Remove from supabase only if it has a real key
     if (row.originalNoEq && !row.originalNoEq.startsWith('new_')) {
       try {
-        await supabase.from('ba_edits').delete().eq('no_eq', row.originalNoEq);
+        await supabase.from(T_BA_EDITS).delete().eq('no_eq', row.originalNoEq);
       } catch (e) {
         console.error(e);
       }
@@ -434,7 +439,7 @@ export default function BeritaAcaraView({ currentUser }) {
       updated_at: new Date().toISOString()
     };
     try {
-      await supabase.from('ba_unit_edits').upsert(payload, { onConflict: 'unit_code' });
+      await supabase.from(T_BA_UNIT_EDITS).upsert(payload, { onConflict: 'unit_code' });
     } catch (err) {
       console.error(err);
     }

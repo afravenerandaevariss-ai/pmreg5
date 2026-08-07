@@ -14,7 +14,11 @@ import Dendrogram from './components/ui/Dendrogram';
 import AfraChatbot from './components/AfraChatbot';
 import WorkOrderMonitoringView from './components/WorkOrderMonitoringView';
 import AdminInbox from './components/AdminInbox';
-import { supabase } from './lib/supabase';
+import { supabase, IS_DEV_ENV } from './lib/supabase';
+
+const T_MASTER_EQ   = IS_DEV_ENV ? 'dev_master_equipment' : 'master_equipment';
+const T_HIERARCHY   = IS_DEV_ENV ? 'dev_hierarchy_data'   : 'hierarchy_data';
+
 import { 
   uploadMasterEquipment, 
   fetchMasterEquipment, 
@@ -884,8 +888,8 @@ function App() {
         await deleteSystemConfig('master_map');
         await deleteSystemConfig('template_data');
         await deleteSystemConfig('hierarchy_data');
-        await supabase.from('master_equipment').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('hierarchy_data').delete().neq('id', 0);
+        await supabase.from(T_MASTER_EQ).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from(T_HIERARCHY).delete().neq('id', 0);
       }
       setMasterMap(null);
       setTemplateData(null);

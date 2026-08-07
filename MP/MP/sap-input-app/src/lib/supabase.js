@@ -33,3 +33,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = (supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
+
+// True when the app was built with VITE_APP_ENV=dev (devpmreg5 server)
+// False (or undefined) for production builds (pmreg5 server)
+export const IS_DEV_ENV = (() => {
+  try {
+    return import.meta?.env?.VITE_APP_ENV === 'dev';
+  } catch {
+    return false;
+  }
+})();
+

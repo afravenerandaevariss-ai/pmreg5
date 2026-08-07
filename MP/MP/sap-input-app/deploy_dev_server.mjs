@@ -52,7 +52,8 @@ function uploadDir(sftp, localDir, remoteDir) {
 }
 
 async function main() {
-  console.log('🚀 DEPLOYING DEVELOPMENT SERVER FIX (devpmreg5.afratarigan.my.id)...');
+  console.log('🚀 DEPLOYING DEVELOPMENT SERVER (devpmreg5.afratarigan.my.id)...');
+  console.log('📦 Build mode: DEV (VITE_APP_ENV=dev → dev_ prefixed Supabase tables)');
 
   const conn = new Client();
   conn.on('ready', () => {

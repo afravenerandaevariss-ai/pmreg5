@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, IS_DEV_ENV } from '../lib/supabase';
+
+const T_PARSED_EXCEL = IS_DEV_ENV ? 'dev_parsed_excel' : 'parsed_excel';
+const BUCKET_EXCEL   = IS_DEV_ENV ? 'dev_excel_uploads' : 'excel_uploads';
+
 
 import { Search, Filter, FileSpreadsheet, RefreshCw, Layers, DollarSign, X, Info, AlertTriangle, CheckCircle, Printer, ChevronDown, Copy, ArrowUpDown } from 'lucide-react';
 
@@ -41,7 +45,7 @@ export default function WorkOrderMonitoringView({ currentUser }) {
       setLoading(true);
       // Fetch from Supabase FIRST
       const { data: dbData, error: dbError } = await supabase
-        .from('parsed_excel')
+        .from(T_PARSED_EXCEL)
         .select('session_id, data')
         .in('session_id', ['global_iw39', 'global_zvtab', 'global_046exp']);
         
@@ -85,7 +89,7 @@ export default function WorkOrderMonitoringView({ currentUser }) {
         // Upload directly to Supabase Storage (100% browser-native upload)
         setUploadProgress(10);
         const { error: uploadError } = await supabase.storage
-          .from('excel_uploads')
+          .from(BUCKET_EXCEL)
           .upload(fileName, fileBlob, {
             cacheControl: '3600',
             upsert: true
@@ -112,7 +116,7 @@ export default function WorkOrderMonitoringView({ currentUser }) {
 
         // Fetch result from Supabase
         const { data, error } = await supabase
-          .from('parsed_excel')
+          .from(T_PARSED_EXCEL)
           .select('data')
           .eq('session_id', sessionId)
           .single();

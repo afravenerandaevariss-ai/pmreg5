@@ -4,7 +4,10 @@ import { id } from 'date-fns/locale';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Search, Plus, Minus, X, Save, Clock, AlertTriangle, CheckCircle, ClipboardList, Download, FileDown, Trash2, Eye, Upload, History, Flag } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { exportDailyToSAP, exportCumulativeToSAP, exportAccumulatedToSAP, validateDailyHours } from '../utils/excel';
-import { supabase } from '../lib/supabase';
+import { supabase, IS_DEV_ENV } from '../lib/supabase';
+
+const T_DAILY_LOGS = IS_DEV_ENV ? 'dev_daily_logs' : 'daily_logs';
+
 import { insertDailyLog, insertDailyLogs, deleteDailyLog, fetchDailyLogs, saveGSheetHistory, getGSheetHistory, saveSystemConfig, getSystemConfig, saveImportLog } from '../lib/supabaseService';
 
 const PLANT_INFO = {
@@ -208,7 +211,7 @@ export default function DailyDashboard({
     setIsHistoryLoading(true);
     try {
       const { data, error } = await supabase
-        .from('daily_logs')
+        .from(T_DAILY_LOGS)
         .select('*')
         .eq('induk_eq_num', eqNum)
         .order('date', { ascending: true });
@@ -1117,7 +1120,7 @@ export default function DailyDashboard({
               // Use .or() instead of .in() to avoid any potential minifier issues with the 'in' keyword
               const orQuery = chunk.map(num => `induk_eq_num.eq.${num}`).join(',');
               const { error: delErr } = await supabase
-                .from('daily_logs')
+                .from(T_DAILY_LOGS)
                 .delete()
                 .eq('date', dateStr)
                 .or(orQuery);
@@ -1226,7 +1229,7 @@ export default function DailyDashboard({
     if (!window.confirm('Perbaiki semua data lama yang plantnya kosong? Proses ini otomatis mengisi plant berdasarkan nomor equipment.')) return;
     
     const { data: allLogs, error } = await supabase
-      .from('daily_logs')
+      .from(T_DAILY_LOGS)
       .select('id, induk_eq_num, plant')
       .or('plant.is.null,plant.eq.');
     
@@ -1239,7 +1242,7 @@ export default function DailyDashboard({
     for (const log of allLogs) {
       const eq = equipments.find(e => e.eqNum === log.induk_eq_num);
       if (eq?.plant) {
-        await supabase.from('daily_logs').update({ plant: eq.plant }).eq('id', log.id);
+        await supabase.from(T_DAILY_LOGS).update({ plant: eq.plant }).eq('id', log.id);
         fixed++;
       }
     }

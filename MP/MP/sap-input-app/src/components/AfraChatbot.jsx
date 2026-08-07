@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send } from 'lucide-react';
 import { fetchLiveChats, saveLiveChats } from '../lib/supabaseService';
-import { supabase } from '../lib/supabase';
+import { supabase, IS_DEV_ENV } from '../lib/supabase';
+
+const T_HIERARCHY = IS_DEV_ENV ? 'dev_hierarchy_data' : 'hierarchy_data';
+
 
 // ─── Knowledge Base ──────────────────────────────────────────────────────────
 const FAQ = [
@@ -54,8 +57,8 @@ export default function AfraChatbot({ currentUser }) {
   useEffect(() => {
     loadMessages();
     const channel = supabase
-      .channel('public:hierarchy_data_chat')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'hierarchy_data', filter: 'id=eq.11' }, (payload) => {
+      .channel(`public:${T_HIERARCHY}_chat`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: T_HIERARCHY, filter: 'id=eq.11' }, (payload) => {
         if (!currentUser?.nik) return;
         const mine = (payload.new.data || []).filter(c => c.user_nik === currentUser.nik);
         if (mine.length > 0) {

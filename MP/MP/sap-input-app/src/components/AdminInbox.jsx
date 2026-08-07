@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { fetchLiveChats, saveLiveChats } from '../lib/supabaseService';
-import { supabase } from '../lib/supabase';
+import { supabase, IS_DEV_ENV } from '../lib/supabase';
+
+const T_HIERARCHY = IS_DEV_ENV ? 'dev_hierarchy_data' : 'hierarchy_data';
+
 import { Send, User } from 'lucide-react';
 
 export default function AdminInbox({ currentUser }) {
@@ -19,8 +22,8 @@ export default function AdminInbox({ currentUser }) {
   useEffect(() => {
     loadChats();
     const channel = supabase
-      .channel('public:hierarchy_data')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'hierarchy_data', filter: 'id=eq.11' }, (payload) => {
+      .channel(`public:${T_HIERARCHY}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: T_HIERARCHY, filter: 'id=eq.11' }, (payload) => {
         setChats(payload.new.data || []);
       })
       .subscribe();

@@ -1,4 +1,17 @@
-import { supabase } from '../lib/supabase.js';
+import { supabase, IS_DEV_ENV } from '../lib/supabase.js';
+
+// ============================================================
+// TABLE NAME RESOLVER
+// DEV server (devpmreg5) uses prefixed tables to isolate data.
+// PROD server (pmreg5) uses the original table names.
+// ============================================================
+const T = {
+  master_equipment: IS_DEV_ENV ? 'dev_master_equipment' : 'master_equipment',
+  daily_logs:       IS_DEV_ENV ? 'dev_daily_logs'       : 'daily_logs',
+  hierarchy_data:   IS_DEV_ENV ? 'dev_hierarchy_data'   : 'hierarchy_data',
+  app_users:        'app_users', // Shared — same users for both envs
+};
+
 
 // ============================================================
 // MASTER EQUIPMENT
@@ -14,7 +27,7 @@ export async function uploadMasterEquipment(equipmentsArray) {
   // Group by plant to do targeted deletes
   const plants = [...new Set(equipmentsArray.map(e => e.plant).filter(Boolean))];
   for (const plant of plants) {
-    await supabase.from('master_equipment').delete().eq('plant', plant);
+    await supabase.from(T.master_equipment).delete().eq('plant', plant);
   }
 
   const rows = equipmentsArray.map(eq => ({
@@ -29,7 +42,7 @@ export async function uploadMasterEquipment(equipmentsArray) {
     reading: parseFloat(eq.reading) || 0,
   }));
 
-  const { error } = await supabase.from('master_equipment').insert(rows);
+  const { error } = await supabase.from(T.master_equipment).insert(rows);
   return { error };
 }
 
@@ -43,7 +56,7 @@ export async function fetchMasterEquipment() {
 
   while (true) {
     const { data, error } = await supabase
-      .from('master_equipment')
+      .from(T.master_equipment)
       .select('*')
       .order('plant')
       .order('eq_num')
@@ -83,7 +96,7 @@ export async function fetchMasterEquipment() {
 export async function updateEquipmentReading(eqNum, reading) {
   if (!supabase) return;
   await supabase
-    .from('master_equipment')
+    .from(T.master_equipment)
     .update({ reading: parseFloat(reading) || 0, updated_at: new Date().toISOString() })
     .eq('eq_num', eqNum);
 }
@@ -95,7 +108,7 @@ export async function bulkUpdateReadings(equipmentsArray) {
   if (!supabase) return;
   for (const eq of equipmentsArray) {
     await supabase
-      .from('master_equipment')
+      .from(T.master_equipment)
       .update({ reading: parseFloat(eq.reading) || 0, updated_at: new Date().toISOString() })
       .eq('eq_num', eq.eqNum);
   }
@@ -108,7 +121,7 @@ export async function bulkUpdateReadings(equipmentsArray) {
 export async function uploadHierarchyData(hierarchyObj) {
   if (!supabase) return { error: 'Supabase not configured' };
   const { error } = await supabase
-    .from('hierarchy_data')
+    .from(T.hierarchy_data)
     .upsert({ id: 1, data: hierarchyObj, updated_at: new Date().toISOString() });
   return { error };
 }
@@ -116,7 +129,7 @@ export async function uploadHierarchyData(hierarchyObj) {
 export async function fetchHierarchyData() {
   if (!supabase) return { data: null, error: 'Supabase not configured' };
   const { data, error } = await supabase
-    .from('hierarchy_data')
+    .from(T.hierarchy_data)
     .select('data')
     .eq('id', 1)
     .single();
@@ -139,7 +152,7 @@ export async function saveSystemConfig(id, dataObj) {
   else if (id === 'wa_logs') numericId = 13;
   
   const { error } = await supabase
-    .from('hierarchy_data')
+    .from(T.hierarchy_data)
     .upsert({ id: numericId, data: dataObj, updated_at: new Date().toISOString() });
   return { error };
 }
@@ -164,7 +177,7 @@ export async function deleteSystemConfig(id) {
   else if (id === 'hierarchy_data') numericId = 0; // assuming 0 is hierarchy data based on App.jsx
 
   const { error } = await supabase
-    .from('hierarchy_data')
+    .from(T.hierarchy_data)
     .delete()
     .eq('id', numericId);
   return { error };
@@ -189,7 +202,7 @@ export async function getSystemConfig(id) {
   else if (id === 'doc_details') numericId = 17;
 
   const { data, error } = await supabase
-    .from('hierarchy_data')
+    .from(T.hierarchy_data)
     .select('data')
     .eq('id', numericId)
     .single();
@@ -213,7 +226,7 @@ export async function fetchDailyLogs(plant, yearMonth) {
   let fetchError = null;
 
   while (true) {
-    let pageQuery = supabase.from('daily_logs').select('*');
+    let pageQuery = supabase.from(T.daily_logs).select('*');
     if (plant && plant !== 'ALL') pageQuery = pageQuery.eq('plant', plant);
     if (yearMonth) {
       const startDate = `${yearMonth}-01`;
@@ -261,7 +274,7 @@ export async function fetchDailyLogs(plant, yearMonth) {
  */
 export async function insertDailyLog(plant, dateStr, log) {
   if (!supabase) return { error: 'Supabase not configured' };
-  const { error } = await supabase.from('daily_logs').insert({
+  const { error } = await supabase.from(T.daily_logs).insert({
     id: log.id,
     plant: log.plant || plant,
     date: dateStr,
@@ -295,7 +308,7 @@ export async function insertDailyLogs(plant, dateStr, logs) {
     damaged_subs: log.damagedSubs || [],
     timestamp: log.timestamp || new Date().toISOString(),
   }));
-  const { error } = await supabase.from('daily_logs').insert(rows);
+  const { error } = await supabase.from(T.daily_logs).insert(rows);
   return { error };
 }
 
@@ -304,7 +317,7 @@ export async function insertDailyLogs(plant, dateStr, logs) {
  */
 export async function deleteDailyLog(logId) {
   if (!supabase) return { error: 'Supabase not configured' };
-  const { error } = await supabase.from('daily_logs').delete().eq('id', logId);
+  const { error } = await supabase.from(T.daily_logs).delete().eq('id', logId);
   return { error };
 }
 
@@ -315,7 +328,7 @@ export async function deleteDailyLog(logId) {
 export async function loginUser(nik, password) {
   if (!supabase) return { data: null, error: 'Supabase not configured' };
   const { data, error } = await supabase
-    .from('app_users')
+    .from(T.app_users)
     .select('*')
     .eq('nik', nik)
     .single();
@@ -332,7 +345,7 @@ export async function loginUser(nik, password) {
 export async function getUserByNik(nik) {
   if (!supabase) return { data: null, error: 'Supabase not configured' };
   const { data, error } = await supabase
-    .from('app_users')
+    .from(T.app_users)
     .select('*')
     .eq('nik', nik)
     .single();
@@ -344,7 +357,7 @@ export async function getUserByNik(nik) {
 export async function fetchAllUsers() {
   if (!supabase) return { data: null, error: 'Supabase not configured' };
   const { data, error } = await supabase
-    .from('app_users')
+    .from(T.app_users)
     .select('nik, name, role, plant, jabatan, unit_name')
     .order('role')
     .order('plant')
@@ -361,7 +374,7 @@ export async function createUser(userData) {
     password: userData.password || '123'
   };
   const { data, error } = await supabase
-    .from('app_users')
+    .from(T.app_users)
     .insert([newUserData])
     .select();
   if (error) return { data: null, error };
@@ -371,7 +384,7 @@ export async function createUser(userData) {
 export async function updateUser(nik, userData) {
   if (!supabase) return { data: null, error: 'Supabase not configured' };
   const { data, error } = await supabase
-    .from('app_users')
+    .from(T.app_users)
     .update(userData)
     .eq('nik', nik)
     .select();
@@ -382,7 +395,7 @@ export async function updateUser(nik, userData) {
 export async function deleteUser(nik) {
   if (!supabase) return { data: null, error: 'Supabase not configured' };
   const { data, error } = await supabase
-    .from('app_users')
+    .from(T.app_users)
     .delete()
     .eq('nik', nik);
   if (error) return { data: null, error };
@@ -400,7 +413,7 @@ export async function deleteUser(nik) {
 export async function saveGSheetHistory(historyArray) {
   if (!supabase) return { error: 'Supabase not configured' };
   const { error } = await supabase
-    .from('hierarchy_data')
+    .from(T.hierarchy_data)
     .upsert({ id: 5, data: historyArray, updated_at: new Date().toISOString() });
   return { error };
 }
@@ -412,7 +425,7 @@ export async function saveGSheetHistory(historyArray) {
 export async function getGSheetHistory() {
   if (!supabase) return { data: [], error: null };
   const { data, error } = await supabase
-    .from('hierarchy_data')
+    .from(T.hierarchy_data)
     .select('data')
     .eq('id', 5)
     .single();
