@@ -458,6 +458,17 @@ export default function SAPVerificationView({ equipments, currentUser }) {
                      sdSelisih.push(diffSD);
                   });
 
+                  // Determine last date with actual Web or SAP log entry for this row
+                  let maxInputDay = 0;
+                  for (let d = daysInMonth; d >= 1; d--) {
+                     const dateKey = `${targetMonth}-${String(d).padStart(2, '0')}`;
+                     const cell = row.dates[dateKey];
+                     if (cell && (cell.web > 0 || cell.sap > 0)) {
+                        maxInputDay = d;
+                        break;
+                     }
+                  }
+
                   return (
                     <React.Fragment key={row.groupName}>
                       {/* --- Kategori: Per Tanggal --- */}
@@ -522,7 +533,15 @@ export default function SAPVerificationView({ equipments, currentUser }) {
                         <td style={{ width: col3Width, minWidth: col3Width, left: colPlantWidth + col1Width + col2Width }} className="border border-slate-200 px-2 py-1 text-slate-600 font-medium text-left bg-white sticky z-10">
                           Web
                         </td>
-                        {sdWeb.map((v, i) => <td key={i} className="border border-slate-200 px-1 py-1 text-slate-500 bg-slate-50/50 font-mono">{v}</td>)}
+                        {sdWeb.map((v, i) => {
+                          const day = i + 1;
+                          const isPastMax = maxInputDay > 0 && day > maxInputDay;
+                          return (
+                            <td key={i} className="border border-slate-200 px-1 py-1 text-slate-500 bg-slate-50/50 font-mono">
+                              {isPastMax || maxInputDay === 0 ? '-' : v}
+                            </td>
+                          );
+                        })}
                         <td className="border border-slate-200 px-2 py-1 font-bold bg-emerald-100 text-[#064e3b] font-mono">{Math.round(cumWeb * 100) / 100}</td>
                       </tr>
                       {/* SAP */}
@@ -530,7 +549,15 @@ export default function SAPVerificationView({ equipments, currentUser }) {
                         <td style={{ width: col3Width, minWidth: col3Width, left: colPlantWidth + col1Width + col2Width }} className="border border-slate-200 px-2 py-1 text-slate-600 font-medium text-left bg-white sticky z-10">
                           SAP
                         </td>
-                        {sdSap.map((v, i) => <td key={i} className="border border-slate-200 px-1 py-1 text-slate-500 bg-slate-50/50 font-mono">{v}</td>)}
+                        {sdSap.map((v, i) => {
+                          const day = i + 1;
+                          const isPastMax = maxInputDay > 0 && day > maxInputDay;
+                          return (
+                            <td key={i} className="border border-slate-200 px-1 py-1 text-slate-500 bg-slate-50/50 font-mono">
+                              {isPastMax || maxInputDay === 0 ? '-' : v}
+                            </td>
+                          );
+                        })}
                         <td className="border border-slate-200 px-2 py-1 font-bold bg-emerald-100 text-[#064e3b] font-mono">{Math.round(cumSap * 100) / 100}</td>
                       </tr>
                       {/* Selisih */}
@@ -538,11 +565,22 @@ export default function SAPVerificationView({ equipments, currentUser }) {
                         <td style={{ width: col3Width, minWidth: col3Width, left: colPlantWidth + col1Width + col2Width }} className="border border-slate-200 px-2 py-1 text-slate-600 font-bold text-left bg-slate-50 sticky z-10">
                           Selisih
                         </td>
-                        {sdSelisih.map((v, i) => (
-                          <td key={i} className={`border border-slate-200 px-1 py-1 font-black ${v > 0 ? 'bg-amber-50 text-amber-600 shadow-[inset_0_0_0_1px_rgba(217,119,6,0.2)]' : (v < 0 ? 'bg-rose-50 text-rose-600 shadow-[inset_0_0_0_1px_rgba(225,29,72,0.2)]' : 'text-slate-300 font-medium bg-slate-50/50')}`}>
-                            {v || 0}
-                          </td>
-                        ))}
+                        {sdSelisih.map((v, i) => {
+                          const day = i + 1;
+                          const isPastMax = maxInputDay > 0 && day > maxInputDay;
+                          if (isPastMax || maxInputDay === 0) {
+                            return (
+                              <td key={i} className="border border-slate-200 px-1 py-1 text-slate-300 font-medium bg-slate-50/50">
+                                -
+                              </td>
+                            );
+                          }
+                          return (
+                            <td key={i} className={`border border-slate-200 px-1 py-1 font-black ${v > 0 ? 'bg-amber-50 text-amber-600 shadow-[inset_0_0_0_1px_rgba(217,119,6,0.2)]' : (v < 0 ? 'bg-rose-50 text-rose-600 shadow-[inset_0_0_0_1px_rgba(225,29,72,0.2)]' : 'text-slate-300 font-medium bg-slate-50/50')}`}>
+                              {v || 0}
+                            </td>
+                          );
+                        })}
                          <td className={`border border-slate-200 px-2 py-1 font-black font-mono ${Math.round((cumWeb - cumSap) * 100) / 100 !== 0 ? 'bg-rose-100 text-rose-700 shadow-[inset_0_0_0_1px_rgba(225,29,72,0.3)]' : 'bg-emerald-50 text-slate-400'}`}>
                             {Math.round((cumWeb - cumSap) * 100) / 100}
                          </td>
