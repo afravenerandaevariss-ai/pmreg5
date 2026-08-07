@@ -233,7 +233,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       }
 
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout loading data from Supabase')), 30000)
+        setTimeout(() => reject(new Error('Timeout loading data from Supabase')), 60000)
       );
 
       const [vRes, lRes, eqRes, zRes, mapRes] = await Promise.race([fetchPromise, timeoutPromise]);
@@ -265,11 +265,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       setError('Gagal memuat data: ' + e.message);
     } finally {
       if (screenshotMode) {
-        // Wait a bit for the browser to paint the huge table before signaling Microlink
+        // Wait 10 seconds for browser to fully render and paint the table before signaling ready
         setTimeout(() => {
           setLoading(false);
           setDataReady(true);
-        }, 5000);
+        }, 10000);
       } else {
         setLoading(false);
       }
@@ -1156,6 +1156,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
     
     try {
+      // Wait 400ms for browser DOM layout and fonts to complete rendering before generating image
+      await new Promise(r => setTimeout(r, 400));
+
       // Create high-quality canvas (pixelRatio 2 for HD but avoids freezing)
       const dataUrl = await toPng(element, {
         pixelRatio: 2,
