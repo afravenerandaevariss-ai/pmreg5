@@ -319,11 +319,12 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   const sapDate = dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` : docDetails.date;
   const sapTime = docDetails.time.length === 5 ? `${docDetails.time}:00` : docDetails.time;
   
-  const dateIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Measurement Date'));
-  const timeIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Measurement Time'));
-  const readingIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Counter Reading'));
-  const readByIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Read By'));
-  const shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Short Text'));
+  const dateIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measurement Date') || h.toLowerCase().includes('date')));
+  const timeIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measurement Time') || h.toLowerCase().includes('time')));
+  const readingIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Counter Reading') || h.toLowerCase().includes('reading')));
+  const readByIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Read By') || h.toLowerCase().includes('read by')));
+  let shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
+  if (shortTextIdx === -1) shortTextIdx = 10;
 
   equipments.forEach(eq => {
     const rowIdx = eq.rowIndex;
@@ -349,15 +350,12 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     if (dateIdx !== -1) rowData[dateIdx] = sapDate;
     if (timeIdx !== -1) rowData[timeIdx] = sapTime;
     if (readingIdx !== -1) rowData[readingIdx] = readingStr;
-    // Leave Difference column (x) as-is from original template
     if (readByIdx !== -1) rowData[readByIdx] = docDetails.readBy;
     
-    if (shortTextIdx !== -1) {
-      const plantStr = eq.plant ? ` ${eq.plant}` : '';
-      let note = `HM Mesin${plantStr} tgl ${sapDate.replace(/\./g, '-')}`;
-      if (note.length > 30) note = note.substring(0, 30);
-      rowData[shortTextIdx] = note;
-    }
+    const plantCodeStr = eq.plant || (docDetails.plant && docDetails.plant !== 'ALL' ? docDetails.plant : '') || '5F01';
+    let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
+    if (note.length > 30) note = note.substring(0, 30);
+    rowData[shortTextIdx] = note;
     
     wsData.push(rowData);
   });
@@ -421,11 +419,12 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
   const sapDate = dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` : endDate;
   const sapTime = docDetails.time.length === 5 ? `${docDetails.time}:00` : docDetails.time;
 
-  const dateIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Measurement Date'));
-  const timeIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Measurement Time'));
-  const readingIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Counter Reading'));
-  const readByIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Read By'));
-  const shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Short Text'));
+  const dateIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measurement Date') || h.toLowerCase().includes('date')));
+  const timeIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measurement Time') || h.toLowerCase().includes('time')));
+  const readingIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Counter Reading') || h.toLowerCase().includes('reading')));
+  const readByIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Read By') || h.toLowerCase().includes('read by')));
+  let shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
+  if (shortTextIdx === -1) shortTextIdx = 10;
 
   // Only export equipments that have at least one log on the end date, OR within the range if accumulated
   // To be safe and show all accumulated HM in the period, we should check if they ran *at all* during the period
@@ -460,12 +459,12 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     if (timeIdx !== -1) rowData[timeIdx] = sapTime;
     if (readingIdx !== -1) rowData[readingIdx] = readingStr;
     if (readByIdx !== -1) rowData[readByIdx] = docDetails.readBy;
-    if (shortTextIdx !== -1) {
-      const plantStr = eq.plant ? ` ${eq.plant}` : '';
-      let note = `HM Mesin${plantStr} tgl ${sapDate.replace(/\./g, '-')}`;
-      if (note.length > 30) note = note.substring(0, 30);
-      rowData[shortTextIdx] = note;
-    }
+
+    const plantCodeStr = eq.plant || (docDetails.plant && docDetails.plant !== 'ALL' ? docDetails.plant : '') || '5F01';
+    let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
+    if (note.length > 30) note = note.substring(0, 30);
+    rowData[shortTextIdx] = note;
+
     wsData.push(rowData);
   });
 
@@ -499,11 +498,12 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
   const endDate = docDetails.endDate || docDetails.date; // format 'yyyy-MM-dd'
   const sapTime = docDetails.time.length === 5 ? `${docDetails.time}:00` : docDetails.time;
 
-  const dateIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Measurement Date'));
-  const timeIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Measurement Time'));
-  const readingIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Counter Reading'));
-  const readByIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Read By'));
-  const shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Short Text'));
+  const dateIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measurement Date') || h.toLowerCase().includes('date')));
+  const timeIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measurement Time') || h.toLowerCase().includes('time')));
+  const readingIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Counter Reading') || h.toLowerCase().includes('reading')));
+  const readByIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Read By') || h.toLowerCase().includes('read by')));
+  let shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
+  if (shortTextIdx === -1) shortTextIdx = 10;
 
   // Iterate each date in sorted order, up to and including selected date
   const dates = (startDate === endDate) ? [endDate] : Object.keys(dailyLogsMap).sort();
@@ -515,7 +515,6 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
     if (!logsForDate || logsForDate.length === 0) return;
 
     const dailyDurations = {};
-    const eqNotes = {};
 
     logsForDate.forEach(log => {
       // If selectedEqs is provided and not empty, skip logs for Induks not selected
@@ -526,7 +525,6 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       equipments.forEach(eq => {
         if (eq.eqNum === log.indukEqNum || (eq.induk === log.indukDesc && eq.plant === actualPlant)) {
           dailyDurations[eq.eqNum] = (dailyDurations[eq.eqNum] || 0) + durationHours;
-          if (log.notes) eqNotes[eq.eqNum] = log.notes;
         }
       });
     });
@@ -551,12 +549,12 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       if (timeIdx !== -1) rowData[timeIdx] = sapTime;
       if (readingIdx !== -1) rowData[readingIdx] = readingStr;
       if (readByIdx !== -1) rowData[readByIdx] = docDetails.readBy;
-      if (shortTextIdx !== -1) {
-        const plantStr = eq.plant ? ` ${eq.plant}` : '';
-        let note = `HM Mesin${plantStr} tgl ${sapDate.replace(/\./g, '-')}`;
-        if (note.length > 30) note = note.substring(0, 30);
-        rowData[shortTextIdx] = note;
-      }
+      
+      const plantCodeStr = eq.plant || (docDetails.plant && docDetails.plant !== 'ALL' ? docDetails.plant : '') || '5F01';
+      let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
+      if (note.length > 30) note = note.substring(0, 30);
+      rowData[shortTextIdx] = note;
+
       wsData.push(rowData);
     });
   });
