@@ -802,126 +802,204 @@ export default function DailyDashboard({
     setUploadError(null);
     try {
       const baseUrl = googleSheetUrl.trim();
-      let fetchUrl = baseUrl;
-      
-      // Auto-convert Google Sheets URLs to /export to bypass Google's 5-minute cache for published CSVs
-      const match = baseUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-      if (match && match[1] !== 'e') {
-        const docId = match[1];
-        const gidMatch = baseUrl.match(/gid=([0-9]+)/);
-        const gidParam = gidMatch ? `&gid=${gidMatch[1]}` : '';
-        fetchUrl = `https://docs.google.com/spreadsheets/d/${docId}/export?format=csv${gidParam}`;
-      }
-      
-      fetchUrl = fetchUrl.includes('?') ? `${fetchUrl}&_t=${Date.now()}` : `${fetchUrl}?_t=${Date.now()}`;
-      
-      const response = await fetch(fetchUrl);
-      if (!response.ok) throw new Error(`HTTP ${response.status}: Gagal mengambil data`);
-      const csvText = await response.text();
-
-      const lines = csvText.split('\n').map(l => l.trimEnd()).filter(l => l.trim());
-      if (lines.length < 2) throw new Error('Data kosong atau hanya header');
-
-      // Parse header row
-      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
-      const tanggalIdx  = headers.findIndex(h => h.includes('tanggal') || h.includes('date'));
-      const plantIdx    = headers.findIndex(h => h.includes('plant'));
-      const eqIdx       = headers.findIndex(h => h.includes('equipment') || h.includes('kode'));
-      const descIdx     = headers.findIndex(h => h.includes('desc') || h.includes('deskripsi'));
-      const jamIdx      = headers.findIndex(h => h.includes('jam') || h.includes('durasi') || h.includes('hour'));
-
-      if (tanggalIdx < 0 || eqIdx < 0 || jamIdx < 0)
-        throw new Error('Kolom wajib tidak ditemukan. Pastikan ada kolom: Tanggal, Equipment, Jam');
-
-      const parsed = [];
-      const errors = [];
-      let lastSeenDate = '';
-
-      for (let i = 1; i < lines.length; i++) {
-        // Split CSV handling quoted fields
-        const cols = [];
-        let cur = '', inQuote = false;
-        for (const ch of lines[i]) {
-          if (ch === '"') { inQuote = !inQuote; }
-          else if (ch === ',' && !inQuote) { cols.push(cur.trim()); cur = ''; }
-          else cur += ch;
-        }
-        cols.push(cur.trim());
-
-        let tanggalRaw = (cols[tanggalIdx] || '').replace(/^"|"$/g, '').trim();
-        const eqNumRaw   = (cols[eqIdx]      || '').replace(/^"|"$/g, '').trim();
-        const jamRaw     = (cols[jamIdx]      || '').replace(/^"|"$/g, '').trim();
-        const plantRaw   = plantIdx >= 0 ? (cols[plantIdx] || '').replace(/^"|"$/g, '').trim() : '';
-        const descRaw    = descIdx >= 0  ? (cols[descIdx]  || '').replace(/^"|"$/g, '').trim() : '';
-
-        if ((!tanggalRaw || tanggalRaw === '-') && !eqNumRaw) continue;
-
-        if ((!tanggalRaw || tanggalRaw === '-') && lastSeenDate) {
-          tanggalRaw = lastSeenDate;
-        }
-
-        // Parse date: accepts DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD
-        let dateStr = '';
-        const dmyMatch = tanggalRaw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
-        const isoMatch = tanggalRaw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (dmyMatch) {
-          dateStr = `${dmyMatch[3]}-${dmyMatch[2].padStart(2,'0')}-${dmyMatch[1].padStart(2,'0')}`;
-        } else if (isoMatch) {
-          dateStr = tanggalRaw;
-        } else {
-          errors.push(`Baris ${i+1}: Format tanggal tidak dikenali ("${tanggalRaw}")`);
-          continue;
-        }
-        lastSeenDate = tanggalRaw;
-
-        let jamRawStr = jamRaw.trim();
-        if (jamRawStr === '' || jamRawStr === '-') jamRawStr = '0';
-        const jam = parseFloat(jamRawStr.replace(',', '.'));
-        if (isNaN(jam) || jam < 0) {
-          errors.push(`Baris ${i+1}: Nilai Jam tidak valid ("${jamRaw}")`);
-          continue;
-        }
-
-        const induk = equipments.find(eq => eq.eqNum === eqNumRaw && eq.type === 'Induk')
-                   || equipments.find(eq => eq.eqNum === eqNumRaw);
-        if (!induk) {
-          errors.push(`Baris ${i+1}: Equipment "${eqNumRaw}" tidak ditemukan di Master Data`);
-          continue;
-        }
-
-        parsed.push({
-          dateStr,
-          indukEqNum: induk.eqNum,
-          indukDesc: induk.description || descRaw,
-          plant: induk.plant || plantRaw,
-          durationMinutes: Math.round(jam * 60),
-          status: 'Normal',
-          notes: '',
-        });
-      }
-
-      if (errors.length > 0) {
-        if (parsed.length === 0) {
-          setUploadError(errors.join('\n'));
-          setIsFetchingSheet(false);
-          return;
-        } else {
-          setUploadError("Peringatan: Terdapat error pada beberapa baris sehingga diabaikan:\n" + errors.slice(0, 15).join('\n'));
-        }
-      } else {
-        setUploadError(null);
-      }
-
-      // Validate that all dates match the currently active calendar month
       const activeMonthStr = format(currentMonth, 'yyyy-MM');
+      
+      // Determine candidate CSV URLs (auto-extracting all GIDs if pubhtml/pub is provided)
+      const csvUrls = [];
+      const cleanUrl = baseUrl.split('?')[0];
+
+      if (baseUrl.includes('/pub') && !baseUrl.includes('gid=')) {
+        // Multi-tab pubhtml handling
+        const pubhtmlUrl = cleanUrl.endsWith('/pubhtml') ? cleanUrl : (cleanUrl.endsWith('/pub') ? `${cleanUrl}html` : `${cleanUrl}/pubhtml`);
+        try {
+          const htmlRes = await fetch(`${pubhtmlUrl}?_t=${Date.now()}`);
+          if (htmlRes.ok) {
+            const htmlText = await htmlRes.text();
+            const hrefGids = [...htmlText.matchAll(/gid=(\d+)["&']/g)].map(h => h[1]);
+            const uniqueGids = [...new Set(hrefGids)];
+            const basePub = pubhtmlUrl.replace('/pubhtml', '/pub');
+            uniqueGids.forEach(gid => {
+              csvUrls.push(`${basePub}?gid=${gid}&single=true&output=csv&_t=${Date.now()}`);
+            });
+          }
+        } catch (e) {
+          console.warn('Could not fetch pubhtml GIDs, using single URL:', e);
+        }
+      }
+
+      if (csvUrls.length === 0) {
+        let fetchUrl = baseUrl;
+        const match = baseUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (match && match[1] !== 'e') {
+          const docId = match[1];
+          const gidMatch = baseUrl.match(/gid=([0-9]+)/);
+          const gidParam = gidMatch ? `&gid=${gidMatch[1]}` : '';
+          fetchUrl = `https://docs.google.com/spreadsheets/d/${docId}/export?format=csv${gidParam}`;
+        }
+        fetchUrl = fetchUrl.includes('?') ? `${fetchUrl}&_t=${Date.now()}` : `${fetchUrl}?_t=${Date.now()}`;
+        csvUrls.push(fetchUrl);
+      }
+
+      const allParsedMap = new Map(); // key: dateStr_eqNum -> record
+      const errors = [];
+
+      for (const url of csvUrls) {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) continue;
+          const csvText = await response.text();
+          const lines = csvText.split('\n').map(l => l.trimEnd()).filter(l => l.trim());
+          if (lines.length < 2) continue;
+
+          // Helper to split CSV handling quoted fields
+          const splitLine = (line) => {
+            const cols = [];
+            let cur = '', inQuote = false;
+            for (const ch of line) {
+              if (ch === '"') { inQuote = !inQuote; }
+              else if (ch === ',' && !inQuote) { cols.push(cur.trim()); cur = ''; }
+              else cur += ch;
+            }
+            cols.push(cur.trim());
+            return cols;
+          };
+
+          // Find header row in first 10 lines
+          let headerIdx = -1;
+          let headers = [];
+          for (let i = 0; i < Math.min(10, lines.length); i++) {
+            const cols = splitLine(lines[i]).map(c => c.replace(/^"|"$/g, '').trim().toLowerCase());
+            if (cols.includes('equipment') || cols.includes('tanggal')) {
+              headerIdx = i;
+              headers = cols;
+              break;
+            }
+          }
+
+          if (headerIdx === -1) continue;
+
+          const isVertical = headers.includes('tanggal') || headers.includes('date');
+
+          if (isVertical) {
+            const tanggalIdx = headers.findIndex(h => h.includes('tanggal') || h.includes('date'));
+            const plantIdx   = headers.findIndex(h => h.includes('plant'));
+            const eqIdx      = headers.findIndex(h => h.includes('equipment') || h.includes('kode'));
+            const descIdx    = headers.findIndex(h => h.includes('desc') || h.includes('deskripsi'));
+            const jamIdx     = headers.findIndex(h => h.includes('jam') || h.includes('durasi') || h.includes('hour'));
+
+            let lastSeenDate = '';
+            for (let i = headerIdx + 1; i < lines.length; i++) {
+              const cols = splitLine(lines[i]).map(c => c.replace(/^"|"$/g, '').trim());
+              let tanggalRaw = cols[tanggalIdx] || '';
+              const eqNumRaw   = cols[eqIdx] || '';
+              const jamRaw     = cols[jamIdx] || '0';
+              const plantRaw   = plantIdx >= 0 ? cols[plantIdx] : '';
+              const descRaw    = descIdx >= 0  ? cols[descIdx] : '';
+
+              if ((!tanggalRaw || tanggalRaw === '-') && !eqNumRaw) continue;
+              if ((!tanggalRaw || tanggalRaw === '-') && lastSeenDate) tanggalRaw = lastSeenDate;
+
+              let dateStr = '';
+              const dmyMatch = tanggalRaw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+              const isoMatch = tanggalRaw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+              if (dmyMatch) {
+                dateStr = `${dmyMatch[3]}-${dmyMatch[2].padStart(2,'0')}-${dmyMatch[1].padStart(2,'0')}`;
+              } else if (isoMatch) {
+                dateStr = tanggalRaw;
+              } else {
+                continue;
+              }
+              lastSeenDate = tanggalRaw;
+
+              const jam = parseFloat((jamRaw || '0').replace(',', '.')) || 0;
+              const eqClean = String(eqNumRaw).trim();
+              const induk = equipments.find(eq => String(eq.eqNum || eq.eq_num).trim() === eqClean && eq.type === 'Induk')
+                         || equipments.find(eq => String(eq.eqNum || eq.eq_num).trim() === eqClean);
+              if (!induk) continue;
+
+              const key = `${dateStr}_${induk.eqNum}`;
+              allParsedMap.set(key, {
+                dateStr,
+                indukEqNum: induk.eqNum,
+                indukDesc: induk.description || descRaw,
+                plant: induk.plant || plantRaw,
+                durationMinutes: Math.round(jam * 60),
+                status: 'Normal',
+                notes: '',
+              });
+            }
+          } else {
+            // HORIZONTAL MATRIX FORMAT: Equipment, Description, ..., Plant, Total, 01, 02, 03, ...
+            const eqIdx = headers.findIndex(h => h === 'equipment' || h.includes('equipment'));
+            const descIdx = headers.findIndex(h => h === 'description' || h.includes('desc'));
+            const plantIdx = headers.findIndex(h => h === 'plant');
+
+            const dateCols = [];
+            headers.forEach((h, idx) => {
+              const dayNum = parseInt(h, 10);
+              if (!isNaN(dayNum) && dayNum >= 1 && dayNum <= 31 && h.length <= 2) {
+                dateCols.push({ dayNum, colIdx: idx, dayStr: String(dayNum).padStart(2, '0') });
+              }
+            });
+
+            for (let i = headerIdx + 1; i < lines.length; i++) {
+              const cols = splitLine(lines[i]).map(c => c.replace(/^"|"$/g, '').trim());
+              const eqNumRaw = cols[eqIdx] || '';
+              if (!eqNumRaw || !/^\d+$/.test(eqNumRaw)) continue;
+
+              const descRaw = descIdx >= 0 ? cols[descIdx] : '';
+              const plantRaw = plantIdx >= 0 ? cols[plantIdx] : '';
+
+              const eqClean = String(eqNumRaw).trim();
+              const induk = equipments.find(eq => String(eq.eqNum || eq.eq_num).trim() === eqClean && eq.type === 'Induk')
+                         || equipments.find(eq => String(eq.eqNum || eq.eq_num).trim() === eqClean);
+              if (!induk) continue;
+
+              dateCols.forEach(({ dayStr, colIdx }) => {
+                const jamRaw = cols[colIdx] || '0';
+                const jam = parseFloat((jamRaw || '0').replace(',', '.')) || 0;
+                const dateStr = `${activeMonthStr}-${dayStr}`;
+
+                const key = `${dateStr}_${induk.eqNum}`;
+                // Only overwrite if not set or if duration is greater than 0
+                if (!allParsedMap.has(key) || jam > 0) {
+                  allParsedMap.set(key, {
+                    dateStr,
+                    indukEqNum: induk.eqNum,
+                    indukDesc: induk.description || descRaw,
+                    plant: induk.plant || plantRaw,
+                    durationMinutes: Math.round(jam * 60),
+                    status: 'Normal',
+                    notes: '',
+                  });
+                }
+              });
+            }
+          }
+        } catch (err) {
+          console.warn('Error reading tab:', url, err);
+        }
+      }
+
+      const parsed = Array.from(allParsedMap.values());
+      if (parsed.length === 0) {
+        throw new Error('Data Google Sheet tidak dapat diproses atau format kolom tidak dikenali.');
+      }
+
+      // Filter mismatched dates if any
       const mismatchedDates = parsed.filter(p => !p.dateStr.startsWith(activeMonthStr));
-      if (mismatchedDates.length > 0) {
+      if (mismatchedDates.length > 0 && parsed.every(p => !p.dateStr.startsWith(activeMonthStr))) {
         setUploadError(`⛔ GAGAL IMPORT: Data Google Sheet berisi tanggal dari bulan lain (contoh: ${mismatchedDates[0].dateStr}).\n\nKalender aplikasi saat ini berada di bulan ${format(currentMonth, 'MMMM yyyy', { locale: id })}.\nSilakan tutup jendela ini, lalu geser kalender utama ke bulan yang sesuai dengan data Google Sheet, baru ulangi proses import.`);
         setIsFetchingSheet(false);
         return;
       }
 
+      // Filter only matching month entries
+      const validParsed = parsed.filter(p => p.dateStr.startsWith(activeMonthStr));
+
       // Save History
+      const urlToSave = googleSheetUrl.trim();
+      const labelToSave = `GSheet ${format(new Date(), 'dd/MM/yyyy HH:mm')}`;
       const newEntry = {
         id: Date.now().toString(),
         url: urlToSave,
@@ -934,7 +1012,7 @@ export default function DailyDashboard({
       setGsheetHistory(newHistory);
       saveGSheetHistory(newHistory);
 
-      analyzeSync(parsed);
+      analyzeSync(validParsed);
       setShowGSheetModal(false);
       setShowSmartSyncModal(true);
     } catch (err) {
