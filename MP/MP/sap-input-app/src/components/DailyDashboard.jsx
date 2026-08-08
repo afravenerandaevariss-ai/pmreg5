@@ -1941,8 +1941,8 @@ export default function DailyDashboard({
               </div>
               <div className="flex items-center gap-2 flex-nowrap overflow-x-auto pb-1 sm:pb-0">
 
-            {/* Regional-only: Template download & bulk upload */}
-            {currentUser?.role !== 'Unit' && (
+            {/* Buttons in Red Box: ONLY DEV */}
+            {isAfraUser && (
               <>
                 <input
                   type="file"
@@ -1964,16 +1964,14 @@ export default function DailyDashboard({
                 >
                   <Upload size={13} /> Upload
                 </button>
-                {isAfraUser && (
-                  <button
-                    onClick={() => { setUploadError(null); setShowGSheetModal(true); }}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
-                    title="Import dari Google Sheet"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M19.77 4.93l1.3 1.3L8.44 18.86l-5.44-5.37 1.29-1.31 4.15 4.09L19.77 4.93m0-2.82L8.44 13.44l-4.15-4.09L0 13.63 8.44 22 24 6.37 19.77 2.11z"/></svg>
-                    GSheet
-                  </button>
-                )}
+                <button
+                  onClick={() => { setUploadError(null); setShowGSheetModal(true); }}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
+                  title="Import dari Google Sheet"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M19.77 4.93l1.3 1.3L8.44 18.86l-5.44-5.37 1.29-1.31 4.15 4.09L19.77 4.93m0-2.82L8.44 13.44l-4.15-4.09L0 13.63 8.44 22 24 6.37 19.77 2.11z"/></svg>
+                  GSheet
+                </button>
                 <button
                   onClick={handleFixOldPlants}
                   className="bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
@@ -1983,29 +1981,32 @@ export default function DailyDashboard({
                 </button>
               </>
             )}
+
             <button 
               onClick={() => setShowHistoryModal(true)}
               className="bg-sky-600 hover:bg-sky-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
             >
               <History size={13} /> Riwayat Alat
             </button>
-            <button 
-              onClick={() => {
-                const selDateStr = format(selectedDate, 'yyyy-MM-dd');
-                setExportSettings(prev => ({ 
-                  ...prev, 
-                  startDate: selDateStr,
-                  endDate: selDateStr,
-                  time: '08:00' 
-                }));
-                setShowExportModal(true);
-              }}
-              className="bg-[#0f172a] hover:bg-slate-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
-            >
-              <FileDown size={13} /> Export SAP
-            </button>
-            {(currentUser?.role !== 'Unit' || isAfraUser) && (
+
+            {isAfraUser && (
               <>
+                <button 
+                  onClick={() => {
+                    const selDateStr = format(selectedDate, 'yyyy-MM-dd');
+                    setExportSettings(prev => ({ 
+                      ...prev, 
+                      startDate: selDateStr,
+                      endDate: selDateStr,
+                      time: '08:00' 
+                    }));
+                    setShowExportModal(true);
+                  }}
+                  className="bg-[#0f172a] hover:bg-slate-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
+                >
+                  <FileDown size={13} /> Export SAP
+                </button>
+
                 <input
                   type="file"
                   ref={ik17InputRef}
@@ -2022,20 +2023,21 @@ export default function DailyDashboard({
                   <CheckCircle size={14} className={isUploadingIK17 ? 'animate-pulse' : ''} /> 
                   {isUploadingIK17 ? 'Memproses...' : 'Verif IK17'}
                 </button>
+
+                <button 
+                  onClick={() => setShowMassForm(true)}
+                  className="bg-[#064e3b] hover:bg-[#065f46] text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
+                >
+                  <ClipboardList size={13} /> Input Masal
+                </button>
+                <button 
+                  onClick={() => setShowForm(true)}
+                  className="bg-[#064e3b] hover:bg-[#065f46] text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm border border-[#064e3b]/30"
+                >
+                  <Plus size={13} /> Input Baru
+                </button>
               </>
             )}
-            <button 
-              onClick={() => setShowMassForm(true)}
-              className="bg-[#064e3b] hover:bg-[#065f46] text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
-            >
-              <ClipboardList size={13} /> Input Masal
-            </button>
-            <button 
-              onClick={() => setShowForm(true)}
-              className="bg-[#064e3b] hover:bg-[#065f46] text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm border border-[#064e3b]/30"
-            >
-              <Plus size={13} /> Input Baru
-            </button>
           </div>
         </div>
         
