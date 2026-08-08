@@ -292,34 +292,38 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   // Strip \r from headers to prevent double \r\r\n corruption
   const cleanHeaders = headers.map(h => typeof h === 'string' ? h.replace(/\r/g, '') : h);
   const wsData = [cleanHeaders];
-  
-  const dailyDurations = {};
-  const eqNotes = {};
 
   // Only use logs from the selected date
   const selectedDate = docDetails.date; // format 'yyyy-MM-dd'
   const todaysLogs = dailyLogsMap[selectedDate] || [];
 
+  // STEP 1: Build indukHmMap — parent equipment number → total HM for this date
+  // Each log already references the parent via induk_eq_num, so we only sum by parent eq num.
+  const indukHmMap = {}; // { [parentEqNum]: totalHours }
   todaysLogs.forEach(log => {
     const logEqNum = String(log.indukEqNum || log.induk_eq_num || '').trim();
+    if (!logEqNum) return;
     if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(logEqNum)) return;
+    const durationHours = (log.durationMinutes || 0) / 60;
+    indukHmMap[logEqNum] = Math.min(24, (indukHmMap[logEqNum] || 0) + durationHours);
+  });
 
-    const durationHours = log.durationMinutes / 60;
-    const actualPlant = log.plant || equipments.find(e => String(e.eqNum || e.eq_num || '').trim() === logEqNum)?.plant;
-    const logDesc = String(log.indukDesc || log.induk_desc || '').trim().toLowerCase();
-    
-    equipments.forEach(eq => {
-      const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
-      const isPlantMatch = !actualPlant || !eq.plant || eq.plant === actualPlant;
-      const eqInduk = String(eq.induk || '').trim().toLowerCase();
-      const isEqMatch = eqKey === logEqNum || (eqInduk && logDesc && (eqInduk === logDesc || logDesc.includes(eqInduk) || eqInduk.includes(logDesc)));
-      if (isPlantMatch && isEqMatch) {
-        dailyDurations[eqKey] = Math.min(24, (dailyDurations[eqKey] || 0) + durationHours);
+  // STEP 2: For each equipment in the template, resolve its HM value:
+  //   - If it's a parent (eqNum is in indukHmMap) → use its own HM
+  //   - If it's a sub-equipment → look up its parent's HM via eq.induk_eq_num field
+  const dailyDurations = {};
+  equipments.forEach(eq => {
+    const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+    if (!eqKey) return;
+    if (indukHmMap[eqKey] !== undefined) {
+      // This eq is itself a parent with logged data
+      dailyDurations[eqKey] = indukHmMap[eqKey];
+    } else {
+      // Sub-equipment: inherit from its parent (induk_eq_num)
+      const parentEqNum = String(eq.induk_eq_num || eq.indukEqNum || '').trim();
+      if (parentEqNum && indukHmMap[parentEqNum] !== undefined) {
+        dailyDurations[eqKey] = indukHmMap[parentEqNum];
       }
-    });
-
-    if (logEqNum) {
-      dailyDurations[logEqNum] = Math.min(24, (dailyDurations[logEqNum] || 0) + durationHours);
     }
   });
 
@@ -451,31 +455,32 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
   const eqNotes = {};
   const loggedEquipmentsMap = {};
 
-  // Sum all logs within the date range
+  // STEP 1: Build indukHmMap — sum HM per parent eq num across the date range
+  const indukHmMap = {}; // { [parentEqNum]: totalHours }
   Object.entries(dailyLogsMap).forEach(([dateStr, logs]) => {
     if (dateStr < startDate || dateStr > endDate) return;
     logs.forEach(log => {
       const logEqNum = String(log.indukEqNum || log.induk_eq_num || '').trim();
+      if (!logEqNum) return;
       if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(logEqNum)) return;
-      
-      const durationHours = log.durationMinutes / 60;
-      const actualPlant = log.plant || equipments.find(e => String(e.eqNum || e.eq_num || '').trim() === logEqNum)?.plant;
-      const logDesc = String(log.indukDesc || log.induk_desc || '').trim().toLowerCase();
-
-      if (logEqNum) {
-        accDurations[logEqNum] = (accDurations[logEqNum] || 0) + durationHours;
-        loggedEquipmentsMap[logEqNum] = log;
-      }
-
-      equipments.forEach(eq => {
-        const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
-        const eqInduk = String(eq.induk || '').trim().toLowerCase();
-        if (eqKey === logEqNum || (eqInduk && logDesc && (eqInduk === logDesc || logDesc.includes(eqInduk) || eqInduk.includes(logDesc)))) {
-          accDurations[eqKey] = (accDurations[eqKey] || 0) + durationHours;
-          if (dateStr === endDate && log.notes) eqNotes[eqKey] = log.notes;
-        }
-      });
+      const durationHours = (log.durationMinutes || 0) / 60;
+      indukHmMap[logEqNum] = (indukHmMap[logEqNum] || 0) + durationHours;
+      loggedEquipmentsMap[logEqNum] = log;
     });
+  });
+
+  // STEP 2: Resolve HM per template row — parent gets own HM, sub inherits parent HM
+  equipments.forEach(eq => {
+    const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+    if (!eqKey) return;
+    if (indukHmMap[eqKey] !== undefined) {
+      accDurations[eqKey] = indukHmMap[eqKey];
+    } else {
+      const parentEqNum = String(eq.induk_eq_num || eq.indukEqNum || '').trim();
+      if (parentEqNum && indukHmMap[parentEqNum] !== undefined) {
+        accDurations[eqKey] = indukHmMap[parentEqNum];
+      }
+    }
   });
 
   const dateParts = endDate.split('-');
@@ -613,26 +618,29 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
     const dailyDurations = {};
     const loggedEquipmentsMap = {};
 
+    // STEP 1: Build indukHmMap per date — sum HM by parent eq num
+    const indukHmMapDate = {}; // { [parentEqNum]: totalHours }
     logsForDate.forEach(log => {
       const logEqNum = String(log.indukEqNum || log.induk_eq_num || '').trim();
+      if (!logEqNum) return;
       if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(logEqNum)) return;
-      
-      const durationHours = log.durationMinutes / 60;
-      const actualPlant = log.plant || equipments.find(e => String(e.eqNum || e.eq_num || '').trim() === logEqNum)?.plant;
-      const logDesc = String(log.indukDesc || log.induk_desc || '').trim().toLowerCase();
+      const durationHours = (log.durationMinutes || 0) / 60;
+      indukHmMapDate[logEqNum] = (indukHmMapDate[logEqNum] || 0) + durationHours;
+      loggedEquipmentsMap[logEqNum] = log;
+    });
 
-      if (logEqNum) {
-        dailyDurations[logEqNum] = (dailyDurations[logEqNum] || 0) + durationHours;
-        loggedEquipmentsMap[logEqNum] = log;
-      }
-
-      equipments.forEach(eq => {
-        const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
-        const eqInduk = String(eq.induk || '').trim().toLowerCase();
-        if (eqKey === logEqNum || (eqInduk && logDesc && (eqInduk === logDesc || logDesc.includes(eqInduk) || eqInduk.includes(logDesc)))) {
-          dailyDurations[eqKey] = (dailyDurations[eqKey] || 0) + durationHours;
+    // STEP 2: Resolve HM per template row for this date
+    equipments.forEach(eq => {
+      const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+      if (!eqKey) return;
+      if (indukHmMapDate[eqKey] !== undefined) {
+        dailyDurations[eqKey] = indukHmMapDate[eqKey];
+      } else {
+        const parentEqNum = String(eq.induk_eq_num || eq.indukEqNum || '').trim();
+        if (parentEqNum && indukHmMapDate[parentEqNum] !== undefined) {
+          dailyDurations[eqKey] = indukHmMapDate[parentEqNum];
         }
-      });
+      }
     });
 
     const dateParts = dateStr.split('-');
