@@ -61,6 +61,7 @@ export default function DailyDashboard({
   // Sub-Tab State for Jam Jalan Mesin Pabrik: 'isi' (Isi Jam Jalan Web Matrix) vs 'riwayat' (Calendar & History)
   const [dashboardSubTab, setDashboardSubTab] = useState('isi');
   const [matrixMonth, setMatrixMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const [simulatedToday, setSimulatedToday] = useState(new Date());
   const defaultPlantFilter = (currentUser?.plant && String(currentUser.plant).toUpperCase().startsWith('5F'))
     ? currentUser.plant
     : '';
@@ -293,7 +294,7 @@ export default function DailyDashboard({
   const isCellEditable = (dateStr) => {
     if (currentUser?.role === 'Admin') return true; // Admin can edit any date
 
-    const today = new Date();
+    const today = simulatedToday || new Date();
     const todayDay = today.getDate();
     const todayMonthStr = format(today, 'yyyy-MM');
     const cellMonthStr = dateStr.substring(0, 7);
@@ -1580,7 +1581,7 @@ export default function DailyDashboard({
               }`}
             >
               <FileSpreadsheet size={16} />
-              Isi Jam Jalan Mesin (Web Matrix)
+              Isi Jam Jalan Pabrik
             </button>
             <button
               onClick={() => setDashboardSubTab('riwayat')}
@@ -1621,7 +1622,7 @@ export default function DailyDashboard({
 
       {/* Main Content Area */}
       {dashboardSubTab === 'isi' ? (
-        /* SUB-TAB 1: ISI JAM JALAN WEB MATRIX SPREADSHEET */
+        /* SUB-TAB 1: ISI JAM JALAN PABRIK WEB MATRIX */
         <div className="flex-1 p-5 flex flex-col gap-4 overflow-hidden">
           {/* Control & Filter Bar */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center justify-between flex-wrap gap-4 shadow-sm">
@@ -1652,7 +1653,7 @@ export default function DailyDashboard({
                 </div>
               )}
 
-              <div className="min-w-[220px]">
+              <div className="min-w-[180px]">
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cari Equipment / Mesin</label>
                 <div className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -1664,6 +1665,24 @@ export default function DailyDashboard({
                     className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-xl text-xs text-slate-800 bg-slate-50 focus:ring-2 focus:ring-[#064e3b]/20 focus:border-[#064e3b] outline-none"
                   />
                 </div>
+              </div>
+
+              {/* Simulasi Tanggal Control for Testing / Afra Veneranda Evaris */}
+              <div className="bg-emerald-50/70 border border-emerald-200 px-3 py-1.5 rounded-xl">
+                <label className="block text-[10px] font-bold text-emerald-800 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                  <Clock size={11} /> Simulasi Tanggal Hari Ini (Testing)
+                </label>
+                <input
+                  type="date"
+                  value={simulatedToday ? format(simulatedToday, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')}
+                  onChange={e => {
+                    if (e.target.value) {
+                      setSimulatedToday(new Date(e.target.value + 'T12:00:00'));
+                    }
+                  }}
+                  className="px-2.5 py-1 border border-emerald-300 rounded-lg text-xs font-bold text-emerald-950 bg-white focus:ring-2 focus:ring-emerald-500/20 outline-none cursor-pointer"
+                  title="Ubah simulasi tanggal hari ini untuk menguji penguncian H-1"
+                />
               </div>
             </div>
 
@@ -1780,8 +1799,19 @@ export default function DailyDashboard({
                             const dateStr = `${matrixMonth}-${d}`;
                             const key = `${eqNum}_${dateStr}`;
                             const rawVal = matrixData[key];
-                            const hasRecord = rawVal !== undefined && rawVal !== null && rawVal !== '';
-                            const val = hasRecord ? rawVal : '';
+                            const dayNum = parseInt(d, 10);
+
+                            let hasRecord = false;
+                            let val = '';
+
+                            if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
+                              hasRecord = true;
+                              val = rawVal;
+                            } else if (dayNum <= 6) {
+                              hasRecord = true;
+                              val = 0;
+                            }
+
                             const editable = isCellEditable(dateStr);
 
                             return (
