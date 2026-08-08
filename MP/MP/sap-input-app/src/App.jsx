@@ -2359,18 +2359,18 @@ function MasterDataView({ masterMap, currentUser }) {
         </div>
       </div>
       
-      <div className="overflow-x-auto w-full">
-        <table className="w-full text-left text-sm text-slate-600">
-          <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] sm:text-xs font-semibold border-b border-slate-200">
+      <div className="overflow-auto max-h-[calc(100vh-270px)] w-full relative">
+        <table className="w-full text-left text-sm text-slate-600 border-collapse">
+          <thead className="bg-slate-100 text-slate-800 uppercase text-[10px] sm:text-xs font-bold border-b-2 border-slate-300 sticky top-0 z-30 shadow-xs">
             <tr>
-              <th className="px-3 sm:px-6 py-3 sm:py-4 w-12 sm:w-16 whitespace-nowrap">No</th>
-              <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">Equipment</th>
-              <th className="px-3 sm:px-6 py-3 sm:py-4 min-w-[200px]">Deskripsi</th>
-              <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">Functional Loc.</th>
-              <th className="px-3 sm:px-6 py-3 sm:py-4 min-w-[200px]">FLoc Description</th>
-              <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">Cost Center</th>
-              <th className="px-3 sm:px-6 py-3 sm:py-4 min-w-[150px]">CC Description</th>
-              <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">MP</th>
+              <th className="px-3 sm:px-6 py-3 sm:py-4 w-12 sm:w-16 whitespace-nowrap sticky top-0 bg-slate-100 text-slate-800 z-30 border-b-2 border-slate-300">No</th>
+              <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap sticky top-0 bg-slate-100 text-slate-800 z-30 border-b-2 border-slate-300">Equipment</th>
+              <th className="px-3 sm:px-6 py-3 sm:py-4 min-w-[200px] sticky top-0 bg-slate-100 text-slate-800 z-30 border-b-2 border-slate-300">Deskripsi</th>
+              <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap sticky top-0 bg-slate-100 text-slate-800 z-30 border-b-2 border-slate-300">Functional Loc.</th>
+              <th className="px-3 sm:px-6 py-3 sm:py-4 min-w-[200px] sticky top-0 bg-slate-100 text-slate-800 z-30 border-b-2 border-slate-300">FLoc Description</th>
+              <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap sticky top-0 bg-slate-100 text-slate-800 z-30 border-b-2 border-slate-300">Cost Center</th>
+              <th className="px-3 sm:px-6 py-3 sm:py-4 min-w-[150px] sticky top-0 bg-slate-100 text-slate-800 z-30 border-b-2 border-slate-300">CC Description</th>
+              <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap sticky top-0 bg-slate-100 text-slate-800 z-30 border-b-2 border-slate-300">MP</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
