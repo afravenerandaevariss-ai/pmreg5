@@ -298,7 +298,7 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   const todaysLogs = dailyLogsMap[selectedDate] || [];
 
   // STEP 1: Build indukHmMap — parent equipment number → total HM for this date
-  // Each log already references the parent via induk_eq_num, so we only sum by parent eq num.
+  // Each log already references the parent via induk_eq_num.
   const indukHmMap = {}; // { [parentEqNum]: totalHours }
   todaysLogs.forEach(log => {
     const logEqNum = String(log.indukEqNum || log.induk_eq_num || '').trim();
@@ -308,9 +308,20 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     indukHmMap[logEqNum] = Math.min(24, (indukHmMap[logEqNum] || 0) + durationHours);
   });
 
+  // Build parentDescToEqNum: description → eqNum for all parent (induk) equipment in the template
+  // Sub-equipment rows have a parentEquipment field (string description of their parent)
+  const parentDescToEqNum = {};
+  equipments.forEach(eq => {
+    const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+    const desc = String(eq.description || '').trim();
+    if (eqKey && desc && indukHmMap[eqKey] !== undefined) {
+      parentDescToEqNum[desc] = eqKey;
+    }
+  });
+
   // STEP 2: For each equipment in the template, resolve its HM value:
   //   - If it's a parent (eqNum is in indukHmMap) → use its own HM
-  //   - If it's a sub-equipment → look up its parent's HM via eq.induk_eq_num field
+  //   - If it's a sub-equipment → look up parent via parentEquipment desc → inherit parent HM
   const dailyDurations = {};
   equipments.forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
@@ -319,10 +330,13 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
       // This eq is itself a parent with logged data
       dailyDurations[eqKey] = indukHmMap[eqKey];
     } else {
-      // Sub-equipment: inherit from its parent (induk_eq_num)
-      const parentEqNum = String(eq.induk_eq_num || eq.indukEqNum || '').trim();
-      if (parentEqNum && indukHmMap[parentEqNum] !== undefined) {
-        dailyDurations[eqKey] = indukHmMap[parentEqNum];
+      // Sub-equipment: inherit from its parent via parentEquipment description
+      const parentDesc = String(eq.parentEquipment || '').trim();
+      if (parentDesc) {
+        const parentEqNum = parentDescToEqNum[parentDesc];
+        if (parentEqNum && indukHmMap[parentEqNum] !== undefined) {
+          dailyDurations[eqKey] = indukHmMap[parentEqNum];
+        }
       }
     }
   });
@@ -469,6 +483,16 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     });
   });
 
+  // Build parentDescToEqNum from template for sub-equipment resolution
+  const parentDescToEqNum = {};
+  equipments.forEach(eq => {
+    const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+    const desc = String(eq.description || '').trim();
+    if (eqKey && desc && indukHmMap[eqKey] !== undefined) {
+      parentDescToEqNum[desc] = eqKey;
+    }
+  });
+
   // STEP 2: Resolve HM per template row — parent gets own HM, sub inherits parent HM
   equipments.forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
@@ -476,9 +500,12 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     if (indukHmMap[eqKey] !== undefined) {
       accDurations[eqKey] = indukHmMap[eqKey];
     } else {
-      const parentEqNum = String(eq.induk_eq_num || eq.indukEqNum || '').trim();
-      if (parentEqNum && indukHmMap[parentEqNum] !== undefined) {
-        accDurations[eqKey] = indukHmMap[parentEqNum];
+      const parentDesc = String(eq.parentEquipment || '').trim();
+      if (parentDesc) {
+        const parentEqNum = parentDescToEqNum[parentDesc];
+        if (parentEqNum && indukHmMap[parentEqNum] !== undefined) {
+          accDurations[eqKey] = indukHmMap[parentEqNum];
+        }
       }
     }
   });
@@ -629,6 +656,16 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       loggedEquipmentsMap[logEqNum] = log;
     });
 
+    // Build parentDescToEqNum for this date's sub-equipment resolution
+    const parentDescToEqNum = {};
+    equipments.forEach(eq => {
+      const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+      const desc = String(eq.description || '').trim();
+      if (eqKey && desc && indukHmMapDate[eqKey] !== undefined) {
+        parentDescToEqNum[desc] = eqKey;
+      }
+    });
+
     // STEP 2: Resolve HM per template row for this date
     equipments.forEach(eq => {
       const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
@@ -636,9 +673,12 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       if (indukHmMapDate[eqKey] !== undefined) {
         dailyDurations[eqKey] = indukHmMapDate[eqKey];
       } else {
-        const parentEqNum = String(eq.induk_eq_num || eq.indukEqNum || '').trim();
-        if (parentEqNum && indukHmMapDate[parentEqNum] !== undefined) {
-          dailyDurations[eqKey] = indukHmMapDate[parentEqNum];
+        const parentDesc = String(eq.parentEquipment || '').trim();
+        if (parentDesc) {
+          const parentEqNum = parentDescToEqNum[parentDesc];
+          if (parentEqNum && indukHmMapDate[parentEqNum] !== undefined) {
+            dailyDurations[eqKey] = indukHmMapDate[parentEqNum];
+          }
         }
       }
     });
