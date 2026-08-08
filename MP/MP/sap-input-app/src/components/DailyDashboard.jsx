@@ -227,7 +227,8 @@ export default function DailyDashboard({
     } else {
       let val = parseFloat(valueStr);
       if (isNaN(val) || val < 0) val = 0;
-      if (val > 24) val = 24;
+      // Only non-DEV users are capped at 24 HM per day
+      if (!isAfraUser && val > 24) val = 24;
       updated[key] = val;
     }
 
@@ -1846,13 +1847,13 @@ export default function DailyDashboard({
                                 <input
                                   type="number"
                                   min="0"
-                                  max="24"
-                                  step="0.5"
+                                  max={isAfraUser ? undefined : 24}
+                                  step={isAfraUser ? 0.1 : 0.5}
                                   value={val}
                                   disabled={!editable}
                                   placeholder="-"
                                   onChange={e => handleMatrixCellChange(eqNum, dateStr, e.target.value)}
-                                  title={!editable ? `Tanggal ${dateStr} terkunci. Hanya H-1 (kemarin) yang dapat diisi.` : `Isi jam jalan ${dateStr}`}
+                                  title={!editable ? `Tanggal ${dateStr} terkunci. Hanya H-1 (kemarin) yang dapat diisi.` : isAfraUser ? `Isi jam jalan ${dateStr} (DEV: tidak ada batas 24)` : `Isi jam jalan ${dateStr} (maks 24)`}
                                   className={`w-11 text-center py-1 text-xs font-mono rounded outline-none transition-all ${
                                     !editable
                                       ? hasRecord
@@ -2206,8 +2207,8 @@ export default function DailyDashboard({
                   <div className="flex flex-col items-center">
                     <div className="flex items-center bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                       <button type="button" onClick={() => setFormData({...formData, hours: Math.max(0, formData.hours - 1)})} className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 border-r border-slate-200"><Minus size={16}/></button>
-                      <input type="number" min="0" max="24" className="w-14 text-center py-2 font-bold text-lg outline-none" value={formData.hours} onChange={e => setFormData({...formData, hours: parseInt(e.target.value)||0})} />
-                      <button type="button" onClick={() => setFormData({...formData, hours: Math.min(24, formData.hours + 1)})} className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 border-l border-slate-200"><Plus size={16}/></button>
+                      <input type="number" min="0" max={isAfraUser ? undefined : 24} className="w-14 text-center py-2 font-bold text-lg outline-none" value={formData.hours} onChange={e => setFormData({...formData, hours: parseInt(e.target.value)||0})} />
+                      <button type="button" onClick={() => setFormData({...formData, hours: isAfraUser ? formData.hours + 1 : Math.min(24, formData.hours + 1)})} className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 border-l border-slate-200"><Plus size={16}/></button>
                     </div>
                     <span className="text-xs text-slate-500 mt-1 font-medium uppercase">Jam</span>
                   </div>
@@ -2345,7 +2346,7 @@ export default function DailyDashboard({
                       <th className="text-center px-4 py-3 font-semibold text-slate-700 w-24">Plant</th>
                     )}
                     <th className="text-center px-6 py-3 font-semibold text-slate-700">Equipment Induk</th>
-                    <th className="px-6 py-3 font-semibold text-slate-700 w-48 text-center">Durasi Jam (Max 24)</th>
+                    <th className="px-6 py-3 font-semibold text-slate-700 w-48 text-center">{isAfraUser ? 'Durasi Jam (DEV: Tanpa Batas)' : 'Durasi Jam (Maks 24)'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -2386,7 +2387,8 @@ export default function DailyDashboard({
                               let val = parseFloat(valStr);
                               if (!isNaN(val)) {
                                 if (val < 0) val = 0;
-                                if (val > 24) val = 24;
+                                // Only non-DEV users are capped at 24 HM per day
+                                if (!isAfraUser && val > 24) val = 24;
                                 val = Math.round(val * 2) / 2;
                                 const h = Math.floor(val);
                                 const m = (val % 1) === 0.5 ? 30 : 0;
