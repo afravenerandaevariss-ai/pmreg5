@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { format, startOfWeek, addDays, startOfMonth, endOfMonth, isSameDay, subMonths, addMonths, getDaysInMonth } from 'date-fns';
+import { format, startOfWeek, addDays, startOfMonth, endOfMonth, isSameDay, subMonths, addMonths, getDaysInMonth, subDays } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Search, Plus, Minus, X, Save, Clock, AlertTriangle, CheckCircle, ClipboardList, Download, FileDown, Trash2, Eye, Upload, History, Flag, FileSpreadsheet, RefreshCw, Layers } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -270,6 +270,28 @@ export default function DailyDashboard({
       return Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0'));
     }
   }, [matrixMonth]);
+
+  // Check if a cell date (yyyy-MM-dd) is editable based on H-1 rule & Tanggal 1-2 exception
+  const isCellEditable = (dateStr) => {
+    if (currentUser?.role === 'Admin') return true; // Admin can edit any date
+
+    const today = new Date();
+    const todayDay = today.getDate();
+    const todayMonthStr = format(today, 'yyyy-MM');
+    const cellMonthStr = dateStr.substring(0, 7);
+
+    // Rule 1: Tanggal 1 & 2 tiap bulan -> bisa edit semua tanggal bulan berjalan & bulan lalu
+    if (todayDay === 1 || todayDay === 2) {
+      const prevMonthStr = format(subMonths(today, 1), 'yyyy-MM');
+      return cellMonthStr === todayMonthStr || cellMonthStr === prevMonthStr;
+    }
+
+    // Rule 2: Tanggal 3 ke atas -> Hanya bisa edit H-1 (kemarin) di bulan berjalan
+    const yesterdayObj = subDays(today, 1);
+    const yesterdayStr = format(yesterdayObj, 'yyyy-MM-dd');
+
+    return dateStr === yesterdayStr;
+  };
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showForm, setShowForm] = useState(false);
@@ -1678,11 +1700,21 @@ export default function DailyDashboard({
                     <th className="p-2.5 text-left border-r border-slate-700 min-w-[120px] sticky left-26 bg-slate-800 z-40">No. Equipment</th>
                     <th className="p-2.5 text-left border-r border-slate-700 min-w-[200px]">Deskripsi Mesin (Induk)</th>
                     <th className="p-2.5 text-center border-r border-slate-700 min-w-[80px] bg-emerald-950 text-emerald-300">Total HM</th>
-                    {matrixDaysInMonth.map(dayStr => (
-                      <th key={dayStr} className="p-2 text-center border-r border-slate-700 min-w-[48px] text-[11px] font-mono">
-                        {dayStr}
-                      </th>
-                    ))}
+                    {matrixDaysInMonth.map(dayStr => {
+                      const dateStr = `${matrixMonth}-${dayStr}`;
+                      const editable = isCellEditable(dateStr);
+                      return (
+                        <th 
+                          key={dayStr} 
+                          title={editable ? "Tanggal aktif dapat diisi (H-1 / Aktif)" : "Tanggal terkunci (Hanya H-1 yang dapat diisi)"}
+                          className={`p-2 text-center border-r border-slate-700 min-w-[48px] text-[11px] font-mono transition-colors ${
+                            editable ? 'bg-emerald-700 text-emerald-100 font-black ring-1 ring-emerald-400' : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {dayStr}
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -1718,25 +1750,29 @@ export default function DailyDashboard({
                             const key = `${eqNum}_${dateStr}`;
                             const rawVal = matrixData[key];
                             const val = rawVal !== undefined ? rawVal : '';
-                            const isPositive = typeof val === 'number' && val > 0;
-                            const isZero = val === 0 || val === '0';
+                            const isFilled = rawVal !== undefined && rawVal !== null && rawVal !== '';
+                            const editable = isCellEditable(dateStr);
 
                             return (
-                              <td key={d} className={`p-0.5 text-center border-r border-slate-200 ${isPositive ? 'bg-emerald-100/70 font-bold' : isZero ? 'bg-slate-100' : ''}`}>
+                              <td key={d} className={`p-0.5 text-center border-r border-slate-200 ${isFilled ? 'bg-emerald-100/80 font-bold' : ''}`}>
                                 <input
                                   type="number"
                                   min="0"
                                   max="24"
                                   step="0.5"
                                   value={val}
+                                  disabled={!editable}
                                   placeholder="0"
                                   onChange={e => handleMatrixCellChange(eqNum, dateStr, e.target.value)}
+                                  title={!editable ? `Tanggal ${dateStr} terkunci. Hanya H-1 (kemarin) yang dapat diisi.` : `Isi jam jalan ${dateStr}`}
                                   className={`w-11 text-center py-1 text-xs font-mono rounded outline-none transition-all ${
-                                    isPositive 
-                                      ? 'bg-emerald-200/60 text-emerald-950 font-black border border-emerald-400 focus:ring-2 focus:ring-emerald-600' 
-                                      : isZero
-                                      ? 'bg-slate-200/80 text-slate-800 font-bold border border-slate-400'
-                                      : 'bg-transparent text-slate-600 focus:bg-white focus:border focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300'
+                                    !editable
+                                      ? isFilled
+                                        ? 'bg-emerald-100/90 text-emerald-900 font-bold border border-emerald-300 opacity-90 cursor-not-allowed'
+                                        : 'bg-slate-100/50 text-slate-400 cursor-not-allowed border border-transparent'
+                                      : isFilled 
+                                        ? 'bg-emerald-200/90 text-emerald-950 font-black border border-emerald-500 focus:ring-2 focus:ring-emerald-600' 
+                                        : 'bg-transparent text-slate-700 focus:bg-white focus:border focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300'
                                   }`}
                                 />
                               </td>
