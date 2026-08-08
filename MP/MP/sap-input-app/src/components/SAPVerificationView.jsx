@@ -1,17 +1,19 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { format, endOfMonth, getDaysInMonth } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { RefreshCw, Download, Calendar, List, X, Copy, Check } from 'lucide-react';
+import { RefreshCw, Download, Calendar, List, X, Copy, Check, Upload } from 'lucide-react';
 import { supabase, IS_DEV_ENV } from '../lib/supabase';
 
 const T_DAILY_LOGS = IS_DEV_ENV ? 'dev_daily_logs' : 'daily_logs';
 
-import { getSystemConfig } from '../lib/supabaseService';
+import { getSystemConfig, saveSystemConfig } from '../lib/supabaseService';
 import * as XLSX from 'xlsx';
 
 export default function SAPVerificationView({ equipments, currentUser }) {
   const [targetMonth, setTargetMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isUploadingIK17, setIsUploadingIK17] = useState(false);
+  const ik17InputRef = useRef(null);
   const [matrixData, setMatrixData] = useState([]); 
   const [lastUpdated, setLastUpdated] = useState('');
   const [debugMsg, setDebugMsg] = useState('');
@@ -25,6 +27,93 @@ export default function SAPVerificationView({ equipments, currentUser }) {
   const [rawWebLogs, setRawWebLogs] = useState([]);
   const [rawSapLogs, setRawSapLogs] = useState([]);
   const [detailModal, setDetailModal] = useState(null); // { plant, dateKey, selisihTotal }
+
+  const handleIK17Upload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIsUploadingIK17(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array' });
+      const sheetName = wb.SheetNames[0];
+      const sheet = wb.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+      if (jsonData.length < 2) throw new Error("Format file IK17 tidak valid.");
+
+      let eqIdx = -1, valIdx = -1, dateIdx = -1, textIdx = -1;
+      let headerRow = 0;
+      for (let r = 0; r < Math.min(10, jsonData.length); r++) {
+        const row = jsonData[r];
+        if (!row || !Array.isArray(row)) continue;
+        row.forEach((cell, colIdx) => {
+          const str = String(cell || '').toUpperCase().trim();
+          if (str === 'EQUIPMENT' || str.includes('NO. EQ') || str.includes('NO EQ')) eqIdx = colIdx;
+          if (str.includes('PENGUKURAN') || str.includes('VAL') || str.includes('NILAI') || str.includes('READING')) valIdx = colIdx;
+          if (str.includes('TANGGAL') || str.includes('DATE') || str.includes('MEASUREMENT DATE')) dateIdx = colIdx;
+          if (str.includes('TEKS') || str.includes('TEXT') || str.includes('CATATAN')) textIdx = colIdx;
+        });
+        if (eqIdx !== -1 && valIdx !== -1) { headerRow = r; break; }
+      }
+
+      if (eqIdx === -1 || valIdx === -1) {
+        eqIdx = 0; valIdx = 3; dateIdx = 1;
+      }
+
+      const parsedRows = [];
+      const newDatesSet = new Set();
+      for (let i = headerRow + 1; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        if (!row || !row[eqIdx]) continue;
+        const eqStr = String(row[eqIdx]).trim();
+        let valNum = parseFloat(String(row[valIdx] || '0').replace(',', '.'));
+        if (isNaN(valNum)) valNum = 0;
+        let dateStr = '';
+        if (dateIdx !== -1 && row[dateIdx]) {
+          const rawDate = row[dateIdx];
+          if (typeof rawDate === 'number') {
+            const dateObj = XLSX.SSF.parse_date_code(rawDate);
+            if (dateObj) dateStr = `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
+          } else {
+            const str = String(rawDate).trim();
+            if (str.includes('/')) {
+              const parts = str.split('/');
+              if (parts.length === 3) dateStr = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            } else if (str.includes('-')) {
+              dateStr = str;
+            }
+          }
+        }
+        const textStr = textIdx !== -1 ? String(row[textIdx] || '') : '';
+        const isSaldoAwal = textStr.toLowerCase().includes('saldo') || textStr.toLowerCase().includes('awal');
+        if (dateStr) newDatesSet.add(dateStr);
+
+        parsedRows.push({
+          e: eqStr,
+          h: valNum,
+          d: dateStr,
+          s: isSaldoAwal
+        });
+      }
+
+      // Merge with existing raw data
+      const { data: existingRaw } = await getSystemConfig('ik17_raw_data');
+      let mergedRaw = Array.isArray(existingRaw) ? existingRaw : [];
+      
+      if (newDatesSet.size > 0) {
+        mergedRaw = mergedRaw.filter(r => !newDatesSet.has(r.d));
+      }
+      mergedRaw = [...mergedRaw, ...parsedRows];
+
+      await saveSystemConfig('ik17_raw_data', mergedRaw);
+      alert(`Berhasil mengunggah file IK17 SAP! Terproses ${parsedRows.length} baris data pengukuran.`);
+      loadMatrixData();
+    } catch (err) {
+      alert('Gagal mengunggah file IK17: ' + err.message);
+    } finally {
+      setIsUploadingIK17(false);
+      if (e.target) e.target.value = '';
+    }
+  };
 
   const uniquePlants = useMemo(() => {
     return ['5F01', '5F04', '5F07', '5F08', '5F09', '5F14', '5F15', '5F21', '5F22'];
@@ -406,6 +495,23 @@ export default function SAPVerificationView({ equipments, currentUser }) {
                 Hanya Selisih
               </label>
             </div>
+
+            <input
+              type="file"
+              ref={ik17InputRef}
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleIK17Upload}
+            />
+            <button
+              onClick={() => ik17InputRef.current?.click()}
+              disabled={isProcessing || isUploadingIK17}
+              title="Upload file IK17 dari SAP untuk sinkronisasi matrik verifikasi"
+              className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 sm:py-2.5 mt-5 sm:mt-0 rounded-2xl font-bold flex items-center justify-center transition-colors shadow-sm disabled:opacity-50 text-xs gap-1.5"
+            >
+              <Upload size={14} className={isUploadingIK17 ? 'animate-pulse' : ''} />
+              {isUploadingIK17 ? 'Memproses IK17...' : 'Upload IK17'}
+            </button>
 
             <button
               onClick={loadMatrixData}

@@ -2007,23 +2007,6 @@ export default function DailyDashboard({
                   <FileDown size={13} /> Export SAP
                 </button>
 
-                <input
-                  type="file"
-                  ref={ik17InputRef}
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  onChange={handleIK17Upload}
-                />
-                <button
-                  onClick={() => ik17InputRef.current.click()}
-                  disabled={isUploadingIK17}
-                  className={`${isUploadingIK17 ? 'bg-slate-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'} text-white px-3 py-1.5 rounded-2xl font-medium flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap`}
-                  title="Upload file IK17 dari SAP untuk sinkronisasi kalender"
-                >
-                  <CheckCircle size={14} className={isUploadingIK17 ? 'animate-pulse' : ''} /> 
-                  {isUploadingIK17 ? 'Memproses...' : 'Verif IK17'}
-                </button>
-
                 <button 
                   onClick={() => setShowMassForm(true)}
                   className="bg-[#064e3b] hover:bg-[#065f46] text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
