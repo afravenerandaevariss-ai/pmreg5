@@ -60,6 +60,7 @@ export default function DailyDashboard({
 
   // Sub-Tab State for Jam Jalan Mesin Pabrik: 'isi' (Isi Jam Jalan Web Matrix) vs 'riwayat' (Calendar & History)
   const [dashboardSubTab, setDashboardSubTab] = useState('isi');
+  const [matrixMonth, setMatrixMonth] = useState(format(new Date(), 'yyyy-MM'));
   const defaultPlantFilter = (currentUser?.plant && String(currentUser.plant).toUpperCase().startsWith('5F'))
     ? currentUser.plant
     : '';
