@@ -146,36 +146,35 @@ export default function DailyDashboard({
 
         if (hours !== undefined && hours !== null && hours !== '') {
           payloadList.push({
+            id: `${dateStr}_${eqNum}`,
             plant: plant,
-            unit_code: plant,
-            log_date: dateStr,
+            date: dateStr,
             induk_eq_num: eqNum,
-            induk_description: eq?.description || '',
+            induk_desc: eq?.description || '',
             duration_minutes: Math.round(hours * 60),
-            reading_value: hours,
-            status: 'Operational',
-            updated_at: new Date().toISOString()
+            status: 'Normal',
+            notes: '',
+            did_run: hours > 0,
+            timestamp: new Date().toISOString()
           });
         } else {
-          keysToDelete.push({ plant, eqNum, dateStr });
+          keysToDelete.push(`${dateStr}_${eqNum}`);
         }
       }
 
       if (payloadList.length > 0) {
         const { error } = await supabase
           .from(T_DAILY_LOGS)
-          .upsert(payloadList, { onConflict: 'plant,induk_eq_num,log_date' });
+          .upsert(payloadList, { onConflict: 'id' });
 
         if (error) throw error;
       }
 
-      for (const item of keysToDelete) {
+      for (const idToDelete of keysToDelete) {
         await supabase
           .from(T_DAILY_LOGS)
           .delete()
-          .eq('plant', item.plant)
-          .eq('induk_eq_num', item.eqNum)
-          .eq('log_date', item.dateStr);
+          .eq('id', idToDelete);
       }
 
       setInitialMatrixData({ ...dataToSave });
