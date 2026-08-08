@@ -56,16 +56,33 @@ export default function DailyDashboard({
   setSapSyncedDates
 }) {
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [logPlantFilter, setLogPlantFilter] = useState('');
 
   // Sub-Tab State for Jam Jalan Mesin Pabrik: 'isi' (Isi Jam Jalan Web Matrix) vs 'riwayat' (Calendar & History)
   const [dashboardSubTab, setDashboardSubTab] = useState('isi');
   const [matrixMonth, setMatrixMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [simulatedToday, setSimulatedToday] = useState(new Date());
+
+  const isAfraUser = useMemo(() => {
+    if (!currentUser) return false;
+    const name = (currentUser.name || '').toLowerCase();
+    const nik = String(currentUser.nik || '');
+    return name.includes('afra') || nik === '13000000';
+  }, [currentUser]);
+
   const defaultPlantFilter = (currentUser?.plant && String(currentUser.plant).toUpperCase().startsWith('5F'))
     ? currentUser.plant
     : '';
   const [matrixPlantFilter, setMatrixPlantFilter] = useState(defaultPlantFilter);
+  const [logPlantFilter, setLogPlantFilter] = useState(defaultPlantFilter);
+
+  // Automatically lock plant filter to currentUser.plant for non-Afra unit users
+  useEffect(() => {
+    if (!isAfraUser && currentUser?.plant) {
+      setMatrixPlantFilter(currentUser.plant);
+      setLogPlantFilter(currentUser.plant);
+      setSelectedExportPlants([currentUser.plant]);
+    }
+  }, [currentUser, isAfraUser]);
   const [matrixSearch, setMatrixSearch] = useState('');
   const [matrixPage, setMatrixPage] = useState(1);
   const matrixPageSize = 250;
@@ -1597,7 +1614,7 @@ export default function DailyDashboard({
 
         {/* Global Action Buttons */}
         <div className="flex items-center gap-2">
-          {currentUser?.role !== 'Unit' && (
+          {isAfraUser && (
             <button
               onClick={handleFetchGoogleSheet}
               disabled={isFetchingSheet || !googleSheetUrl.trim()}
@@ -1635,7 +1652,7 @@ export default function DailyDashboard({
                 />
               </div>
 
-              {currentUser?.role !== 'Unit' && (
+              {isAfraUser ? (
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter Plant / Pabrik</label>
                   <select
@@ -1648,6 +1665,14 @@ export default function DailyDashboard({
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Plant / Pabrik Unit</label>
+                  <div className="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    {currentUser?.plant || '5F01'}
+                  </div>
                 </div>
               )}
 
@@ -1665,23 +1690,26 @@ export default function DailyDashboard({
                 </div>
               </div>
 
-              {/* Simulasi Tanggal Control for Testing / Afra Veneranda Evaris */}
-              <div className="bg-emerald-50/70 border border-emerald-200 px-3 py-1.5 rounded-xl">
-                <label className="block text-[10px] font-bold text-emerald-800 uppercase tracking-wider mb-0.5 flex items-center gap-1">
-                  <Clock size={11} /> Simulasi Tanggal Hari Ini (Testing)
-                </label>
-                <input
-                  type="date"
-                  value={simulatedToday ? format(simulatedToday, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')}
-                  onChange={e => {
-                    if (e.target.value) {
-                      setSimulatedToday(new Date(e.target.value + 'T12:00:00'));
-                    }
-                  }}
-                  className="px-2.5 py-1 border border-emerald-300 rounded-lg text-xs font-bold text-emerald-950 bg-white focus:ring-2 focus:ring-emerald-500/20 outline-none cursor-pointer"
-                  title="Ubah simulasi tanggal hari ini untuk menguji penguncian H-1"
-                />
-              </div>
+              {/* Simulasi Tanggal Control for Testing (Khusus Afra Veneranda Evaris) */}
+              {isAfraUser && (
+                <div className="bg-emerald-50/70 border border-emerald-200 px-3 py-1.5 rounded-xl">
+                  <label className="block text-[10px] font-bold text-emerald-800 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                    <Clock size={11} /> Simulasi Tanggal Hari Ini (Testing)
+                  </label>
+                  <input
+                    type="date"
+                    value={simulatedToday ? format(simulatedToday, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')}
+                    onChange={e => {
+                      if (e.target.value) {
+                        const [y, m, d] = e.target.value.split('-').map(Number);
+                        setSimulatedToday(new Date(y, m - 1, d, 12, 0, 0));
+                      }
+                    }}
+                    className="px-2.5 py-1 border border-emerald-300 rounded-lg text-xs font-bold text-emerald-950 bg-white focus:ring-2 focus:ring-emerald-500/20 outline-none cursor-pointer"
+                    title="Ubah simulasi tanggal hari ini untuk menguji penguncian H-1"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-3">
@@ -1892,7 +1920,7 @@ export default function DailyDashboard({
                   <h2 className="text-base font-black text-slate-800 tracking-tight">Riwayat Input Jam Jalan</h2>
                   <p className="text-xs text-emerald-600 font-semibold">{format(selectedDate, 'EEEE, dd MMMM yyyy', { locale: id })}</p>
                 </div>
-                {currentUser?.role !== 'Unit' && (
+                {isAfraUser ? (
                   <select
                     value={logPlantFilter}
                     onChange={(e) => setLogPlantFilter(e.target.value)}
@@ -1903,6 +1931,11 @@ export default function DailyDashboard({
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
+                ) : (
+                  <div className="px-3.5 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    {currentUser?.plant || '5F01'}
+                  </div>
                 )}
               </div>
               <div className="flex items-center gap-2 flex-nowrap overflow-x-auto pb-1 sm:pb-0">
@@ -1930,14 +1963,16 @@ export default function DailyDashboard({
                 >
                   <Upload size={13} /> Upload
                 </button>
-                <button
-                  onClick={() => { setUploadError(null); setShowGSheetModal(true); }}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
-                  title="Import dari Google Sheet"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M19.77 4.93l1.3 1.3L8.44 18.86l-5.44-5.37 1.29-1.31 4.15 4.09L19.77 4.93m0-2.82L8.44 13.44l-4.15-4.09L0 13.63 8.44 22 24 6.37 19.77 2.11z"/></svg>
-                  GSheet
-                </button>
+                {isAfraUser && (
+                  <button
+                    onClick={() => { setUploadError(null); setShowGSheetModal(true); }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
+                    title="Import dari Google Sheet"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M19.77 4.93l1.3 1.3L8.44 18.86l-5.44-5.37 1.29-1.31 4.15 4.09L19.77 4.93m0-2.82L8.44 13.44l-4.15-4.09L0 13.63 8.44 22 24 6.37 19.77 2.11z"/></svg>
+                    GSheet
+                  </button>
+                )}
                 <button
                   onClick={handleFixOldPlants}
                   className="bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
@@ -2437,7 +2472,7 @@ export default function DailyDashboard({
                 </div>
               </div>
 
-              {currentUser?.role?.toUpperCase() === 'ADMIN' && (
+              {isAfraUser ? (
                 <fieldset className="border border-slate-200 rounded-2xl p-3 bg-white space-y-1">
                   <div className="flex justify-between items-center mb-1.5 px-1">
                     <legend className="text-xs font-bold text-slate-500 uppercase tracking-wide">Pilih Pabrik (Opsional)</legend>
@@ -2484,6 +2519,14 @@ export default function DailyDashboard({
                     })}
                   </div>
                 </fieldset>
+              ) : (
+                <div className="border border-slate-200 rounded-2xl p-3 bg-slate-50">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Pabrik Terkunci</label>
+                  <div className="text-xs font-bold text-slate-700 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    Ekspor terbatas khusus untuk Unit Plant: {currentUser?.plant || '5F01'}
+                  </div>
+                </div>
               )}
 
               <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
