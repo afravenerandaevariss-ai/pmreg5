@@ -1111,41 +1111,35 @@ function App() {
             <p className={`text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-2 ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
               Sinkronisasi & Laporan
             </p>
-            {isAdmin && (
-              <button 
-                onClick={() => {
-                  setActiveTab('verifikasi');
-                  window.history.pushState({}, '', '?tab=verifikasi');
-                  setIsMobileMenuOpen(false);
-                }} 
-                className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'verifikasi' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
-                title="Verifikasi Sinkronisasi SAP"
-              >
-                <CheckCircle size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4" : "mx-auto group-hover:mr-4 group-hover:mx-0"} />
-                <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
-                  Verifikasi SAP
-                </span>
-              </button>
-            )}
+            <button 
+              onClick={() => {
+                setActiveTab('verifikasi');
+                window.history.pushState({}, '', '?tab=verifikasi');
+                setIsMobileMenuOpen(false);
+              }} 
+              className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'verifikasi' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
+              title="Verifikasi Sinkronisasi SAP"
+            >
+              <CheckCircle size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4" : "mx-auto group-hover:mr-4 group-hover:mx-0"} />
+              <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
+                Verifikasi SAP
+              </span>
+            </button>
 
-            {currentUser?.role !== 'Unit' && (
-              <>
-                <button 
-                  onClick={() => {
-                    setActiveTab('table');
-                    window.history.pushState({}, '', window.location.pathname);
-                    setIsMobileMenuOpen(false);
-                  }} 
-                  className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'table' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
-                  title="Tabel & Ekspor SAP"
-                >
-                  <ClipboardList size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4" : "mx-auto group-hover:mr-4 group-hover:mx-0"} />
-                  <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
-                    Tabel & Ekspor SAP
-                  </span>
-                </button>
-              </>
-            )}
+            <button 
+              onClick={() => {
+                setActiveTab('table');
+                window.history.pushState({}, '', window.location.pathname);
+                setIsMobileMenuOpen(false);
+              }} 
+              className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'table' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
+              title="Tabel & Ekspor SAP"
+            >
+              <ClipboardList size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4" : "mx-auto group-hover:mr-4 group-hover:mx-0"} />
+              <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
+                Tabel & Ekspor SAP
+              </span>
+            </button>
 
             <button 
               onClick={() => {

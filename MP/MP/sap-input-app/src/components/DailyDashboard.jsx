@@ -2004,7 +2004,7 @@ export default function DailyDashboard({
             >
               <FileDown size={13} /> Export SAP
             </button>
-            {currentUser?.role?.toUpperCase() === 'ADMIN' && (
+            {(currentUser?.role !== 'Unit' || isAfraUser) && (
               <>
                 <input
                   type="file"
