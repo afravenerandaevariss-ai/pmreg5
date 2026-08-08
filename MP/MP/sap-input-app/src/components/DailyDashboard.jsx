@@ -112,7 +112,94 @@ export default function DailyDashboard({
     }
   }, [dashboardSubTab, matrixMonth, matrixPlantFilter]);
 
-  // Matrix cell change handler
+  const autoSaveTimerRef = useRef(null);
+  const [autoSaveStatus, setAutoSaveStatus] = useState(''); // 'saving', 'saved', ''
+
+  // Core save routine for both Auto-Save and Manual Save
+  const performSaveMatrix = async (dataToSave = matrixData, isManual = false) => {
+    setIsSavingMatrix(true);
+    setAutoSaveStatus('saving');
+    try {
+      const modifiedKeys = new Set();
+      const allKeys = new Set([...Object.keys(dataToSave), ...Object.keys(initialMatrixData)]);
+      allKeys.forEach(k => {
+        if (dataToSave[k] !== initialMatrixData[k]) {
+          modifiedKeys.add(k);
+        }
+      });
+
+      if (modifiedKeys.size === 0) {
+        if (isManual) alert('Tidak ada perubahan jam jalan yang perlu disimpan.');
+        setIsSavingMatrix(false);
+        setAutoSaveStatus('');
+        return;
+      }
+
+      const payloadList = [];
+      const keysToDelete = [];
+
+      for (const key of modifiedKeys) {
+        const [eqNum, dateStr] = key.split('_');
+        const eq = (templateData?.equipments || equipments).find(e => String(e.eqNum || e.eq_num).trim() === eqNum);
+        const plant = eq?.plant || matrixPlantFilter || '5F07';
+        const hours = dataToSave[key];
+
+        if (hours !== undefined && hours !== null && hours !== '') {
+          payloadList.push({
+            plant: plant,
+            unit_code: plant,
+            log_date: dateStr,
+            induk_eq_num: eqNum,
+            induk_description: eq?.description || '',
+            duration_minutes: Math.round(hours * 60),
+            reading_value: hours,
+            status: 'Operational',
+            updated_at: new Date().toISOString()
+          });
+        } else {
+          keysToDelete.push({ plant, eqNum, dateStr });
+        }
+      }
+
+      if (payloadList.length > 0) {
+        const { error } = await supabase
+          .from(T_DAILY_LOGS)
+          .upsert(payloadList, { onConflict: 'plant,induk_eq_num,log_date' });
+
+        if (error) throw error;
+      }
+
+      for (const item of keysToDelete) {
+        await supabase
+          .from(T_DAILY_LOGS)
+          .delete()
+          .eq('plant', item.plant)
+          .eq('induk_eq_num', item.eqNum)
+          .eq('log_date', item.dateStr);
+      }
+
+      setInitialMatrixData({ ...dataToSave });
+      setUnsavedMatrixCount(0);
+      setAutoSaveStatus('saved');
+      setTimeout(() => setAutoSaveStatus(''), 3000);
+
+      // Refresh calendar daily logs map
+      const { data: updatedLogsMap } = await fetchDailyLogs(logPlantFilter || 'ALL', format(selectedDate, 'yyyy-MM'));
+      if (updatedLogsMap) setDailyLogs(updatedLogsMap);
+
+      if (isManual) {
+        alert(`✅ Berhasil menyimpan ${modifiedKeys.size} entri Jam Jalan Mesin Pabrik ke database!`);
+      }
+    } catch (err) {
+      console.error('Error saving matrix:', err);
+      setAutoSaveStatus('');
+      if (isManual) alert('❌ Gagal menyimpan jam jalan: ' + err.message);
+    } finally {
+      setIsSavingMatrix(false);
+    }
+  };
+
+  // Matrix cell change handler with Auto-Save trigger
   const handleMatrixCellChange = (eqNum, dateStr, valueStr) => {
     const key = `${eqNum}_${dateStr}`;
     const updated = { ...matrixData };
@@ -136,87 +223,16 @@ export default function DailyDashboard({
       }
     });
     setUnsavedMatrixCount(unsaved);
+
+    // Trigger Auto-Save after 800ms debounce
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      performSaveMatrix(updated, false);
+    }, 800);
   };
 
-  // Matrix Save handler
-  const handleSaveMatrix = async () => {
-    setIsSavingMatrix(true);
-    try {
-      const modifiedKeys = new Set();
-      const allKeys = new Set([...Object.keys(matrixData), ...Object.keys(initialMatrixData)]);
-      allKeys.forEach(k => {
-        if (matrixData[k] !== initialMatrixData[k]) {
-          modifiedKeys.add(k);
-        }
-      });
-
-      if (modifiedKeys.size === 0) {
-        alert('Tidak ada perubahan jam jalan yang perlu disimpan.');
-        setIsSavingMatrix(false);
-        return;
-      }
-
-      const logsByPlantAndDate = {};
-
-      for (const key of modifiedKeys) {
-        const [eqNum, dateStr] = key.split('_');
-        const eq = equipments.find(e => String(e.eqNum || e.eq_num).trim() === eqNum);
-        const plant = eq?.plant || matrixPlantFilter || '5F07';
-        const hours = matrixData[key] || 0;
-
-        const groupKey = `${plant}_${dateStr}`;
-        if (!logsByPlantAndDate[groupKey]) {
-          logsByPlantAndDate[groupKey] = [];
-        }
-
-        if (hours > 0) {
-          logsByPlantAndDate[groupKey].push({
-            id: `${dateStr}_${eqNum}`,
-            plant,
-            dateStr,
-            indukEqNum: eqNum,
-            indukDesc: eq?.description || '',
-            durationMinutes: Math.round(hours * 60),
-            status: 'Normal',
-            notes: '',
-            didRun: true,
-            timestamp: new Date().toISOString(),
-          });
-        }
-      }
-
-      for (const [groupKey, logs] of Object.entries(logsByPlantAndDate)) {
-        const [plant, dateStr] = groupKey.split('_');
-        if (logs.length > 0) {
-          for (const l of logs) {
-            await deleteDailyLog(l.id);
-          }
-          await insertDailyLogs(plant, dateStr, logs);
-        }
-      }
-
-      for (const key of modifiedKeys) {
-        if (!matrixData[key] && initialMatrixData[key]) {
-          const [eqNum, dateStr] = key.split('_');
-          await deleteDailyLog(`${dateStr}_${eqNum}`);
-        }
-      }
-
-      setInitialMatrixData({ ...matrixData });
-      setUnsavedMatrixCount(0);
-
-      // Refresh calendar daily logs map
-      const { data: updatedLogsMap } = await fetchDailyLogs(logPlantFilter || 'ALL', format(selectedDate, 'yyyy-MM'));
-      if (updatedLogsMap) setDailyLogs(updatedLogsMap);
-
-      alert(`✅ Berhasil menyimpan ${modifiedKeys.size} entri Jam Jalan Mesin Pabrik ke database!`);
-    } catch (err) {
-      console.error('Error saving matrix:', err);
-      alert('❌ Gagal menyimpan jam jalan: ' + err.message);
-    } finally {
-      setIsSavingMatrix(false);
-    }
-  };
+  // Matrix Save handler (Manual button trigger)
+  const handleSaveMatrix = () => performSaveMatrix(matrixData, true);
 
   // Unique 5F Pabrik plants for matrix dropdown
   const matrix5FPlants = useMemo(() => {
@@ -1653,6 +1669,19 @@ export default function DailyDashboard({
             </div>
 
             <div className="flex items-center gap-3">
+              {autoSaveStatus === 'saving' && (
+                <span className="text-xs font-bold text-amber-700 flex items-center gap-1.5 animate-pulse bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 shadow-xs">
+                  <RefreshCw size={13} className="animate-spin text-amber-600" />
+                  Auto-Save...
+                </span>
+              )}
+              {autoSaveStatus === 'saved' && (
+                <span className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 shadow-xs">
+                  <CheckCircle size={14} className="text-emerald-600" />
+                  Tersimpan Otomatis ✓
+                </span>
+              )}
+
               <button
                 onClick={loadMatrixFromDB}
                 disabled={isMatrixLoading}
