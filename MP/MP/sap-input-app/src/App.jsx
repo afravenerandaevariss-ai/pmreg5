@@ -591,7 +591,8 @@ function App() {
   const isAdmin = currentUser && (
     currentUser.role === 'Admin' || 
     currentUser.role?.toUpperCase() === 'ADMIN' || 
-    currentUser.role?.toUpperCase() === 'REGIONAL'
+    currentUser.role?.toUpperCase() === 'REGIONAL' ||
+    currentUser.role?.toUpperCase() === 'DEV'
   );
   
   

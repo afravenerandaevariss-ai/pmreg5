@@ -64,9 +64,10 @@ export default function DailyDashboard({
 
   const isAfraUser = useMemo(() => {
     if (!currentUser) return false;
+    const role = String(currentUser.role || '').toUpperCase();
     const name = (currentUser.name || '').toLowerCase();
     const nik = String(currentUser.nik || '');
-    return name.includes('afra') || nik === '13000000';
+    return role === 'DEV' || name.includes('afra') || nik === '13000000' || nik === '19010048';
   }, [currentUser]);
 
   const defaultPlantFilter = (currentUser?.plant && String(currentUser.plant).toUpperCase().startsWith('5F'))
