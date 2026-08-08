@@ -1781,12 +1781,12 @@ export default function DailyDashboard({
                             const dateStr = `${matrixMonth}-${d}`;
                             const key = `${eqNum}_${dateStr}`;
                             const rawVal = matrixData[key];
-                            const val = (rawVal !== undefined && rawVal !== null && rawVal !== '') ? rawVal : 0;
-                            const isPositive = typeof val === 'number' && val > 0;
+                            const hasRecord = rawVal !== undefined && rawVal !== null && rawVal !== '';
+                            const val = hasRecord ? rawVal : '';
                             const editable = isCellEditable(dateStr);
 
                             return (
-                              <td key={d} className="p-0.5 text-center border-r border-slate-200 bg-emerald-100/70 font-bold">
+                              <td key={d} className={`p-0.5 text-center border-r border-slate-200 ${hasRecord ? 'bg-emerald-100/90 font-bold' : ''}`}>
                                 <input
                                   type="number"
                                   min="0"
@@ -1794,15 +1794,17 @@ export default function DailyDashboard({
                                   step="0.5"
                                   value={val}
                                   disabled={!editable}
-                                  placeholder="0"
+                                  placeholder="-"
                                   onChange={e => handleMatrixCellChange(eqNum, dateStr, e.target.value)}
                                   title={!editable ? `Tanggal ${dateStr} terkunci. Hanya H-1 (kemarin) yang dapat diisi.` : `Isi jam jalan ${dateStr}`}
                                   className={`w-11 text-center py-1 text-xs font-mono rounded outline-none transition-all ${
                                     !editable
-                                      ? 'bg-emerald-100/90 text-emerald-950 font-bold border border-emerald-300 opacity-80 cursor-not-allowed'
-                                      : isPositive 
+                                      ? hasRecord
+                                        ? 'bg-emerald-100/90 text-emerald-950 font-bold border border-emerald-300 opacity-90 cursor-not-allowed'
+                                        : 'bg-slate-100/50 text-slate-400 cursor-not-allowed border border-transparent opacity-60'
+                                      : hasRecord 
                                         ? 'bg-emerald-200/90 text-emerald-950 font-black border border-emerald-500 focus:ring-2 focus:ring-emerald-600' 
-                                        : 'bg-emerald-100/90 text-emerald-950 font-bold border border-emerald-300 focus:bg-white focus:border focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300'
+                                        : 'bg-transparent text-slate-700 focus:bg-white focus:border focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300'
                                   }`}
                                 />
                               </td>
