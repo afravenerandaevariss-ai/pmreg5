@@ -292,8 +292,6 @@ export default function DailyDashboard({
 
   // Check if a cell date (yyyy-MM-dd) is editable based on H-1 rule & Tanggal 1-2 exception
   const isCellEditable = (dateStr) => {
-    if (currentUser?.role === 'Admin') return true; // Admin can edit any date
-
     const today = simulatedToday || new Date();
     const todayDay = today.getDate();
     const todayMonthStr = format(today, 'yyyy-MM');
@@ -1756,9 +1754,9 @@ export default function DailyDashboard({
                       return (
                         <th 
                           key={dayStr} 
-                          title={editable ? "Tanggal aktif dapat diisi (H-1 / Aktif)" : "Tanggal terkunci (Hanya H-1 yang dapat diisi)"}
-                          className={`p-2 text-center border-r border-slate-700 min-w-[48px] text-[11px] font-mono transition-colors ${
-                            editable ? 'bg-emerald-700 text-emerald-100 font-black ring-1 ring-emerald-400' : 'bg-slate-800 text-slate-400'
+                          title={editable ? "Tanggal aktif H-1 dapat diisi" : "Tanggal terkunci (Hanya H-1 yang dapat diisi)"}
+                          className={`p-2 text-center border-r border-slate-700 min-w-[48px] text-[11px] font-mono transition-all ${
+                            editable ? 'bg-emerald-600 text-white font-black ring-2 ring-emerald-300 shadow-md scale-105 z-10' : 'bg-slate-800 text-slate-400'
                           }`}
                         >
                           {dayStr}
@@ -1815,7 +1813,7 @@ export default function DailyDashboard({
                             const editable = isCellEditable(dateStr);
 
                             return (
-                              <td key={d} className={`p-0.5 text-center border-r border-slate-200 ${hasRecord ? 'bg-emerald-100/90 font-bold' : ''}`}>
+                              <td key={d} className={`p-0.5 text-center border-r border-slate-200 ${hasRecord ? 'bg-emerald-100/90 font-bold' : editable ? 'bg-emerald-50/50' : ''}`}>
                                 <input
                                   type="number"
                                   min="0"
@@ -1832,8 +1830,8 @@ export default function DailyDashboard({
                                         ? 'bg-emerald-100/90 text-emerald-950 font-bold border border-emerald-300 opacity-90 cursor-not-allowed'
                                         : 'bg-slate-100/50 text-slate-400 cursor-not-allowed border border-transparent opacity-60'
                                       : hasRecord 
-                                        ? 'bg-emerald-200/90 text-emerald-950 font-black border border-emerald-500 focus:ring-2 focus:ring-emerald-600' 
-                                        : 'bg-transparent text-slate-700 focus:bg-white focus:border focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300'
+                                        ? 'bg-emerald-200/90 text-emerald-950 font-black border-2 border-emerald-500 focus:ring-2 focus:ring-emerald-600 shadow-xs' 
+                                        : 'bg-white text-emerald-950 font-bold border-2 border-dashed border-emerald-500 hover:bg-emerald-100/50 focus:bg-emerald-100 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/30 cursor-pointer shadow-xs'
                                   }`}
                                 />
                               </td>
