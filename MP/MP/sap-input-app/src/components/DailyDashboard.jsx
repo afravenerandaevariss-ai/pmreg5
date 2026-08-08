@@ -60,8 +60,10 @@ export default function DailyDashboard({
 
   // Sub-Tab State for Jam Jalan Mesin Pabrik: 'isi' (Isi Jam Jalan Web Matrix) vs 'riwayat' (Calendar & History)
   const [dashboardSubTab, setDashboardSubTab] = useState('isi');
-  const [matrixMonth, setMatrixMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const [matrixPlantFilter, setMatrixPlantFilter] = useState(currentUser?.plant || '5F07');
+  const defaultPlantFilter = (currentUser?.plant && String(currentUser.plant).toUpperCase().startsWith('5F'))
+    ? currentUser.plant
+    : '';
+  const [matrixPlantFilter, setMatrixPlantFilter] = useState(defaultPlantFilter);
   const [matrixSearch, setMatrixSearch] = useState('');
   const [matrixPage, setMatrixPage] = useState(1);
   const matrixPageSize = 250;
