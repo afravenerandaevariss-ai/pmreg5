@@ -64,7 +64,7 @@ export default function DailyDashboard({
   const [matrixPlantFilter, setMatrixPlantFilter] = useState(currentUser?.plant || '5F07');
   const [matrixSearch, setMatrixSearch] = useState('');
   const [matrixPage, setMatrixPage] = useState(1);
-  const matrixPageSize = 35;
+  const matrixPageSize = 250;
   const [matrixData, setMatrixData] = useState({});
   const [initialMatrixData, setInitialMatrixData] = useState({});
   const [isMatrixLoading, setIsMatrixLoading] = useState(false);
@@ -111,17 +111,18 @@ export default function DailyDashboard({
 
   // Matrix cell change handler
   const handleMatrixCellChange = (eqNum, dateStr, valueStr) => {
-    let val = parseFloat(valueStr);
-    if (isNaN(val) || val < 0) val = 0;
-    if (val > 24) val = 24;
-
     const key = `${eqNum}_${dateStr}`;
     const updated = { ...matrixData };
-    if (val > 0) {
-      updated[key] = val;
-    } else {
+
+    if (valueStr.trim() === '') {
       delete updated[key];
+    } else {
+      let val = parseFloat(valueStr);
+      if (isNaN(val) || val < 0) val = 0;
+      if (val > 24) val = 24;
+      updated[key] = val;
     }
+
     setMatrixData(updated);
 
     let unsaved = 0;
@@ -214,14 +215,34 @@ export default function DailyDashboard({
     }
   };
 
-  // Filter Parent Equipments strictly for Isi Jam Jalan matrix (ONLY Parent/Induk equipments)
+  // Unique 5F Pabrik plants for matrix dropdown
+  const matrix5FPlants = useMemo(() => {
+    const sourceList = (templateData && Array.isArray(templateData.equipments) && templateData.equipments.length > 0)
+      ? templateData.equipments
+      : equipments;
+    const set = new Set();
+    sourceList.forEach(eq => {
+      const p = String(eq.plant || '').trim().toUpperCase();
+      if (p.startsWith('5F')) set.add(p);
+    });
+    if (set.size === 0) ['5F01', '5F04', '5F07', '5F08', '5F09', '5F14', '5F15', '5F21', '5F22'].forEach(p => set.add(p));
+    return Array.from(set).sort();
+  }, [templateData, equipments]);
+
+  // Filter Parent Equipments strictly matching GSheet template (type Induk & 5F Pabrik)
   const parentEquipments = useMemo(() => {
-    return equipments.filter(eq => {
+    const sourceList = (templateData && Array.isArray(templateData.equipments) && templateData.equipments.length > 0)
+      ? templateData.equipments
+      : equipments;
+
+    return sourceList.filter(eq => {
       const typeStr = String(eq.type || eq.eq_type || '').trim();
-      const isInduk = typeStr === 'Induk';
-      if (!isInduk) return false;
-      
-      if (matrixPlantFilter && eq.plant !== matrixPlantFilter) return false;
+      if (typeStr !== 'Induk') return false;
+
+      const plant = String(eq.plant || '').trim().toUpperCase();
+      if (!plant.startsWith('5F')) return false;
+
+      if (matrixPlantFilter && plant !== matrixPlantFilter) return false;
       if (matrixSearch.trim()) {
         const query = matrixSearch.toLowerCase();
         const numMatch = String(eq.eqNum || eq.eq_num || '').toLowerCase().includes(query);
@@ -230,7 +251,7 @@ export default function DailyDashboard({
       }
       return true;
     });
-  }, [equipments, matrixPlantFilter, matrixSearch]);
+  }, [templateData, equipments, matrixPlantFilter, matrixSearch]);
 
   const totalMatrixPages = Math.ceil(parentEquipments.length / matrixPageSize) || 1;
   const paginatedParentEquipments = useMemo(() => {
@@ -1583,8 +1604,8 @@ export default function DailyDashboard({
                     onChange={e => setMatrixPlantFilter(e.target.value)}
                     className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-slate-50 focus:ring-2 focus:ring-[#064e3b]/20 focus:border-[#064e3b] outline-none"
                   >
-                    <option value="">Semua Plant</option>
-                    {uniquePlants.map(p => (
+                    <option value="">Semua Plant (Pabrik 5F)</option>
+                    {matrix5FPlants.map(p => (
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
@@ -1673,43 +1694,48 @@ export default function DailyDashboard({
                     </tr>
                   ) : (
                     paginatedParentEquipments.map((eq, idx) => {
+                      const eqNum = eq.eqNum || eq.eq_num;
                       let rowTotal = 0;
                       matrixDaysInMonth.forEach(d => {
                         const dateStr = `${matrixMonth}-${d}`;
-                        const val = matrixData[`${eq.eqNum}_${dateStr}`] || 0;
-                        rowTotal += val;
+                        const val = matrixData[`${eqNum}_${dateStr}`];
+                        if (typeof val === 'number') rowTotal += val;
                       });
 
                       const rowNum = (matrixPage - 1) * matrixPageSize + idx + 1;
 
                       return (
-                        <tr key={eq.eqNum} className="hover:bg-emerald-50/50 transition-colors">
+                        <tr key={eqNum} className="hover:bg-emerald-50/50 transition-colors">
                           <td className="p-2 text-center text-slate-500 font-mono border-r border-slate-200 sticky left-0 bg-white z-20">{rowNum}</td>
                           <td className="p-2 text-center font-bold text-slate-700 border-r border-slate-200 sticky left-10 bg-white z-20">{eq.plant}</td>
-                          <td className="p-2 font-mono font-bold text-emerald-800 border-r border-slate-200 sticky left-26 bg-white z-20">{eq.eqNum}</td>
+                          <td className="p-2 font-mono font-bold text-emerald-800 border-r border-slate-200 sticky left-26 bg-white z-20">{eqNum}</td>
                           <td className="p-2 font-semibold text-slate-800 border-r border-slate-200 truncate max-w-[200px]" title={eq.description}>{eq.description}</td>
                           <td className="p-2 text-center font-bold font-mono text-emerald-700 bg-emerald-50/80 border-r border-slate-200">
-                            {rowTotal > 0 ? rowTotal.toFixed(1) : '-'}
+                            {rowTotal.toFixed(1)}
                           </td>
                           {matrixDaysInMonth.map(d => {
                             const dateStr = `${matrixMonth}-${d}`;
-                            const key = `${eq.eqNum}_${dateStr}`;
-                            const val = matrixData[key] !== undefined ? matrixData[key] : '';
-                            const hasVal = val > 0;
+                            const key = `${eqNum}_${dateStr}`;
+                            const rawVal = matrixData[key];
+                            const val = rawVal !== undefined ? rawVal : '';
+                            const isPositive = typeof val === 'number' && val > 0;
+                            const isZero = val === 0 || val === '0';
 
                             return (
-                              <td key={d} className={`p-0.5 text-center border-r border-slate-200 ${hasVal ? 'bg-emerald-100/70 font-bold' : ''}`}>
+                              <td key={d} className={`p-0.5 text-center border-r border-slate-200 ${isPositive ? 'bg-emerald-100/70 font-bold' : isZero ? 'bg-slate-100' : ''}`}>
                                 <input
                                   type="number"
                                   min="0"
                                   max="24"
                                   step="0.5"
                                   value={val}
-                                  placeholder="-"
-                                  onChange={e => handleMatrixCellChange(eq.eqNum, dateStr, e.target.value)}
+                                  placeholder="0"
+                                  onChange={e => handleMatrixCellChange(eqNum, dateStr, e.target.value)}
                                   className={`w-11 text-center py-1 text-xs font-mono rounded outline-none transition-all ${
-                                    hasVal 
+                                    isPositive 
                                       ? 'bg-emerald-200/60 text-emerald-950 font-black border border-emerald-400 focus:ring-2 focus:ring-emerald-600' 
+                                      : isZero
+                                      ? 'bg-slate-200/80 text-slate-800 font-bold border border-slate-400'
                                       : 'bg-transparent text-slate-600 focus:bg-white focus:border focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300'
                                   }`}
                                 />
