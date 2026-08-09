@@ -486,6 +486,9 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     if (!logEqNum || exportedEqKeys.has(logEqNum)) return;
     exportedEqKeys.add(logEqNum);
 
+    const pEqNum = eqToParentEqNum[logEqNum] || logEqNum;
+    const isSubEq = (logEqNum !== pEqNum);
+
     const duration = dailyDurations[logEqNum] || (log.durationMinutes / 60) || 0;
     const newRow = new Array(cleanHeaders.length).fill('');
 
@@ -504,6 +507,10 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
 
     const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
     if (readByIdx !== -1) newRow[readByIdx] = readByVal;
+
+    if (measuringPtIdx !== -1) {
+      newRow[measuringPtIdx] = isSubEq ? '' : (log.measuringPoint || log.measuring_point || '');
+    }
 
     const plantCodeStr = log.plant || '5F01';
     let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
@@ -650,6 +657,8 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     if (total <= 0) return;
 
     const log = loggedEquipmentsMap[eqKey];
+    const pEqNum = eqToParentEqNum[eqKey] || eqKey;
+    const isSubEq = (eqKey !== pEqNum);
     const newRow = new Array(cleanHeaders.length).fill('');
 
     const eqColIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Equipment Number'));
@@ -667,6 +676,10 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
 
     const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
     if (readByIdx !== -1) newRow[readByIdx] = readByVal;
+
+    if (measuringPtIdx !== -1) {
+      newRow[measuringPtIdx] = isSubEq ? '' : (log.measuringPoint || log.measuring_point || '');
+    }
 
     const plantCodeStr = log.plant || '5F01';
     let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
@@ -814,6 +827,8 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       if (duration <= 0) return;
 
       const log = loggedEquipmentsMap[eqKey];
+      const pEqNum = eqToParentEqNum[eqKey] || eqKey;
+      const isSubEq = (eqKey !== pEqNum);
       const newRow = new Array(cleanHeaders.length).fill('');
 
       const eqColIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Equipment Number'));
@@ -831,6 +846,10 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
 
       const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
       if (readByIdx !== -1) newRow[readByIdx] = readByVal;
+
+      if (measuringPtIdx !== -1) {
+        newRow[measuringPtIdx] = isSubEq ? '' : (log.measuringPoint || log.measuring_point || '');
+      }
 
       const plantCodeStr = log.plant || '5F01';
       let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
