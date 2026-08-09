@@ -1391,6 +1391,7 @@ function App() {
                 </div>
               ) : (
                 <DailyDashboard 
+                  masterMap={masterMap}
                   templateData={templateData} 
                   equipments={equipments} 
                   setEquipments={setEquipments}

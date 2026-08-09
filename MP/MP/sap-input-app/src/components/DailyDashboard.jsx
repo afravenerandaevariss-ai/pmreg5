@@ -48,6 +48,7 @@ const PLANT_INFO = {
 };
 
 export default function DailyDashboard({ 
+  masterMap,
   equipments, 
   setEquipments,
   currentUser,
@@ -2869,85 +2870,93 @@ export default function DailyDashboard({
               {isAfraUser && pendingExportPayload && (
                 <button
                   onClick={() => {
-                    const { freshLogs: pLogs, exportSettings: pSettings, selectedExportPlants: pPlants, selectedExportEqs: pEqs } = pendingExportPayload;
-                    const pPayload = {
-                      date: pSettings.endDate,
-                      startDate: pSettings.startDate,
-                      endDate: pSettings.endDate,
-                      time: pSettings.time,
-                      readBy: pSettings.readBy,
-                      plant: currentUser?.plant,
-                      selectedEqs: pEqs,
-                      selectedPlants: pPlants
-                    };
-                    const resolveEqPlant = (eq) => {
-                      const rawPlant = String(eq.plant || '').trim().toUpperCase();
-                      if (rawPlant && rawPlant !== 'UNCATEGORIZED' && rawPlant !== '-') {
-                        return rawPlant;
-                      }
-                      const text = `${eq.description || ''} ${eq.induk || ''} ${eq.functionalLoc || ''} ${eq.flDescription || ''}`;
-                      const match = text.match(/\b(5F\d{2})\b/i);
-                      if (match) return match[1].toUpperCase();
-
-                      if (masterMap) {
-                        const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
-                        const eqKeyNorm = eqKey.replace(/^0+/, '');
-                        const info = masterMap.get(eqKey) || masterMap.get(eqKeyNorm);
-                        if (info) {
-                          const p = typeof info === 'string' ? info : info.plant;
-                          if (p && p !== 'Uncategorized' && p !== '-') return String(p).trim().toUpperCase();
+                    try {
+                      const { freshLogs: pLogs, exportSettings: pSettings, selectedExportPlants: pPlants, selectedExportEqs: pEqs } = pendingExportPayload;
+                      const pPayload = {
+                        date: pSettings.endDate,
+                        startDate: pSettings.startDate,
+                        endDate: pSettings.endDate,
+                        time: pSettings.time,
+                        readBy: pSettings.readBy,
+                        plant: currentUser?.plant,
+                        selectedEqs: pEqs,
+                        selectedPlants: pPlants
+                      };
+                      const resolveEqPlant = (eq) => {
+                        const rawPlant = String(eq.plant || '').trim().toUpperCase();
+                        if (rawPlant && rawPlant !== 'UNCATEGORIZED' && rawPlant !== '-') {
+                          return rawPlant;
                         }
-                      }
-                      return '';
-                    };
+                        const text = `${eq.description || ''} ${eq.induk || ''} ${eq.functionalLoc || ''} ${eq.flDescription || ''}`;
+                        const match = text.match(/\b(5F\d{2})\b/i);
+                        if (match) return match[1].toUpperCase();
 
-                    const filterTargetEquipments = (equipList, plantList, eqList, role, userPlant) => {
-                      let res = [...equipList];
-                      if (plantList && plantList.length > 0) {
-                        const selectedSet = new Set(plantList.map(p => String(p).trim().toUpperCase()));
-                        res = res.filter(eq => {
-                          const p = resolveEqPlant(eq);
-                          return p ? selectedSet.has(p) : false;
-                        });
-                      } else if (role?.toUpperCase() === 'UNIT' && userPlant) {
-                        const uPlant = String(userPlant).trim().toUpperCase();
-                        res = res.filter(eq => {
-                          const p = resolveEqPlant(eq);
-                          return p ? p === uPlant : false;
-                        });
-                      }
-                      if (eqList && eqList.length > 0) {
-                        const selSet = new Set(eqList.map(e => String(e).trim()));
-                        const selDescs = new Set();
-                        equipList.forEach(eq => {
-                          const num = String(eq.eqNum || eq.eq_num || '').trim();
-                          if (selSet.has(num)) {
+                        if (masterMap && typeof masterMap.get === 'function') {
+                          const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+                          const eqKeyNorm = eqKey.replace(/^0+/, '');
+                          const info = masterMap.get(eqKey) || masterMap.get(eqKeyNorm);
+                          if (info) {
+                            const p = typeof info === 'string' ? info : info.plant;
+                            if (p && p !== 'Uncategorized' && p !== '-') return String(p).trim().toUpperCase();
+                          }
+                        }
+                        return '';
+                      };
+
+                      const filterTargetEquipments = (equipList, plantList, eqList, role, userPlant) => {
+                        let res = [...equipList];
+                        if (plantList && plantList.length > 0) {
+                          const selectedSet = new Set(plantList.map(p => String(p).trim().toUpperCase()));
+                          res = res.filter(eq => {
+                            const p = resolveEqPlant(eq);
+                            return p ? selectedSet.has(p) : false;
+                          });
+                        } else if (role?.toUpperCase() === 'UNIT' && userPlant) {
+                          const uPlant = String(userPlant).trim().toUpperCase();
+                          res = res.filter(eq => {
+                            const p = resolveEqPlant(eq);
+                            return p ? p === uPlant : false;
+                          });
+                        }
+                        if (eqList && eqList.length > 0) {
+                          const selSet = new Set(eqList.map(e => String(e).trim()));
+                          const selDescs = new Set();
+                          equipList.forEach(eq => {
+                            const num = String(eq.eqNum || eq.eq_num || '').trim();
+                            if (selSet.has(num)) {
+                              const d = String(eq.description || '').trim();
+                              const pd = String(eq.induk || eq.parentEquipment || d).trim();
+                              if (d) selDescs.add(d);
+                              if (pd) selDescs.add(pd);
+                            }
+                          });
+                          res = res.filter(eq => {
+                            const num = String(eq.eqNum || eq.eq_num || '').trim();
                             const d = String(eq.description || '').trim();
                             const pd = String(eq.induk || eq.parentEquipment || d).trim();
-                            if (d) selDescs.add(d);
-                            if (pd) selDescs.add(pd);
-                          }
-                        });
-                        res = res.filter(eq => {
-                          const num = String(eq.eqNum || eq.eq_num || '').trim();
-                          const d = String(eq.description || '').trim();
-                          const pd = String(eq.induk || eq.parentEquipment || d).trim();
-                          return selSet.has(num) || selDescs.has(d) || selDescs.has(pd);
-                        });
+                            return selSet.has(num) || selDescs.has(d) || selDescs.has(pd);
+                          });
+                        }
+                        return res;
+                      };
+                      let pTargetEqs = filterTargetEquipments(equipments, pPlants, pEqs, currentUser?.role, currentUser?.plant);
+                      const headers = templateData?.headers || [];
+                      const originalData = templateData?.originalData || [];
+                      if (pSettings.startDate === pSettings.endDate && !pSettings.isAccumulated) {
+                        exportDailyToSAP(headers, originalData, pTargetEqs, pLogs, pPayload);
+                      } else if (pSettings.isAccumulated) {
+                        exportAccumulatedToSAP(headers, originalData, pTargetEqs, pLogs, pPayload);
+                      } else {
+                        exportCumulativeToSAP(headers, originalData, pTargetEqs, pLogs, pPayload);
                       }
-                      return res;
-                    };
-                    let pTargetEqs = filterTargetEquipments(equipments, pPlants, pEqs, currentUser?.role, currentUser?.plant);
-                    if (pSettings.startDate === pSettings.endDate && !pSettings.isAccumulated) {
-                      exportDailyToSAP(templateData.headers, templateData.originalData, pTargetEqs, pLogs, pPayload);
-                    } else if (pSettings.isAccumulated) {
-                      exportAccumulatedToSAP(templateData.headers, templateData.originalData, pTargetEqs, pLogs, pPayload);
-                    } else {
-                      exportCumulativeToSAP(templateData.headers, templateData.originalData, pTargetEqs, pLogs, pPayload);
+                    } catch (err) {
+                      console.error("Error during Export Tetap:", err);
+                      alert("Gagal melakukan export: " + err.message);
+                    } finally {
+                      setShowExportHourError(false);
+                      setShowExportModal(false);
+                      setPendingExportPayload(null);
                     }
-                    setShowExportHourError(false);
-                    setShowExportModal(false);
-                    setPendingExportPayload(null);
                   }}
                   className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
                 >
