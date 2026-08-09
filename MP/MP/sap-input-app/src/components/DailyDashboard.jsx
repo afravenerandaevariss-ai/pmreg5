@@ -75,6 +75,8 @@ export default function DailyDashboard({
     : '';
   const [matrixPlantFilter, setMatrixPlantFilter] = useState(defaultPlantFilter);
   const [logPlantFilter, setLogPlantFilter] = useState(defaultPlantFilter);
+  const [selectedExportEqs, setSelectedExportEqs] = useState([]);
+  const [selectedExportPlants, setSelectedExportPlants] = useState([]);
 
   // Automatically lock plant filter to currentUser.plant for non-Afra unit users
   useEffect(() => {
@@ -366,8 +368,6 @@ export default function DailyDashboard({
     endDate: format(new Date(), 'yyyy-MM-dd'),
     isAccumulated: false
   });
-  const [selectedExportEqs, setSelectedExportEqs] = useState([]);
-  const [selectedExportPlants, setSelectedExportPlants] = useState([]);
   const [exportEqSearch, setExportEqSearch] = useState('');
   // Export validation error state
   const [showExportHourError, setShowExportHourError] = useState(false);
