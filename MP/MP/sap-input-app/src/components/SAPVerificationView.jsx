@@ -256,11 +256,19 @@ export default function SAPVerificationView({ equipments, currentUser }) {
           setLastUpdated('Data terakhir yang tersimpan di server');
           
           let matched = 0;
+          const ik17DatesInMonth = [];
           rawIK17.forEach(r => {
             const e = String(r.e || '').trim();
             if (eqToPlant.has(e) || eqToPlant.has(normEq(e))) matched++;
+            if (r.d && r.d >= startDate && r.d <= endDate && !r.s) {
+              ik17DatesInMonth.push(r.d);
+            }
           });
-          setDebugMsg(`(Debug: ${rawIK17.length} rows IK17, ${matched} matched eq, ${eqToPlant.size} eq mapping)`);
+          ik17DatesInMonth.sort();
+          const minDateStr = ik17DatesInMonth.length > 0 ? ik17DatesInMonth[0] : '-';
+          const maxDateStr = ik17DatesInMonth.length > 0 ? ik17DatesInMonth[ik17DatesInMonth.length - 1] : '-';
+
+          setDebugMsg(`(Debug: ${rawIK17.length} rows IK17, Data SAP tersedia: ${minDateStr} s/d ${maxDateStr}, ${matched} matched eq)`);
         } else {
           setDebugMsg(`(Debug: rawIK17 is ${typeof rawIK17})`);
         }
