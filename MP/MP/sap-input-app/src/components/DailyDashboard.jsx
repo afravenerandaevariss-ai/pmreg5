@@ -2668,11 +2668,38 @@ export default function DailyDashboard({
                     selectedEqs: selectedExportEqs
                   };
 
-                  let targetEquipments = equipments;
-                  const isAdmin = currentUser?.role?.toUpperCase() === 'ADMIN';
-                  if (isAdmin && selectedExportPlants.length > 0) {
-                    targetEquipments = equipments.filter(eq => !eq.plant || selectedExportPlants.includes(eq.plant));
-                  }
+                  // Helper to filter equipments by selected plants and selected equipments
+                  const filterTargetEquipments = (equipList, plantList, eqList, role, userPlant) => {
+                    let res = [...equipList];
+                    if (plantList && plantList.length > 0) {
+                      res = res.filter(eq => !eq.plant || plantList.includes(eq.plant));
+                    } else if (role?.toUpperCase() === 'UNIT' && userPlant) {
+                      res = res.filter(eq => !eq.plant || eq.plant === userPlant);
+                    }
+
+                    if (eqList && eqList.length > 0) {
+                      const selSet = new Set(eqList);
+                      const selDescs = new Set();
+                      equipList.forEach(eq => {
+                        const num = String(eq.eqNum || eq.eq_num || '').trim();
+                        if (selSet.has(num)) {
+                          const d = String(eq.description || '').trim();
+                          const pd = String(eq.induk || eq.parentEquipment || d).trim();
+                          selDescs.add(d);
+                          selDescs.add(pd);
+                        }
+                      });
+                      res = res.filter(eq => {
+                        const num = String(eq.eqNum || eq.eq_num || '').trim();
+                        const d = String(eq.description || '').trim();
+                        const pd = String(eq.induk || eq.parentEquipment || d).trim();
+                        return selSet.has(num) || selDescs.has(d) || selDescs.has(pd);
+                      });
+                    }
+                    return res;
+                  };
+
+                  let targetEquipments = filterTargetEquipments(equipments, selectedExportPlants, selectedExportEqs, currentUser?.role, currentUser?.plant);
 
                   if (exportSettings.startDate === exportSettings.endDate && !exportSettings.isAccumulated) {
                     exportDailyToSAP(templateData.headers, templateData.originalData, targetEquipments, freshLogs, exportPayload);
@@ -2795,11 +2822,36 @@ export default function DailyDashboard({
                       plant: currentUser?.plant,
                       selectedEqs: pEqs
                     };
-                    let pTargetEqs = equipments;
-                    const pIsAdmin = currentUser?.role?.toUpperCase() === 'ADMIN';
-                    if (pIsAdmin && pPlants.length > 0) {
-                      pTargetEqs = equipments.filter(eq => !eq.plant || pPlants.includes(eq.plant));
-                    }
+                    // Helper to filter equipments by selected plants and selected equipments
+                    const filterTargetEquipments = (equipList, plantList, eqList, role, userPlant) => {
+                      let res = [...equipList];
+                      if (plantList && plantList.length > 0) {
+                        res = res.filter(eq => !eq.plant || plantList.includes(eq.plant));
+                      } else if (role?.toUpperCase() === 'UNIT' && userPlant) {
+                        res = res.filter(eq => !eq.plant || eq.plant === userPlant);
+                      }
+                      if (eqList && eqList.length > 0) {
+                        const selSet = new Set(eqList);
+                        const selDescs = new Set();
+                        equipList.forEach(eq => {
+                          const num = String(eq.eqNum || eq.eq_num || '').trim();
+                          if (selSet.has(num)) {
+                            const d = String(eq.description || '').trim();
+                            const pd = String(eq.induk || eq.parentEquipment || d).trim();
+                            selDescs.add(d);
+                            selDescs.add(pd);
+                          }
+                        });
+                        res = res.filter(eq => {
+                          const num = String(eq.eqNum || eq.eq_num || '').trim();
+                          const d = String(eq.description || '').trim();
+                          const pd = String(eq.induk || eq.parentEquipment || d).trim();
+                          return selSet.has(num) || selDescs.has(d) || selDescs.has(pd);
+                        });
+                      }
+                      return res;
+                    };
+                    let pTargetEqs = filterTargetEquipments(equipments, pPlants, pEqs, currentUser?.role, currentUser?.plant);
                     if (pSettings.startDate === pSettings.endDate && !pSettings.isAccumulated) {
                       exportDailyToSAP(templateData.headers, templateData.originalData, pTargetEqs, pLogs, pPayload);
                     } else if (pSettings.isAccumulated) {
