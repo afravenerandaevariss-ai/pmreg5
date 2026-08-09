@@ -332,41 +332,15 @@ function buildParentChildMaps(equipments) {
     const plant = String(eq.plant || '').trim().toUpperCase();
     if (eqKey && desc && (desc === pDesc || eq.type === 'Induk')) {
       const normDesc = normalizeDesc(desc);
-      const key = plant ? `${plant}_${normDesc}` : normDesc;
-      parentDescToEqNum[key] = eqKey;
+      if (plant) parentDescToEqNum[`${plant}_${normDesc}`] = eqKey;
       if (plant) parentDescToEqNum[`${plant}_${desc}`] = eqKey;
+      parentDescToEqNum[normDesc] = eqKey;
       parentDescToEqNum[desc] = eqKey;
       parentEqNumsSet.add(eqKey);
     }
   });
 
-  // Pass 2: Fallback — register any equipment whose desc has no parent registered yet per plant
-  equipments.forEach(eq => {
-    const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
-    const desc = String(eq.description || '').trim();
-    const plant = String(eq.plant || '').trim().toUpperCase();
-    const normDesc = normalizeDesc(desc);
-    const key = plant ? `${plant}_${normDesc}` : normDesc;
-    if (eqKey && desc && !parentDescToEqNum[key]) {
-      let isSub = false;
-      const prefix = plant ? `${plant}_` : '';
-      for (const pKey of Object.keys(parentDescToEqNum)) {
-        if (!prefix || pKey.startsWith(prefix)) {
-          const pDesc = prefix ? pKey.substring(prefix.length) : pKey;
-          if (normDesc !== pDesc && normDesc.includes(pDesc)) {
-            isSub = true;
-            break;
-          }
-        }
-      }
-      if (!isSub) {
-        parentDescToEqNum[key] = eqKey;
-        parentEqNumsSet.add(eqKey);
-      }
-    }
-  });
-
-  // Pass 3: Map every eqKey -> Parent EqNum
+  // Pass 2: Map every eqKey -> Parent EqNum in O(1) time
   const eqToParentEqNum = {};
   equipments.forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
@@ -378,27 +352,19 @@ function buildParentChildMaps(equipments) {
     const normPDesc = normalizeDesc(pDesc);
 
     let candidateDesc = normDesc;
-    SUB_PREFIXES.forEach(p => {
+    for (let i = 0; i < SUB_PREFIXES.length; i++) {
+      const p = SUB_PREFIXES[i];
       if (candidateDesc.startsWith(p)) {
         candidateDesc = candidateDesc.substring(p.length).trim();
-      }
-    });
-
-    let pEqNum = (plant ? parentDescToEqNum[`${plant}_${normPDesc}`] : null) || parentDescToEqNum[normPDesc] || (plant ? parentDescToEqNum[`${plant}_${candidateDesc}`] : null) || parentDescToEqNum[candidateDesc];
-
-    if (!pEqNum) {
-      let bestLen = 0;
-      const prefix = plant ? `${plant}_` : '';
-      for (const [pKey, parentNum] of Object.entries(parentDescToEqNum)) {
-        if (!prefix || pKey.startsWith(prefix)) {
-          const parentDesc = prefix ? pKey.substring(prefix.length) : pKey;
-          if (normDesc.includes(parentDesc) && parentDesc.length > bestLen) {
-            bestLen = parentDesc.length;
-            pEqNum = parentNum;
-          }
-        }
+        break;
       }
     }
+
+    let pEqNum = (plant ? parentDescToEqNum[`${plant}_${normPDesc}`] : null) ||
+                 parentDescToEqNum[normPDesc] ||
+                 (plant ? parentDescToEqNum[`${plant}_${candidateDesc}`] : null) ||
+                 parentDescToEqNum[candidateDesc];
+
     eqToParentEqNum[eqKey] = pEqNum || eqKey;
   });
 
