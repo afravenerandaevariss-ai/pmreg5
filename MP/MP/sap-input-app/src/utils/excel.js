@@ -420,6 +420,7 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   const timeIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measurement Time') || h.toLowerCase().includes('time')));
   const readingIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Counter Reading') || h.toLowerCase().includes('reading')));
   const readByIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Read By') || h.toLowerCase().includes('read by')));
+  const measuringPtIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measuring point') || h.toLowerCase().includes('meas. point') || h.toLowerCase().includes('measuring pt')));
   let shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
   if (shortTextIdx === -1) shortTextIdx = 10;
 
@@ -435,10 +436,13 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     if (eqKey) exportedEqKeys.add(eqKey);
 
+    const pEqNum = eqToParentEqNum[eqKey] || eqKey;
+    const isSubEq = (eqKey !== pEqNum) || (eq.type === 'Sub');
+
     const duration = dailyDurations[eqKey] || 0;
     const rowData = [...originalData[rowIdx]]; 
     
-    const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx);
+    const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx, measuringPtIdx);
     while (rowData.length <= maxColIdx) {
       rowData.push("");
     }
@@ -456,6 +460,11 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
     if (readByIdx !== -1) rowData[readByIdx] = readByVal;
     
+    // Sub-equipments in SAP do not own measuring points: clear measuring point for sub-equipments to avoid SAP mismatch error
+    if (isSubEq && measuringPtIdx !== -1) {
+      rowData[measuringPtIdx] = '';
+    }
+
     const plantCodeStr = eq.plant || '5F01';
     let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
     if (note.length > 30) note = note.substring(0, 30);
@@ -578,6 +587,7 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
   const timeIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measurement Time') || h.toLowerCase().includes('time')));
   const readingIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Counter Reading') || h.toLowerCase().includes('reading')));
   const readByIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Read By') || h.toLowerCase().includes('read by')));
+  const measuringPtIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measuring point') || h.toLowerCase().includes('meas. point') || h.toLowerCase().includes('measuring pt')));
   let shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
   if (shortTextIdx === -1) shortTextIdx = 10;
 
@@ -593,9 +603,12 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     if (eqKey) exportedEqKeys.add(eqKey);
 
+    const pEqNum = eqToParentEqNum[eqKey] || eqKey;
+    const isSubEq = (eqKey !== pEqNum) || (eq.type === 'Sub');
+
     const total = accDurations[eqKey] || 0;
     const rowData = [...originalData[rowIdx]];
-    const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx);
+    const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx, measuringPtIdx);
     while (rowData.length <= maxColIdx) rowData.push('');
 
     let readingStr = total.toString();
@@ -607,6 +620,11 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     if (readingIdx !== -1) rowData[readingIdx] = readingStr;
     const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
     if (readByIdx !== -1) rowData[readByIdx] = readByVal;
+
+    // Sub-equipments in SAP do not own measuring points: clear measuring point for sub-equipments to avoid SAP mismatch error
+    if (isSubEq && measuringPtIdx !== -1) {
+      rowData[measuringPtIdx] = '';
+    }
 
     const plantCodeStr = eq.plant || '5F01';
     let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
@@ -738,6 +756,8 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
     const processedRowIndices = new Set();
     const exportedEqKeys = new Set();
 
+    const measuringPtIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measuring point') || h.toLowerCase().includes('meas. point') || h.toLowerCase().includes('measuring pt')));
+
     equipments.forEach((eq) => {
       const rowIdx = eq.rowIndex;
       if (rowIdx === undefined || !originalData[rowIdx]) return;
@@ -747,9 +767,12 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
       if (eqKey) exportedEqKeys.add(eqKey);
 
+      const pEqNum = eqToParentEqNum[eqKey] || eqKey;
+      const isSubEq = (eqKey !== pEqNum) || (eq.type === 'Sub');
+
       const duration = dailyDurations[eqKey] || 0;
       const rowData = [...originalData[rowIdx]];
-      const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx);
+      const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx, measuringPtIdx);
       while (rowData.length <= maxColIdx) rowData.push('');
 
       let readingStr = duration.toString();
@@ -762,6 +785,11 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
       if (readByIdx !== -1) rowData[readByIdx] = readByVal;
       
+      // Sub-equipments in SAP do not own measuring points: clear measuring point for sub-equipments to avoid SAP mismatch error
+      if (isSubEq && measuringPtIdx !== -1) {
+        rowData[measuringPtIdx] = '';
+      }
+
       const plantCodeStr = eq.plant || '5F01';
       let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
       if (note.length > 30) note = note.substring(0, 30);
