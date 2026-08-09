@@ -59,6 +59,7 @@ export async function parseMasterEQ(file) {
           const functionalLoc = getValue(row, ['Functional Loc.', 'Functional Location', 'Func. Loc.']);
           const flDescription = getValue(row, ['Description2', 'FL Description']);
           const costCenter = getValue(row, ['Cost Center', 'Cost center', 'Cost Ctr', 'Cost Ctr.']);
+          const measuringPoint = getValue(row, ['Measuring point', 'Meas. Point', 'Measuring Point', 'Point', 'Meas.point']);
           
           if (eq) {
             map.set(String(eq), {
@@ -66,7 +67,8 @@ export async function parseMasterEQ(file) {
               description: String(description || ''),
               functionalLoc: String(functionalLoc || ''),
               flDescription: String(flDescription || ''),
-              costCenter: String(costCenter || '')
+              costCenter: String(costCenter || ''),
+              measuringPoint: measuringPoint ? String(measuringPoint) : ''
             });
           }
         });
