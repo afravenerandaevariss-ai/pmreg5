@@ -65,7 +65,7 @@ async function main() {
         return;
       }
       try {
-        await runCmd(conn, 'mkdir -p /var/www/devpmreg5/dist', 'Ensure DEV directory');
+        await runCmd(conn, 'rm -rf /var/www/devpmreg5/dist/* && mkdir -p /var/www/devpmreg5/dist', 'Ensure fresh DEV directory');
         console.log('📤 Uploading fresh dist/ build...');
         await uploadDir(sftp, path.resolve('./dist'), '/var/www/devpmreg5/dist');
 

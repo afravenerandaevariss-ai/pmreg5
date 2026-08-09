@@ -63,7 +63,7 @@ async function main() {
         return;
       }
       try {
-        await runCmd(conn, 'mkdir -p /var/www/pmreg5/dist', 'Ensure PROD directory');
+        await runCmd(conn, 'rm -rf /var/www/pmreg5/dist/* && mkdir -p /var/www/pmreg5/dist', 'Ensure fresh PROD directory');
         console.log('📤 Uploading fresh dist/ build...');
         await uploadDir(sftp, path.resolve('./dist'), '/var/www/pmreg5/dist');
 
