@@ -147,23 +147,22 @@ export async function parseRegionalMP(file, masterMap) {
           
           const description = masterDescription || String(row[descColIdx] || '').trim();
           
-          // Find parent: first try suffix match, then substring containment match.
-          // Example: "BODY SLUDGE SEPARATOR NO. 1" doesn't end with "SLUDGE SEPARATOR NO. 1"
-          // but "SLUDGE SEPARATOR NO. 1" is contained in it — so we use substring match.
-          let parentEquipment = description; // default: self (is a parent or standalone)
-          // Pass 1: suffix match (shortest description that this ends with)
-          for (const p of allDescriptions) {
-            if (p !== description && description.endsWith(p)) {
-              parentEquipment = p;
-              break;
-            }
-          }
-          // Pass 2: if still self, try substring containment (shortest desc that is a part of this desc)
-          if (parentEquipment === description) {
+          let parentEquipment = (typeof masterInfo === 'object' && masterInfo.induk) ? masterInfo.induk : description;
+          if (!parentEquipment || parentEquipment === description) {
+            // Pass 1: suffix match
             for (const p of allDescriptions) {
-              if (p !== description && p.length < description.length && description.includes(p)) {
+              if (p !== description && description.endsWith(p)) {
                 parentEquipment = p;
                 break;
+              }
+            }
+            // Pass 2: substring containment match
+            if (parentEquipment === description) {
+              for (const p of allDescriptions) {
+                if (p !== description && p.length < description.length && description.includes(p)) {
+                  parentEquipment = p;
+                  break;
+                }
               }
             }
           }
@@ -173,10 +172,11 @@ export async function parseRegionalMP(file, masterMap) {
             no: row[0],
             eqNum: eqNum,
             description: description,
+            induk: parentEquipment,
+            parentEquipment: parentEquipment,
             measuringPoint: row[measuringPtIdx] || '',
             plant: plant,
             costCenter: costCenter,
-            parentEquipment: parentEquipment,
             reading: row[readingIdx] || '',
           });
         }
@@ -300,6 +300,68 @@ export function exportToSAP(headers, originalData, updatedEquipments, docDetails
   XLSX.writeFile(wb, `SAP_Export_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`);
 }
 
+/**
+ * Build parentDescToEqNum and eqToParentEqNum for robust parent-child HM resolution.
+ * - parentDescToEqNum: Map<Parent Description, Parent EqNum>
+ * - eqToParentEqNum: Map<Equipment EqNum, Parent EqNum>
+ */
+function buildParentChildMaps(equipments) {
+  const parentDescToEqNum = {};
+  const parentEqNumsSet = new Set();
+  
+  // Pass 1: Register true parents (where description === induk or type === 'Induk')
+  equipments.forEach(eq => {
+    const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+    const desc = String(eq.description || '').trim();
+    const pDesc = String(eq.induk || eq.parentEquipment || desc).trim();
+    if (eqKey && desc && (desc === pDesc || eq.type === 'Induk')) {
+      parentDescToEqNum[desc] = eqKey;
+      parentEqNumsSet.add(eqKey);
+    }
+  });
+
+  // Pass 2: Fallback — register any equipment whose desc has no parent registered yet
+  equipments.forEach(eq => {
+    const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+    const desc = String(eq.description || '').trim();
+    if (eqKey && desc && !parentDescToEqNum[desc]) {
+      let isSub = false;
+      for (const pDesc of Object.keys(parentDescToEqNum)) {
+        if (desc !== pDesc && desc.includes(pDesc)) {
+          isSub = true;
+          break;
+        }
+      }
+      if (!isSub) {
+        parentDescToEqNum[desc] = eqKey;
+        parentEqNumsSet.add(eqKey);
+      }
+    }
+  });
+
+  // Pass 3: Map every eqKey -> Parent EqNum
+  const eqToParentEqNum = {};
+  equipments.forEach(eq => {
+    const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+    const desc = String(eq.description || '').trim();
+    const pDesc = String(eq.induk || eq.parentEquipment || desc).trim();
+    
+    let pEqNum = parentDescToEqNum[pDesc];
+    if (!pEqNum) {
+      let bestLen = 0;
+      for (const [parentDesc, parentNum] of Object.entries(parentDescToEqNum)) {
+        if (desc.includes(parentDesc) && parentDesc.length > bestLen) {
+          bestLen = parentDesc.length;
+          pEqNum = parentNum;
+        }
+      }
+    }
+    eqToParentEqNum[eqKey] = pEqNum || eqKey;
+  });
+
+  return { parentDescToEqNum, eqToParentEqNum };
+}
+
 export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap, docDetails) {
   // Strip \r from headers to prevent double \r\r\n corruption
   const cleanHeaders = headers.map(h => typeof h === 'string' ? h.replace(/\r/g, '') : h);
@@ -309,63 +371,26 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   const selectedDate = docDetails.date; // format 'yyyy-MM-dd'
   const todaysLogs = dailyLogsMap[selectedDate] || [];
 
-  // STEP 1: Build indukHmMap — parent equipment number → total HM for this date
-  // Each log already references the parent via induk_eq_num.
-  const indukHmMap = {}; // { [parentEqNum]: totalHours }
+  const { eqToParentEqNum } = buildParentChildMaps(equipments);
+
+  // STEP 1: Aggregate HM to Family Parent EqNum
+  const parentHmMap = {}; // { [parentEqNum]: totalHours }
   todaysLogs.forEach(log => {
     const logEqNum = String(log.indukEqNum || log.induk_eq_num || '').trim();
     if (!logEqNum) return;
     if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(logEqNum)) return;
+    const pEqNum = eqToParentEqNum[logEqNum] || logEqNum;
     const durationHours = (log.durationMinutes || 0) / 60;
-    indukHmMap[logEqNum] = Math.min(24, (indukHmMap[logEqNum] || 0) + durationHours);
+    parentHmMap[pEqNum] = Math.min(24, (parentHmMap[pEqNum] || 0) + durationHours);
   });
 
-  // Build parentDescToEqNum: description → eqNum for all parent (induk) equipment in the template
-  const parentDescToEqNum = {};
-  equipments.forEach(eq => {
-    const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
-    const desc = String(eq.description || '').trim();
-    if (eqKey && desc && indukHmMap[eqKey] !== undefined) {
-      parentDescToEqNum[desc] = eqKey;
-    }
-  });
-
-  // Helper: find parent HM for a sub-equipment by scanning all known parents
-  // Uses parentEquipment field first, then falls back to substring/suffix scan
-  const resolveParentHm = (eq) => {
-    const subDesc = String(eq.description || '').trim();
-    // 1. Try via parentEquipment field
-    const parentDesc = String(eq.parentEquipment || '').trim();
-    if (parentDesc && parentDesc !== subDesc) {
-      const pEqNum = parentDescToEqNum[parentDesc];
-      if (pEqNum && indukHmMap[pEqNum] !== undefined) return indukHmMap[pEqNum];
-    }
-    // 2. Fallback: scan all parent descs — find longest parent desc that is contained in subDesc
-    let bestParentHm = undefined;
-    let bestLen = 0;
-    for (const [pDesc, pEqNum] of Object.entries(parentDescToEqNum)) {
-      if (pDesc === subDesc) continue;
-      if (subDesc.includes(pDesc) && pDesc.length > bestLen) {
-        bestLen = pDesc.length;
-        bestParentHm = indukHmMap[pEqNum];
-      }
-    }
-    return bestParentHm;
-  };
-
-  // STEP 2: For each equipment in the template, resolve its HM value:
-  //   - If it's a parent (eqNum is in indukHmMap) → use its own HM
-  //   - If it's a sub-equipment → inherit parent HM via resolveParentHm
+  // STEP 2: Resolve HM per template row — parent and all sub-equipments get parentHmMap[pEqNum]
   const dailyDurations = {};
   equipments.forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     if (!eqKey) return;
-    if (indukHmMap[eqKey] !== undefined) {
-      dailyDurations[eqKey] = indukHmMap[eqKey];
-    } else {
-      const parentHm = resolveParentHm(eq);
-      if (parentHm !== undefined) dailyDurations[eqKey] = parentHm;
-    }
+    const pEqNum = eqToParentEqNum[eqKey] || eqKey;
+    dailyDurations[eqKey] = parentHmMap[pEqNum] || 0;
   });
 
   const dateParts = docDetails.date.split('-');
@@ -496,60 +521,29 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
   const eqNotes = {};
   const loggedEquipmentsMap = {};
 
-  // STEP 1: Build indukHmMap — sum HM per parent eq num across the date range
-  const indukHmMap = {}; // { [parentEqNum]: totalHours }
+  const { eqToParentEqNum } = buildParentChildMaps(equipments);
+
+  // STEP 1: Aggregate HM per parent eq num across the date range
+  const parentHmMap = {}; // { [parentEqNum]: totalHours }
   Object.entries(dailyLogsMap).forEach(([dateStr, logs]) => {
     if (dateStr < startDate || dateStr > endDate) return;
     logs.forEach(log => {
       const logEqNum = String(log.indukEqNum || log.induk_eq_num || '').trim();
       if (!logEqNum) return;
       if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(logEqNum)) return;
+      const pEqNum = eqToParentEqNum[logEqNum] || logEqNum;
       const durationHours = (log.durationMinutes || 0) / 60;
-      indukHmMap[logEqNum] = (indukHmMap[logEqNum] || 0) + durationHours;
-      loggedEquipmentsMap[logEqNum] = log;
+      parentHmMap[pEqNum] = (parentHmMap[pEqNum] || 0) + durationHours;
+      loggedEquipmentsMap[pEqNum] = log;
     });
   });
 
-  // Build parentDescToEqNum from template for sub-equipment resolution
-  const parentDescToEqNum = {};
-  equipments.forEach(eq => {
-    const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
-    const desc = String(eq.description || '').trim();
-    if (eqKey && desc && indukHmMap[eqKey] !== undefined) {
-      parentDescToEqNum[desc] = eqKey;
-    }
-  });
-
-  // Helper: resolve parent HM for sub-equipment via field then substring fallback
-  const resolveParentHmAcc = (eq) => {
-    const subDesc = String(eq.description || '').trim();
-    const parentDesc = String(eq.parentEquipment || '').trim();
-    if (parentDesc && parentDesc !== subDesc) {
-      const pEqNum = parentDescToEqNum[parentDesc];
-      if (pEqNum && indukHmMap[pEqNum] !== undefined) return indukHmMap[pEqNum];
-    }
-    let bestParentHm = undefined;
-    let bestLen = 0;
-    for (const [pDesc, pEqNum] of Object.entries(parentDescToEqNum)) {
-      if (pDesc === subDesc) continue;
-      if (subDesc.includes(pDesc) && pDesc.length > bestLen) {
-        bestLen = pDesc.length;
-        bestParentHm = indukHmMap[pEqNum];
-      }
-    }
-    return bestParentHm;
-  };
-
-  // STEP 2: Resolve HM per template row — parent gets own HM, sub inherits parent HM
+  // STEP 2: Resolve HM per template row — parent and all sub-equipments get parentHmMap[pEqNum]
   equipments.forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     if (!eqKey) return;
-    if (indukHmMap[eqKey] !== undefined) {
-      accDurations[eqKey] = indukHmMap[eqKey];
-    } else {
-      const parentHm = resolveParentHmAcc(eq);
-      if (parentHm !== undefined) accDurations[eqKey] = parentHm;
-    }
+    const pEqNum = eqToParentEqNum[eqKey] || eqKey;
+    accDurations[eqKey] = parentHmMap[pEqNum] || 0;
   });
 
   const dateParts = endDate.split('-');
@@ -687,57 +681,26 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
     const dailyDurations = {};
     const loggedEquipmentsMap = {};
 
-    // STEP 1: Build indukHmMap per date — sum HM by parent eq num
-    const indukHmMapDate = {}; // { [parentEqNum]: totalHours }
+    const { eqToParentEqNum } = buildParentChildMaps(equipments);
+
+    // STEP 1: Aggregate HM per parent eq num for this date
+    const parentHmMapDate = {}; // { [parentEqNum]: totalHours }
     logsForDate.forEach(log => {
       const logEqNum = String(log.indukEqNum || log.induk_eq_num || '').trim();
       if (!logEqNum) return;
       if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(logEqNum)) return;
+      const pEqNum = eqToParentEqNum[logEqNum] || logEqNum;
       const durationHours = (log.durationMinutes || 0) / 60;
-      indukHmMapDate[logEqNum] = (indukHmMapDate[logEqNum] || 0) + durationHours;
-      loggedEquipmentsMap[logEqNum] = log;
+      parentHmMapDate[pEqNum] = (parentHmMapDate[pEqNum] || 0) + durationHours;
+      loggedEquipmentsMap[pEqNum] = log;
     });
-
-    // Build parentDescToEqNum for this date's sub-equipment resolution
-    const parentDescToEqNum = {};
-    equipments.forEach(eq => {
-      const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
-      const desc = String(eq.description || '').trim();
-      if (eqKey && desc && indukHmMapDate[eqKey] !== undefined) {
-        parentDescToEqNum[desc] = eqKey;
-      }
-    });
-
-    // Helper: resolve parent HM for sub-equipment via field then substring fallback
-    const resolveParentHmDate = (eq) => {
-      const subDesc = String(eq.description || '').trim();
-      const parentDesc = String(eq.parentEquipment || '').trim();
-      if (parentDesc && parentDesc !== subDesc) {
-        const pEqNum = parentDescToEqNum[parentDesc];
-        if (pEqNum && indukHmMapDate[pEqNum] !== undefined) return indukHmMapDate[pEqNum];
-      }
-      let bestParentHm = undefined;
-      let bestLen = 0;
-      for (const [pDesc, pEqNum] of Object.entries(parentDescToEqNum)) {
-        if (pDesc === subDesc) continue;
-        if (subDesc.includes(pDesc) && pDesc.length > bestLen) {
-          bestLen = pDesc.length;
-          bestParentHm = indukHmMapDate[pEqNum];
-        }
-      }
-      return bestParentHm;
-    };
 
     // STEP 2: Resolve HM per template row for this date
     equipments.forEach(eq => {
       const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
       if (!eqKey) return;
-      if (indukHmMapDate[eqKey] !== undefined) {
-        dailyDurations[eqKey] = indukHmMapDate[eqKey];
-      } else {
-        const parentHm = resolveParentHmDate(eq);
-        if (parentHm !== undefined) dailyDurations[eqKey] = parentHm;
-      }
+      const pEqNum = eqToParentEqNum[eqKey] || eqKey;
+      dailyDurations[eqKey] = parentHmMapDate[pEqNum] || 0;
     });
 
     const dateParts = dateStr.split('-');
