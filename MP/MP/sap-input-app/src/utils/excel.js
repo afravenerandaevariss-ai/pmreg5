@@ -1,6 +1,17 @@
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 
+export const EXCLUDED_SAP_EQS = new Set([
+  '1000204985',
+  '1000204982',
+  '1000204979',
+  '1000204961',
+  '1000204958',
+  '1000204955',
+  '1000204952',
+  '1000204914'
+]);
+
 /**
  * Forces specific columns in a worksheet to text (string) type.
  * Prevents large numbers (e.g. Equipment Number, Measuring Point) from
@@ -461,10 +472,14 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     const rowIdx = eq.rowIndex;
     if (rowIdx === undefined || !originalData[rowIdx]) return;
     if (processedRowIndices.has(rowIdx)) return;
-    processedRowIndices.add(rowIdx);
 
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
-    if (eqKey) exportedEqKeys.add(eqKey);
+    if (!eqKey) return;
+    const eqKeyNorm = eqKey.replace(/^0+/, '');
+    if (EXCLUDED_SAP_EQS.has(eqKey) || EXCLUDED_SAP_EQS.has(eqKeyNorm)) return;
+
+    processedRowIndices.add(rowIdx);
+    exportedEqKeys.add(eqKey);
 
     const pEqNum = eqToParentEqNum[eqKey] || eqKey;
 
@@ -514,6 +529,8 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   todaysLogs.forEach(log => {
     const logEqNum = String(log.indukEqNum || log.induk_eq_num || '').trim();
     if (!logEqNum || exportedEqKeys.has(logEqNum)) return;
+    const logEqNumNorm = logEqNum.replace(/^0+/, '');
+    if (EXCLUDED_SAP_EQS.has(logEqNum) || EXCLUDED_SAP_EQS.has(logEqNumNorm)) return;
 
     if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
       const logPlant = String(log.plant || '').trim().toUpperCase();
@@ -674,10 +691,14 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     const rowIdx = eq.rowIndex;
     if (rowIdx === undefined || !originalData[rowIdx]) return;
     if (processedRowIndices.has(rowIdx)) return;
-    processedRowIndices.add(rowIdx);
 
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
-    if (eqKey) exportedEqKeys.add(eqKey);
+    if (!eqKey) return;
+    const eqKeyNorm = eqKey.replace(/^0+/, '');
+    if (EXCLUDED_SAP_EQS.has(eqKey) || EXCLUDED_SAP_EQS.has(eqKeyNorm)) return;
+
+    processedRowIndices.add(rowIdx);
+    exportedEqKeys.add(eqKey);
 
     const pEqNum = eqToParentEqNum[eqKey] || eqKey;
 
@@ -720,6 +741,8 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
   // FALLBACK: Include logged equipments missing from originalData template
   Object.keys(loggedEquipmentsMap).forEach(eqKey => {
     if (exportedEqKeys.has(eqKey)) return;
+    const eqKeyNorm = eqKey.replace(/^0+/, '');
+    if (EXCLUDED_SAP_EQS.has(eqKey) || EXCLUDED_SAP_EQS.has(eqKeyNorm)) return;
 
     const log = loggedEquipmentsMap[eqKey];
     if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
@@ -883,10 +906,14 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       const rowIdx = eq.rowIndex;
       if (rowIdx === undefined || !originalData[rowIdx]) return;
       if (processedRowIndices.has(rowIdx)) return;
-      processedRowIndices.add(rowIdx);
 
       const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
-      if (eqKey) exportedEqKeys.add(eqKey);
+      if (!eqKey) return;
+      const eqKeyNorm = eqKey.replace(/^0+/, '');
+      if (EXCLUDED_SAP_EQS.has(eqKey) || EXCLUDED_SAP_EQS.has(eqKeyNorm)) return;
+
+      processedRowIndices.add(rowIdx);
+      exportedEqKeys.add(eqKey);
 
       const pEqNum = eqToParentEqNum[eqKey] || eqKey;
 
@@ -929,6 +956,8 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
     // FALLBACK: Include logged equipments missing from template originalData
     Object.keys(loggedEquipmentsMap).forEach(eqKey => {
       if (exportedEqKeys.has(eqKey)) return;
+      const eqKeyNorm = eqKey.replace(/^0+/, '');
+      if (EXCLUDED_SAP_EQS.has(eqKey) || EXCLUDED_SAP_EQS.has(eqKeyNorm)) return;
 
       const log = loggedEquipmentsMap[eqKey];
       if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
