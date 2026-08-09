@@ -78,14 +78,7 @@ export default function DailyDashboard({
   const [selectedExportEqs, setSelectedExportEqs] = useState([]);
   const [selectedExportPlants, setSelectedExportPlants] = useState([]);
 
-  // Automatically lock plant filter to currentUser.plant for non-Afra unit users
-  useEffect(() => {
-    if (!isAfraUser && currentUser?.plant) {
-      setMatrixPlantFilter(currentUser.plant);
-      setLogPlantFilter(currentUser.plant);
-      setSelectedExportPlants([currentUser.plant]);
-    }
-  }, [currentUser, isAfraUser]);
+  // All component state & ref declarations consolidated at top
   const [matrixSearch, setMatrixSearch] = useState('');
   const [matrixPage, setMatrixPage] = useState(1);
   const [matrixPageSize, setMatrixPageSize] = useState(50);
@@ -94,6 +87,76 @@ export default function DailyDashboard({
   const [isMatrixLoading, setIsMatrixLoading] = useState(false);
   const [isSavingMatrix, setIsSavingMatrix] = useState(false);
   const [unsavedMatrixCount, setUnsavedMatrixCount] = useState(0);
+
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [showForm, setShowForm] = useState(false);
+  const [showMassForm, setShowMassForm] = useState(false);
+  const [massPlantFilter, setMassPlantFilter] = useState('');
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [viewLog, setViewLog] = useState(null);
+  const [uploadError, setUploadError] = useState(null);
+  const [uploadPreview, setUploadPreview] = useState(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState('');
+
+  const [showGSheetModal, setShowGSheetModal] = useState(false);
+  const [googleSheetUrl, setGoogleSheetUrl] = useState('');
+  const [selectedGSheetMonth, setSelectedGSheetMonth] = useState((new Date().getMonth() + 1).toString());
+  const [selectedGSheetYear, setSelectedGSheetYear] = useState(new Date().getFullYear().toString());
+  const [isFetchingSheet, setIsFetchingSheet] = useState(false);
+  const [gsheetHistory, setGsheetHistory] = useState([]);
+
+  const [showSmartSyncModal, setShowSmartSyncModal] = useState(false);
+  const [smartSyncResult, setSmartSyncResult] = useState(null);
+  const [conflictResolutions, setConflictResolutions] = useState({});
+  const [syncTab, setSyncTab] = useState('new');
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const [importSummary, setImportSummary] = useState(null);
+  const [showImportSummary, setShowImportSummary] = useState(false);
+  const [isRefreshingForExport, setIsRefreshingForExport] = useState(false);
+  const [massData, setMassData] = useState({});
+  const [exportSettings, setExportSettings] = useState({ 
+    time: '08:00', 
+    readBy: currentUser?.role === 'Unit' ? currentUser.name : 'ADMIN',
+    startDate: format(new Date(), 'yyyy-MM-dd'),
+    endDate: format(new Date(), 'yyyy-MM-dd'),
+    isAccumulated: false
+  });
+  const [exportEqSearch, setExportEqSearch] = useState('');
+  const [showExportHourError, setShowExportHourError] = useState(false);
+  const [exportHourViolations, setExportHourViolations] = useState([]);
+  const [pendingExportPayload, setPendingExportPayload] = useState(null);
+
+  const [indukSearch, setIndukSearch] = useState('');
+  const [showIndukDropdown, setShowIndukDropdown] = useState(false);
+  const indukDropdownRef = useRef(null);
+  const ik17InputRef = useRef(null);
+
+  const [dailyLogs, setDailyLogs] = useState({});
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [isUploadingIK17, setIsUploadingIK17] = useState(false);
+
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyEqId, setHistoryEqId] = useState('');
+  const [historySearchEq, setHistorySearchEq] = useState('');
+  const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
+  const [historyData, setHistoryData] = useState([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const historyDropdownRef = useRef(null);
+
+  const [sortCol, setSortCol] = useState('plant');
+  const [sortDir, setSortDir] = useState('asc');
+
+  // Automatically lock plant filter to currentUser.plant for non-Afra unit users
+  useEffect(() => {
+    if (!isAfraUser && currentUser?.plant) {
+      setMatrixPlantFilter(currentUser.plant);
+      setLogPlantFilter(currentUser.plant);
+      setSelectedExportPlants([currentUser.plant]);
+    }
+  }, [currentUser, isAfraUser]);
 
   useEffect(() => {
     setMatrixPage(1);
@@ -332,54 +395,7 @@ export default function DailyDashboard({
     return dateStr === yesterdayStr;
   };
 
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [showForm, setShowForm] = useState(false);
-  const [showMassForm, setShowMassForm] = useState(false);
-  const [massPlantFilter, setMassPlantFilter] = useState('');
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [viewLog, setViewLog] = useState(null);
-  const [uploadError, setUploadError] = useState(null);
-  const [uploadPreview, setUploadPreview] = useState(null);
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState('');
-  // GSheet states
-  const [showGSheetModal, setShowGSheetModal] = useState(false);
-  const [googleSheetUrl, setGoogleSheetUrl] = useState('');
-  const [selectedGSheetMonth, setSelectedGSheetMonth] = useState((new Date().getMonth() + 1).toString());
-  const [selectedGSheetYear, setSelectedGSheetYear] = useState(new Date().getFullYear().toString());
-  const [isFetchingSheet, setIsFetchingSheet] = useState(false);
-  const [gsheetHistory, setGsheetHistory] = useState([]);
-  // Smart sync states
-  const [showSmartSyncModal, setShowSmartSyncModal] = useState(false);
-  const [smartSyncResult, setSmartSyncResult] = useState(null); // { newRows, conflictRows, skipRows }
-  const [conflictResolutions, setConflictResolutions] = useState({}); // { 'dateStr_eqNum': 'timpa'|'skip' }
-  const [syncTab, setSyncTab] = useState('new'); // 'new'|'conflict'|'skip'
-  const [isSyncing, setIsSyncing] = useState(false);
-  // Import summary notification state
-  const [importSummary, setImportSummary] = useState(null);
-  const [showImportSummary, setShowImportSummary] = useState(false);
-  const [isRefreshingForExport, setIsRefreshingForExport] = useState(false);
-  const [massData, setMassData] = useState({});
-  const [exportSettings, setExportSettings] = useState({ 
-    time: '08:00', 
-    readBy: currentUser?.role === 'Unit' ? currentUser.name : 'ADMIN',
-    startDate: format(new Date(), 'yyyy-MM-dd'),
-    endDate: format(new Date(), 'yyyy-MM-dd'),
-    isAccumulated: false
-  });
-  const [exportEqSearch, setExportEqSearch] = useState('');
-  // Export validation error state
-  const [showExportHourError, setShowExportHourError] = useState(false);
-  const [exportHourViolations, setExportHourViolations] = useState([]);
-  // Pending export payload for DEV to proceed after warning
-  const [pendingExportPayload, setPendingExportPayload] = useState(null);
 
-  const [indukSearch, setIndukSearch] = useState('');
-  const [showIndukDropdown, setShowIndukDropdown] = useState(false);
-  const indukDropdownRef = useRef(null);
-  
-  const ik17InputRef = useRef(null);
   const handleIK17Upload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -468,19 +484,7 @@ export default function DailyDashboard({
     reader.readAsArrayBuffer(file);
   };
   
-  // dailyLogs: { 'yyyy-MM-dd': [ { id, indukEqNum, indukDesc, durationHours, durationMins, status, notes, damagedSubs: [] } ] }
-  const [dailyLogs, setDailyLogs] = useState({});
-  const [logsLoading, setLogsLoading] = useState(false); // eslint-disable-line no-unused-vars
-  const [isUploadingIK17, setIsUploadingIK17] = useState(false);
 
-  // Riwayat Alat State
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [historyEqId, setHistoryEqId] = useState('');
-  const [historySearchEq, setHistorySearchEq] = useState('');
-  const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
-  const [historyData, setHistoryData] = useState([]);
-  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-  const historyDropdownRef = useRef(null);
 
   const fetchHistory = async (eqNum) => {
     setIsHistoryLoading(true);
