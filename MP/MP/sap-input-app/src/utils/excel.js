@@ -426,6 +426,33 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   let shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
   if (shortTextIdx === -1) shortTextIdx = 10;
 
+  // STEP 1.5: Build Parent & Sub Measuring Point Map
+  const parentMpMap = {};
+  equipments.forEach(eq => {
+    const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+    if (!eqKey) return;
+    const pEqNum = eqToParentEqNum[eqKey] || eqKey;
+    const rowIdx = eq.rowIndex;
+
+    let mp = '';
+    if (masterMap && (masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint)) {
+      mp = masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint;
+    } else if (rowIdx !== undefined && originalData[rowIdx] && measuringPtIdx !== -1) {
+      mp = String(originalData[rowIdx][measuringPtIdx] || '').trim();
+    } else if (eq.measuringPoint || eq.measuring_point) {
+      mp = String(eq.measuringPoint || eq.measuring_point).trim();
+    }
+
+    if (mp) {
+      if (!parentMpMap[pEqNum] || eqKey === pEqNum) {
+        parentMpMap[pEqNum] = mp;
+      }
+      if (!parentMpMap[eqKey]) {
+        parentMpMap[eqKey] = mp;
+      }
+    }
+  });
+
   const processedRowIndices = new Set();
   const exportedEqKeys = new Set();
 
@@ -439,7 +466,6 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     if (eqKey) exportedEqKeys.add(eqKey);
 
     const pEqNum = eqToParentEqNum[eqKey] || eqKey;
-    const isSubEq = (eqKey !== pEqNum) || (eq.type === 'Sub');
 
     const duration = dailyDurations[eqKey] || 0;
     const rowData = [...originalData[rowIdx]]; 
@@ -462,9 +488,12 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
     if (readByIdx !== -1) rowData[readByIdx] = readByVal;
     
-    // Sub-equipments in SAP do not own measuring points: clear measuring point for sub-equipments to avoid SAP mismatch error
-    if (isSubEq && measuringPtIdx !== -1) {
-      rowData[measuringPtIdx] = '';
+    // Ensure measuring point column is 100% fully populated for all parent & sub-equipments
+    if (measuringPtIdx !== -1) {
+      const origMp = (rowIdx !== undefined && originalData[rowIdx]) ? String(originalData[rowIdx][measuringPtIdx] || '').trim() : '';
+      const masterMp = masterMap ? (masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint) : '';
+      const finalMp = masterMp || origMp || parentMpMap[eqKey] || parentMpMap[pEqNum] || eq.measuringPoint || '';
+      rowData[measuringPtIdx] = finalMp;
     }
 
     const plantCodeStr = eq.plant || '5F01';
@@ -509,7 +538,9 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     if (readByIdx !== -1) newRow[readByIdx] = readByVal;
 
     if (measuringPtIdx !== -1) {
-      newRow[measuringPtIdx] = isSubEq ? '' : (log.measuringPoint || log.measuring_point || '');
+      const masterMp = masterMap ? (masterMap.get(logEqNum)?.measuringPoint || masterMap.get(logEqNum.replace(/^0+/, ''))?.measuringPoint) : '';
+      const finalMp = masterMp || parentMpMap[logEqNum] || parentMpMap[pEqNum] || log.measuringPoint || log.measuring_point || '';
+      newRow[measuringPtIdx] = finalMp;
     }
 
     const plantCodeStr = log.plant || '5F01';
@@ -600,6 +631,33 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
   let shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
   if (shortTextIdx === -1) shortTextIdx = 10;
 
+  // STEP 1.5: Build Parent & Sub Measuring Point Map
+  const parentMpMap = {};
+  equipments.forEach(eq => {
+    const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+    if (!eqKey) return;
+    const pEqNum = eqToParentEqNum[eqKey] || eqKey;
+    const rowIdx = eq.rowIndex;
+
+    let mp = '';
+    if (masterMap && (masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint)) {
+      mp = masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint;
+    } else if (rowIdx !== undefined && originalData[rowIdx] && measuringPtIdx !== -1) {
+      mp = String(originalData[rowIdx][measuringPtIdx] || '').trim();
+    } else if (eq.measuringPoint || eq.measuring_point) {
+      mp = String(eq.measuringPoint || eq.measuring_point).trim();
+    }
+
+    if (mp) {
+      if (!parentMpMap[pEqNum] || eqKey === pEqNum) {
+        parentMpMap[pEqNum] = mp;
+      }
+      if (!parentMpMap[eqKey]) {
+        parentMpMap[eqKey] = mp;
+      }
+    }
+  });
+
   const processedRowIndices = new Set();
   const exportedEqKeys = new Set();
 
@@ -613,7 +671,6 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     if (eqKey) exportedEqKeys.add(eqKey);
 
     const pEqNum = eqToParentEqNum[eqKey] || eqKey;
-    const isSubEq = (eqKey !== pEqNum) || (eq.type === 'Sub');
 
     const total = accDurations[eqKey] || 0;
     const rowData = [...originalData[rowIdx]];
@@ -630,9 +687,12 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
     if (readByIdx !== -1) rowData[readByIdx] = readByVal;
 
-    // Sub-equipments in SAP do not own measuring points: clear measuring point for sub-equipments to avoid SAP mismatch error
-    if (isSubEq && measuringPtIdx !== -1) {
-      rowData[measuringPtIdx] = '';
+    // Ensure measuring point column is 100% fully populated for all parent & sub-equipments
+    if (measuringPtIdx !== -1) {
+      const origMp = (rowIdx !== undefined && originalData[rowIdx]) ? String(originalData[rowIdx][measuringPtIdx] || '').trim() : '';
+      const masterMp = masterMap ? (masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint) : '';
+      const finalMp = masterMp || origMp || parentMpMap[eqKey] || parentMpMap[pEqNum] || eq.measuringPoint || '';
+      rowData[measuringPtIdx] = finalMp;
     }
 
     const plantCodeStr = eq.plant || '5F01';
@@ -678,7 +738,9 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     if (readByIdx !== -1) newRow[readByIdx] = readByVal;
 
     if (measuringPtIdx !== -1) {
-      newRow[measuringPtIdx] = isSubEq ? '' : (log.measuringPoint || log.measuring_point || '');
+      const masterMp = masterMap ? (masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint) : '';
+      const finalMp = masterMp || parentMpMap[eqKey] || parentMpMap[pEqNum] || log.measuringPoint || log.measuring_point || '';
+      newRow[measuringPtIdx] = finalMp;
     }
 
     const plantCodeStr = log.plant || '5F01';
@@ -773,6 +835,33 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
 
     const measuringPtIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measuring point') || h.toLowerCase().includes('meas. point') || h.toLowerCase().includes('measuring pt')));
 
+    // STEP 1.5: Build Parent & Sub Measuring Point Map
+    const parentMpMap = {};
+    equipments.forEach(eq => {
+      const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+      if (!eqKey) return;
+      const pEqNum = eqToParentEqNum[eqKey] || eqKey;
+      const rowIdx = eq.rowIndex;
+
+      let mp = '';
+      if (masterMap && (masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint)) {
+        mp = masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint;
+      } else if (rowIdx !== undefined && originalData[rowIdx] && measuringPtIdx !== -1) {
+        mp = String(originalData[rowIdx][measuringPtIdx] || '').trim();
+      } else if (eq.measuringPoint || eq.measuring_point) {
+        mp = String(eq.measuringPoint || eq.measuring_point).trim();
+      }
+
+      if (mp) {
+        if (!parentMpMap[pEqNum] || eqKey === pEqNum) {
+          parentMpMap[pEqNum] = mp;
+        }
+        if (!parentMpMap[eqKey]) {
+          parentMpMap[eqKey] = mp;
+        }
+      }
+    });
+
     equipments.forEach((eq) => {
       const rowIdx = eq.rowIndex;
       if (rowIdx === undefined || !originalData[rowIdx]) return;
@@ -783,7 +872,6 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       if (eqKey) exportedEqKeys.add(eqKey);
 
       const pEqNum = eqToParentEqNum[eqKey] || eqKey;
-      const isSubEq = (eqKey !== pEqNum) || (eq.type === 'Sub');
 
       const duration = dailyDurations[eqKey] || 0;
       const rowData = [...originalData[rowIdx]];
@@ -800,9 +888,12 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
       if (readByIdx !== -1) rowData[readByIdx] = readByVal;
       
-      // Sub-equipments in SAP do not own measuring points: clear measuring point for sub-equipments to avoid SAP mismatch error
-      if (isSubEq && measuringPtIdx !== -1) {
-        rowData[measuringPtIdx] = '';
+      // Ensure measuring point column is 100% fully populated for all parent & sub-equipments
+      if (measuringPtIdx !== -1) {
+        const origMp = (rowIdx !== undefined && originalData[rowIdx]) ? String(originalData[rowIdx][measuringPtIdx] || '').trim() : '';
+        const masterMp = masterMap ? (masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint) : '';
+        const finalMp = masterMp || origMp || parentMpMap[eqKey] || parentMpMap[pEqNum] || eq.measuringPoint || '';
+        rowData[measuringPtIdx] = finalMp;
       }
 
       const plantCodeStr = eq.plant || '5F01';
@@ -848,7 +939,9 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       if (readByIdx !== -1) newRow[readByIdx] = readByVal;
 
       if (measuringPtIdx !== -1) {
-        newRow[measuringPtIdx] = isSubEq ? '' : (log.measuringPoint || log.measuring_point || '');
+        const masterMp = masterMap ? (masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint) : '';
+        const finalMp = masterMp || parentMpMap[eqKey] || parentMpMap[pEqNum] || log.measuringPoint || log.measuring_point || '';
+        newRow[measuringPtIdx] = finalMp;
       }
 
       const plantCodeStr = log.plant || '5F01';
