@@ -201,8 +201,7 @@ export async function parseRegionalMP(file, masterMap) {
  *
  * @returns {{ valid: boolean, violations: Array<{ date: string, indukEqNum: string, indukDesc: string, totalMinutes: number }> }}
  */
-export function validateDailyHours(dailyLogsMap, startDate, endDate, selectedEqs, isAfraUser) {
-  if (isAfraUser) return { valid: true, violations: [] };
+export function validateDailyHours(dailyLogsMap, startDate, endDate, selectedEqs) {
   const MAX_MINUTES_PER_DAY = 24 * 60; // 1440 minutes
   const violations = [];
 

@@ -2667,8 +2667,7 @@ export default function DailyDashboard({
                     freshLogs,
                     exportSettings.startDate,
                     exportSettings.endDate,
-                    selectedExportEqs,
-                    isAfraUser
+                    selectedExportEqs
                   );
                   if (!validation.valid) {
                     setExportHourViolations(validation.violations);
