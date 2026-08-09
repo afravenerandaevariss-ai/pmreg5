@@ -371,6 +371,8 @@ export default function DailyDashboard({
   // Export validation error state
   const [showExportHourError, setShowExportHourError] = useState(false);
   const [exportHourViolations, setExportHourViolations] = useState([]);
+  // Pending export payload for DEV to proceed after warning
+  const [pendingExportPayload, setPendingExportPayload] = useState(null);
 
   const [indukSearch, setIndukSearch] = useState('');
   const [showIndukDropdown, setShowIndukDropdown] = useState(false);
@@ -2644,8 +2646,16 @@ export default function DailyDashboard({
                   );
                   if (!validation.valid) {
                     setExportHourViolations(validation.violations);
-                    setShowExportHourError(true);
-                    return;
+                    if (isAfraUser) {
+                      // DEV: store pending payload then show warning (allow to proceed)
+                      setPendingExportPayload({ freshLogs, targetEquipments: equipments, exportPayload: null, exportSettings: { ...exportSettings }, selectedExportPlants: [...selectedExportPlants], selectedExportEqs: [...selectedExportEqs] });
+                      setShowExportHourError(true);
+                      return; // pause here — DEV can click "Export Tetap" to proceed
+                    } else {
+                      // USER/ADMIN: blocked
+                      setShowExportHourError(true);
+                      return;
+                    }
                   }
 
                   const exportPayload = {
@@ -2685,19 +2695,25 @@ export default function DailyDashboard({
       {showExportHourError && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh]">
-            {/* Header */}
-            <div className="bg-red-600 text-white p-4 rounded-t-2xl flex justify-between items-center">
+            {/* Header — amber for DEV warning, red for blocked */}
+            <div className={`${isAfraUser ? 'bg-amber-500' : 'bg-red-600'} text-white p-4 rounded-t-2xl flex justify-between items-center`}>
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center flex-none">
                   <AlertTriangle size={20} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base leading-tight">EXPORT DIBLOKIR</h3>
-                  <p className="text-xs text-red-100 mt-0.5">Jam jalan melebihi batas maksimum 24 jam/hari</p>
+                  <h3 className="font-bold text-base leading-tight">
+                    {isAfraUser ? 'PERINGATAN — JAM > 24' : 'EXPORT DIBLOKIR'}
+                  </h3>
+                  <p className={`text-xs mt-0.5 ${isAfraUser ? 'text-amber-100' : 'text-red-100'}`}>
+                    {isAfraUser
+                      ? 'Data melebihi 24 jam/hari. DEV dapat tetap melanjutkan export.'
+                      : 'Jam jalan melebihi batas maksimum 24 jam/hari'}
+                  </p>
                 </div>
               </div>
               <button
-                onClick={() => setShowExportHourError(false)}
+                onClick={() => { setShowExportHourError(false); setPendingExportPayload(null); }}
                 className="text-white/70 hover:text-white p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
               >
                 <X size={18} />
@@ -2707,12 +2723,14 @@ export default function DailyDashboard({
             {/* Body */}
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
               {/* Explanation */}
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 flex gap-3 items-start">
-                <AlertTriangle size={16} className="text-red-500 flex-none mt-0.5" />
-                <p className="text-sm text-red-700 leading-relaxed">
+              <div className={`${isAfraUser ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200'} border rounded-xl p-3.5 flex gap-3 items-start`}>
+                <AlertTriangle size={16} className={`${isAfraUser ? 'text-amber-500' : 'text-red-500'} flex-none mt-0.5`} />
+                <p className={`text-sm ${isAfraUser ? 'text-amber-700' : 'text-red-700'} leading-relaxed`}>
                   Ditemukan <strong>{exportHourViolations.length} pelanggaran</strong> data jam jalan.
-                  Total jam jalan per alat induk dalam satu hari <strong>tidak boleh melebihi 24 jam (1.440 menit)</strong>.
-                  Silakan periksa dan perbaiki data berikut sebelum mengekspor ke Excel.
+                  Total jam jalan per alat induk dalam satu hari <strong>melebihi 24 jam (1.440 menit)</strong>.
+                  {isAfraUser
+                    ? ' Sebagai DEV, Anda dapat tetap mengekspor data ini.'
+                    : ' Silakan periksa dan perbaiki data berikut sebelum mengekspor ke Excel.'}
                 </p>
               </div>
 
@@ -2731,9 +2749,9 @@ export default function DailyDashboard({
                       ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`
                       : v.date;
                     return (
-                      <div key={idx} className="flex items-start gap-3 p-3 bg-white hover:bg-red-50 transition-colors">
+                      <div key={idx} className={`flex items-start gap-3 p-3 bg-white hover:${isAfraUser ? 'bg-amber-50' : 'bg-red-50'} transition-colors`}>
                         {/* Date badge */}
-                        <div className="bg-red-100 text-red-700 rounded-lg px-2.5 py-1.5 text-center flex-none min-w-[70px]">
+                        <div className={`${isAfraUser ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'} rounded-lg px-2.5 py-1.5 text-center flex-none min-w-[70px]`}>
                           <p className="text-[11px] font-bold leading-tight">{displayDate}</p>
                         </div>
                         {/* Equipment info */}
@@ -2745,8 +2763,8 @@ export default function DailyDashboard({
                         </div>
                         {/* Hours info */}
                         <div className="text-right flex-none">
-                          <p className="text-sm font-bold text-red-600">{totalHours} jam</p>
-                          <p className="text-[11px] text-red-400">+{excessHours} jam lebih</p>
+                          <p className={`text-sm font-bold ${isAfraUser ? 'text-amber-600' : 'text-red-600'}`}>{totalHours} jam</p>
+                          <p className={`text-[11px] ${isAfraUser ? 'text-amber-400' : 'text-red-400'}`}>+{excessHours} jam lebih</p>
                         </div>
                       </div>
                     );
@@ -2758,11 +2776,46 @@ export default function DailyDashboard({
             {/* Footer */}
             <div className="p-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex gap-3">
               <button
-                onClick={() => setShowExportHourError(false)}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
+                onClick={() => { setShowExportHourError(false); setPendingExportPayload(null); }}
+                className={`${isAfraUser ? 'flex-1' : 'flex-1'} ${isAfraUser ? 'bg-slate-200 hover:bg-slate-300 text-slate-700' : 'bg-red-600 hover:bg-red-700 text-white'} font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm`}
               >
-                <X size={16} /> Tutup & Perbaiki Data
+                <X size={16} /> {isAfraUser ? 'Tutup' : 'Tutup & Perbaiki Data'}
               </button>
+              {/* DEV-only: proceed button */}
+              {isAfraUser && pendingExportPayload && (
+                <button
+                  onClick={() => {
+                    const { freshLogs: pLogs, exportSettings: pSettings, selectedExportPlants: pPlants, selectedExportEqs: pEqs } = pendingExportPayload;
+                    const pPayload = {
+                      date: pSettings.endDate,
+                      startDate: pSettings.startDate,
+                      endDate: pSettings.endDate,
+                      time: pSettings.time,
+                      readBy: pSettings.readBy,
+                      plant: currentUser?.plant,
+                      selectedEqs: pEqs
+                    };
+                    let pTargetEqs = equipments;
+                    const pIsAdmin = currentUser?.role?.toUpperCase() === 'ADMIN';
+                    if (pIsAdmin && pPlants.length > 0) {
+                      pTargetEqs = equipments.filter(eq => !eq.plant || pPlants.includes(eq.plant));
+                    }
+                    if (pSettings.startDate === pSettings.endDate && !pSettings.isAccumulated) {
+                      exportDailyToSAP(templateData.headers, templateData.originalData, pTargetEqs, pLogs, pPayload);
+                    } else if (pSettings.isAccumulated) {
+                      exportAccumulatedToSAP(templateData.headers, templateData.originalData, pTargetEqs, pLogs, pPayload);
+                    } else {
+                      exportCumulativeToSAP(templateData.headers, templateData.originalData, pTargetEqs, pLogs, pPayload);
+                    }
+                    setShowExportHourError(false);
+                    setShowExportModal(false);
+                    setPendingExportPayload(null);
+                  }}
+                  className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
+                >
+                  <FileDown size={16} /> Export Tetap
+                </button>
+              )}
             </div>
           </div>
         </div>
