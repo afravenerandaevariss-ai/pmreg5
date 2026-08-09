@@ -119,7 +119,7 @@ export async function parseRegionalMP(file, masterMap) {
           if (desc) allDescriptions.push(desc);
         }
         
-        // Optimize suffix matching by sorting descriptions by length ascending
+        // Sort descriptions by length ascending for parent matching
         allDescriptions.sort((a, b) => a.length - b.length);
         
         for (let i = 1; i < jsonData.length; i++) {
@@ -147,12 +147,24 @@ export async function parseRegionalMP(file, masterMap) {
           
           const description = masterDescription || String(row[descColIdx] || '').trim();
           
-          // Find parent: the shortest description that is a suffix of the current description
-          let parentEquipment = description;
+          // Find parent: first try suffix match, then substring containment match.
+          // Example: "BODY SLUDGE SEPARATOR NO. 1" doesn't end with "SLUDGE SEPARATOR NO. 1"
+          // but "SLUDGE SEPARATOR NO. 1" is contained in it — so we use substring match.
+          let parentEquipment = description; // default: self (is a parent or standalone)
+          // Pass 1: suffix match (shortest description that this ends with)
           for (const p of allDescriptions) {
-            if (description.endsWith(p)) {
+            if (p !== description && description.endsWith(p)) {
               parentEquipment = p;
-              break; // sorted by length ascending, so first match is shortest (root parent)
+              break;
+            }
+          }
+          // Pass 2: if still self, try substring containment (shortest desc that is a part of this desc)
+          if (parentEquipment === description) {
+            for (const p of allDescriptions) {
+              if (p !== description && p.length < description.length && description.includes(p)) {
+                parentEquipment = p;
+                break;
+              }
             }
           }
           
@@ -309,7 +321,6 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   });
 
   // Build parentDescToEqNum: description → eqNum for all parent (induk) equipment in the template
-  // Sub-equipment rows have a parentEquipment field (string description of their parent)
   const parentDescToEqNum = {};
   equipments.forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
@@ -319,25 +330,41 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     }
   });
 
+  // Helper: find parent HM for a sub-equipment by scanning all known parents
+  // Uses parentEquipment field first, then falls back to substring/suffix scan
+  const resolveParentHm = (eq) => {
+    const subDesc = String(eq.description || '').trim();
+    // 1. Try via parentEquipment field
+    const parentDesc = String(eq.parentEquipment || '').trim();
+    if (parentDesc && parentDesc !== subDesc) {
+      const pEqNum = parentDescToEqNum[parentDesc];
+      if (pEqNum && indukHmMap[pEqNum] !== undefined) return indukHmMap[pEqNum];
+    }
+    // 2. Fallback: scan all parent descs — find longest parent desc that is contained in subDesc
+    let bestParentHm = undefined;
+    let bestLen = 0;
+    for (const [pDesc, pEqNum] of Object.entries(parentDescToEqNum)) {
+      if (pDesc === subDesc) continue;
+      if (subDesc.includes(pDesc) && pDesc.length > bestLen) {
+        bestLen = pDesc.length;
+        bestParentHm = indukHmMap[pEqNum];
+      }
+    }
+    return bestParentHm;
+  };
+
   // STEP 2: For each equipment in the template, resolve its HM value:
   //   - If it's a parent (eqNum is in indukHmMap) → use its own HM
-  //   - If it's a sub-equipment → look up parent via parentEquipment desc → inherit parent HM
+  //   - If it's a sub-equipment → inherit parent HM via resolveParentHm
   const dailyDurations = {};
   equipments.forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     if (!eqKey) return;
     if (indukHmMap[eqKey] !== undefined) {
-      // This eq is itself a parent with logged data
       dailyDurations[eqKey] = indukHmMap[eqKey];
     } else {
-      // Sub-equipment: inherit from its parent via parentEquipment description
-      const parentDesc = String(eq.parentEquipment || '').trim();
-      if (parentDesc) {
-        const parentEqNum = parentDescToEqNum[parentDesc];
-        if (parentEqNum && indukHmMap[parentEqNum] !== undefined) {
-          dailyDurations[eqKey] = indukHmMap[parentEqNum];
-        }
-      }
+      const parentHm = resolveParentHm(eq);
+      if (parentHm !== undefined) dailyDurations[eqKey] = parentHm;
     }
   });
 
@@ -493,6 +520,26 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     }
   });
 
+  // Helper: resolve parent HM for sub-equipment via field then substring fallback
+  const resolveParentHmAcc = (eq) => {
+    const subDesc = String(eq.description || '').trim();
+    const parentDesc = String(eq.parentEquipment || '').trim();
+    if (parentDesc && parentDesc !== subDesc) {
+      const pEqNum = parentDescToEqNum[parentDesc];
+      if (pEqNum && indukHmMap[pEqNum] !== undefined) return indukHmMap[pEqNum];
+    }
+    let bestParentHm = undefined;
+    let bestLen = 0;
+    for (const [pDesc, pEqNum] of Object.entries(parentDescToEqNum)) {
+      if (pDesc === subDesc) continue;
+      if (subDesc.includes(pDesc) && pDesc.length > bestLen) {
+        bestLen = pDesc.length;
+        bestParentHm = indukHmMap[pEqNum];
+      }
+    }
+    return bestParentHm;
+  };
+
   // STEP 2: Resolve HM per template row — parent gets own HM, sub inherits parent HM
   equipments.forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
@@ -500,13 +547,8 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     if (indukHmMap[eqKey] !== undefined) {
       accDurations[eqKey] = indukHmMap[eqKey];
     } else {
-      const parentDesc = String(eq.parentEquipment || '').trim();
-      if (parentDesc) {
-        const parentEqNum = parentDescToEqNum[parentDesc];
-        if (parentEqNum && indukHmMap[parentEqNum] !== undefined) {
-          accDurations[eqKey] = indukHmMap[parentEqNum];
-        }
-      }
+      const parentHm = resolveParentHmAcc(eq);
+      if (parentHm !== undefined) accDurations[eqKey] = parentHm;
     }
   });
 
@@ -666,6 +708,26 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       }
     });
 
+    // Helper: resolve parent HM for sub-equipment via field then substring fallback
+    const resolveParentHmDate = (eq) => {
+      const subDesc = String(eq.description || '').trim();
+      const parentDesc = String(eq.parentEquipment || '').trim();
+      if (parentDesc && parentDesc !== subDesc) {
+        const pEqNum = parentDescToEqNum[parentDesc];
+        if (pEqNum && indukHmMapDate[pEqNum] !== undefined) return indukHmMapDate[pEqNum];
+      }
+      let bestParentHm = undefined;
+      let bestLen = 0;
+      for (const [pDesc, pEqNum] of Object.entries(parentDescToEqNum)) {
+        if (pDesc === subDesc) continue;
+        if (subDesc.includes(pDesc) && pDesc.length > bestLen) {
+          bestLen = pDesc.length;
+          bestParentHm = indukHmMapDate[pEqNum];
+        }
+      }
+      return bestParentHm;
+    };
+
     // STEP 2: Resolve HM per template row for this date
     equipments.forEach(eq => {
       const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
@@ -673,13 +735,8 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       if (indukHmMapDate[eqKey] !== undefined) {
         dailyDurations[eqKey] = indukHmMapDate[eqKey];
       } else {
-        const parentDesc = String(eq.parentEquipment || '').trim();
-        if (parentDesc) {
-          const parentEqNum = parentDescToEqNum[parentDesc];
-          if (parentEqNum && indukHmMapDate[parentEqNum] !== undefined) {
-            dailyDurations[eqKey] = indukHmMapDate[parentEqNum];
-          }
-        }
+        const parentHm = resolveParentHmDate(eq);
+        if (parentHm !== undefined) dailyDurations[eqKey] = parentHm;
       }
     });
 
