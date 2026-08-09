@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { format, startOfWeek, addDays, startOfMonth, endOfMonth, isSameDay, subMonths, addMonths, getDaysInMonth, subDays } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Search, Plus, Minus, X, Save, Clock, AlertTriangle, CheckCircle, ClipboardList, Download, FileDown, Trash2, Eye, Upload, History, Flag, FileSpreadsheet, RefreshCw, Layers } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Search, Plus, Minus, X, Save, Clock, AlertTriangle, CheckCircle, ClipboardList, Download, FileDown, Trash2, Eye, Upload, History, Flag, FileSpreadsheet, RefreshCw, Layers, Lock } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { exportDailyToSAP, exportCumulativeToSAP, exportAccumulatedToSAP, validateDailyHours } from '../utils/excel';
 import { supabase, IS_DEV_ENV } from '../lib/supabase';
@@ -1631,6 +1631,10 @@ export default function DailyDashboard({
 
         {/* Global Action Buttons */}
         <div className="flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200/80 rounded-xl text-xs font-bold shadow-2xs">
+            <Lock size={13} className="text-emerald-600" />
+            <span>Pengaturan Jam Jalan: Terkunci &amp; Terproteksi</span>
+          </div>
           {isAfraUser && (
             <button
               onClick={handleFetchGoogleSheet}
