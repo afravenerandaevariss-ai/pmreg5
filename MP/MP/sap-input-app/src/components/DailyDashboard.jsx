@@ -86,7 +86,7 @@ export default function DailyDashboard({
   }, [currentUser, isAfraUser]);
   const [matrixSearch, setMatrixSearch] = useState('');
   const [matrixPage, setMatrixPage] = useState(1);
-  const matrixPageSize = 250;
+  const [matrixPageSize, setMatrixPageSize] = useState(50);
   const [matrixData, setMatrixData] = useState({});
   const [initialMatrixData, setInitialMatrixData] = useState({});
   const [isMatrixLoading, setIsMatrixLoading] = useState(false);
@@ -156,10 +156,12 @@ export default function DailyDashboard({
 
       const payloadList = [];
       const keysToDelete = [];
+      const eqList = templateData?.equipments || equipments;
+      const eqMap = new Map(eqList.map(e => [String(e.eqNum || e.eq_num).trim(), e]));
 
       for (const key of modifiedKeys) {
         const [eqNum, dateStr] = key.split('_');
-        const eq = (templateData?.equipments || equipments).find(e => String(e.eqNum || e.eq_num).trim() === eqNum);
+        const eq = eqMap.get(eqNum);
         const plant = eq?.plant || matrixPlantFilter || '5F07';
         const hours = dataToSave[key];
 
@@ -227,21 +229,20 @@ export default function DailyDashboard({
     } else {
       let val = parseFloat(valueStr);
       if (isNaN(val) || val < 0) val = 0;
-      // Only non-DEV users are capped at 24 HM per day
       if (!isAfraUser && val > 24) val = 24;
       updated[key] = val;
     }
 
-    setMatrixData(updated);
+    // Efficient O(1) unsaved count delta instead of scanning all keys
+    const isNowModified = updated[key] !== initialMatrixData[key];
+    const wasModified = matrixData[key] !== initialMatrixData[key];
+    if (isNowModified && !wasModified) {
+      setUnsavedMatrixCount(prev => prev + 1);
+    } else if (!isNowModified && wasModified) {
+      setUnsavedMatrixCount(prev => Math.max(0, prev - 1));
+    }
 
-    let unsaved = 0;
-    const allKeys = new Set([...Object.keys(updated), ...Object.keys(initialMatrixData)]);
-    allKeys.forEach(k => {
-      if (updated[k] !== initialMatrixData[k]) {
-        unsaved++;
-      }
-    });
-    setUnsavedMatrixCount(unsaved);
+    setMatrixData(updated);
 
     // Trigger Auto-Save after 800ms debounce
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
@@ -509,15 +510,25 @@ export default function DailyDashboard({
       } catch (_e) { /* ik17 base HM not available */ }
 
       if (baseDate) {
-        processed = logs.map(log => {
-           let hm = baseHm;
-           if (log.date >= baseDate) {
-              hm += logs.filter(l => l.date > baseDate && l.date <= log.date).reduce((acc, l) => acc + (l.duration_minutes/60), 0);
-           } else {
-              hm -= logs.filter(l => l.date > log.date && l.date <= baseDate).reduce((acc, l) => acc + (l.duration_minutes/60), 0);
-           }
-           return { ...log, cumulative_hm: hm };
+        const sortedAsc = [...logs].sort((a, b) => a.date.localeCompare(b.date));
+        let runningAfter = baseHm;
+        let runningBefore = baseHm;
+        const logHmMap = {};
+
+        sortedAsc.filter(l => l.date > baseDate).forEach(l => {
+          runningAfter += (l.duration_minutes / 60);
+          logHmMap[l.id] = runningAfter;
         });
+
+        sortedAsc.filter(l => l.date <= baseDate).sort((a, b) => b.date.localeCompare(a.date)).forEach(l => {
+          logHmMap[l.id] = runningBefore;
+          runningBefore -= (l.duration_minutes / 60);
+        });
+
+        processed = logs.map(log => ({
+          ...log,
+          cumulative_hm: logHmMap[log.id] !== undefined ? logHmMap[log.id] : baseHm
+        }));
       } else {
         let running = 0;
         processed = logs.map(log => {
@@ -1880,8 +1891,22 @@ export default function DailyDashboard({
 
             {/* Pagination Controls */}
             <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-xs font-semibold text-slate-700 flex-wrap gap-2">
-              <div>
-                Menampilkan {parentEquipments.length === 0 ? 0 : (matrixPage - 1) * matrixPageSize + 1} - {Math.min(matrixPage * matrixPageSize, parentEquipments.length)} dari {parentEquipments.length} Equipment Induk
+              <div className="flex items-center gap-3">
+                <span>Menampilkan {parentEquipments.length === 0 ? 0 : (matrixPage - 1) * matrixPageSize + 1} - {Math.min(matrixPage * matrixPageSize, parentEquipments.length)} dari {parentEquipments.length} Equipment Induk</span>
+                <span className="text-slate-300">|</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500 font-normal">Tampilkan:</span>
+                  <select
+                    value={matrixPageSize}
+                    onChange={e => { setMatrixPageSize(Number(e.target.value)); setMatrixPage(1); }}
+                    className="bg-white border border-slate-300 rounded-md px-2 py-0.5 text-xs font-mono font-bold text-slate-700 focus:ring-1 focus:ring-emerald-500 outline-none cursor-pointer"
+                  >
+                    <option value={25}>25 / hal</option>
+                    <option value={50}>50 / hal (Cepat)</option>
+                    <option value={100}>100 / hal</option>
+                    <option value={250}>250 / hal</option>
+                  </select>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <button
