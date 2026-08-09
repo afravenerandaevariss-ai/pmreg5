@@ -514,6 +514,13 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   todaysLogs.forEach(log => {
     const logEqNum = String(log.indukEqNum || log.induk_eq_num || '').trim();
     if (!logEqNum || exportedEqKeys.has(logEqNum)) return;
+
+    if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
+      const logPlant = String(log.plant || '').trim().toUpperCase();
+      const selPlants = docDetails.selectedPlants.map(p => String(p).trim().toUpperCase());
+      if (logPlant && !selPlants.includes(logPlant)) return;
+    }
+
     exportedEqKeys.add(logEqNum);
 
     const pEqNum = eqToParentEqNum[logEqNum] || logEqNum;
@@ -713,12 +720,19 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
   // FALLBACK: Include logged equipments missing from originalData template
   Object.keys(loggedEquipmentsMap).forEach(eqKey => {
     if (exportedEqKeys.has(eqKey)) return;
+
+    const log = loggedEquipmentsMap[eqKey];
+    if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
+      const logPlant = String(log?.plant || '').trim().toUpperCase();
+      const selPlants = docDetails.selectedPlants.map(p => String(p).trim().toUpperCase());
+      if (logPlant && !selPlants.includes(logPlant)) return;
+    }
+
     exportedEqKeys.add(eqKey);
 
     const total = accDurations[eqKey] || 0;
     if (total <= 0) return;
 
-    const log = loggedEquipmentsMap[eqKey];
     const pEqNum = eqToParentEqNum[eqKey] || eqKey;
     const isSubEq = (eqKey !== pEqNum);
     const newRow = new Array(cleanHeaders.length).fill('');
@@ -915,12 +929,19 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
     // FALLBACK: Include logged equipments missing from template originalData
     Object.keys(loggedEquipmentsMap).forEach(eqKey => {
       if (exportedEqKeys.has(eqKey)) return;
+
+      const log = loggedEquipmentsMap[eqKey];
+      if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
+        const logPlant = String(log?.plant || '').trim().toUpperCase();
+        const selPlants = docDetails.selectedPlants.map(p => String(p).trim().toUpperCase());
+        if (logPlant && !selPlants.includes(logPlant)) return;
+      }
+
       exportedEqKeys.add(eqKey);
 
       const duration = dailyDurations[eqKey] || 0;
       if (duration <= 0) return;
 
-      const log = loggedEquipmentsMap[eqKey];
       const pEqNum = eqToParentEqNum[eqKey] || eqKey;
       const isSubEq = (eqKey !== pEqNum);
       const newRow = new Array(cleanHeaders.length).fill('');
