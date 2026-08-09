@@ -201,7 +201,8 @@ export async function parseRegionalMP(file, masterMap) {
  *
  * @returns {{ valid: boolean, violations: Array<{ date: string, indukEqNum: string, indukDesc: string, totalMinutes: number }> }}
  */
-export function validateDailyHours(dailyLogsMap, startDate, endDate, selectedEqs) {
+export function validateDailyHours(dailyLogsMap, startDate, endDate, selectedEqs, isAfraUser) {
+  if (isAfraUser) return { valid: true, violations: [] };
   const MAX_MINUTES_PER_DAY = 24 * 60; // 1440 minutes
   const violations = [];
 
@@ -236,7 +237,10 @@ export function validateDailyHours(dailyLogsMap, startDate, endDate, selectedEqs
     });
   });
 
-  return { valid: violations.length === 0, violations };
+  return {
+    valid: violations.length === 0,
+    violations,
+  };
 }
 
 /**
@@ -395,7 +399,7 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(logEqNum)) return;
     const pEqNum = eqToParentEqNum[logEqNum] || logEqNum;
     const durationHours = (log.durationMinutes || 0) / 60;
-    parentHmMap[pEqNum] = Math.min(24, (parentHmMap[pEqNum] || 0) + durationHours);
+    parentHmMap[pEqNum] = (parentHmMap[pEqNum] || 0) + durationHours;
   });
 
   // STEP 2: Resolve HM per template row — parent and all sub-equipments get parentHmMap[pEqNum]

@@ -1955,8 +1955,8 @@ export default function DailyDashboard({
                     onChange={(e) => setLogPlantFilter(e.target.value)}
                     className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs text-slate-700 font-bold focus:ring-2 focus:ring-[#064e3b]/20 focus:border-[#064e3b] focus:outline-none bg-slate-50 hover:bg-slate-100 transition-colors"
                   >
-                    <option value="">Semua Plant</option>
-                    {uniquePlants.map(p => (
+                    <option value="">Semua Plant (5F)</option>
+                    {pabrikPlants.map(p => (
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
@@ -2667,7 +2667,8 @@ export default function DailyDashboard({
                     freshLogs,
                     exportSettings.startDate,
                     exportSettings.endDate,
-                    selectedExportEqs
+                    selectedExportEqs,
+                    isAfraUser
                   );
                   if (!validation.valid) {
                     setExportHourViolations(validation.violations);
