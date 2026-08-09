@@ -503,7 +503,7 @@ export async function fetchWAConfig() {
     gowaUser: 'admin',
     gowaPass: 'Sedap321#',
     gowaDevice: '黄玲玲',
-    autoSendEnabled: true,
+    autoSendEnabled: false,
     sendTime: '08:00 & 15:30',
   };
   if (error || !data || typeof data !== 'object') {
