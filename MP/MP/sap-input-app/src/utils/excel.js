@@ -309,31 +309,39 @@ function buildParentChildMaps(equipments) {
   const parentDescToEqNum = {};
   const parentEqNumsSet = new Set();
   
-  // Pass 1: Register true parents (where description === induk or type === 'Induk')
+  // Pass 1: Register true parents with plant isolation key: `${plant}_${parentDesc}`
   equipments.forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     const desc = String(eq.description || '').trim();
     const pDesc = String(eq.induk || eq.parentEquipment || desc).trim();
+    const plant = String(eq.plant || '').trim().toUpperCase();
     if (eqKey && desc && (desc === pDesc || eq.type === 'Induk')) {
-      parentDescToEqNum[desc] = eqKey;
+      const key = plant ? `${plant}_${desc}` : desc;
+      parentDescToEqNum[key] = eqKey;
       parentEqNumsSet.add(eqKey);
     }
   });
 
-  // Pass 2: Fallback — register any equipment whose desc has no parent registered yet
+  // Pass 2: Fallback — register any equipment whose desc has no parent registered yet per plant
   equipments.forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     const desc = String(eq.description || '').trim();
-    if (eqKey && desc && !parentDescToEqNum[desc]) {
+    const plant = String(eq.plant || '').trim().toUpperCase();
+    const key = plant ? `${plant}_${desc}` : desc;
+    if (eqKey && desc && !parentDescToEqNum[key]) {
       let isSub = false;
-      for (const pDesc of Object.keys(parentDescToEqNum)) {
-        if (desc !== pDesc && desc.includes(pDesc)) {
-          isSub = true;
-          break;
+      const prefix = plant ? `${plant}_` : '';
+      for (const pKey of Object.keys(parentDescToEqNum)) {
+        if (!prefix || pKey.startsWith(prefix)) {
+          const pDesc = prefix ? pKey.substring(prefix.length) : pKey;
+          if (desc !== pDesc && desc.includes(pDesc)) {
+            isSub = true;
+            break;
+          }
         }
       }
       if (!isSub) {
-        parentDescToEqNum[desc] = eqKey;
+        parentDescToEqNum[key] = eqKey;
         parentEqNumsSet.add(eqKey);
       }
     }
@@ -345,14 +353,20 @@ function buildParentChildMaps(equipments) {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     const desc = String(eq.description || '').trim();
     const pDesc = String(eq.induk || eq.parentEquipment || desc).trim();
+    const plant = String(eq.plant || '').trim().toUpperCase();
     
-    let pEqNum = parentDescToEqNum[pDesc];
+    const key = plant ? `${plant}_${pDesc}` : pDesc;
+    let pEqNum = parentDescToEqNum[key];
     if (!pEqNum) {
       let bestLen = 0;
-      for (const [parentDesc, parentNum] of Object.entries(parentDescToEqNum)) {
-        if (desc.includes(parentDesc) && parentDesc.length > bestLen) {
-          bestLen = parentDesc.length;
-          pEqNum = parentNum;
+      const prefix = plant ? `${plant}_` : '';
+      for (const [pKey, parentNum] of Object.entries(parentDescToEqNum)) {
+        if (!prefix || pKey.startsWith(prefix)) {
+          const parentDesc = prefix ? pKey.substring(prefix.length) : pKey;
+          if (desc.includes(parentDesc) && parentDesc.length > bestLen) {
+            bestLen = parentDesc.length;
+            pEqNum = parentNum;
+          }
         }
       }
     }
