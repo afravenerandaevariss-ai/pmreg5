@@ -201,7 +201,7 @@ export async function parseRegionalMP(file, masterMap) {
  *
  * @returns {{ valid: boolean, violations: Array<{ date: string, indukEqNum: string, indukDesc: string, totalMinutes: number }> }}
  */
-export function validateDailyHours(dailyLogsMap, startDate, endDate, selectedEqs) {
+export function validateDailyHours(dailyLogsMap, startDate, endDate, selectedEqs, selectedPlants) {
   const MAX_MINUTES_PER_DAY = 24 * 60; // 1440 minutes
   const violations = [];
 
@@ -216,6 +216,11 @@ export function validateDailyHours(dailyLogsMap, startDate, endDate, selectedEqs
     const minutesPerInduk = {}; // indukEqNum -> { totalMinutes, indukDesc }
     logs.forEach(log => {
       if (selectedEqs && selectedEqs.length > 0 && !selectedEqs.includes(log.indukEqNum)) return;
+      if (selectedPlants && selectedPlants.length > 0) {
+        const logPlant = String(log.plant || '').trim().toUpperCase();
+        const selPlants = selectedPlants.map(p => String(p).trim().toUpperCase());
+        if (logPlant && !selPlants.includes(logPlant)) return;
+      }
       const key = log.indukEqNum || log.indukDesc || 'UNKNOWN';
       if (!minutesPerInduk[key]) {
         minutesPerInduk[key] = { totalMinutes: 0, indukDesc: log.indukDesc || log.indukEqNum || 'Unknown' };
@@ -388,6 +393,11 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     const logEqNum = String(log.indukEqNum || log.induk_eq_num || '').trim();
     if (!logEqNum) return;
     if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(logEqNum)) return;
+    if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
+      const logPlant = String(log.plant || '').trim().toUpperCase();
+      const selPlants = docDetails.selectedPlants.map(p => String(p).trim().toUpperCase());
+      if (logPlant && !selPlants.includes(logPlant)) return;
+    }
     const pEqNum = eqToParentEqNum[logEqNum] || logEqNum;
     const durationHours = (log.durationMinutes || 0) / 60;
     parentHmMap[pEqNum] = (parentHmMap[pEqNum] || 0) + durationHours;
@@ -540,6 +550,11 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
       const logEqNum = String(log.indukEqNum || log.induk_eq_num || '').trim();
       if (!logEqNum) return;
       if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(logEqNum)) return;
+      if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
+        const logPlant = String(log.plant || '').trim().toUpperCase();
+        const selPlants = docDetails.selectedPlants.map(p => String(p).trim().toUpperCase());
+        if (logPlant && !selPlants.includes(logPlant)) return;
+      }
       const pEqNum = eqToParentEqNum[logEqNum] || logEqNum;
       const durationHours = (log.durationMinutes || 0) / 60;
       parentHmMap[pEqNum] = (parentHmMap[pEqNum] || 0) + durationHours;
@@ -692,15 +707,20 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
 
     const { eqToParentEqNum } = buildParentChildMaps(equipments);
 
-    // STEP 1: Aggregate HM per parent eq num for this date
-    const parentHmMapDate = {}; // { [parentEqNum]: totalHours }
+    // STEP 1: Aggregate HM for this date to Parent EqNum
+    const parentHmMap = {};
     logsForDate.forEach(log => {
       const logEqNum = String(log.indukEqNum || log.induk_eq_num || '').trim();
       if (!logEqNum) return;
       if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(logEqNum)) return;
+      if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
+        const logPlant = String(log.plant || '').trim().toUpperCase();
+        const selPlants = docDetails.selectedPlants.map(p => String(p).trim().toUpperCase());
+        if (logPlant && !selPlants.includes(logPlant)) return;
+      }
       const pEqNum = eqToParentEqNum[logEqNum] || logEqNum;
       const durationHours = (log.durationMinutes || 0) / 60;
-      parentHmMapDate[pEqNum] = (parentHmMapDate[pEqNum] || 0) + durationHours;
+      parentHmMap[pEqNum] = (parentHmMap[pEqNum] || 0) + durationHours;
       loggedEquipmentsMap[pEqNum] = log;
     });
 

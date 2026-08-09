@@ -2668,7 +2668,8 @@ export default function DailyDashboard({
                     freshLogs,
                     exportSettings.startDate,
                     exportSettings.endDate,
-                    selectedExportEqs
+                    selectedExportEqs,
+                    selectedExportPlants
                   );
                   if (!validation.valid) {
                     setExportHourViolations(validation.violations);
@@ -2685,34 +2686,64 @@ export default function DailyDashboard({
                   }
 
                   const exportPayload = {
-                    date: exportSettings.endDate, // for compatibility
+                    date: exportSettings.endDate,
                     startDate: exportSettings.startDate,
                     endDate: exportSettings.endDate,
                     time: exportSettings.time,
                     readBy: exportSettings.readBy,
                     plant: currentUser?.plant,
-                    selectedEqs: selectedExportEqs
+                    selectedEqs: selectedExportEqs,
+                    selectedPlants: selectedExportPlants
                   };
 
-                  // Helper to filter equipments by selected plants and selected equipments
+                  const resolveEqPlant = (eq) => {
+                    const rawPlant = String(eq.plant || '').trim().toUpperCase();
+                    if (rawPlant && rawPlant !== 'UNCATEGORIZED' && rawPlant !== '-') {
+                      return rawPlant;
+                    }
+                    const text = `${eq.description || ''} ${eq.induk || ''} ${eq.functionalLoc || ''} ${eq.flDescription || ''}`;
+                    const match = text.match(/\b(5F\d{2})\b/i);
+                    if (match) return match[1].toUpperCase();
+
+                    if (masterMap) {
+                      const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+                      const eqKeyNorm = eqKey.replace(/^0+/, '');
+                      const info = masterMap.get(eqKey) || masterMap.get(eqKeyNorm);
+                      if (info) {
+                        const p = typeof info === 'string' ? info : info.plant;
+                        if (p && p !== 'Uncategorized' && p !== '-') return String(p).trim().toUpperCase();
+                      }
+                    }
+                    return '';
+                  };
+
                   const filterTargetEquipments = (equipList, plantList, eqList, role, userPlant) => {
                     let res = [...equipList];
+
                     if (plantList && plantList.length > 0) {
-                      res = res.filter(eq => !eq.plant || plantList.includes(eq.plant));
+                      const selectedSet = new Set(plantList.map(p => String(p).trim().toUpperCase()));
+                      res = res.filter(eq => {
+                        const p = resolveEqPlant(eq);
+                        return p ? selectedSet.has(p) : false;
+                      });
                     } else if (role?.toUpperCase() === 'UNIT' && userPlant) {
-                      res = res.filter(eq => !eq.plant || eq.plant === userPlant);
+                      const uPlant = String(userPlant).trim().toUpperCase();
+                      res = res.filter(eq => {
+                        const p = resolveEqPlant(eq);
+                        return p ? p === uPlant : false;
+                      });
                     }
 
                     if (eqList && eqList.length > 0) {
-                      const selSet = new Set(eqList);
+                      const selSet = new Set(eqList.map(e => String(e).trim()));
                       const selDescs = new Set();
                       equipList.forEach(eq => {
                         const num = String(eq.eqNum || eq.eq_num || '').trim();
                         if (selSet.has(num)) {
                           const d = String(eq.description || '').trim();
                           const pd = String(eq.induk || eq.parentEquipment || d).trim();
-                          selDescs.add(d);
-                          selDescs.add(pd);
+                          if (d) selDescs.add(d);
+                          if (pd) selDescs.add(pd);
                         }
                       });
                       res = res.filter(eq => {
@@ -2846,26 +2877,55 @@ export default function DailyDashboard({
                       time: pSettings.time,
                       readBy: pSettings.readBy,
                       plant: currentUser?.plant,
-                      selectedEqs: pEqs
+                      selectedEqs: pEqs,
+                      selectedPlants: pPlants
                     };
-                    // Helper to filter equipments by selected plants and selected equipments
+                    const resolveEqPlant = (eq) => {
+                      const rawPlant = String(eq.plant || '').trim().toUpperCase();
+                      if (rawPlant && rawPlant !== 'UNCATEGORIZED' && rawPlant !== '-') {
+                        return rawPlant;
+                      }
+                      const text = `${eq.description || ''} ${eq.induk || ''} ${eq.functionalLoc || ''} ${eq.flDescription || ''}`;
+                      const match = text.match(/\b(5F\d{2})\b/i);
+                      if (match) return match[1].toUpperCase();
+
+                      if (masterMap) {
+                        const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+                        const eqKeyNorm = eqKey.replace(/^0+/, '');
+                        const info = masterMap.get(eqKey) || masterMap.get(eqKeyNorm);
+                        if (info) {
+                          const p = typeof info === 'string' ? info : info.plant;
+                          if (p && p !== 'Uncategorized' && p !== '-') return String(p).trim().toUpperCase();
+                        }
+                      }
+                      return '';
+                    };
+
                     const filterTargetEquipments = (equipList, plantList, eqList, role, userPlant) => {
                       let res = [...equipList];
                       if (plantList && plantList.length > 0) {
-                        res = res.filter(eq => !eq.plant || plantList.includes(eq.plant));
+                        const selectedSet = new Set(plantList.map(p => String(p).trim().toUpperCase()));
+                        res = res.filter(eq => {
+                          const p = resolveEqPlant(eq);
+                          return p ? selectedSet.has(p) : false;
+                        });
                       } else if (role?.toUpperCase() === 'UNIT' && userPlant) {
-                        res = res.filter(eq => !eq.plant || eq.plant === userPlant);
+                        const uPlant = String(userPlant).trim().toUpperCase();
+                        res = res.filter(eq => {
+                          const p = resolveEqPlant(eq);
+                          return p ? p === uPlant : false;
+                        });
                       }
                       if (eqList && eqList.length > 0) {
-                        const selSet = new Set(eqList);
+                        const selSet = new Set(eqList.map(e => String(e).trim()));
                         const selDescs = new Set();
                         equipList.forEach(eq => {
                           const num = String(eq.eqNum || eq.eq_num || '').trim();
                           if (selSet.has(num)) {
                             const d = String(eq.description || '').trim();
                             const pd = String(eq.induk || eq.parentEquipment || d).trim();
-                            selDescs.add(d);
-                            selDescs.add(pd);
+                            if (d) selDescs.add(d);
+                            if (pd) selDescs.add(pd);
                           }
                         });
                         res = res.filter(eq => {
