@@ -1874,7 +1874,7 @@ function App() {
           {/* TAB: MASTER DATA */}
           {activeTab === 'master' && (
             <div className="bg-white p-2 rounded-xl shadow border border-slate-200 min-h-full">
-              <MasterDataView masterMap={masterMap} currentUser={currentUser} />
+              <MasterDataView masterMap={masterMap} equipments={equipments} currentUser={currentUser} />
             </div>
           )}
 
@@ -2182,9 +2182,11 @@ const COST_CENTER_DESC = {
   "5F22STAS19": "Laboratorium"
 };
 
-function MasterDataView({ masterMap, currentUser }) {
+function MasterDataView({ masterMap, equipments = [], currentUser }) {
   const isAdmin = currentUser && (
     currentUser.role === 'Admin' ||
+    currentUser.role?.toUpperCase() === 'ADMIN' ||
+    currentUser.role?.toUpperCase() === 'DEV' ||
     ['1', '2', '3'].includes(String(currentUser.role_id))
   );
   const [plantFilter, setPlantFilter] = useState('');
@@ -2193,10 +2195,40 @@ function MasterDataView({ masterMap, currentUser }) {
   const [page, setPage] = useState(1);
   const itemsPerPage = 100;
 
+  const effectiveMap = useMemo(() => {
+    if (masterMap instanceof Map && masterMap.size > 0) return masterMap;
+    if (masterMap && typeof masterMap === 'object' && !Array.isArray(masterMap)) {
+      const keys = Object.keys(masterMap);
+      if (keys.length > 0) {
+        return new Map(Object.entries(masterMap));
+      }
+    }
+    if (Array.isArray(masterMap) && masterMap.length > 0) {
+      return new Map(masterMap);
+    }
+    if (Array.isArray(equipments) && equipments.length > 0) {
+      const m = new Map();
+      equipments.forEach(e => {
+        const key = e.eqNum || e.eq_num;
+        if (key) {
+          m.set(key, {
+            plant: e.plant || '',
+            description: e.description || key,
+            functionalLoc: e.functionalLoc || e.functional_loc || '',
+            flDescription: e.flDescription || e.fl_description || '',
+            costCenter: e.costCenter || e.cost_center || ''
+          });
+        }
+      });
+      return m;
+    }
+    return null;
+  }, [masterMap, equipments]);
+
   const dataList = useMemo(() => {
-    if (!masterMap) return [];
+    if (!effectiveMap) return [];
     const list = [];
-    masterMap.forEach((info, eqNum) => {
+    effectiveMap.forEach((info, eqNum) => {
       if (!info) return;
       const plant = typeof info === 'string' ? info : (info.plant || '');
       const desc = typeof info === 'string' ? 'Deskripsi tidak tersedia (Silakan Hapus Data & Re-upload Master EQ)' : (info.description || '');
@@ -2208,7 +2240,7 @@ function MasterDataView({ masterMap, currentUser }) {
       list.push({ eqNum, plant, description: desc, functionalLoc, flDescription, costCenter, ccDescription, searchStr });
     });
     return list;
-  }, [masterMap]);
+  }, [effectiveMap]);
 
   const uniquePlants = useMemo(() => {
     const plants = new Set();
@@ -2243,12 +2275,12 @@ function MasterDataView({ masterMap, currentUser }) {
     if (currentUser && !isAdmin) {
       setPlantFilter(currentUser.plant);
     }
-  }, [currentUser]);
+  }, [currentUser, isAdmin]);
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const currentData = filteredData.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
-  if (!masterMap) {
+  if (!effectiveMap || dataList.length === 0) {
     return (
       <div className="text-center py-24 bg-white rounded-xl shadow-sm border border-slate-200 mt-8 flex flex-col items-center justify-center">
         <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-5 border border-slate-100 shadow-sm">
