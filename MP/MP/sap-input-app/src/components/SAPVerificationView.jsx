@@ -68,18 +68,35 @@ export default function SAPVerificationView({ equipments, currentUser }) {
         let valNum = parseFloat(String(row[valIdx] || '0').replace(',', '.'));
         if (isNaN(valNum)) valNum = 0;
         let dateStr = '';
-        if (dateIdx !== -1 && row[dateIdx]) {
+        if (dateIdx !== -1 && row[dateIdx] !== undefined && row[dateIdx] !== null) {
           const rawDate = row[dateIdx];
           if (typeof rawDate === 'number') {
             const dateObj = XLSX.SSF.parse_date_code(rawDate);
             if (dateObj) dateStr = `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
           } else {
             const str = String(rawDate).trim();
-            if (str.includes('/')) {
+            if (str.includes('.')) {
+              const parts = str.split('.');
+              if (parts.length === 3) {
+                const yr = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+                dateStr = `${yr}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+              }
+            } else if (str.includes('/')) {
               const parts = str.split('/');
-              if (parts.length === 3) dateStr = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+              if (parts.length === 3) {
+                const yr = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+                dateStr = `${yr}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+              }
             } else if (str.includes('-')) {
-              dateStr = str;
+              const parts = str.split('-');
+              if (parts.length === 3) {
+                if (parts[0].length === 4) {
+                  dateStr = str;
+                } else {
+                  const yr = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+                  dateStr = `${yr}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                }
+              }
             }
           }
         }
@@ -154,6 +171,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
         setRawWebLogs(allLogs);
 
         const monitoredEqNums = new Set(allLogs.map(l => String(l.induk_eq_num)));
+        const normEq = (s) => String(s || '').replace(/^0+/, '').trim();
 
         const subKeywords = [
           'ACCESSORIES', 'ACCESSORY', 'ACC ', 'ACC_', 'ACC.',
@@ -172,8 +190,9 @@ export default function SAPVerificationView({ equipments, currentUser }) {
         const isIndukMap = new Map();
         const eqNameMap = new Map();
         equipments.forEach(eq => {
-          const eqNum = String(eq.eqNum || eq.eq_num || '');
+          const eqNum = String(eq.eqNum || eq.eq_num || '').trim();
           if (!eqNum) return;
+          const eqNumNorm = normEq(eqNum);
 
           const eqType = eq.type || eq.eq_type;
           const desc = eq.description || '';
@@ -192,12 +211,16 @@ export default function SAPVerificationView({ equipments, currentUser }) {
             isSub = true;
           }
 
-          const isGenuineParent = (eqType === 'Induk' || eqType === 'parent') && !isSub;
-          const isMonitored = monitoredEqNums.has(eqNum) || hMapping[desc] !== undefined;
+          const isGenuineParent = (eqType === 'Induk' || eqType === 'parent') || !isSub;
 
-          isIndukMap.set(eqNum, isGenuineParent && isMonitored);
+          isIndukMap.set(eqNum, isGenuineParent);
+          isIndukMap.set(eqNumNorm, isGenuineParent);
           eqNameMap.set(eqNum, `${desc} [${eqNum}]`);
-          if (eq.plant) eqToPlant.set(eqNum, eq.plant);
+          eqNameMap.set(eqNumNorm, `${desc} [${eqNum}]`);
+          if (eq.plant) {
+            eqToPlant.set(eqNum, eq.plant);
+            eqToPlant.set(eqNumNorm, eq.plant);
+          }
         });
 
         // 2. Fetch ik17_raw_data
@@ -208,14 +231,16 @@ export default function SAPVerificationView({ equipments, currentUser }) {
         if (Array.isArray(rawIK17)) {
           rawIK17.forEach(row => {
             if (row.d >= startDate && row.d <= endDate) {
-              const eqStr = String(row.e);
-              // Only process if it is a genuine monitored Induk!
-              if (isIndukMap.get(eqStr)) {
-                if (filterJenis && !eqStr.startsWith(filterJenis)) return;
-                const plant = eqToPlant.get(eqStr) || 'Unknown';
+              const eqStr = String(row.e || '').trim();
+              const eqNorm = normEq(eqStr);
+
+              const isParent = isIndukMap.has(eqStr) ? isIndukMap.get(eqStr) : (isIndukMap.has(eqNorm) ? isIndukMap.get(eqNorm) : true);
+              if (isParent) {
+                if (filterJenis && !eqStr.startsWith(filterJenis) && !eqNorm.startsWith(filterJenis)) return;
+                const plant = eqToPlant.get(eqStr) || eqToPlant.get(eqNorm) || 'Unknown';
                 if (currentUser?.role === 'Unit' && currentUser?.plant !== plant) return;
 
-                const groupKey = groupBy === 'plant' ? plant : eqStr;
+                const groupKey = groupBy === 'plant' ? plant : (eqToPlant.has(eqStr) ? eqStr : eqNorm);
 
                 if (row.s) { // is Saldo Awal
                   sapSaldoAwalMap.set(groupKey, (sapSaldoAwalMap.get(groupKey) || 0) + (row.h || 0));
@@ -232,7 +257,8 @@ export default function SAPVerificationView({ equipments, currentUser }) {
           
           let matched = 0;
           rawIK17.forEach(r => {
-            if (eqToPlant.has(String(r.e))) matched++;
+            const e = String(r.e || '').trim();
+            if (eqToPlant.has(e) || eqToPlant.has(normEq(e))) matched++;
           });
           setDebugMsg(`(Debug: ${rawIK17.length} rows IK17, ${matched} matched eq, ${eqToPlant.size} eq mapping)`);
         } else {
