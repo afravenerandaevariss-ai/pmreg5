@@ -2759,12 +2759,13 @@ export default function DailyDashboard({
 
                   let targetEquipments = filterTargetEquipments(equipments, selectedExportPlants, selectedExportEqs, currentUser?.role, currentUser?.plant);
 
+                  const exportPayloadWithMaster = { ...exportPayload, masterMap };
                   if (exportSettings.startDate === exportSettings.endDate && !exportSettings.isAccumulated) {
-                    exportDailyToSAP(templateData.headers, templateData.originalData, targetEquipments, freshLogs, exportPayload);
+                    exportDailyToSAP(templateData.headers, templateData.originalData, targetEquipments, freshLogs, exportPayloadWithMaster, masterMap);
                   } else if (exportSettings.isAccumulated) {
-                    exportAccumulatedToSAP(templateData.headers, templateData.originalData, targetEquipments, freshLogs, exportPayload);
+                    exportAccumulatedToSAP(templateData.headers, templateData.originalData, targetEquipments, freshLogs, exportPayloadWithMaster, masterMap);
                   } else {
-                    exportCumulativeToSAP(templateData.headers, templateData.originalData, targetEquipments, freshLogs, exportPayload);
+                    exportCumulativeToSAP(templateData.headers, templateData.originalData, targetEquipments, freshLogs, exportPayloadWithMaster, masterMap);
                   }
                   setShowExportModal(false);
                 }}
@@ -2942,12 +2943,13 @@ export default function DailyDashboard({
                       let pTargetEqs = filterTargetEquipments(equipments, pPlants, pEqs, currentUser?.role, currentUser?.plant);
                       const headers = templateData?.headers || [];
                       const originalData = templateData?.originalData || [];
+                      const pPayloadWithMaster = { ...pPayload, masterMap };
                       if (pSettings.startDate === pSettings.endDate && !pSettings.isAccumulated) {
-                        exportDailyToSAP(headers, originalData, pTargetEqs, pLogs, pPayload);
+                        exportDailyToSAP(headers, originalData, pTargetEqs, pLogs, pPayloadWithMaster, masterMap);
                       } else if (pSettings.isAccumulated) {
-                        exportAccumulatedToSAP(headers, originalData, pTargetEqs, pLogs, pPayload);
+                        exportAccumulatedToSAP(headers, originalData, pTargetEqs, pLogs, pPayloadWithMaster, masterMap);
                       } else {
-                        exportCumulativeToSAP(headers, originalData, pTargetEqs, pLogs, pPayload);
+                        exportCumulativeToSAP(headers, originalData, pTargetEqs, pLogs, pPayloadWithMaster, masterMap);
                       }
                     } catch (err) {
                       console.error("Error during Export Tetap:", err);

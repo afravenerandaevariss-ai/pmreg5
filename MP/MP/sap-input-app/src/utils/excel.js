@@ -378,7 +378,8 @@ function buildParentChildMaps(equipments) {
   return { parentDescToEqNum, eqToParentEqNum };
 }
 
-export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap, docDetails) {
+export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap, docDetails, masterMapParam) {
+  const masterMap = masterMapParam || docDetails?.masterMap || null;
   // Strip \r from headers to prevent double \r\r\n corruption
   const cleanHeaders = headers.map(h => typeof h === 'string' ? h.replace(/\r/g, '') : h);
   const wsData = [cleanHeaders];
@@ -579,7 +580,8 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
 /**
  * Export SAP accumulated: 1 row per equipment, total summed hours from day 1 up to selected date.
  */
-export function exportAccumulatedToSAP(headers, originalData, equipments, dailyLogsMap, docDetails) {
+export function exportAccumulatedToSAP(headers, originalData, equipments, dailyLogsMap, docDetails, masterMapParam) {
+  const masterMap = masterMapParam || docDetails?.masterMap || null;
   const cleanHeaders = headers.map(h => typeof h === 'string' ? h.replace(/\r/g, '') : h);
   const wsData = [cleanHeaders];
 
@@ -772,7 +774,8 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
 /**
  * Export SAP per-date up to the selected date (one row per date per equipment, not summed).
  */
-export function exportCumulativeToSAP(headers, originalData, equipments, dailyLogsMap, docDetails) {
+export function exportCumulativeToSAP(headers, originalData, equipments, dailyLogsMap, docDetails, masterMapParam) {
+  const masterMap = masterMapParam || docDetails?.masterMap || null;
   // Strip \r from headers to prevent double \r\r\n corruption
   const cleanHeaders = headers.map(h => typeof h === 'string' ? h.replace(/\r/g, '') : h);
   const wsData = [cleanHeaders];
@@ -970,7 +973,8 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
   XLSX.writeFile(wb, fileName);
 }
 
-export function exportMonthlyToSAP(headers, originalData, equipments, logsMap, docDetails) {
+export function exportMonthlyToSAP(headers, originalData, equipments, logsMap, docDetails, masterMapParam) {
+  const masterMap = masterMapParam || docDetails?.masterMap || null;
   // Strip \r from headers to prevent double \r\r\n corruption
   const cleanHeaders = headers.map(h => typeof h === 'string' ? h.replace(/\r/g, '') : h);
   const wsData = [cleanHeaders];
