@@ -626,9 +626,6 @@ export default function DailyDashboard({
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
   const todaysLogs = dailyLogs[selectedDateStr] || [];
 
-  const [sortCol, setSortCol] = useState('plant');
-  const [sortDir, setSortDir] = useState('asc');
-
   const handleSort = (col) => {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortCol(col); setSortDir('asc'); }
