@@ -311,7 +311,19 @@ export function exportToSAP(headers, originalData, updatedEquipments, docDetails
 function buildParentChildMaps(equipments) {
   const parentDescToEqNum = {};
   const parentEqNumsSet = new Set();
-  
+
+  function normalizeDesc(desc) {
+    let s = desc.toUpperCase();
+    s = s.replace(/\bVERT STR\b/g, 'VERTICAL STERILIZER');
+    s = s.replace(/\bVERT STERILIZER\b/g, 'VERTICAL STERILIZER');
+    s = s.replace(/\bHORIZ STERILIZER\b/g, 'HORIZONTAL STERILIZER');
+    s = s.replace(/\bSTG\b/g, 'STEAM TURBO GENERATOR');
+    s = s.replace(/\bBPV\b/g, 'BACK PRESSURE VESSEL');
+    return s;
+  }
+
+  const SUB_PREFIXES = ['BODY', 'PIPE', 'ACCESSORIES', 'HYD SYS', 'PUMP HYD', 'ELMOT HYD', 'ACC HYD', 'PANEL HYD', 'STIRRER', 'COUPLING', 'GEARBOX', 'ELECTROMOTOR', 'PANEL', 'VALVE', 'MOTOR'];
+
   // Pass 1: Register true parents with plant isolation key: `${plant}_${parentDesc}`
   equipments.forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
@@ -319,8 +331,11 @@ function buildParentChildMaps(equipments) {
     const pDesc = String(eq.induk || eq.parentEquipment || desc).trim();
     const plant = String(eq.plant || '').trim().toUpperCase();
     if (eqKey && desc && (desc === pDesc || eq.type === 'Induk')) {
-      const key = plant ? `${plant}_${desc}` : desc;
+      const normDesc = normalizeDesc(desc);
+      const key = plant ? `${plant}_${normDesc}` : normDesc;
       parentDescToEqNum[key] = eqKey;
+      if (plant) parentDescToEqNum[`${plant}_${desc}`] = eqKey;
+      parentDescToEqNum[desc] = eqKey;
       parentEqNumsSet.add(eqKey);
     }
   });
@@ -330,14 +345,15 @@ function buildParentChildMaps(equipments) {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     const desc = String(eq.description || '').trim();
     const plant = String(eq.plant || '').trim().toUpperCase();
-    const key = plant ? `${plant}_${desc}` : desc;
+    const normDesc = normalizeDesc(desc);
+    const key = plant ? `${plant}_${normDesc}` : normDesc;
     if (eqKey && desc && !parentDescToEqNum[key]) {
       let isSub = false;
       const prefix = plant ? `${plant}_` : '';
       for (const pKey of Object.keys(parentDescToEqNum)) {
         if (!prefix || pKey.startsWith(prefix)) {
           const pDesc = prefix ? pKey.substring(prefix.length) : pKey;
-          if (desc !== pDesc && desc.includes(pDesc)) {
+          if (normDesc !== pDesc && normDesc.includes(pDesc)) {
             isSub = true;
             break;
           }
@@ -358,15 +374,25 @@ function buildParentChildMaps(equipments) {
     const pDesc = String(eq.induk || eq.parentEquipment || desc).trim();
     const plant = String(eq.plant || '').trim().toUpperCase();
     
-    const key = plant ? `${plant}_${pDesc}` : pDesc;
-    let pEqNum = parentDescToEqNum[key];
+    const normDesc = normalizeDesc(desc);
+    const normPDesc = normalizeDesc(pDesc);
+
+    let candidateDesc = normDesc;
+    SUB_PREFIXES.forEach(p => {
+      if (candidateDesc.startsWith(p)) {
+        candidateDesc = candidateDesc.substring(p.length).trim();
+      }
+    });
+
+    let pEqNum = (plant ? parentDescToEqNum[`${plant}_${normPDesc}`] : null) || parentDescToEqNum[normPDesc] || (plant ? parentDescToEqNum[`${plant}_${candidateDesc}`] : null) || parentDescToEqNum[candidateDesc];
+
     if (!pEqNum) {
       let bestLen = 0;
       const prefix = plant ? `${plant}_` : '';
       for (const [pKey, parentNum] of Object.entries(parentDescToEqNum)) {
         if (!prefix || pKey.startsWith(prefix)) {
           const parentDesc = prefix ? pKey.substring(prefix.length) : pKey;
-          if (desc.includes(parentDesc) && parentDesc.length > bestLen) {
+          if (normDesc.includes(parentDesc) && parentDesc.length > bestLen) {
             bestLen = parentDesc.length;
             pEqNum = parentNum;
           }
