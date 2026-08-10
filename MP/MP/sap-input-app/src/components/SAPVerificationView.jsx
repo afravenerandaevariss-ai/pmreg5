@@ -434,9 +434,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
   };
 
   useEffect(() => {
-    if (equipments && equipments.length > 0) {
-      loadMatrixData();
-    }
+    loadMatrixData();
   }, [targetMonth, equipments, groupBy, filterJenis]);
 
   const daysInMonth = getDaysInMonth(new Date(`${targetMonth}-01`));
