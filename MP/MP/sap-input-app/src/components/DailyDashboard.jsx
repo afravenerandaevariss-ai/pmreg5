@@ -71,6 +71,12 @@ export default function DailyDashboard({
     return role === 'DEV' || name.includes('afra') || nik === '13000000' || nik === '19010048';
   }, [currentUser]);
 
+  const isAdminUser = useMemo(() => {
+    if (!currentUser) return false;
+    const role = String(currentUser.role || '').toUpperCase();
+    return role === 'ADMIN' || role === 'DEV' || currentUser.plant === 'ALL';
+  }, [currentUser]);
+
   const defaultPlantFilter = (currentUser?.plant && String(currentUser.plant).toUpperCase().startsWith('5F'))
     ? currentUser.plant
     : '';
@@ -1646,13 +1652,15 @@ export default function DailyDashboard({
               ✓ GSheet
             </button>
           )}
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 rounded-xl shadow-xs transition-colors flex items-center gap-1.5 font-bold text-xs"
-          >
-            <Download size={14} />
-            Export SAP
-          </button>
+          {isAdminUser && (
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 rounded-xl shadow-xs transition-colors flex items-center gap-1.5 font-bold text-xs"
+            >
+              <Download size={14} />
+              Export SAP
+            </button>
+          )}
         </div>
       </div>
 
