@@ -235,7 +235,37 @@ export default function SAPVerificationView({ equipments, currentUser }) {
         const isIndukMap = new Map();
         const eqNameMap = new Map();
 
-        // 1. Populate from web logs first
+        // 1. Fetch & populate from master_map (id = 2) in database (17,277 entries)
+        const { data: masterMapRaw } = await getSystemConfig('master_map');
+        if (masterMapRaw) {
+          let mmEntries = [];
+          if (Array.isArray(masterMapRaw)) {
+            mmEntries = masterMapRaw;
+          } else if (masterMapRaw.map && Array.isArray(masterMapRaw.map)) {
+            mmEntries = masterMapRaw.map;
+          }
+          mmEntries.forEach(([eqNum, info]) => {
+            if (!eqNum || !info) return;
+            const eqNumStr = String(eqNum).trim();
+            const eqNumNorm = normEq(eqNumStr);
+            const plant = typeof info === 'string' ? info : (info.plant || '');
+            const desc = typeof info === 'string' ? eqNumStr : (info.description || eqNumStr);
+            const type = typeof info === 'string' ? 'Induk' : (info.type || 'Induk');
+            const isSub = type === 'Sub' || type === 'sub';
+
+            if (plant) {
+              const p = String(plant).toUpperCase().trim();
+              eqToPlant.set(eqNumStr, p);
+              eqToPlant.set(eqNumNorm, p);
+            }
+            isIndukMap.set(eqNumStr, !isSub);
+            isIndukMap.set(eqNumNorm, !isSub);
+            eqNameMap.set(eqNumStr, `${desc} [${eqNumStr}]`);
+            eqNameMap.set(eqNumNorm, `${desc} [${eqNumStr}]`);
+          });
+        }
+
+        // 2. Populate from web logs (daily_logs)
         allLogs.forEach(l => {
           if (l.induk_eq_num && l.plant) {
             const e = String(l.induk_eq_num).trim();
@@ -245,41 +275,43 @@ export default function SAPVerificationView({ equipments, currentUser }) {
           }
         });
 
-        // 2. Populate from equipments master list
-        equipments.forEach(eq => {
-          const eqNum = String(eq.eqNum || eq.eq_num || '').trim();
-          if (!eqNum) return;
-          const eqNumNorm = normEq(eqNum);
+        // 3. Populate from equipments master list prop
+        if (Array.isArray(equipments)) {
+          equipments.forEach(eq => {
+            const eqNum = String(eq.eqNum || eq.eq_num || '').trim();
+            if (!eqNum) return;
+            const eqNumNorm = normEq(eqNum);
 
-          const eqType = eq.type || eq.eq_type;
-          const desc = eq.description || '';
-          const descUpper = desc.toUpperCase();
-          const indukUpper = (eq.induk || '').toUpperCase();
-          const eqNumStr = eqNum.toUpperCase();
+            const eqType = eq.type || eq.eq_type;
+            const desc = eq.description || '';
+            const descUpper = desc.toUpperCase();
+            const indukUpper = (eq.induk || '').toUpperCase();
+            const eqNumStr = eqNum.toUpperCase();
 
-          let isSub = false;
-          for (const kw of subKeywords) {
-            if (descUpper.includes(kw)) {
-              isSub = true;
-              break;
+            let isSub = false;
+            for (const kw of subKeywords) {
+              if (descUpper.includes(kw)) {
+                isSub = true;
+                break;
+              }
             }
-          }
-          if (indukUpper && indukUpper !== descUpper && indukUpper !== eqNumStr) {
-            isSub = true;
-          }
+            if (indukUpper && indukUpper !== descUpper && indukUpper !== eqNumStr) {
+              isSub = true;
+            }
 
-          const isGenuineParent = (eqType === 'Induk' || eqType === 'parent') || !isSub;
+            const isGenuineParent = (eqType === 'Induk' || eqType === 'parent') || !isSub;
 
-          isIndukMap.set(eqNum, isGenuineParent);
-          isIndukMap.set(eqNumNorm, isGenuineParent);
-          eqNameMap.set(eqNum, `${desc} [${eqNum}]`);
-          eqNameMap.set(eqNumNorm, `${desc} [${eqNum}]`);
-          if (eq.plant) {
-            const p = String(eq.plant).toUpperCase().trim();
-            eqToPlant.set(eqNum, p);
-            eqToPlant.set(eqNumNorm, p);
-          }
-        });
+            isIndukMap.set(eqNum, isGenuineParent);
+            isIndukMap.set(eqNumNorm, isGenuineParent);
+            eqNameMap.set(eqNum, `${desc} [${eqNum}]`);
+            eqNameMap.set(eqNumNorm, `${desc} [${eqNum}]`);
+            if (eq.plant) {
+              const p = String(eq.plant).toUpperCase().trim();
+              eqToPlant.set(eqNum, p);
+              eqToPlant.set(eqNumNorm, p);
+            }
+          });
+        }
 
         const getPlantFromEq = (eStr, eNorm) => {
           if (eqToPlant.has(eStr)) return eqToPlant.get(eStr);
