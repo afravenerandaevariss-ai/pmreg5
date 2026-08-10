@@ -167,7 +167,11 @@ export default function SAPVerificationView({ equipments, currentUser }) {
     return ['5F01', '5F04', '5F07', '5F08', '5F09', '5F14', '5F15', '5F21', '5F22'];
   }, []);
 
+  const isLoadingRef = useRef(false);
+
   const loadMatrixData = async () => {
+    if (isLoadingRef.current) return;
+    isLoadingRef.current = true;
     setIsProcessing(true);
     try {
        const startDate = `${targetMonth}-01`;
@@ -181,7 +185,9 @@ export default function SAPVerificationView({ equipments, currentUser }) {
         if (supabase) {
            let from = 0;
            const PAGE_SIZE = 1000;
-           while (true) {
+           let iterations = 0;
+           while (iterations < 10) { // Limit to 10k rows max to avoid browser lockup
+             iterations++;
              const { data, error } = await supabase
                .from(T_DAILY_LOGS)
                .select('plant, date, duration_minutes, induk_eq_num')
@@ -429,13 +435,16 @@ export default function SAPVerificationView({ equipments, currentUser }) {
     } catch (e) {
        console.error(e);
        alert("Gagal memuat data matrix: " + e.message);
+    } finally {
+       setIsProcessing(false);
+       isLoadingRef.current = false;
     }
-    setIsProcessing(false);
   };
 
+  const eqCount = Array.isArray(equipments) ? equipments.length : 0;
   useEffect(() => {
     loadMatrixData();
-  }, [targetMonth, equipments, groupBy, filterJenis]);
+  }, [targetMonth, eqCount, groupBy, filterJenis]);
 
   const daysInMonth = getDaysInMonth(new Date(`${targetMonth}-01`));
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
