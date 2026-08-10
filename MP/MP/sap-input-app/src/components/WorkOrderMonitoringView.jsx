@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { supabase, IS_DEV_ENV } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import * as XLSX from 'xlsx';
 
-const T_PARSED_EXCEL = IS_DEV_ENV ? 'dev_parsed_excel' : 'parsed_excel';
-const BUCKET_EXCEL   = IS_DEV_ENV ? 'dev_excel_uploads' : 'excel_uploads';
-
+const T_PARSED_EXCEL = 'parsed_excel';
+const BUCKET_EXCEL   = 'excel_uploads';
 
 import { Search, Filter, FileSpreadsheet, RefreshCw, Layers, DollarSign, X, Info, AlertTriangle, CheckCircle, Printer, ChevronDown, Copy, ArrowUpDown } from 'lucide-react';
 
@@ -17,7 +17,7 @@ export default function WorkOrderMonitoringView({ currentUser }) {
   const [uploadProgress, setUploadProgress] = useState(0);
 
   // Filters state
-  const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'Regional';
+  const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'Regional' || currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV';
 
   const [selectedPlant, setSelectedPlant] = useState(
     !isAdmin && currentUser?.plant ? currentUser.plant : ''
@@ -43,6 +43,7 @@ export default function WorkOrderMonitoringView({ currentUser }) {
   const fetchData = async () => {
     try {
       setLoading(true);
+      setError(null);
       // Fetch from Supabase FIRST
       const { data: dbData, error: dbError } = await supabase
         .from(T_PARSED_EXCEL)
@@ -52,7 +53,7 @@ export default function WorkOrderMonitoringView({ currentUser }) {
       let hasIw39 = false;
       if (!dbError && dbData && dbData.length > 0) {
         const iw39Row = dbData.find(d => d.session_id === 'global_iw39');
-        if (iw39Row) {
+        if (iw39Row && Array.isArray(iw39Row.data) && iw39Row.data.length > 0) {
           setData(iw39Row.data);
           hasIw39 = true;
         }
@@ -68,7 +69,7 @@ export default function WorkOrderMonitoringView({ currentUser }) {
       if (!hasIw39) {
         const res = await fetch('/IW39.xlsx');
         if (res.ok) {
-          const parsedData = await processFileOnBackend(await res.blob(), 'iw39', 'local_fallback_iw39');
+          const parsedData = await processFileOnBackend(await res.blob(), 'iw39', 'global_iw39');
           setData(parsedData);
         }
       }
@@ -80,14 +81,66 @@ export default function WorkOrderMonitoringView({ currentUser }) {
     }
   };
 
+  const parseFileInBrowser = async (fileBlob, type) => {
+    const arrayBuffer = await fileBlob.arrayBuffer();
+    const wb = XLSX.read(arrayBuffer, { type: 'array' });
+    const sheetName = wb.SheetNames[0];
+    const sheet = wb.Sheets[sheetName];
+
+    let result;
+    if (type === 'iw39') {
+      result = XLSX.utils.sheet_to_json(sheet);
+    } else if (type === 'zvtab') {
+      const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+      result = {};
+      for (let i = 1; i < rawData.length; i++) {
+        const row = rawData[i];
+        if (!row || row.length === 0) continue;
+        const order = String(row[57] || '').trim();
+        const po = String(row[38] || '').trim();
+        if (order && po) result[order] = po;
+      }
+    } else if (type === '046exp') {
+      const rawData = XLSX.utils.sheet_to_json(sheet, { range: 5 });
+      result = {};
+      for (const row of rawData) {
+        const po = String(row['PO Number'] || '').trim();
+        if (po) {
+          result[po] = {
+            pr: String(row['PR'] || '').trim(),
+            ses: String(row['Ses Doc'] || '').trim(),
+            mir7: String(row['Invoice Doc'] || '').trim()
+          };
+        }
+      }
+    }
+    return result;
+  };
+
   const processFileOnBackend = async (fileBlob, type, customSessionId = null) => {
     return new Promise(async (resolve, reject) => {
       try {
         const sessionId = customSessionId || `global_${type}`;
         const fileName = `${sessionId}.xlsx`;
         
-        // Upload directly to Supabase Storage (100% browser-native upload)
-        setUploadProgress(10);
+        setUploadProgress(20);
+
+        // Try direct browser parsing first as robust fallback
+        try {
+          const clientParsed = await parseFileInBrowser(fileBlob, type);
+          if (clientParsed) {
+            setUploadProgress(70);
+            await supabase
+              .from(T_PARSED_EXCEL)
+              .upsert({ session_id: sessionId, type, data: clientParsed }, { onConflict: 'session_id' });
+            setUploadProgress(100);
+            return resolve(clientParsed);
+          }
+        } catch (_clientErr) {
+          console.warn("Client parsing fallback failed, trying backend upload...", _clientErr);
+        }
+
+        // Upload directly to Supabase Storage if bucket exists
         const { error: uploadError } = await supabase.storage
           .from(BUCKET_EXCEL)
           .upload(fileName, fileBlob, {
@@ -99,7 +152,7 @@ export default function WorkOrderMonitoringView({ currentUser }) {
           throw new Error(`Gagal mengunggah file ke Storage: ${uploadError.message}`);
         }
         
-        setUploadProgress(75); // Start processing
+        setUploadProgress(75);
 
         // Trigger backend processing
         const processRes = await fetch('/api/process-excel', {
@@ -112,7 +165,7 @@ export default function WorkOrderMonitoringView({ currentUser }) {
           const errBody = await processRes.text();
           throw new Error(`Gagal memproses data di server: ${errBody}`);
         }
-        setUploadProgress(90); // Fetching from DB
+        setUploadProgress(90);
 
         // Fetch result from Supabase
         const { data, error } = await supabase
