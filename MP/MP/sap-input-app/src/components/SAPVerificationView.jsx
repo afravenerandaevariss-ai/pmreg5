@@ -210,6 +210,18 @@ export default function SAPVerificationView({ equipments, currentUser }) {
         const eqToPlant = new Map();
         const isIndukMap = new Map();
         const eqNameMap = new Map();
+
+        // 1. Populate from web logs first
+        allLogs.forEach(l => {
+          if (l.induk_eq_num && l.plant) {
+            const e = String(l.induk_eq_num).trim();
+            const p = String(l.plant).toUpperCase().trim();
+            eqToPlant.set(e, p);
+            eqToPlant.set(normEq(e), p);
+          }
+        });
+
+        // 2. Populate from equipments master list
         equipments.forEach(eq => {
           const eqNum = String(eq.eqNum || eq.eq_num || '').trim();
           if (!eqNum) return;
@@ -239,10 +251,20 @@ export default function SAPVerificationView({ equipments, currentUser }) {
           eqNameMap.set(eqNum, `${desc} [${eqNum}]`);
           eqNameMap.set(eqNumNorm, `${desc} [${eqNum}]`);
           if (eq.plant) {
-            eqToPlant.set(eqNum, eq.plant);
-            eqToPlant.set(eqNumNorm, eq.plant);
+            const p = String(eq.plant).toUpperCase().trim();
+            eqToPlant.set(eqNum, p);
+            eqToPlant.set(eqNumNorm, p);
           }
         });
+
+        const getPlantFromEq = (eStr, eNorm) => {
+          if (eqToPlant.has(eStr)) return eqToPlant.get(eStr);
+          if (eqToPlant.has(eNorm)) return eqToPlant.get(eNorm);
+          for (const p of uniquePlants) {
+            if (eStr.includes(p) || eNorm.includes(p)) return p;
+          }
+          return 'Unknown';
+        };
 
         // 2. Fetch ik17_raw_data
         const { data: rawIK17 } = await getSystemConfig('ik17_raw_data');
@@ -259,7 +281,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
               const isParent = isIndukMap.has(eqStr) ? isIndukMap.get(eqStr) : (isIndukMap.has(eqNorm) ? isIndukMap.get(eqNorm) : true);
               if (isParent) {
                 if (filterJenis && !eqStr.startsWith(filterJenis) && !eqNorm.startsWith(filterJenis)) return;
-                const plant = eqToPlant.get(eqStr) || eqToPlant.get(eqNorm) || 'Unknown';
+                const plant = getPlantFromEq(eqStr, eqNorm);
                 if (currentUser?.role === 'Unit' && currentUser?.plant !== plant) return;
 
                 const groupKey = groupBy === 'plant' ? plant : (eqToPlant.has(eqStr) ? eqStr : eqNorm);
@@ -281,7 +303,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
           const ik17DatesInMonth = [];
           rawIK17.forEach(r => {
             const e = String(r.e || '').trim();
-            if (eqToPlant.has(e) || eqToPlant.has(normEq(e))) matched++;
+            if (getPlantFromEq(e, normEq(e)) !== 'Unknown') matched++;
             const cleanD = cleanDateStr(r.d || '');
             if (cleanD && cleanD >= startDate && cleanD <= endDate && !r.s) {
               ik17DatesInMonth.push(cleanD);
@@ -291,7 +313,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
           const minDateStr = ik17DatesInMonth.length > 0 ? ik17DatesInMonth[0] : '-';
           const maxDateStr = ik17DatesInMonth.length > 0 ? ik17DatesInMonth[ik17DatesInMonth.length - 1] : '-';
 
-          setDebugMsg(`(Debug: ${rawIK17.length} rows IK17, Data SAP tersedia: ${minDateStr} s/d ${maxDateStr}, ${matched} matched eq)`);
+          setDebugMsg(`(Debug: ${rawIK17.length} rows IK17, Data SAP tersedia: ${minDateStr} s/d ${maxDateStr}, ${matched} matched eq dari ${eqToPlant.size} mapping)`);
         } else {
           setDebugMsg(`(Debug: rawIK17 is ${typeof rawIK17})`);
         }
