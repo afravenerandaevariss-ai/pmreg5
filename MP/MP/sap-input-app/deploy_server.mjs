@@ -24,34 +24,34 @@ function runCmd(conn, cmd, label = cmd) {
   });
 }
 
-function uploadDir(sftp, localDir, remoteDir) {
-  return new Promise((resolve, reject) => {
-    sftp.mkdir(remoteDir, { mode: '0755' }, (err) => {
-      const files = fs.readdirSync(localDir);
-      let i = 0;
-      const next = () => {
-        if (i >= files.length) return resolve();
-        const file = files[i++];
-        const localPath = path.join(localDir, file);
-        const remotePath = path.join(remoteDir, file).replace(/\\/g, '/');
-        const stat = fs.statSync(localPath);
-        if (stat.isDirectory()) {
-          uploadDir(sftp, localPath, remotePath).then(next).catch(reject);
-        } else {
-          sftp.fastPut(localPath, remotePath, (putErr) => {
-            if (putErr) console.warn('  ⚠️ Upload warning:', file, putErr.message);
-            else console.log('  📁 Uploaded:', remotePath);
-            next();
-          });
-        }
-      };
-      next();
-    });
-  });
+async function uploadDir(sftp, localDir, remoteDir) {
+  await new Promise((resolve) => sftp.mkdir(remoteDir, { mode: '0755' }, () => resolve()));
+  const files = fs.readdirSync(localDir);
+  for (const file of files) {
+    const localPath = path.join(localDir, file);
+    const remotePath = path.join(remoteDir, file).replace(/\\/g, '/');
+    const stat = fs.statSync(localPath);
+    if (stat.isDirectory()) {
+      await uploadDir(sftp, localPath, remotePath);
+    } else {
+      await new Promise((resolve) => {
+        sftp.fastPut(localPath, remotePath, (putErr) => {
+          if (putErr) console.warn('  ⚠️ Upload warning:', file, putErr.message);
+          else console.log('  📁 Uploaded:', remotePath);
+          resolve();
+        });
+      });
+    }
+  }
 }
+
+import { execSync } from 'child_process';
 
 async function main() {
   console.log('🚀 DEPLOYING PRODUCTION SERVER FIX (pmreg5.afratarigan.my.id)...');
+  console.log('📦 Building Vite for Production...');
+
+  execSync('npx vite build --mode production --outDir dist-prod', { stdio: 'inherit' });
 
   const conn = new Client();
   conn.on('ready', () => {
@@ -63,9 +63,11 @@ async function main() {
         return;
       }
       try {
+        await runCmd(conn, 'sudo chmod -R 755 /var/www/pmreg5 && sudo chown -R ubuntu:www-data /var/www/pmreg5', 'Fix permissions on PROD root');
         await runCmd(conn, 'rm -rf /var/www/pmreg5/dist/* && mkdir -p /var/www/pmreg5/dist', 'Ensure fresh PROD directory');
-        console.log('📤 Uploading fresh dist/ build...');
-        await uploadDir(sftp, path.resolve('./dist'), '/var/www/pmreg5/dist');
+        console.log('📤 Uploading fresh dist-prod/ build...');
+        await uploadDir(sftp, path.resolve('./dist-prod'), '/var/www/pmreg5/dist');
+        await runCmd(conn, 'sudo chmod -R 755 /var/www/pmreg5/dist && sudo chown -R ubuntu:www-data /var/www/pmreg5/dist', 'Ensure 755 permissions on dist');
 
         await runCmd(conn, 'pm2 reload pmreg5 || pm2 restart pmreg5', 'Reloading PM2 pmreg5');
         await runCmd(conn, 'sudo nginx -t && sudo systemctl reload nginx', 'Reloading Nginx');
