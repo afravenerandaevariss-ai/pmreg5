@@ -344,7 +344,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
               if (isParent) {
                 if (filterJenis && !eqStr.startsWith(filterJenis) && !eqNorm.startsWith(filterJenis)) return;
                 const plant = getPlantFromEq(eqStr, eqNorm);
-                if (currentUser?.role === 'Unit' && currentUser?.plant !== plant) return;
+                if ((currentUser?.role === 'Unit' || currentUser?.role?.toUpperCase() === 'USER') && currentUser?.plant !== plant) return;
 
                 const groupKey = groupBy === 'plant' ? plant : (eqToPlant.has(eqStr) ? eqStr : eqNorm);
 
@@ -386,7 +386,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
            if (filterJenis && !String(log.induk_eq_num).startsWith(filterJenis)) return;
            const hm = (log.duration_minutes || 0) / 60;
            const plant = log.plant || 'Unknown';
-           if (currentUser?.role === 'Unit' && currentUser?.plant !== plant) return;
+           if ((currentUser?.role === 'Unit' || currentUser?.role?.toUpperCase() === 'USER') && currentUser?.plant !== plant) return;
            
            const groupKey = groupBy === 'plant' ? plant : log.induk_eq_num;
            if (!groupKey) return; // skip if induk_eq_num missing
@@ -402,7 +402,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
        
        if (groupBy === 'plant') {
           uniquePlants.forEach(p => {
-              if (currentUser?.role === 'Unit' && currentUser?.plant !== p) return;
+              if ((currentUser?.role === 'Unit' || currentUser?.role?.toUpperCase() === 'USER') && currentUser?.plant !== p) return;
               groupsToInclude.add(p);
           });
        }
