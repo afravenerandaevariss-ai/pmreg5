@@ -41,22 +41,44 @@ export default function SAPVerificationView({ equipments, currentUser }) {
       if (jsonData.length < 2) throw new Error("Format file IK17 tidak valid.");
 
       let eqIdx = -1, valIdx = -1, dateIdx = -1, textIdx = -1;
-      let headerRow = 0;
-      for (let r = 0; r < Math.min(10, jsonData.length); r++) {
+      let headerRow = -1;
+      for (let r = 0; r < Math.min(25, jsonData.length); r++) {
         const row = jsonData[r];
         if (!row || !Array.isArray(row)) continue;
+
+        let tempEq = -1, tempVal = -1, tempDate = -1, tempText = -1;
         row.forEach((cell, colIdx) => {
           const str = String(cell || '').toUpperCase().trim();
-          if (str === 'EQUIPMENT' || str.includes('NO. EQ') || str.includes('NO EQ')) eqIdx = colIdx;
-          if (str.includes('PENGUKURAN') || str.includes('VAL') || str.includes('NILAI') || str.includes('READING')) valIdx = colIdx;
-          if (str.includes('TANGGAL') || str.includes('DATE') || str.includes('MEASUREMENT DATE')) dateIdx = colIdx;
-          if (str.includes('TEKS') || str.includes('TEXT') || str.includes('CATATAN')) textIdx = colIdx;
+          if (str === 'EQUIPMENT' || str.includes('EQUIPMENT') || str.includes('NO. EQ') || str.includes('NO EQ') || str.includes('OBJEK') || str.includes('MEASURING POINT') || str.includes('MEASPOINT')) {
+            if (tempEq === -1) tempEq = colIdx;
+          }
+          if (str.includes('DIFFERENCE') || str.includes('DIFF') || str.includes('PENGUKURAN') || str.includes('VAL') || str.includes('NILAI') || str.includes('READING') || str.includes('COUNTER') || str.includes('HASIL') || str.includes('MEAS/TOTCTRRDG') || str.includes('HM') || str.includes('JAM')) {
+            if (tempVal === -1) tempVal = colIdx;
+          }
+          if (str === 'DATE' || str.includes('TANGGAL') || str.includes('DATE') || str.includes('TGL') || str.includes('WAKTU')) {
+            if (tempDate === -1) tempDate = colIdx;
+          }
+          if (str === 'TEXT' || str.includes('TEKS') || str.includes('TEXT') || str.includes('CATATAN') || str.includes('KETERANGAN')) {
+            if (tempText === -1) tempText = colIdx;
+          }
         });
-        if (eqIdx !== -1 && valIdx !== -1) { headerRow = r; break; }
+
+        if (tempEq !== -1 && (tempVal !== -1 || tempDate !== -1)) {
+          eqIdx = tempEq;
+          valIdx = tempVal;
+          dateIdx = tempDate;
+          textIdx = tempText;
+          headerRow = r;
+          break;
+        }
       }
 
-      if (eqIdx === -1 || valIdx === -1) {
-        eqIdx = 0; valIdx = 3; dateIdx = 1;
+      if (headerRow === -1) {
+        headerRow = 0;
+        if (eqIdx === -1) eqIdx = 5;
+        if (valIdx === -1) valIdx = 7;
+        if (dateIdx === -1) dateIdx = 3;
+        if (textIdx === -1) textIdx = 11;
       }
 
       const cleanDateStr = (raw) => {
@@ -101,8 +123,10 @@ export default function SAPVerificationView({ equipments, currentUser }) {
       const newDatesSet = new Set();
       for (let i = headerRow + 1; i < jsonData.length; i++) {
         const row = jsonData[i];
-        if (!row || !row[eqIdx]) continue;
+        if (!row || row[eqIdx] === undefined || row[eqIdx] === null) continue;
         const eqStr = String(row[eqIdx]).trim();
+        if (!eqStr || eqStr.toUpperCase().includes('EQUIPMENT') || eqStr.toUpperCase().includes('CREATED BY')) continue;
+
         let valNum = parseFloat(String(row[valIdx] || '0').replace(',', '.'));
         if (isNaN(valNum)) valNum = 0;
         
