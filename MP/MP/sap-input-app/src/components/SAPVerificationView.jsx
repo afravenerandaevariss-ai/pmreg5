@@ -49,8 +49,8 @@ export default function SAPVerificationView({ equipments, currentUser }) {
         let tempEq = -1, tempVal = -1, tempDate = -1, tempText = -1;
         row.forEach((cell, colIdx) => {
           const str = String(cell || '').toUpperCase().trim();
-          if (str === 'EQUIPMENT' || str.includes('EQUIPMENT') || str.includes('NO. EQ') || str.includes('NO EQ') || str.includes('OBJEK') || str.includes('MEASURING POINT') || str.includes('MEASPOINT')) {
-            if (tempEq === -1) tempEq = colIdx;
+          if (str === 'EQUIPMENT' || str.includes('EQUIPMENT') || str.includes('NO. EQ') || str.includes('NO EQ') || str.includes('OBJEK PENGUKURAN')) {
+            if (!str.includes('POINT') && tempEq === -1) tempEq = colIdx;
           }
           if (str.includes('DIFFERENCE') || str.includes('DIFF') || str.includes('PENGUKURAN') || str.includes('VAL') || str.includes('NILAI') || str.includes('READING') || str.includes('COUNTER') || str.includes('HASIL') || str.includes('MEAS/TOTCTRRDG') || str.includes('HM') || str.includes('JAM')) {
             if (tempVal === -1) tempVal = colIdx;
