@@ -59,6 +59,44 @@ export default function SAPVerificationView({ equipments, currentUser }) {
         eqIdx = 0; valIdx = 3; dateIdx = 1;
       }
 
+      const cleanDateStr = (raw) => {
+        if (raw === undefined || raw === null || raw === '') return '';
+        if (typeof raw === 'number') {
+          const dateObj = XLSX.SSF.parse_date_code(raw);
+          if (dateObj) {
+            return `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
+          }
+        }
+        if (raw instanceof Date && !isNaN(raw.getTime())) {
+          return format(raw, 'yyyy-MM-dd');
+        }
+
+        let str = String(raw).trim();
+        if (str.includes(' ')) {
+          str = str.split(' ')[0];
+        }
+        if (!str) return '';
+
+        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+
+        if (/^\d{4}[\/\.]\d{1,2}[\/\.]\d{1,2}$/.test(str)) {
+          const p = str.split(/[\/\.]/);
+          return `${p[0]}-${p[1].padStart(2, '0')}-${p[2].padStart(2, '0')}`;
+        }
+
+        const parts = str.split(/[\/\.\-]/);
+        if (parts.length === 3) {
+          let [p1, p2, p3] = parts;
+          if (p3.length === 2) p3 = `20${p3}`;
+          if (p1.length === 4) {
+            return `${p1}-${p2.padStart(2, '0')}-${p3.padStart(2, '0')}`;
+          }
+          return `${p3.padStart(4, '20')}-${p2.padStart(2, '0')}-${p1.padStart(2, '0')}`;
+        }
+
+        return '';
+      };
+
       const parsedRows = [];
       const newDatesSet = new Set();
       for (let i = headerRow + 1; i < jsonData.length; i++) {
@@ -67,39 +105,8 @@ export default function SAPVerificationView({ equipments, currentUser }) {
         const eqStr = String(row[eqIdx]).trim();
         let valNum = parseFloat(String(row[valIdx] || '0').replace(',', '.'));
         if (isNaN(valNum)) valNum = 0;
-        let dateStr = '';
-        if (dateIdx !== -1 && row[dateIdx] !== undefined && row[dateIdx] !== null) {
-          const rawDate = row[dateIdx];
-          if (typeof rawDate === 'number') {
-            const dateObj = XLSX.SSF.parse_date_code(rawDate);
-            if (dateObj) dateStr = `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
-          } else {
-            const str = String(rawDate).trim();
-            if (str.includes('.')) {
-              const parts = str.split('.');
-              if (parts.length === 3) {
-                const yr = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
-                dateStr = `${yr}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-              }
-            } else if (str.includes('/')) {
-              const parts = str.split('/');
-              if (parts.length === 3) {
-                const yr = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
-                dateStr = `${yr}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-              }
-            } else if (str.includes('-')) {
-              const parts = str.split('-');
-              if (parts.length === 3) {
-                if (parts[0].length === 4) {
-                  dateStr = str;
-                } else {
-                  const yr = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
-                  dateStr = `${yr}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-                }
-              }
-            }
-          }
-        }
+        
+        const dateStr = dateIdx !== -1 ? cleanDateStr(row[dateIdx]) : '';
         const textStr = textIdx !== -1 ? String(row[textIdx] || '') : '';
         const isSaldoAwal = textStr.toLowerCase().includes('saldo') || textStr.toLowerCase().includes('awal');
         if (dateStr) newDatesSet.add(dateStr);
@@ -117,7 +124,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
       let mergedRaw = Array.isArray(existingRaw) ? existingRaw : [];
       
       if (newDatesSet.size > 0) {
-        mergedRaw = mergedRaw.filter(r => !newDatesSet.has(r.d));
+        mergedRaw = mergedRaw.filter(r => r.d && !newDatesSet.has(cleanDateStr(r.d)));
       }
       mergedRaw = [...mergedRaw, ...parsedRows];
 
@@ -172,6 +179,20 @@ export default function SAPVerificationView({ equipments, currentUser }) {
 
         const monitoredEqNums = new Set(allLogs.map(l => String(l.induk_eq_num)));
         const normEq = (s) => String(s || '').replace(/^0+/, '').trim();
+        const cleanDateStr = (raw) => {
+          if (!raw) return '';
+          let str = String(raw).trim();
+          if (str.includes(' ')) str = str.split(' ')[0];
+          if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+          const parts = str.split(/[\/\.\-]/);
+          if (parts.length === 3) {
+            let [p1, p2, p3] = parts;
+            if (p3.length === 2) p3 = `20${p3}`;
+            if (p1.length === 4) return `${p1}-${p2.padStart(2, '0')}-${p3.padStart(2, '0')}`;
+            return `${p3.padStart(4, '20')}-${p2.padStart(2, '0')}-${p1.padStart(2, '0')}`;
+          }
+          return str;
+        };
 
         const subKeywords = [
           'ACCESSORIES', 'ACCESSORY', 'ACC ', 'ACC_', 'ACC.',
@@ -230,7 +251,8 @@ export default function SAPVerificationView({ equipments, currentUser }) {
 
         if (Array.isArray(rawIK17)) {
           rawIK17.forEach(row => {
-            if (row.d >= startDate && row.d <= endDate) {
+            const cleanD = cleanDateStr(row.d || '');
+            if (cleanD >= startDate && cleanD <= endDate) {
               const eqStr = String(row.e || '').trim();
               const eqNorm = normEq(eqStr);
 
@@ -245,7 +267,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
                 if (row.s) { // is Saldo Awal
                   sapSaldoAwalMap.set(groupKey, (sapSaldoAwalMap.get(groupKey) || 0) + (row.h || 0));
                 } else {
-                  const key = `${groupKey}_${row.d}`;
+                  const key = `${groupKey}_${cleanD}`;
                   if (!sapHmMap.has(key)) sapHmMap.set(key, 0);
                   sapHmMap.set(key, sapHmMap.get(key) + (row.h || 0));
                 }
@@ -260,8 +282,9 @@ export default function SAPVerificationView({ equipments, currentUser }) {
           rawIK17.forEach(r => {
             const e = String(r.e || '').trim();
             if (eqToPlant.has(e) || eqToPlant.has(normEq(e))) matched++;
-            if (r.d && r.d >= startDate && r.d <= endDate && !r.s) {
-              ik17DatesInMonth.push(r.d);
+            const cleanD = cleanDateStr(r.d || '');
+            if (cleanD && cleanD >= startDate && cleanD <= endDate && !r.s) {
+              ik17DatesInMonth.push(cleanD);
             }
           });
           ik17DatesInMonth.sort();
