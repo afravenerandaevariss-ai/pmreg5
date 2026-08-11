@@ -1666,15 +1666,13 @@ export default function DailyDashboard({
               ✓ GSheet
             </button>
           )}
-          {isAdminUser && (
-            <button
-              onClick={() => setShowExportModal(true)}
-              className="bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 rounded-xl shadow-xs transition-colors flex items-center gap-1.5 font-bold text-xs"
-            >
-              <Download size={14} />
-              Export SAP
-            </button>
-          )}
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 rounded-xl shadow-xs transition-colors flex items-center gap-1.5 font-bold text-xs"
+          >
+            <Download size={14} />
+            Export SAP
+          </button>
         </div>
       </div>
 
@@ -2515,7 +2513,7 @@ export default function DailyDashboard({
                 </div>
               </div>
 
-              {isAfraUser ? (
+              {isAdminUser ? (
                 <fieldset className="border border-slate-200 rounded-2xl p-3 bg-white space-y-1">
                   <div className="flex justify-between items-center mb-1.5 px-1">
                     <legend className="text-xs font-bold text-slate-500 uppercase tracking-wide">Pilih Pabrik (Opsional)</legend>
@@ -2753,7 +2751,7 @@ export default function DailyDashboard({
                         const p = resolveEqPlant(eq);
                         return p ? selectedSet.has(p) : false;
                       });
-                    } else if (role?.toUpperCase() === 'UNIT' && userPlant) {
+                    } else if ((!isAdminUser || role?.toUpperCase() === 'UNIT' || role?.toUpperCase() === 'USER') && userPlant) {
                       const uPlant = String(userPlant).trim().toUpperCase();
                       res = res.filter(eq => {
                         const p = resolveEqPlant(eq);
@@ -2938,7 +2936,7 @@ export default function DailyDashboard({
                             const p = resolveEqPlant(eq);
                             return p ? selectedSet.has(p) : false;
                           });
-                        } else if (role?.toUpperCase() === 'UNIT' && userPlant) {
+                        } else if ((!isAdminUser || role?.toUpperCase() === 'UNIT' || role?.toUpperCase() === 'USER') && userPlant) {
                           const uPlant = String(userPlant).trim().toUpperCase();
                           res = res.filter(eq => {
                             const p = resolveEqPlant(eq);
