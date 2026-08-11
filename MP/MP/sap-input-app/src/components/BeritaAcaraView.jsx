@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FileText, RefreshCw, Printer, ExternalLink, AlertTriangle, Upload, X, FolderOpen, Trash2, Clock, CheckCircle2, Loader2, FileUp } from 'lucide-react';
-import { supabase, IS_DEV_ENV } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 
-const T_BA_EDITS      = IS_DEV_ENV ? 'dev_ba_edits'      : 'ba_edits';
-const T_BA_UNIT_EDITS = IS_DEV_ENV ? 'dev_ba_unit_edits' : 'ba_unit_edits';
-const T_PDF_UPLOADS   = IS_DEV_ENV ? 'dev_pdf_uploads'   : 'pdf_uploads';
+// BA tables are shared between DEV and PROD (dev_ba_edits etc. don't exist in Supabase)
+const T_BA_EDITS      = 'ba_edits';
+const T_BA_UNIT_EDITS = 'ba_unit_edits';
+const T_PDF_UPLOADS   = 'pdf_uploads';
 
 
 // ============================================================
