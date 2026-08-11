@@ -402,7 +402,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
               const eqStr = String(row.e || '').trim();
               const eqNorm = normEq(eqStr);
 
-              const isParent = isIndukMap.has(eqStr) ? isIndukMap.get(eqStr) : (isIndukMap.has(eqNorm) ? isIndukMap.get(eqNorm) : true);
+              const isParent = isIndukMap.has(eqStr) ? isIndukMap.get(eqStr) : (isIndukMap.has(eqNorm) ? isIndukMap.get(eqNorm) : false);
               if (isParent) {
                 if (filterJenis && !eqStr.startsWith(filterJenis) && !eqNorm.startsWith(filterJenis)) return;
                 const plant = getPlantFromEq(eqStr, eqNorm, row.t || '');
