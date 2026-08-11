@@ -29,13 +29,18 @@ export default function WorkOrderMonitoringView({ currentUser }) {
     }
   }, [isAdmin, currentUser]);
 
+  const currentMonthNum = (new Date().getMonth() + 1).toString();
   const [selectedType, setSelectedType] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState([]);
+  const [selectedStatus, setSelectedStatus] = useState(['REL']);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const statusDropdownRef = useRef(null);
-  const [selectedMonth, setSelectedMonth] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthNum);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateSortOrder, setDateSortOrder] = useState(null); // 'asc' | 'desc' | null
+  const [isUploadAccordionOpen, setIsUploadAccordionOpen] = useState(false);
+  const [isHeaderHovered, setIsHeaderHovered] = useState(false);
+  const [isHeaderPinned, setIsHeaderPinned] = useState(false);
+  const isHeaderOpen = isHeaderHovered || isHeaderPinned;
 
   // Selected WO for Detail Modal
   const [selectedWoDetail, setSelectedWoDetail] = useState(null);
@@ -81,6 +86,173 @@ export default function WorkOrderMonitoringView({ currentUser }) {
     }
   };
 
+  const parseIw39Sheet = (sheet) => {
+    const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    if (!rawRows || rawRows.length === 0) return [];
+
+    // Headerless SAP Basis exports support (e.g., 1108 iw39 Worksheet in Basis.xlsx)
+    // Order number in Col 8, Order Type in Col 1, Ref Date in Col 3, Status in Col 4, etc.
+    const headerlessResults = [];
+    for (let r = 0; r < rawRows.length; r++) {
+      const row = rawRows[r];
+      if (!row || !Array.isArray(row) || row.length < 9) continue;
+
+      const orderCandidate8 = String(row[8] || '').trim();
+      const orderCandidate0 = String(row[0] || '').trim();
+      let orderVal = '';
+      let isBasisExport = false;
+
+      if (/^\d{8,12}$/.test(orderCandidate8)) {
+        orderVal = orderCandidate8;
+        isBasisExport = true;
+      } else if (/^\d{8,12}$/.test(orderCandidate0) && !isNaN(parseFloat(String(row[9] || '')))) {
+        orderVal = orderCandidate0;
+        isBasisExport = true;
+      }
+
+      if (isBasisExport) {
+        const parseNum = (v) => typeof v === 'number' ? v : (parseFloat(String(v || '0').replace(/[^0-9.-]/g, '')) || 0);
+        const parseDate = (v) => {
+          if (typeof v === 'number') {
+            const d = XLSX.SSF.parse_date_code(v);
+            if (d) return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+          }
+          return String(v || '');
+        };
+
+        headerlessResults.push({
+          'Order': orderVal,
+          'Order Type': String(row[1] || '').trim(),
+          'Reference Date': parseDate(row[3]),
+          'System status': String(row[4] || '').trim(),
+          'Cost Center': String(row[5] || '').trim(),
+          'Equipment': String(row[13] || '').trim(),
+          'Description': String(row[14] || '').trim(),
+          'Description_2': String(row[29] || row[28] || '').trim(),
+          'TotalPlnndCosts': parseNum(row[9]),
+          'Total act.costs': parseNum(row[10]),
+          'Plant': String(row[2] || row[12] || '').trim(),
+          'Planning Plant': String(row[12] || row[2] || '').trim()
+        });
+      }
+    }
+
+    let headerRowIdx = -1;
+    for (let r = 0; r < Math.min(rawRows.length, 25); r++) {
+      const row = rawRows[r];
+      if (Array.isArray(row)) {
+        const hasMatch = row.some(cell => {
+          const c = String(cell || '').trim().toLowerCase();
+          return c === 'order' || c === 'order type' || c === 'equipment' || c === 'cost center' || c === 'system status' || c === 'planning plant';
+        });
+        if (hasMatch) {
+          headerRowIdx = r;
+          break;
+        }
+      }
+    }
+
+    if (headerRowIdx !== -1) {
+      const headers = rawRows[headerRowIdx].map(h => String(h || '').trim());
+      
+      const findColIdx = (patterns) => {
+        return headers.findIndex(h => {
+          const clean = h.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return patterns.some(p => p.test(clean));
+        });
+      };
+
+      const idxOrder = findColIdx([/order$/, /^noorder$/, /^wonumber$/, /^wono$/]);
+      const idxType = findColIdx([/ordertype$/, /^type$/, /^tipe$/]);
+      const idxRefDate = findColIdx([/referencedate$/, /^refdate$/, /^tanggal$/, /^createdon$/]);
+      const idxSysStatus = findColIdx([/systemstatus$/, /^status$/]);
+      const idxCostCenter = findColIdx([/costcenter$/, /^costctr$/]);
+      const idxEquipment = findColIdx([/equipment$/, /^equip$/, /^noequipment$/]);
+      const idxDesc = findColIdx([/^description$/, /^desceq$/, /^deskripsi$/, /^orderdescription$/]);
+      const idxDesc2 = findColIdx([/^description2$/, /^keterangan$/, /^longtext$/, /^ketwo$/]);
+      const idxPlnCost = findColIdx([/totalplnndcosts/, /totalplannedcosts/, /plannedcost/, /plncost/]);
+      const idxActCost = findColIdx([/totalactcosts/, /totalactualcosts/, /actualcost/, /actcost/]);
+      const idxPlant = findColIdx([/planningplant/, /^plant$/, /^unit$/]);
+
+      const result = [];
+      for (let r = headerRowIdx + 1; r < rawRows.length; r++) {
+        const row = rawRows[r];
+        if (!row || row.length === 0) continue;
+        
+        const orderVal = idxOrder !== -1 ? String(row[idxOrder] || '').trim() : '';
+        if (!orderVal || orderVal.toLowerCase() === 'order') continue;
+
+        const parseNum = (val) => {
+          if (typeof val === 'number') return val;
+          if (!val) return 0;
+          const cleaned = String(val).replace(/[^0-9.-]/g, '');
+          return parseFloat(cleaned) || 0;
+        };
+
+        result.push({
+          'Order': orderVal,
+          'Order Type': idxType !== -1 ? String(row[idxType] || '').trim() : '',
+          'Reference Date': idxRefDate !== -1 ? row[idxRefDate] : '',
+          'System status': idxSysStatus !== -1 ? String(row[idxSysStatus] || '').trim() : '',
+          'Cost Center': idxCostCenter !== -1 ? String(row[idxCostCenter] || '').trim() : '',
+          'Equipment': idxEquipment !== -1 ? String(row[idxEquipment] || '').trim() : '',
+          'Description': idxDesc !== -1 ? String(row[idxDesc] || '').trim() : '',
+          'Description_2': idxDesc2 !== -1 ? String(row[idxDesc2] || '').trim() : '',
+          'TotalPlnndCosts': idxPlnCost !== -1 ? parseNum(row[idxPlnCost]) : 0,
+          'Total act.costs': idxActCost !== -1 ? parseNum(row[idxActCost]) : 0,
+          'Plant': idxPlant !== -1 ? String(row[idxPlant] || '').trim() : '',
+          'Planning Plant': idxPlant !== -1 ? String(row[idxPlant] || '').trim() : ''
+        });
+      }
+
+      if (result.length > 0) return result;
+    }
+
+    if (headerlessResults.length > 0) {
+      return headerlessResults;
+    }
+
+    // Fallback: standard sheet_to_json with fuzzy key matching
+    const jsonRows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    return jsonRows.map(item => {
+      const getKey = (...keys) => {
+        for (const k of keys) {
+          if (item[k] !== undefined && item[k] !== '') return item[k];
+        }
+        for (const itemKey of Object.keys(item)) {
+          const cleanKey = itemKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+          for (const k of keys) {
+            const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (cleanKey === cleanK) return item[itemKey];
+          }
+        }
+        return '';
+      };
+
+      const parseNum = (val) => {
+        if (typeof val === 'number') return val;
+        if (!val) return 0;
+        const cleaned = String(val).replace(/[^0-9.-]/g, '');
+        return parseFloat(cleaned) || 0;
+      };
+
+      return {
+        'Order': String(getKey('Order', 'Order No', 'WO No', 'No Order') || '').trim(),
+        'Order Type': String(getKey('Order Type', 'Type', 'OrderType', 'Tipe') || '').trim(),
+        'Reference Date': getKey('Reference Date', 'Ref Date', 'Tanggal', 'Created On'),
+        'System status': String(getKey('System status', 'System Status', 'Status') || '').trim(),
+        'Cost Center': String(getKey('Cost Center', 'CostCenter', 'Cost Ctr') || '').trim(),
+        'Equipment': String(getKey('Equipment', 'Equip', 'No Equipment') || '').trim(),
+        'Description': String(getKey('Description', 'Desc EQ', 'Deskripsi') || '').trim(),
+        'Description_2': String(getKey('Description_2', 'Description 2', 'Keterangan', 'Ket WO') || '').trim(),
+        'TotalPlnndCosts': parseNum(getKey('TotalPlnndCosts', 'Total planned costs', 'Planned Costs', 'Pln Cost')),
+        'Total act.costs': parseNum(getKey('Total act.costs', 'Total actual costs', 'Actual Costs', 'Act Cost')),
+        'Plant': String(getKey('Plant', 'Planning Plant', 'Unit') || '').trim(),
+        'Planning Plant': String(getKey('Planning Plant', 'Plant', 'Unit') || '').trim()
+      };
+    }).filter(row => row['Order']);
+  };
+
   const parseFileInBrowser = async (fileBlob, type) => {
     const arrayBuffer = await fileBlob.arrayBuffer();
     const wb = XLSX.read(arrayBuffer, { type: 'array' });
@@ -89,27 +261,27 @@ export default function WorkOrderMonitoringView({ currentUser }) {
 
     let result;
     if (type === 'iw39') {
-      result = XLSX.utils.sheet_to_json(sheet);
+      result = parseIw39Sheet(sheet);
     } else if (type === 'zvtab') {
       const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
       result = {};
       for (let i = 1; i < rawData.length; i++) {
         const row = rawData[i];
         if (!row || row.length === 0) continue;
-        const order = String(row[57] || '').trim();
-        const po = String(row[38] || '').trim();
+        const order = String(row[57] || row[0] || '').trim();
+        const po = String(row[38] || row[1] || '').trim();
         if (order && po) result[order] = po;
       }
     } else if (type === '046exp') {
       const rawData = XLSX.utils.sheet_to_json(sheet, { range: 5 });
       result = {};
       for (const row of rawData) {
-        const po = String(row['PO Number'] || '').trim();
+        const po = String(row['PO Number'] || row['PO'] || '').trim();
         if (po) {
           result[po] = {
             pr: String(row['PR'] || '').trim(),
-            ses: String(row['Ses Doc'] || '').trim(),
-            mir7: String(row['Invoice Doc'] || '').trim()
+            ses: String(row['Ses Doc'] || row['SES'] || '').trim(),
+            mir7: String(row['Invoice Doc'] || row['MIR7'] || '').trim()
           };
         }
       }
@@ -286,6 +458,10 @@ export default function WorkOrderMonitoringView({ currentUser }) {
           return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
         }
       }
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+      }
       return serial;
     }
     const date = new Date((serial - 25569) * 86400 * 1000);
@@ -294,15 +470,32 @@ export default function WorkOrderMonitoringView({ currentUser }) {
 
   const getExcelMonth = (serial) => {
     if (!serial) return null;
+    if (typeof serial === 'number') {
+      const date = new Date((serial - 25569) * 86400 * 1000);
+      return date.getMonth() + 1; // 1-indexed
+    }
     if (typeof serial === 'string') {
       const s = serial.trim();
       if (/^\d{8}$/.test(s)) {
         return parseInt(s.substring(4, 6)); // 1-12
       }
-      return null;
+      if (s.includes('-')) {
+        const parts = s.split('-');
+        if (parts.length >= 2) {
+          if (parts[0].length === 4) return parseInt(parts[1]); // YYYY-MM-DD
+          if (parts[2]?.length === 4) return parseInt(parts[1]); // DD-MM-YYYY
+        }
+      }
+      if (s.includes('/')) {
+        const parts = s.split('/');
+        if (parts.length >= 2) {
+          if (parts[2]?.length === 4) return parseInt(parts[1]); // MM/DD/YYYY or DD/MM/YYYY
+        }
+      }
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d.getMonth() + 1;
     }
-    const date = new Date((serial - 25569) * 86400 * 1000);
-    return date.getMonth() + 1; // 1-indexed
+    return null;
   };
 
   const getRawDateTimestamp = (serial) => {
@@ -442,7 +635,7 @@ export default function WorkOrderMonitoringView({ currentUser }) {
     return (
       <div className="flex flex-col items-center justify-center py-32 bg-white rounded-3xl border border-slate-200 shadow-sm m-8 gap-4">
         <RefreshCw className="animate-spin text-[#064e3b]" size={40} />
-        <p className="text-sm font-semibold text-slate-500">Membaca file data IW39.xlsx dari server lokal...</p>
+        <p className="text-sm font-semibold text-slate-500">Memuat Data Work Order (IW39) dari Database...</p>
       </div>
     );
   }
@@ -541,119 +734,167 @@ export default function WorkOrderMonitoringView({ currentUser }) {
         `}
       </style>
       
-      {/* Header */}
-      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
-        <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-            <FileSpreadsheet className="text-[#064e3b]" /> Laporan Realisasi Work Order (IW39)
-          </h2>
-          <p className="text-slate-500 text-sm mt-1">
-            Data pemeliharaan aset, realisasi pengerjaan, dan monitoring biaya aktual vs planned langsung dari SAP PM.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 print:hidden">
-          {isAdmin && (
-            <button 
-              onClick={handleCopyOrders}
-              className="flex items-center gap-2 text-xs font-bold bg-slate-100 text-slate-700 px-4 py-2 rounded-xl border border-slate-200 shadow-sm hover:bg-slate-200 transition-colors duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-slate-300"
-            >
-              {copiedOrders ? <><CheckCircle size={16} className="text-emerald-600" /> Disalin</> : <><Copy size={16} /> Salin No. Order</>}
-            </button>
-          )}
-          <button 
-            onClick={handlePrint}
-            className="flex items-center gap-2 text-xs font-bold bg-white text-slate-700 px-4 py-2 rounded-xl border border-slate-200 shadow-sm hover:bg-slate-50 transition-colors duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-slate-200"
+      {/* Hover-To-Reveal Top Panel Container */}
+      <div 
+        onMouseEnter={() => setIsHeaderHovered(true)}
+        onMouseLeave={() => setIsHeaderHovered(false)}
+        className="print:hidden transition-all duration-300 ease-in-out"
+      >
+        {!isHeaderOpen ? (
+          /* Collapsed Bar: Hidden state until cursor is hovered over */
+          <div 
+            onClick={() => setIsHeaderPinned(true)}
+            className="bg-transparent text-slate-800 px-4 py-2.5 rounded-2xl cursor-pointer flex items-center justify-between group border border-slate-200/80 hover:bg-slate-100/60 hover:border-slate-300 transition-all duration-200"
           >
-            <Printer size={16} /> Cetak Laporan
-          </button>
-          <div className="flex items-center gap-2 text-xs font-semibold bg-emerald-50 text-emerald-700 px-3.5 py-2 rounded-xl border border-emerald-100 hidden sm:flex">
-            <Layers size={14} /> Sinkronisasi SAP PM
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-[#064e3b] group-hover:scale-105 transition-transform">
+                <FileSpreadsheet size={18} />
+              </div>
+              <h2 className="text-base font-bold tracking-tight text-slate-800 flex items-center gap-2">
+                Laporan Realisasi Work Order (IW39)
+              </h2>
+            </div>
+            <div className="w-8 h-8 rounded-xl bg-slate-100/80 flex items-center justify-center text-slate-500 group-hover:bg-slate-200 group-hover:text-slate-800 transition-colors">
+              <ChevronDown size={18} />
+            </div>
           </div>
-        </div>
-      </div>
+        ) : (
+          /* Expanded Content when Hovered or Pinned */
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+            {/* Header Main Card */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                    <FileSpreadsheet className="text-[#064e3b]" /> Laporan Realisasi Work Order (IW39)
+                  </h2>
+                  <button 
+                    onClick={() => setIsHeaderPinned(!isHeaderPinned)}
+                    title={isHeaderPinned ? "Lepaskan Pin (Panel Otomatis Sembunyi)" : "Sematkan Panel agar Tetap Terbuka"}
+                    className={`text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 border transition-colors ${
+                      isHeaderPinned ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                    }`}
+                  >
+                    📌 {isHeaderPinned ? 'Tersemat (Pinned)' : 'Sematkan'}
+                  </button>
+                </div>
+                <p className="text-slate-500 text-sm mt-1">
+                  Data pemeliharaan aset, realisasi pengerjaan, dan monitoring biaya aktual vs planned langsung dari SAP PM.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 print:hidden">
+                {isAdmin && (
+                  <button 
+                    onClick={handleCopyOrders}
+                    className="flex items-center gap-2 text-xs font-bold bg-slate-100 text-slate-700 px-4 py-2 rounded-xl border border-slate-200 shadow-sm hover:bg-slate-200 transition-colors duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-slate-300"
+                  >
+                    {copiedOrders ? <><CheckCircle size={16} className="text-emerald-600" /> Disalin</> : <><Copy size={16} /> Salin No. Order</>}
+                  </button>
+                )}
+                <button 
+                  onClick={handlePrint}
+                  className="flex items-center gap-2 text-xs font-bold bg-white text-slate-700 px-4 py-2 rounded-xl border border-slate-200 shadow-sm hover:bg-slate-50 transition-colors duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-slate-200"
+                >
+                  <Printer size={16} /> Cetak Laporan
+                </button>
+                <div className="flex items-center gap-2 text-xs font-semibold bg-emerald-50 text-emerald-700 px-3.5 py-2 rounded-xl border border-emerald-100 hidden sm:flex">
+                  <Layers size={14} /> Sinkronisasi SAP PM
+                </div>
+              </div>
+            </div>
 
-      {/* Upload Section (Regional/Admin Only) */}
-      {isAdmin && (
-        <div className="bg-white p-6 rounded-3xl border border-emerald-200 shadow-sm bg-emerald-50/30 print:hidden">
-          <h3 className="text-sm font-bold text-[#064e3b] mb-3 flex items-center gap-2">
-            <Layers size={16} /> Update Data Laporan IW39 (Admin Area)
-          </h3>
-          
-          {successMsg && (
-            <div className="mb-4 bg-emerald-100 border border-emerald-300 text-emerald-800 px-4 py-3 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-              <CheckCircle size={18} className="text-emerald-600 shrink-0" />
-              <p className="text-sm font-bold">{successMsg}</p>
-            </div>
-          )}
-          
-          {loading && (
-            <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-4 rounded-2xl flex flex-col gap-3 shadow-sm print:hidden">
-              <div className="flex items-center gap-3">
-                <RefreshCw className="animate-spin text-blue-500" size={20} />
-                <div className="flex flex-col">
-                  <span className="font-bold text-sm">Sedang memproses data di Backend Server...</span>
-                  <span className="text-xs text-blue-600">Mohon tunggu. Proses ini dijamin tidak akan membuat browser Anda freeze.</span>
+            {/* Upload Section (Admin Area) */}
+            {isAdmin && (
+              <div className="bg-white p-6 rounded-3xl border border-emerald-200 shadow-sm bg-emerald-50/20 space-y-4">
+                <h3 className="text-sm font-bold text-[#064e3b] flex items-center gap-2">
+                  <Layers size={16} /> Update Data Laporan IW39 (Admin Area)
+                </h3>
+                
+                {successMsg && (
+                  <div className="bg-emerald-100 border border-emerald-300 text-emerald-800 px-4 py-3 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <CheckCircle size={18} className="text-emerald-600 shrink-0" />
+                    <p className="text-sm font-bold">{successMsg}</p>
+                  </div>
+                )}
+                
+                {loading && (
+                  <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-4 rounded-2xl flex flex-col gap-3 shadow-sm print:hidden">
+                    <div className="flex items-center gap-3">
+                      <RefreshCw className="animate-spin text-blue-500" size={20} />
+                      <div className="flex flex-col">
+                        <span className="font-bold text-sm">Sedang memproses data di Backend Server...</span>
+                        <span className="text-xs text-blue-600">Mohon tunggu. Proses ini dijamin tidak akan membuat browser Anda freeze.</span>
+                      </div>
+                    </div>
+                    {uploadProgress > 0 && (
+                      <div className="w-full bg-blue-200 rounded-full h-2.5 mt-1">
+                        <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <div className="flex flex-col xl:flex-row items-start justify-between gap-6">
+                  <p className="text-xs text-slate-600 max-w-sm leading-relaxed">
+                    Silakan upload file <strong className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">IW39</strong>, <strong className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">ZVTAB</strong>, dan <strong className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">046EXP</strong> untuk memperbarui data realisasi WO di *dashboard* ini.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2 w-full xl:w-auto">
+                    <div className="flex items-center justify-between sm:justify-start gap-2 bg-white p-2 rounded-xl border border-slate-200 flex-1">
+                      <span className="text-[10px] font-bold text-slate-600 w-12 text-right">IW39</span>
+                      <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="block w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-[#064e3b] file:text-white hover:file:bg-[#065f46] transition-colors duration-200 ease-out cursor-pointer focus:outline-none" />
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-start gap-2 bg-white p-2 rounded-xl border border-slate-200 flex-1">
+                      <span className="text-[10px] font-bold text-slate-600 w-12 text-right">ZVTAB</span>
+                      <input type="file" accept=".xlsx, .xls" onChange={handleZvtabUpload} className="block w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-[#064e3b] file:text-white hover:file:bg-[#065f46] transition-colors duration-200 ease-out cursor-pointer focus:outline-none" />
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-start gap-2 bg-white p-2 rounded-xl border border-slate-200 flex-1">
+                      <span className="text-[10px] font-bold text-slate-600 w-12 text-right">046EXP</span>
+                      <input type="file" accept=".xlsx, .xls" onChange={handleExport046Upload} className="block w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-[#064e3b] file:text-white hover:file:bg-[#065f46] transition-colors duration-200 ease-out cursor-pointer focus:outline-none" />
+                    </div>
+                  </div>
                 </div>
               </div>
-              {uploadProgress > 0 && (
-                <div className="w-full bg-blue-200 rounded-full h-2.5 mt-1">
-                  <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
-                </div>
-              )}
-            </div>
-          )}
-          
-          <div className="flex flex-col xl:flex-row items-start justify-between gap-6">
-            <p className="text-xs text-slate-600 max-w-sm leading-relaxed">
-              Silakan upload file <strong className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">IW39</strong>, <strong className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">ZVTAB</strong>, dan <strong className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">046EXP</strong> untuk memperbarui data realisasi WO di *dashboard* ini.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-2 w-full xl:w-auto">
-              <div className="flex items-center justify-between sm:justify-start gap-2 bg-white p-2 rounded-xl border border-slate-200 flex-1">
-                <span className="text-[10px] font-bold text-slate-600 w-12 text-right">IW39</span>
-                <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="block w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-[#064e3b] file:text-white hover:file:bg-[#065f46] transition-colors duration-200 ease-out cursor-pointer focus:outline-none" />
-              </div>
-              <div className="flex items-center justify-between sm:justify-start gap-2 bg-white p-2 rounded-xl border border-slate-200 flex-1">
-                <span className="text-[10px] font-bold text-slate-600 w-12 text-right">ZVTAB</span>
-                <input type="file" accept=".xlsx, .xls" onChange={handleZvtabUpload} className="block w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-[#064e3b] file:text-white hover:file:bg-[#065f46] transition-colors duration-200 ease-out cursor-pointer focus:outline-none" />
-              </div>
-              <div className="flex items-center justify-between sm:justify-start gap-2 bg-white p-2 rounded-xl border border-slate-200 flex-1">
-                <span className="text-[10px] font-bold text-slate-600 w-12 text-right">046EXP</span>
-                <input type="file" accept=".xlsx, .xls" onChange={handleExport046Upload} className="block w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-[#064e3b] file:text-white hover:file:bg-[#065f46] transition-colors duration-200 ease-out cursor-pointer focus:outline-none" />
-              </div>
-            </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Summary totals */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 print:hidden">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="p-3.5 bg-emerald-50 text-[#064e3b] rounded-2xl border border-emerald-100">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex items-center gap-4">
+          <div className="p-3.5 bg-emerald-50 text-[#064e3b] rounded-2xl border border-emerald-100/80 shrink-0">
             <Layers size={24} />
           </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Work Order</p>
-            <h3 className="text-2xl font-black text-slate-800 mt-1">{totals.count} WO</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Work Order</p>
+            <h3 className="text-2xl font-black text-slate-800 mt-0.5 tracking-tight">{totals.count} <span className="text-xs text-slate-500 font-bold">WO</span></h3>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="p-3.5 bg-slate-100 text-slate-700 rounded-2xl border border-slate-200">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex items-center gap-4">
+          <div className="p-3.5 bg-sky-50 text-sky-700 rounded-2xl border border-sky-100 shrink-0">
             <DollarSign size={24} />
           </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Planned Cost (Budget)</p>
-            <h3 className="text-2xl font-black text-slate-800 mt-1">{formatCurrency(totals.planned)}</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Planned Cost (Budget)</p>
+            <h3 className="text-2xl font-black text-slate-800 mt-0.5 tracking-tight">{formatCurrency(totals.planned)}</h3>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="p-3.5 bg-amber-50 text-amber-700 rounded-2xl border border-amber-100">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex items-center gap-4">
+          <div className="p-3.5 bg-amber-50 text-amber-700 rounded-2xl border border-amber-100 shrink-0">
             <DollarSign size={24} />
           </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Actual Cost (Realisasi)</p>
-            <h3 className="text-2xl font-black text-[#064e3b] mt-1">{formatCurrency(totals.actual)}</h3>
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Actual Cost (Realisasi)</p>
+              {totals.planned > 0 && (
+                <span className="text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-mono">
+                  {((totals.actual / totals.planned) * 100).toFixed(1)}%
+                </span>
+              )}
+            </div>
+            <h3 className="text-2xl font-black text-[#064e3b] mt-0.5 tracking-tight">{formatCurrency(totals.actual)}</h3>
           </div>
         </div>
       </div>
@@ -780,49 +1021,51 @@ export default function WorkOrderMonitoringView({ currentUser }) {
         <div className="print:overflow-visible print:max-h-none">
           <table className="w-full text-left text-xs text-slate-700 border-collapse print:text-black print:border-collapse print:w-full print:table-fixed">
             <colgroup className="hidden print:table-column-group">
-              <col style={{ width: '6%' }} />
+              <col style={{ width: '3%' }} />
+              <col style={{ width: '7%' }} />
               <col style={{ width: '4%' }} />
               <col style={{ width: '6%' }} />
               <col style={{ width: '8%' }} />
               <col style={{ width: '6%' }} />
               <col style={{ width: '6%' }} />
               <col style={{ width: '10%' }} />
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '7%' }} />
-              <col style={{ width: '7%' }} />
-              <col style={{ width: '7%' }} />
-              <col style={{ width: '7%' }} />
-              <col style={{ width: '7%' }} />
-              <col style={{ width: '7%' }} />
+              <col style={{ width: '11%' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '7.5%' }} />
+              <col style={{ width: '7.5%' }} />
             </colgroup>
-            <thead className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono print:static print:shadow-none">
-              <tr>
-                <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">NO ORDER</th>
-                <th className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5 print:text-center">TIPE</th>
-                <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5 cursor-pointer hover:bg-slate-50 transition-colors"
+            <thead className="text-[11px] font-black uppercase tracking-wider font-sans print:static print:shadow-none">
+              <tr className="bg-[#064e3b] text-white">
+                <th className="text-center sticky top-0 z-40 bg-[#064e3b] text-white border-b border-emerald-900 shadow-xs px-3 py-3.5 print:static print:px-1 print:py-1.5 print:bg-white print:text-black">NO</th>
+                <th className="text-center sticky top-0 z-40 bg-[#064e3b] text-white border-b border-emerald-900 shadow-xs px-3 py-3.5 print:static print:px-1 print:py-1.5 print:bg-white print:text-black">NO ORDER</th>
+                <th className="text-center sticky top-0 z-40 bg-[#064e3b] text-white border-b border-emerald-900 shadow-xs px-3 py-3.5 print:static print:px-1 print:py-1.5 print:bg-white print:text-black">TIPE</th>
+                <th className="text-center sticky top-0 z-40 bg-[#064e3b] text-white border-b border-emerald-900 shadow-xs px-3 py-3.5 print:static print:px-1 print:py-1.5 cursor-pointer hover:bg-[#065f46] transition-colors print:bg-white print:text-black"
                     onClick={() => setDateSortOrder(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')}>
                   <div className="flex items-center justify-center gap-1">
                     TANGGAL
-                    <ArrowUpDown size={14} className={`text-slate-400 ${dateSortOrder ? 'text-[#064e3b]' : ''}`} />
+                    <ArrowUpDown size={14} className={`text-emerald-200 ${dateSortOrder ? 'text-white' : ''}`} />
                   </div>
                 </th>
-                <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">STATUS</th>
-                <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">Cost Center</th>
-                <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">EQUIP</th>
-                <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">DESC EQ</th>
-                <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">KET WO</th>
-                <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">PO</th>
-                <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">PR</th>
-                <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">SES</th>
-                <th className="text-center sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 print:static print:px-1 print:py-1.5">MIR7</th>
-                <th className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 text-center print:static print:px-1 print:py-1.5">PLN COST</th>
-                <th className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-3.5 text-center print:static print:px-1 print:py-1.5">ACT COST</th>
+                <th className="text-center sticky top-0 z-40 bg-[#064e3b] text-white border-b border-emerald-900 shadow-xs px-3 py-3.5 print:static print:px-1 print:py-1.5 print:bg-white print:text-black">STATUS</th>
+                <th className="text-center sticky top-0 z-40 bg-[#064e3b] text-white border-b border-emerald-900 shadow-xs px-3 py-3.5 print:static print:px-1 print:py-1.5 print:bg-white print:text-black">COST CENTER</th>
+                <th className="text-center sticky top-0 z-40 bg-[#064e3b] text-white border-b border-emerald-900 shadow-xs px-3 py-3.5 print:static print:px-1 print:py-1.5 print:bg-white print:text-black">EQUIP</th>
+                <th className="text-center sticky top-0 z-40 bg-[#064e3b] text-white border-b border-emerald-900 shadow-xs px-3 py-3.5 print:static print:px-1 print:py-1.5 print:bg-white print:text-black">DESC EQ</th>
+                <th className="text-center sticky top-0 z-40 bg-[#064e3b] text-white border-b border-emerald-900 shadow-xs px-3 py-3.5 print:static print:px-1 print:py-1.5 print:bg-white print:text-black">KET WO</th>
+                <th className="text-center sticky top-0 z-40 bg-[#064e3b] text-white border-b border-emerald-900 shadow-xs px-3 py-3.5 print:static print:px-1 print:py-1.5 print:bg-white print:text-black">PO</th>
+                <th className="text-center sticky top-0 z-40 bg-[#064e3b] text-white border-b border-emerald-900 shadow-xs px-3 py-3.5 print:static print:px-1 print:py-1.5 print:bg-white print:text-black">PR</th>
+                <th className="text-center sticky top-0 z-40 bg-[#064e3b] text-white border-b border-emerald-900 shadow-xs px-3 py-3.5 print:static print:px-1 print:py-1.5 print:bg-white print:text-black">SES</th>
+                <th className="text-center sticky top-0 z-40 bg-[#064e3b] text-white border-b border-emerald-900 shadow-xs px-3 py-3.5 print:static print:px-1 print:py-1.5 print:bg-white print:text-black">MIR7</th>
+                <th className="sticky top-0 z-40 bg-[#064e3b] text-white border-b border-emerald-900 shadow-xs px-3 py-3.5 text-center print:static print:px-1 print:py-1.5 print:bg-white print:text-black">PLN COST</th>
+                <th className="sticky top-0 z-40 bg-[#064e3b] text-white border-b border-emerald-900 shadow-xs px-3 py-3.5 text-center print:static print:px-1 print:py-1.5 print:bg-white print:text-black">ACT COST</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-[11px]">
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan="14" className="px-6 py-20 text-center bg-white/50">
+                  <td colSpan="15" className="px-6 py-20 text-center bg-white/50">
                     <div className="flex flex-col items-center justify-center space-y-3">
                       <div className="p-4 bg-slate-100 rounded-full text-slate-400">
                         <Search size={32} />
@@ -835,6 +1078,9 @@ export default function WorkOrderMonitoringView({ currentUser }) {
               ) : (
                 filteredData.map((item, idx) => (
                   <tr key={idx} className="hover:bg-slate-50 transition-colors duration-200 ease-out">
+                    <td className="px-3 py-2 text-center text-slate-400 font-mono text-[11px] font-bold print:px-1 print:py-1 print:text-[7.5px]">
+                      {idx + 1}
+                    </td>
                     <td className="px-3 py-2 print:px-1 print:py-1 text-slate-900 font-mono font-bold text-center print:text-[7.5px] print:whitespace-nowrap print:overflow-hidden">
                       <button 
                         onClick={() => setSelectedWoDetail(item)}

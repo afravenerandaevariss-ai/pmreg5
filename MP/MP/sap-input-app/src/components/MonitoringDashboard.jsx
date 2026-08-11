@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getISOWeek, addMonths, subMonths } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Download, Loader2, X, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Loader2, X, Check, AlertCircle, Search, Filter, FileSpreadsheet } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
@@ -21,6 +21,36 @@ export default function MonitoringDashboard({
   const [selectedCellDetail, setSelectedCellDetail] = useState(null);
   const [chartPlantFilter, setChartPlantFilter] = useState('ALL');
 
+  // Plant filtering logic based on logged in user
+  const userPlant = currentUser?.plant || '';
+  const isAdminUser = currentUser && (
+    currentUser.role === 'Admin' || 
+    currentUser.role?.toUpperCase() === 'ADMIN' || 
+    currentUser.role?.toUpperCase() === 'DEV' ||
+    ['1', '2', '3'].includes(String(currentUser.role_id))
+  );
+
+  const isUserPlantRestricted = !isAdminUser && userPlant && userPlant !== '5R00' && userPlant !== 'ALL';
+  const initialPlantFilter = userPlant && userPlant !== '5R00' && userPlant !== 'ALL' ? userPlant : 'ALL';
+
+  const [selectedPlantFilter, setSelectedPlantFilter] = useState(initialPlantFilter);
+  const [showMissingModal, setShowMissingModal] = useState(false);
+  const [missingSearchQuery, setMissingSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (userPlant && userPlant !== '5R00' && userPlant !== 'ALL') {
+      setSelectedPlantFilter(userPlant);
+    }
+  }, [userPlant]);
+
+  const availablePlants = useMemo(() => {
+    const plants = new Set();
+    equipments.forEach(eq => {
+      if (eq.plant) plants.add(eq.plant);
+    });
+    return Array.from(plants).sort();
+  }, [equipments]);
+
   // Load logs from Supabase (or localStorage fallback)
   useEffect(() => {
     const loadLogs = async () => {
@@ -28,14 +58,14 @@ export default function MonitoringDashboard({
       try {
         if (supabase) {
           const yearMonth = format(currentMonth, 'yyyy-MM');
-          const plant = currentUser?.role === 'Unit' ? currentUser.plant : null;
+          const plant = isUserPlantRestricted ? userPlant : (selectedPlantFilter !== 'ALL' ? selectedPlantFilter : null);
           const { data, error } = await fetchDailyLogs(plant, yearMonth);
           if (!error && data) {
             setDailyLogs(data);
           }
         } else {
           // localStorage fallback
-          const saved = localStorage.getItem(`sapApp_dailyLogs_${currentUser?.plant || 'ALL'}`);
+          const saved = localStorage.getItem(`sapApp_dailyLogs_${selectedPlantFilter}`);
           if (saved) setDailyLogs(JSON.parse(saved));
         }
       } catch (e) {
@@ -45,27 +75,77 @@ export default function MonitoringDashboard({
       }
     };
     loadLogs();
-  }, [currentMonth, currentUser]);
+  }, [currentMonth, currentUser, selectedPlantFilter, isUserPlantRestricted, userPlant]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [currentMonth, currentUser]);
+  }, [currentMonth, currentUser, selectedPlantFilter]);
 
-  // Get only Induk equipments that have at least 1 day of HM data in this month
+  // Get Induk equipments filtered by selectedPlantFilter
   const indukEquipments = useMemo(() => {
     const base = equipments.filter(eq =>
       eq.type === 'Induk' &&
-      (currentUser?.role !== 'Unit' || eq.plant === currentUser?.plant)
+      (selectedPlantFilter === 'ALL' || eq.plant === selectedPlantFilter)
     );
 
-    // If logs have loaded, filter to only those with HM > 0 somewhere this month
     const allLogs = Object.values(dailyLogs).flat();
-    if (allLogs.length === 0) return base; // while loading, show all
+    if (allLogs.length === 0) return base;
 
     return base.filter(eq =>
       allLogs.some(log => log.indukEqNum === eq.eqNum && log.durationMinutes > 0)
     );
-  }, [equipments, currentUser, dailyLogs]);
+  }, [equipments, selectedPlantFilter, dailyLogs]);
+
+  // Compute all Induk equipments and their missing days in currentMonth
+  const missingInputData = useMemo(() => {
+    const targetEquipments = equipments.filter(eq =>
+      eq.type === 'Induk' &&
+      (selectedPlantFilter === 'ALL' || eq.plant === selectedPlantFilter)
+    );
+
+    const result = [];
+    targetEquipments.forEach(eq => {
+      const missingDays = [];
+      const filledDays = [];
+
+      flatDays.forEach(day => {
+        const dateStr = format(day, 'yyyy-MM-dd');
+        const duration = getLogDuration(eq.eqNum, dateStr);
+        if (duration > 0) {
+          filledDays.push({ date: day, dateStr, duration });
+        } else {
+          missingDays.push({ date: day, dateStr });
+        }
+      });
+
+      if (missingDays.length > 0) {
+        result.push({
+          eqNum: eq.eqNum,
+          description: eq.description,
+          plant: eq.plant,
+          functionalLoc: eq.functionalLoc || '',
+          measuringPoint: eq.measuringPoint || '',
+          missingDays,
+          missingCount: missingDays.length,
+          filledCount: filledDays.length,
+          totalDays: flatDays.length
+        });
+      }
+    });
+
+    return result.sort((a, b) => b.missingCount - a.missingCount);
+  }, [equipments, selectedPlantFilter, flatDays, dailyLogs]);
+
+  const filteredMissingInputData = useMemo(() => {
+    if (!missingSearchQuery.trim()) return missingInputData;
+    const q = missingSearchQuery.toLowerCase();
+    return missingInputData.filter(item =>
+      (item.eqNum && String(item.eqNum).toLowerCase().includes(q)) ||
+      (item.description && item.description.toLowerCase().includes(q)) ||
+      (item.plant && item.plant.toLowerCase().includes(q)) ||
+      (item.measuringPoint && String(item.measuringPoint).toLowerCase().includes(q))
+    );
+  }, [missingInputData, missingSearchQuery]);
 
   // Generate days for the current month grouped by week
   const { weeks, flatDays } = useMemo(() => {
@@ -253,9 +333,30 @@ export default function MonitoringDashboard({
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Monitoring");
     
-    const plantCode = (currentUser?.plant || 'ALL').toLowerCase();
+    const plantCode = (selectedPlantFilter || 'ALL').toLowerCase();
     const monthStr = format(currentMonth, 'MM-yyyy');
     XLSX.writeFile(wb, `Monitoring_${plantCode}_${monthStr}.xlsx`);
+  };
+
+  const exportMissingToExcel = () => {
+    const exportRows = filteredMissingInputData.map((item, idx) => ({
+      "No": idx + 1,
+      "Plant": item.plant,
+      "No. Equipment": item.eqNum,
+      "Deskripsi Equipment Induk": item.description,
+      "Measuring Point": item.measuringPoint,
+      "Total Belum Input (Hari)": item.missingCount,
+      "Total Sudah Input (Hari)": item.filledCount,
+      "Detail Tanggal Belum Input": item.missingDays.map(d => format(d.date, 'dd')).join(', ')
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Equipment_Belum_Input");
+    
+    const plantCode = selectedPlantFilter.toLowerCase();
+    const monthStr = format(currentMonth, 'MM-yyyy');
+    XLSX.writeFile(wb, `Detail_Belum_Input_${plantCode}_${monthStr}.xlsx`);
   };
 
   return (
@@ -293,9 +394,20 @@ export default function MonitoringDashboard({
 
           <div className="h-4 w-px bg-slate-200 mx-1 hidden md:block"></div>
 
-          <div className="hidden md:flex bg-slate-50 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-[11px] font-medium items-center gap-1.5">
-            <span className="text-slate-400">Pabrik</span>
-            <span className="font-semibold">{currentUser?.plant || 'Semua Plant'}</span>
+          <div className="flex bg-slate-50 border border-slate-200 text-slate-700 px-3 py-1 rounded-lg text-[11px] font-medium items-center gap-1.5 shadow-xs">
+            <Filter size={13} className="text-slate-400" />
+            <span className="text-slate-400 font-bold">Pabrik:</span>
+            <select
+              value={selectedPlantFilter}
+              onChange={(e) => setSelectedPlantFilter(e.target.value)}
+              disabled={isUserPlantRestricted}
+              className="bg-transparent border-none text-slate-800 font-bold focus:outline-none cursor-pointer disabled:cursor-not-allowed text-xs"
+            >
+              {!isUserPlantRestricted && <option value="ALL">Semua Plant</option>}
+              {availablePlants.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
           </div>
           
           <div className="flex items-center bg-white rounded-lg border border-slate-200 shadow-sm text-slate-700 overflow-hidden">
@@ -311,11 +423,23 @@ export default function MonitoringDashboard({
           </div>
         </div>
 
-        <button onClick={exportToExcel} className="bg-[#064e3b] hover:bg-[#022c22] text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-2 transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-[#064e3b]/50 active:scale-95">
-          {loading ? <Loader2 size={14} className="animate-spin opacity-80" /> : <Download size={14} className="opacity-80" />} 
-          <span className="hidden sm:inline">Ekspor Data</span>
-          <span className="inline sm:hidden">Ekspor</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowMissingModal(true)}
+            className="bg-amber-500 hover:bg-amber-600 text-white px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm focus:outline-none"
+            title="Lihat Detail Equipment Induk Yang Belum Di-input"
+          >
+            <AlertCircle size={14} />
+            <span className="hidden md:inline">Detail Belum Input ({missingInputData.length})</span>
+            <span className="md:hidden">Belum Input</span>
+          </button>
+
+          <button onClick={exportToExcel} className="bg-[#064e3b] hover:bg-[#022c22] text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-2 transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-[#064e3b]/50 active:scale-95">
+            {loading ? <Loader2 size={14} className="animate-spin opacity-80" /> : <Download size={14} className="opacity-80" />} 
+            <span className="hidden sm:inline">Ekspor Data</span>
+            <span className="inline sm:hidden">Ekspor</span>
+          </button>
+        </div>
       </div>
 
       {/* Content Wrapper */}
@@ -655,6 +779,121 @@ export default function MonitoringDashboard({
             </div>
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
               <button onClick={() => setSelectedCellDetail(null)} className="px-4 py-2 bg-[#064e3b] hover:bg-[#065f46] text-white rounded-xl text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2">
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Detail Equipment Parents Belum Input */}
+      {showMissingModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col border border-slate-200">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-200 bg-amber-50 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-amber-500/10 border border-amber-500/30 text-amber-600 rounded-xl">
+                  <AlertCircle size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-800">
+                    Detail Equipment Induk Belum Di-Input
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Bulan: <span className="font-bold text-slate-700">{format(currentMonth, 'MMMM yyyy', { locale: id })}</span> | Plant: <span className="font-bold text-emerald-700">{selectedPlantFilter}</span>
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowMissingModal(false)} 
+                className="text-slate-400 hover:text-slate-700 p-1.5 hover:bg-slate-200/60 rounded-xl transition-colors"
+              >
+                <X size={20}/>
+              </button>
+            </div>
+
+            {/* Modal Toolbar */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="relative w-full sm:w-80">
+                <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Cari Equipment, Nomor, atau Plant..."
+                  value={missingSearchQuery}
+                  onChange={(e) => setMissingSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <span className="text-xs text-slate-500 font-medium">
+                  Total: <strong className="text-slate-800">{filteredMissingInputData.length}</strong> Equipment
+                </span>
+                <button
+                  onClick={exportMissingToExcel}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                >
+                  <Download size={14} />
+                  <span>Ekspor Excel</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body Table */}
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+              {filteredMissingInputData.length === 0 ? (
+                <div className="text-center py-12 text-slate-500">
+                  <Check size={48} className="mx-auto text-emerald-500 mb-2" />
+                  <p className="font-bold text-slate-700">Semua Equipment Induk Telah Di-input!</p>
+                  <p className="text-xs text-slate-400 mt-1">Tidak ada data kosong yang belum terisi pada filter ini.</p>
+                </div>
+              ) : (
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-slate-100 text-slate-700 uppercase font-bold sticky top-0 border-b border-slate-200 z-10">
+                    <tr>
+                      <th className="px-3 py-2.5 w-12 text-center">No</th>
+                      <th className="px-3 py-2.5 w-20">Plant</th>
+                      <th className="px-3 py-2.5 w-32 font-mono">No. Equipment</th>
+                      <th className="px-3 py-2.5">Deskripsi Equipment Induk</th>
+                      <th className="px-3 py-2.5 w-24 text-center">Belum Input</th>
+                      <th className="px-3 py-2.5">Tanggal Belum Diisi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {filteredMissingInputData.map((item, idx) => (
+                      <tr key={`${item.eqNum}-${idx}`} className="hover:bg-amber-50/40 transition-colors">
+                        <td className="px-3 py-2.5 text-center text-slate-400">{idx + 1}</td>
+                        <td className="px-3 py-2.5 font-bold font-mono text-slate-700">{item.plant}</td>
+                        <td className="px-3 py-2.5 font-mono font-medium text-slate-800">{item.eqNum}</td>
+                        <td className="px-3 py-2.5 font-bold text-slate-800">{item.description}</td>
+                        <td className="px-3 py-2.5 text-center">
+                          <span className="px-2 py-0.5 bg-red-100 text-red-700 font-extrabold rounded-full text-[11px]">
+                            {item.missingCount} Hari
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-slate-600 leading-relaxed">
+                          <div className="flex flex-wrap gap-1">
+                            {item.missingDays.map(d => (
+                              <span key={d.dateStr} className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 text-[10px] font-mono rounded">
+                                {format(d.date, 'dd')}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+              <button 
+                onClick={() => setShowMissingModal(false)}
+                className="px-5 py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors"
+              >
                 Tutup
               </button>
             </div>

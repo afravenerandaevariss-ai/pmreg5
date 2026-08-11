@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { format, startOfWeek, addDays, startOfMonth, endOfMonth, isSameDay, subMonths, addMonths, getDaysInMonth, subDays } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Search, Plus, Minus, X, Save, Clock, AlertTriangle, CheckCircle, ClipboardList, Download, FileDown, Trash2, Eye, Upload, History, Flag, FileSpreadsheet, RefreshCw, Layers, Lock } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Search, Plus, Minus, X, Save, Clock, AlertTriangle, CheckCircle, ClipboardList, Download, FileDown, Trash2, Eye, Upload, History, Flag, FileSpreadsheet, RefreshCw, Layers, Lock, ExternalLink } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { exportDailyToSAP, exportCumulativeToSAP, exportAccumulatedToSAP, validateDailyHours } from '../utils/excel';
 import { supabase, IS_DEV_ENV } from '../lib/supabase';
@@ -74,12 +74,13 @@ export default function DailyDashboard({
   const isAdminUser = useMemo(() => {
     if (!currentUser) return false;
     const role = String(currentUser.role || '').toUpperCase();
-    return role === 'ADMIN' || role === 'DEV' || currentUser.plant === 'ALL';
+    const plant = String(currentUser.plant || '').toUpperCase();
+    return role === 'ADMIN' || role === 'DEV' || role === 'REGIONAL' || plant === 'ALL' || plant === '5R00' || !plant.startsWith('5F');
   }, [currentUser]);
 
   const defaultPlantFilter = (currentUser?.plant && String(currentUser.plant).toUpperCase().startsWith('5F'))
     ? currentUser.plant
-    : '';
+    : '5F01';
   const [matrixPlantFilter, setMatrixPlantFilter] = useState(defaultPlantFilter);
   const [logPlantFilter, setLogPlantFilter] = useState(defaultPlantFilter);
   const [selectedExportEqs, setSelectedExportEqs] = useState([]);
@@ -156,14 +157,17 @@ export default function DailyDashboard({
   const [sortCol, setSortCol] = useState('plant');
   const [sortDir, setSortDir] = useState('asc');
 
-  // Automatically lock plant filter to currentUser.plant for non-Afra unit users
+  // Automatically lock plant filter for unit users, while allowing Admin/DEV/5R00 users to select any plant
   useEffect(() => {
-    if (!isAfraUser && currentUser?.plant) {
+    if (!isAdminUser && currentUser?.plant && String(currentUser.plant).toUpperCase().startsWith('5F')) {
       setMatrixPlantFilter(currentUser.plant);
       setLogPlantFilter(currentUser.plant);
       setSelectedExportPlants([currentUser.plant]);
+    } else if (isAdminUser && (!matrixPlantFilter || matrixPlantFilter === '5R00')) {
+      setMatrixPlantFilter('5F01');
+      setLogPlantFilter('5F01');
     }
-  }, [currentUser, isAfraUser]);
+  }, [currentUser, isAdminUser]);
 
   useEffect(() => {
     setMatrixPage(1);
@@ -1630,8 +1634,18 @@ export default function DailyDashboard({
               }`}
             >
               <CalendarIcon size={16} />
-              Riwayat & Kalender Jam Jalan
+              Riwayat &amp; Kalender Jam Jalan
             </button>
+            <a
+              href="https://cmms.ptpn4.co.id/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300/80 shadow-xs group"
+              title="Buka CMMS PTPN IV (cmms.ptpn4.co.id)"
+            >
+              <ExternalLink size={15} className="text-emerald-600 group-hover:scale-110 transition-transform" />
+              <span>CMMS PTPN IV</span>
+            </a>
           </div>
         </div>
 
@@ -1681,17 +1695,17 @@ export default function DailyDashboard({
                 />
               </div>
 
-              {isAfraUser ? (
+              {isAdminUser ? (
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter Plant / Pabrik</label>
                   <select
                     value={matrixPlantFilter}
                     onChange={e => setMatrixPlantFilter(e.target.value)}
-                    className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-slate-50 focus:ring-2 focus:ring-[#064e3b]/20 focus:border-[#064e3b] outline-none"
+                    className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-[#064e3b]/20 focus:border-[#064e3b] outline-none cursor-pointer"
                   >
                     <option value="">Semua Plant (Pabrik 5F)</option>
                     {matrix5FPlants.map(p => (
-                      <option key={p} value={p}>{p}</option>
+                      <option key={p} value={p}>{p} - {PLANT_INFO[p]?.desc || p}</option>
                     ))}
                   </select>
                 </div>

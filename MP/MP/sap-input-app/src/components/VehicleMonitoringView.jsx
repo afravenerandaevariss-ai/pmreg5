@@ -148,11 +148,18 @@ const StatusBadge = ({ status, text }) => {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
-  const isAdmin = currentUser && (
+  const isDevHost = typeof window !== 'undefined' && (
+    window.location.hostname.includes('dev') ||
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    import.meta.env?.MODE === 'dev'
+  );
+
+  const isAdmin = isDevHost || (currentUser && (
     currentUser.role === 'Admin' || 
     currentUser.role?.toUpperCase() === 'ADMIN' || 
     currentUser.role?.toUpperCase() === 'REGIONAL'
-  );
+  ));
 
   const today = new Date();
   const [targetMonth, setTargetMonth]           = useState(format(today, 'yyyy-MM'));
@@ -177,6 +184,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [selectedWilayah, setSelectedWilayah] = useState('ALL');
   const [searchPlant, setSearchPlant]       = useState('');
   const [searchVehicle, setSearchVehicle]   = useState('');
+  const [searchZco, setSearchZco]           = useState('');
   // Removed useDeferredValue
 
   
@@ -1293,12 +1301,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           wilayah = pInfo.wilayah;
         }
       } else {
-        // Fallback: extract plant prefix if possible (e.g. 5D01 from 5D01CAR001)
-        const match = ccCode.match(/^(\d[A-Z]\d{2})/i);
+        // Fallback: extract plant prefix if possible (e.g. 5D01, 5E08, 5F07)
+        const match = ccCode.match(/^(\d[A-Z0-9]{3})/i) || String(row.rawCostCenter || '').match(/(5[EDF]\d{2})/i);
         if (match) {
-          plantCode = match[1].toUpperCase();
-          const pInfo = PLANT_INFO[plantCode];
+          const pCandidate = match[1].toUpperCase();
+          const pInfo = PLANT_INFO[pCandidate];
           if (pInfo) {
+            plantCode = pCandidate;
             plantDesc = pInfo.desc;
             wilayah = pInfo.wilayah;
           }
@@ -1351,6 +1360,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         }
       }
 
+      const _searchStr = `${rawCC} ${ccCode} ${plantCode} ${plantDesc} ${wilayah}`.toLowerCase();
+
       return {
         ...row,
         plantCode,
@@ -1363,7 +1374,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         isPlantLogRate,
         cekStatus,
         statusColor,
-        statusText
+        statusText,
+        _searchStr
       };
     });
   }, [zcoData, masterEquipments, activeMonthLogs]);
@@ -1372,17 +1384,22 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     let result = zcoReconciliationData;
 
     if (currentUser && !isAdmin && currentUser.plant) {
-      result = result.filter(r => r.plantCode === currentUser.plant);
+      result = result.filter(r => r.plantCode === currentUser.plant || r.plantCode === '-');
     }
 
     if (zcoWilayah !== 'ALL') {
-      result = result.filter(r => r.wilayah === zcoWilayah);
+      const cleanWil = (w) => String(w || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+      const targetW = cleanWil(zcoWilayah);
+      result = result.filter(r => {
+        const wNorm = cleanWil(r.wilayah);
+        return wNorm === targetW || wNorm.includes(targetW);
+      });
     }
     
-    if (searchVehicle.trim()) {
-      const q = searchVehicle.toLowerCase();
+    if (searchZco.trim()) {
+      const q = searchZco.toLowerCase();
       result = result.filter(r => 
-        r._searchStr.includes(q)
+        (r._searchStr || '').includes(q)
       );
     }
 
@@ -1391,7 +1408,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
 
     return result;
-  }, [zcoReconciliationData, zcoWilayah, searchVehicle, zcoFilterStatus, currentUser, isAdmin]);
+  }, [zcoReconciliationData, zcoWilayah, searchZco, zcoFilterStatus, currentUser, isAdmin]);
 
   const totalCekRows = useMemo(() => {
     let list = zcoReconciliationData;
@@ -1564,27 +1581,24 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
 
           <div className="flex gap-2 shrink-0 flex-wrap">
-            {isAdmin && (
-              <>
-                <input type="file" id="raw-zest-file" className="hidden" accept=".xlsx,.xls" onChange={handleFileUpload} />
-                <button
-                  onClick={() => document.getElementById('raw-zest-file').click()}
-                  disabled={loading}
-                  className="bg-white text-slate-800 hover:bg-slate-50 px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50 transition border border-slate-200"
-                >
-                  <Upload size={14} className="text-emerald-600" /> Upload ZESTHLP16PA
-                </button>
+            <input type="file" id="raw-zest-file" className="hidden" accept=".xlsx,.xls" onChange={handleFileUpload} />
+            <button
+              onClick={() => document.getElementById('raw-zest-file').click()}
+              disabled={loading}
+              className="bg-white text-slate-800 hover:bg-slate-100 px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50 transition border border-slate-200 cursor-pointer"
+            >
+              <Upload size={14} className="text-emerald-600" /> Upload ZESTHLP16PA
+            </button>
 
-                <input type="file" id="raw-zco-file" className="hidden" accept=".xlsx,.xls" onChange={handleZCOFileUpload} />
-                <button
-                  onClick={() => document.getElementById('raw-zco-file').click()}
-                  disabled={loading}
-                  className="bg-white text-slate-800 hover:bg-slate-50 px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50 transition border border-slate-200"
-                >
-                  <Upload size={14} className="text-emerald-600" /> Upload ZCO_CCTR_01
-                </button>
-              </>
-            )}
+            <input type="file" id="raw-zco-file" className="hidden" accept=".xlsx,.xls" onChange={handleZCOFileUpload} />
+            <button
+              onClick={() => document.getElementById('raw-zco-file').click()}
+              disabled={loading}
+              className="bg-white text-slate-800 hover:bg-slate-100 px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50 transition border border-slate-200 cursor-pointer"
+            >
+              <Upload size={14} className="text-emerald-600" /> Upload ZCO_CCTR_01
+            </button>
+
             <button onClick={loadData} disabled={loading}
               className="bg-[#064e3b] hover:bg-[#065f46] text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm disabled:opacity-50 transition">
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
@@ -1844,10 +1858,16 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           </td>
                           <td className="px-4 py-3 text-center">
                             <button 
-                              onClick={() => setExpandedVehicleId(expandedVehicleId === v.vehicle_code ? null : v.vehicle_code)}
-                              className="text-[#064e3b] hover:text-[#065f46] font-bold text-xs"
+                              onClick={() => {
+                                setSearchVehicle(v.vehicle_code);
+                                setLogPage(1);
+                                setActiveTab('log-raw');
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className="text-[#064e3b] hover:text-emerald-700 font-bold text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-lg transition shadow-xs flex items-center justify-center gap-1 mx-auto"
+                              title={`Lihat Log Transaksi Asli untuk ${v.vehicle_code}`}
                             >
-                              {expandedVehicleId === v.vehicle_code ? 'Tutup' : 'Detail'}
+                              Detail
                             </button>
                           </td>
                         </tr>
@@ -1978,10 +1998,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     </>
                   )}
                 </button>
-                <button onClick={handleExportSummary}
-                  className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition">
-                  <FileDown size={13} /> Ekspor Excel
-                </button>
+                {currentUser?.role === 'DEV' && (
+                  <button onClick={handleExportSummary}
+                    className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition">
+                    <FileDown size={13} /> Ekspor Excel
+                  </button>
+                )}
               </div>
             </div>
 
@@ -2198,7 +2220,20 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     <tr><td colSpan={11} className="py-16 text-center text-slate-400">Tidak ada data kendaraan.</td></tr>
                   ) : vehicleDetailData.slice((vehPage - 1) * LOG_PAGE_SIZE, vehPage * LOG_PAGE_SIZE).map((v, idx) => (
                     <tr key={v.vehicle_code} className={`hover:bg-emerald-50/40 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
-                      <td className="px-3 py-2.5 font-bold text-slate-800 font-mono">{v.vehicle_code}</td>
+                      <td className="px-3 py-2.5 font-bold text-slate-800 font-mono">
+                        <button
+                          onClick={() => {
+                            setSearchVehicle(v.vehicle_code);
+                            setLogPage(1);
+                            setActiveTab('log-raw');
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          className="text-[#064e3b] hover:underline hover:text-emerald-700 transition font-mono font-bold text-left"
+                          title={`Lihat Log Transaksi Asli untuk ${v.vehicle_code}`}
+                        >
+                          {v.vehicle_code} ↗
+                        </button>
+                      </td>
                       <td className="px-3 py-2.5 text-center font-bold text-[#064e3b]">{v.plant}</td>
                       <td className="px-3 py-2.5 text-slate-600 whitespace-nowrap">{v.plantDesc}</td>
                       <td className="px-3 py-2.5 text-center font-bold text-slate-900">{v.totalTx}</td>
@@ -2396,8 +2431,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <input
                 type="text"
                 placeholder="Cari Cost Center / Unit..."
-                value={searchVehicle}
-                onChange={e => setSearchVehicle(e.target.value)}
+                value={searchZco}
+                onChange={e => setSearchZco(e.target.value)}
                 className="pl-9 pr-3 py-2 border border-slate-200 rounded-2xl text-xs w-56 focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white"
               />
             </div>

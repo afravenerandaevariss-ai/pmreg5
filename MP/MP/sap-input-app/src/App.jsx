@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Upload, FileSpreadsheet, Download, ChevronDown, ChevronUp, ChevronRight, CheckCircle, AlertCircle, Trash2, Calendar, Clock, User, FileText, Search, Filter, LogOut, Menu, Bell, MessageSquare, Database, ClipboardList, Settings, ChevronsLeft, ChevronsRight, LayoutDashboard, Plus, Minus, Activity, Share2, Copy, ClipboardCheck, Truck, Leaf, Flame, Zap, Cog, Wind, Hammer, Wrench, BookOpen, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { Upload, FileSpreadsheet, Download, ChevronDown, ChevronUp, ChevronRight, CheckCircle, AlertCircle, Trash2, Calendar, Clock, User, FileText, Search, Filter, LogOut, Menu, Bell, MessageSquare, Database, ClipboardList, Settings, ChevronsLeft, ChevronsRight, LayoutDashboard, Plus, Minus, Activity, Share2, Copy, ClipboardCheck, Truck, Leaf, Flame, Zap, Cog, Wind, Hammer, Wrench, BookOpen, Eye, EyeOff, RefreshCw, ExternalLink, Lock, X } from 'lucide-react';
 import { parseMasterEQ, parseRegionalMP, exportToSAP, parseHierarchyReference } from './utils/excel';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -99,7 +99,8 @@ function LoginView({ onLogin }) {
     if (error) {
       setError(error);
     } else if (data) {
-      onLogin({ nik: data.nik, role: data.role, plant: data.plant, name: data.name, password: data.password || password });
+      const normalizedRole = (data.role?.toUpperCase() === 'REGIONAL') ? 'Admin' : data.role;
+      onLogin({ nik: data.nik, role: normalizedRole, plant: data.plant, name: data.name, password: data.password || password });
     }
   };
 
@@ -538,6 +539,14 @@ function App() {
 
   const handleSaveUser = async (e) => {
     e.preventDefault();
+    if (currentUser?.role?.toUpperCase() === 'USER') {
+      alert('Role USER tidak memiliki akses untuk menambah atau mengubah user.');
+      return;
+    }
+    if (currentUser?.role?.toUpperCase() === 'ADMIN' && userForm.role === 'DEV') {
+      alert('Role ADMIN hanya diperbolehkan membuat atau mengedit user dengan role USER dan ADMIN.');
+      return;
+    }
     setIsSavingUser(true);
     let res;
     if (editingUser) {
@@ -557,6 +566,10 @@ function App() {
   };
 
   const handleDeleteUser = async (nik) => {
+    if (currentUser?.role?.toUpperCase() === 'USER') {
+      alert('Role USER tidak memiliki akses untuk menghapus user.');
+      return;
+    }
     if (window.confirm(`Yakin ingin menghapus user dengan NIK ${nik}?`)) {
       setLoadingUsers(true);
       const res = await deleteUser(nik);
@@ -579,6 +592,30 @@ function App() {
     }
     return null;
   });
+
+  const isProdHost = typeof window !== 'undefined' && window.location.hostname === 'pmreg5.afratarigan.my.id';
+  const [devUnlocked, setDevUnlocked] = useState(false);
+  const [showDevLoginModal, setShowDevLoginModal] = useState(false);
+  const [devUser, setDevUser] = useState('');
+  const [devPass, setDevPass] = useState('');
+  const [devLoginErr, setDevLoginErr] = useState('');
+  const [maintenanceCountdown, setMaintenanceCountdown] = useState(10);
+
+  useEffect(() => {
+    if (!isProdHost || devUnlocked) return;
+    const interval = setInterval(() => {
+      setMaintenanceCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          window.location.href = "https://devpmreg5.afratarigan.my.id/?action=login";
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isProdHost, devUnlocked]);
+
   // True while we are checking if there is a saved session in Supabase.
   // Prevents the login screen from flashing on every refresh for logged-in users.
   const [isSessionLoading, setIsSessionLoading] = useState(() => {
@@ -610,7 +647,13 @@ function App() {
       try {
         if (supabase) {
           // --- Restore Session from Supabase ---
-          const sessionNik = localStorage.getItem('sapApp_session_nik');
+          const urlParams = new URLSearchParams(window.location.search);
+          const isForceLogin = urlParams.get('action') === 'login';
+          if (isForceLogin) {
+            localStorage.removeItem('sapApp_session_nik');
+            setCurrentUser(null);
+          }
+          const sessionNik = isForceLogin ? null : localStorage.getItem('sapApp_session_nik');
           if (sessionNik) {
             const userRes = await getUserByNik(sessionNik);
             if (userRes.data) {
@@ -970,6 +1013,103 @@ function App() {
 
   const pendingEquipmentCount = totalEquipmentCount - filledEquipmentCount;
 
+  if (isProdHost && !devUnlocked) {
+    return (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-2xl text-slate-100 font-sans overflow-hidden">
+        {/* Palm Plantation Watermark Texture */}
+        <div 
+          className="fixed inset-0 bg-cover bg-center filter blur-3xl scale-110 opacity-30 pointer-events-none"
+          style={{ backgroundImage: "url('/sawit.jpg')" }}
+        />
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-2xl pointer-events-none" />
+
+        <div className="relative z-10 max-w-md w-full bg-slate-900/90 border-2 border-red-500/80 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl text-center flex flex-col items-center gap-5">
+          {/* Animated Warning Icon */}
+          <div className="w-16 h-16 bg-red-500/20 border-2 border-red-500/40 rounded-2xl flex items-center justify-center text-red-400 animate-pulse">
+            <AlertCircle size={36} />
+          </div>
+
+          <div className="space-y-3 w-full">
+            <span className="inline-block px-3 py-1 bg-red-500/20 border border-red-400/40 text-red-300 text-[11px] font-extrabold rounded-full uppercase tracking-wider">
+              ⛔ Server Maintenance Mode
+            </span>
+            <h1 className="text-xl font-black text-white">
+              Web PM REG 5 Sedang Maintenance
+            </h1>
+            
+            {/* Red Box Notification */}
+            <div className="w-full bg-red-950/90 border-2 border-red-500 rounded-2xl p-4 text-red-100 text-xs sm:text-sm font-bold leading-relaxed shadow-lg text-center">
+              Web PM REG 5 anda sedang maintenance dan dialihkan ke Server DEV.
+            </div>
+          </div>
+
+          {/* Direct Button to DEV Server */}
+          <a 
+            href="https://devpmreg5.afratarigan.my.id/?action=login" 
+            className="w-full py-3.5 px-5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-sm rounded-2xl shadow-xl shadow-emerald-900/40 transition-all flex items-center justify-center gap-2 group"
+          >
+            <span>Buka Web DEV (devpmreg5.afratarigan.my.id)</span>
+            <ExternalLink size={18} className="group-hover:translate-x-1 transition-transform" />
+          </a>
+
+          {/* Automatic Redirect Counter Badge */}
+          <div className="flex items-center justify-center gap-2 text-xs font-bold text-amber-400 bg-amber-950/60 border border-amber-500/40 px-4 py-2 rounded-xl w-full">
+            <RefreshCw size={14} className="animate-spin text-amber-400" />
+            <span>Mengalihkan otomatis ke server DEV dalam <strong className="text-white text-sm font-extrabold px-1">{maintenanceCountdown}</strong> detik...</span>
+          </div>
+
+          {/* Direct Password Unlock Form */}
+          <div className="w-full pt-4 border-t border-slate-800 space-y-3 text-left">
+            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              🔑 Masukkan Password Untuk Akses Server
+            </label>
+
+            {devLoginErr && (
+              <div className="bg-red-500/20 border border-red-500/40 text-red-300 text-xs p-2.5 rounded-xl font-bold flex items-center gap-2">
+                <AlertCircle size={14} />
+                <span>{devLoginErr}</span>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <input 
+                type="password" 
+                placeholder="Password..."
+                value={devPass}
+                onChange={(e) => {
+                  setDevPass(e.target.value);
+                  setDevLoginErr('');
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    if (devPass === 'Akuhebat123#') {
+                      setDevUnlocked(true);
+                    } else {
+                      setDevLoginErr('Password salah!');
+                    }
+                  }
+                }}
+                className="flex-1 px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs sm:text-sm font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <button
+                onClick={() => {
+                  if (devPass === 'Akuhebat123#') {
+                    setDevUnlocked(true);
+                  } else {
+                    setDevLoginErr('Password salah!');
+                  }
+                }}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all whitespace-nowrap"
+              >
+                Masuk
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Show full-screen spinner while restoring session (prevents login flash)
   if (isSessionLoading) {
     return (
@@ -1211,6 +1351,19 @@ function App() {
               </span>
             </button>
 
+            <a 
+              href="https://cmms.ptpn4.co.id/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 border-transparent text-slate-300 hover:bg-slate-800/60 hover:text-emerald-300 group"
+              title="CMMS PTPN IV (cmms.ptpn4.co.id)"
+            >
+              <ExternalLink size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4 text-emerald-400" : "mx-auto text-emerald-400 group-hover:mr-4 group-hover:mx-0"} />
+              <span className={`text-xs font-bold text-emerald-400 group-hover:text-emerald-300 ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
+                CMMS PTPN IV
+              </span>
+            </a>
+
             {isAdmin ? (
               <button 
                 onClick={() => {
@@ -1243,8 +1396,8 @@ function App() {
               </button>
             )}
 
-            {/* Inbox Tab - Only for Regional Admin */}
-            {isAdmin && (
+            {/* Inbox Tab - Only for DEV */}
+            {currentUser?.role?.toUpperCase() === 'DEV' && (
               <button
                 onClick={() => { setActiveTab('inbox'); setIsMobileMenuOpen(false); }}
                 className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'inbox' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
@@ -1283,7 +1436,7 @@ function App() {
             <h1 className="text-base font-bold text-slate-800 tracking-tight">PM Regional 5</h1>
           </div>
           
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 sm:gap-4">
             <HeaderClock />
 
             <div className="h-6 w-px bg-slate-200"></div>
@@ -1596,8 +1749,8 @@ function App() {
                 </div>
               </div>
 
-              {/* Only show these to Regional */}
-              {isAdmin && (
+              {/* Only show Manajemen File Dasar to DEV */}
+              {currentUser?.role?.toUpperCase() === 'DEV' && (
                 <div className="space-y-6 pt-4 border-t border-slate-200">
                   <div className="flex justify-between items-center mb-2 bg-white p-5 rounded-xl shadow-sm border border-slate-200">
                     <h3 className="text-lg font-bold text-slate-800">Manajemen File Dasar</h3>
@@ -1688,17 +1841,19 @@ function App() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            setEditingUser(null);
-                            setUserForm({ nik: '', name: '', password: '123', role: 'Unit', plant: '', jabatan: '', unit_name: '' });
-                            setIsUserModalOpen(true);
-                          }}
-                          className="flex items-center gap-2 text-[11px] font-bold text-white bg-[#064e3b] hover:bg-[#047857] px-3 py-1.5 rounded-lg transition-colors shadow-sm"
-                        >
-                          <Plus size={12} />
-                          Tambah User
-                        </button>
+                        {currentUser?.role?.toUpperCase() !== 'USER' && (
+                          <button
+                            onClick={() => {
+                              setEditingUser(null);
+                              setUserForm({ nik: '', name: '', password: '123', role: 'USER', plant: '', jabatan: '', unit_name: '' });
+                              setIsUserModalOpen(true);
+                            }}
+                            className="flex items-center gap-2 text-[11px] font-bold text-white bg-[#064e3b] hover:bg-[#047857] px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+                          >
+                            <Plus size={12} />
+                            Tambah User
+                          </button>
+                        )}
                         <button
                         onClick={async () => {
                           setLoadingUsers(true);
@@ -1725,14 +1880,18 @@ function App() {
                       </div>
                     ) : (
                       <div className="overflow-x-auto">
-                        <div className="flex gap-3 px-6 pt-4 pb-2">
+                        <div className="flex gap-3 px-6 pt-4 pb-2 flex-wrap">
+                          <span className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 text-emerald-700 text-[11px] font-bold px-3 py-1 rounded-full">
+                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                            DEV: {allUsers.filter(u => u.role === 'DEV').length} user
+                          </span>
                           <span className="inline-flex items-center gap-1.5 bg-purple-50 border border-purple-100 text-purple-700 text-[11px] font-bold px-3 py-1 rounded-full">
                             <span className="w-1.5 h-1.5 bg-purple-500 rounded-full"></span>
-                            Admin: {allUsers.filter(u => u.role === 'Admin').length} user
+                            ADMIN: {allUsers.filter(u => u.role === 'ADMIN').length} user
                           </span>
                           <span className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-100 text-blue-700 text-[11px] font-bold px-3 py-1 rounded-full">
                             <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                            Unit: {allUsers.filter(u => u.role === 'Unit').length} user
+                            USER: {allUsers.filter(u => u.role === 'USER').length} user
                           </span>
                         </div>
                         <table className="w-full text-sm">
@@ -1743,7 +1902,9 @@ function App() {
                               <th className="text-left px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">NIK / User ID</th>
                               <th className="text-left px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Unit / Plant</th>
                               <th className="text-left px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Role</th>
-                              <th className="text-right px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Aksi</th>
+                              {currentUser?.role?.toUpperCase() !== 'USER' && (
+                                <th className="text-right px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Aksi</th>
+                              )}
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-50">
@@ -1752,7 +1913,7 @@ function App() {
                                 <td className="px-6 py-3 text-slate-400 text-[11px]">{idx + 1}</td>
                                 <td className="px-6 py-3">
                                   <div className="flex items-center gap-2.5">
-                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 ${u.role === 'Admin' ? 'bg-purple-500' : 'bg-blue-500'}`}>
+                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 ${u.role === 'DEV' ? 'bg-emerald-600' : u.role === 'ADMIN' ? 'bg-purple-500' : 'bg-blue-500'}`}>
                                       {(u.name || u.nik).charAt(0).toUpperCase()}
                                     </div>
                                     <span className="font-semibold text-slate-700 text-xs">{u.name || '-'}</span>
@@ -1765,37 +1926,43 @@ function App() {
                                   {u.plant ? `${u.plant} - ${getUnitName(u.plant, u.unit_name)}` : '-'}
                                 </td>
                                 <td className="px-6 py-3">
-                                  <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full ${u.role === 'Admin' ? 'bg-purple-50 text-purple-700 border border-purple-100' : 'bg-blue-50 text-blue-700 border border-blue-100'}`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${u.role === 'Admin' ? 'bg-purple-500' : 'bg-blue-500'}`}></span>
+                                  <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                                    u.role === 'DEV' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                                    u.role === 'ADMIN' ? 'bg-purple-50 text-purple-700 border border-purple-100' : 
+                                    'bg-blue-50 text-blue-700 border border-blue-100'
+                                  }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${u.role === 'DEV' ? 'bg-emerald-500' : u.role === 'ADMIN' ? 'bg-purple-500' : 'bg-blue-500'}`}></span>
                                     {u.role}
                                   </span>
                                 </td>
-                                <td className="px-6 py-3 text-right">
-                                  <div className="flex items-center justify-end gap-2">
-                                    <button 
-                                      onClick={() => {
-                                        setEditingUser(u);
-                                        setUserForm({
-                                          nik: u.nik, name: u.name, password: '123', 
-                                          role: u.role, plant: u.plant || '', 
-                                          jabatan: u.jabatan || '', unit_name: u.unit_name || ''
-                                        });
-                                        setIsUserModalOpen(true);
-                                      }}
-                                      className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                      title="Edit User"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                                    </button>
-                                    <button 
-                                      onClick={() => handleDeleteUser(u.nik)}
-                                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                      title="Hapus User"
-                                    >
-                                      <Trash2 size={16} />
-                                    </button>
-                                  </div>
-                                </td>
+                                {currentUser?.role?.toUpperCase() !== 'USER' && (
+                                  <td className="px-6 py-3 text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <button 
+                                        onClick={() => {
+                                          setEditingUser(u);
+                                          setUserForm({
+                                            nik: u.nik, name: u.name, password: '123', 
+                                            role: u.role, plant: u.plant || '', 
+                                            jabatan: u.jabatan || '', unit_name: u.unit_name || ''
+                                          });
+                                          setIsUserModalOpen(true);
+                                        }}
+                                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        title="Edit User"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                                      </button>
+                                      <button 
+                                        onClick={() => handleDeleteUser(u.nik)}
+                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="Hapus User"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                )}
                               </tr>
                             ))}
                           </tbody>
@@ -1830,9 +1997,10 @@ function App() {
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label className="block text-xs font-bold text-slate-700 mb-1">Role *</label>
-                              <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 bg-white">
-                                <option value="Unit">Unit (User)</option>
-                                <option value="Admin">Admin</option>
+                              <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 bg-white">
+                                <option value="USER">USER</option>
+                                <option value="ADMIN">ADMIN</option>
+                                {currentUser?.role?.toUpperCase() === 'DEV' && <option value="DEV">DEV</option>}
                               </select>
                             </div>
                             <div>
@@ -2036,12 +2204,12 @@ function App() {
             </>
           )}
 
-          {activeTab === 'inbox' && currentUser?.role === 'Admin' && (
+          {activeTab === 'inbox' && currentUser?.role?.toUpperCase() === 'DEV' && (
             <AdminInbox currentUser={currentUser} />
           )}
 
-          {/* AI Assistant (Global across all tabs) */}
-          <AfraChatbot currentUser={currentUser} />
+          {/* AI Assistant (DEV only) */}
+          {currentUser?.role?.toUpperCase() === 'DEV' && <AfraChatbot currentUser={currentUser} />}
 
         </main>
       </div>

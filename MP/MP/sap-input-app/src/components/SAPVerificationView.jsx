@@ -6,7 +6,7 @@ import { supabase, IS_DEV_ENV } from '../lib/supabase';
 
 const T_DAILY_LOGS = IS_DEV_ENV ? 'dev_daily_logs' : 'daily_logs';
 
-import { getSystemConfig, saveSystemConfig } from '../lib/supabaseService';
+import { getSystemConfig, saveSystemConfig, fetchMasterEquipment } from '../lib/supabaseService';
 import * as XLSX from 'xlsx';
 
 export default function SAPVerificationView({ equipments, currentUser }) {
@@ -39,47 +39,6 @@ export default function SAPVerificationView({ equipments, currentUser }) {
       const sheet = wb.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
       if (jsonData.length < 2) throw new Error("Format file IK17 tidak valid.");
-
-      let eqIdx = -1, valIdx = -1, dateIdx = -1, textIdx = -1;
-      let headerRow = -1;
-      for (let r = 0; r < Math.min(25, jsonData.length); r++) {
-        const row = jsonData[r];
-        if (!row || !Array.isArray(row)) continue;
-
-        let tempEq = -1, tempVal = -1, tempDate = -1, tempText = -1;
-        row.forEach((cell, colIdx) => {
-          const str = String(cell || '').toUpperCase().trim();
-          if (str === 'EQUIPMENT' || str.includes('EQUIPMENT') || str.includes('NO. EQ') || str.includes('NO EQ') || str.includes('OBJEK PENGUKURAN')) {
-            if (!str.includes('POINT') && tempEq === -1) tempEq = colIdx;
-          }
-          if (str.includes('DIFFERENCE') || str.includes('DIFF') || str.includes('PENGUKURAN') || str.includes('VAL') || str.includes('NILAI') || str.includes('READING') || str.includes('COUNTER') || str.includes('HASIL') || str.includes('MEAS/TOTCTRRDG') || str.includes('HM') || str.includes('JAM')) {
-            if (tempVal === -1) tempVal = colIdx;
-          }
-          if (str === 'DATE' || str.includes('TANGGAL') || str.includes('DATE') || str.includes('TGL') || str.includes('WAKTU')) {
-            if (tempDate === -1) tempDate = colIdx;
-          }
-          if (str === 'TEXT' || str.includes('TEKS') || str.includes('TEXT') || str.includes('CATATAN') || str.includes('KETERANGAN')) {
-            if (tempText === -1) tempText = colIdx;
-          }
-        });
-
-        if (tempEq !== -1 && (tempVal !== -1 || tempDate !== -1)) {
-          eqIdx = tempEq;
-          valIdx = tempVal;
-          dateIdx = tempDate;
-          textIdx = tempText;
-          headerRow = r;
-          break;
-        }
-      }
-
-      if (headerRow === -1) {
-        headerRow = 0;
-        if (eqIdx === -1) eqIdx = 5;
-        if (valIdx === -1) valIdx = 7;
-        if (dateIdx === -1) dateIdx = 3;
-        if (textIdx === -1) textIdx = 11;
-      }
 
       const cleanDateStr = (raw) => {
         if (raw === undefined || raw === null || raw === '') return '';
@@ -119,27 +78,97 @@ export default function SAPVerificationView({ equipments, currentUser }) {
         return '';
       };
 
+      const normEq = (s) => String(s || '').replace(/^0+/, '').trim();
+
+      // Build Set of Parent / Induk equipments for "only parents yg dibaca" filter
+      const parentEqSet = new Set();
+
+      // 1. Populate from dbMasterEq
+      try {
+        const { data: dbMasterEq } = await fetchMasterEquipment();
+        if (Array.isArray(dbMasterEq)) {
+          dbMasterEq.forEach(eq => {
+            const eqNum = String(eq.eq_num || eq.eqNum || '').trim();
+            if (!eqNum) return;
+            const eqType = eq.eq_type || eq.type || 'Induk';
+            if (eqType === 'Induk' || eqType === 'induk' || eqType === 'Parent' || eqType === 'parent' || (!eq.induk || eq.induk === eq.description || eq.induk === eq.eq_num)) {
+              parentEqSet.add(eqNum);
+              parentEqSet.add(normEq(eqNum));
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Error fetching master equipment for IK17 parent set:', err);
+      }
+
+      // 2. Populate from master_map
+      const { data: masterMapRaw } = await getSystemConfig('master_map');
+      if (masterMapRaw) {
+        let mmEntries = Array.isArray(masterMapRaw) ? masterMapRaw : (masterMapRaw.map || []);
+        mmEntries.forEach(([eqNum, info]) => {
+          if (!eqNum || !info) return;
+          const eqNumStr = String(eqNum).trim();
+          const eqNumNorm = normEq(eqNumStr);
+          const type = typeof info === 'string' ? 'Induk' : (info.type || 'Induk');
+          if (type === 'Induk' || type === 'induk' || type === 'Parent' || type === 'parent') {
+            parentEqSet.add(eqNumStr);
+            parentEqSet.add(eqNumNorm);
+          }
+        });
+      }
+
+      // 3. Populate from equipments prop
+      if (Array.isArray(equipments)) {
+        equipments.forEach(eq => {
+          const eqNum = String(eq.eqNum || eq.eq_num || '').trim();
+          if (!eqNum) return;
+          const eqType = eq.type || eq.eq_type;
+          if (eqType === 'Induk' || eqType === 'induk' || eqType === 'Parent' || eqType === 'parent' || (!eq.induk || eq.induk === eq.description || eq.induk === eq.eqNum)) {
+            parentEqSet.add(eqNum);
+            parentEqSet.add(normEq(eqNum));
+          }
+        });
+      }
+
+      // STRICT COLUMN MAPPING AS INSTRUCTED BY USER:
+      // Column D = Index 3 (Tanggal)
+      // Column F = Index 5 (Nomor Equipment Induk)
+      // Column H = Index 7 (Nilai HM / Hour Meter)
+      // Column L = Index 11 (Catatan / Saldo Awal)
       const parsedRows = [];
       const newDatesSet = new Set();
-      for (let i = headerRow + 1; i < jsonData.length; i++) {
-        const row = jsonData[i];
-        if (!row || row[eqIdx] === undefined || row[eqIdx] === null) continue;
-        const eqStr = String(row[eqIdx]).trim();
-        if (!eqStr || eqStr.toUpperCase().includes('EQUIPMENT') || eqStr.toUpperCase().includes('CREATED BY')) continue;
 
-        let valNum = parseFloat(String(row[valIdx] || '0').replace(',', '.'));
+      for (let i = 0; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        if (!row || row[5] === undefined || row[5] === null) continue;
+        const eqStr = String(row[5]).trim();
+        // Skip non-numeric header lines
+        if (!eqStr || !/\d/.test(eqStr) || eqStr.toUpperCase().includes('EQUIPMENT') || eqStr.toUpperCase().includes('CREATED BY') || eqStr.toUpperCase().includes('TOTAL') || eqStr.toUpperCase().includes('RESULT')) continue;
+
+        const eqNorm = normEq(eqStr);
+
+        // Filter ONLY parents (Induk equipment)
+        if (parentEqSet.size > 0) {
+          const isParent = parentEqSet.has(eqStr) || parentEqSet.has(eqNorm);
+          if (!isParent) continue; // Skip sub-equipments
+        }
+
+        let valNum = parseFloat(String(row[7] || '0').replace(',', '.'));
         if (isNaN(valNum)) valNum = 0;
         
-        const dateStr = dateIdx !== -1 ? cleanDateStr(row[dateIdx]) : '';
-        const textStr = textIdx !== -1 ? String(row[textIdx] || '') : '';
+        const dateStr = cleanDateStr(row[3]);
+        if (!dateStr) continue;
+
+        const textStr = String(row[11] || '');
         const isSaldoAwal = textStr.toLowerCase().includes('saldo') || textStr.toLowerCase().includes('awal');
-        if (dateStr) newDatesSet.add(dateStr);
+        newDatesSet.add(dateStr);
 
         parsedRows.push({
           e: eqStr,
           h: valNum,
           d: dateStr,
-          s: isSaldoAwal
+          s: isSaldoAwal,
+          t: textStr
         });
       }
 
@@ -153,7 +182,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
       mergedRaw = [...mergedRaw, ...parsedRows];
 
       await saveSystemConfig('ik17_raw_data', mergedRaw);
-      alert(`Berhasil mengunggah file IK17 SAP! Terproses ${parsedRows.length} baris data pengukuran.`);
+      alert(`Berhasil mengunggah file IK17 SAP! Terproses ${parsedRows.length} baris data pengukuran parent equipment.`);
       loadMatrixData();
     } catch (err) {
       alert('Gagal mengunggah file IK17: ' + err.message);
@@ -224,22 +253,37 @@ export default function SAPVerificationView({ equipments, currentUser }) {
           return str;
         };
 
-        const subKeywords = [
-          'ACCESSORIES', 'ACCESSORY', 'ACC ', 'ACC_', 'ACC.',
-          'PANEL', 'GEARBOX', 'GEAR BOX', 'G/BOX', 'PIPE', 'PIPING',
-          'ELECTROMOTOR', 'ELECTRO MOTOR', 'ELMOT', 'EL. MOTOR', 'E/M',
-          'HYDRAULIC', 'HIDROLIK', 'HPU', 'STRUCTURE', 'STRUKTUR',
-          'BODY', 'WHEEL', 'RODA', 'CONTROLLERS', 'CONTROLLER', 'KONTROL',
-          'AUTOMATIC', 'EXHAUST', 'VALVE', 'CHAIN', 'RANTAI', 'BEARING',
-          'SHAFT', 'POROS', 'COUPLING', 'KOPLING', 'CHUTE', 'CORONG',
-          'IMPELLER', 'NOZZLE', 'GAUGE', 'METER', 'SENSOR', 'SWITCH',
-          'BREAKER', 'KABEL', 'CABLE', 'DUCTING', 'DUCT', 'SILENCER'
-        ];
-
         // map eq to plant
         const eqToPlant = new Map();
         const isIndukMap = new Map();
         const eqNameMap = new Map();
+
+        // 0. Populate from dbMasterEq (dev_master_equipment / master_equipment)
+        try {
+          const { data: dbMasterEq } = await fetchMasterEquipment();
+          if (Array.isArray(dbMasterEq)) {
+            dbMasterEq.forEach(eq => {
+              const eqNum = String(eq.eq_num || eq.eqNum || '').trim();
+              if (!eqNum) return;
+              const eqNumNorm = normEq(eqNum);
+              const plant = String(eq.plant || '').toUpperCase().trim();
+              const type = eq.eq_type || eq.type || 'Induk';
+              const isSub = type === 'Sub' || type === 'sub';
+              const desc = eq.description || eqNum;
+
+              if (plant) {
+                eqToPlant.set(eqNum, plant);
+                eqToPlant.set(eqNumNorm, plant);
+              }
+              isIndukMap.set(eqNum, !isSub);
+              isIndukMap.set(eqNumNorm, !isSub);
+              eqNameMap.set(eqNum, `${desc} [${eqNum}]`);
+              eqNameMap.set(eqNumNorm, `${desc} [${eqNum}]`);
+            });
+          }
+        } catch (e) {
+          console.warn('Could not fetch dbMasterEq:', e);
+        }
 
         // 1. Fetch & populate from master_map (id = 2) in database (17,277 entries)
         const { data: masterMapRaw } = await getSystemConfig('master_map');
@@ -267,7 +311,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
             isIndukMap.set(eqNumStr, !isSub);
             isIndukMap.set(eqNumNorm, !isSub);
             eqNameMap.set(eqNumStr, `${desc} [${eqNumStr}]`);
-            eqNameMap.set(eqNumNorm, `${desc} [${eqNumStr}]`);
+            eqNameMap.set(eqNumNorm, `${desc} [${eqNumNorm}]`);
           });
         }
 
@@ -290,22 +334,17 @@ export default function SAPVerificationView({ equipments, currentUser }) {
 
             const eqType = eq.type || eq.eq_type;
             const desc = eq.description || '';
-            const descUpper = desc.toUpperCase();
             const indukUpper = (eq.induk || '').toUpperCase();
             const eqNumStr = eqNum.toUpperCase();
 
             let isSub = false;
-            for (const kw of subKeywords) {
-              if (descUpper.includes(kw)) {
-                isSub = true;
-                break;
-              }
-            }
-            if (indukUpper && indukUpper !== descUpper && indukUpper !== eqNumStr) {
+            if (eqType === 'Sub' || eqType === 'sub') {
+              isSub = true;
+            } else if (indukUpper && indukUpper !== desc.toUpperCase() && indukUpper !== eqNumStr && indukUpper !== 'INDUK') {
               isSub = true;
             }
 
-            const isGenuineParent = (eqType === 'Induk' || eqType === 'parent') || !isSub;
+            const isGenuineParent = !isSub;
 
             isIndukMap.set(eqNum, isGenuineParent);
             isIndukMap.set(eqNumNorm, isGenuineParent);
@@ -319,17 +358,34 @@ export default function SAPVerificationView({ equipments, currentUser }) {
           });
         }
 
-        const getPlantFromEq = (eStr, eNorm) => {
+        const getPlantFromEq = (eStr, eNorm, textStr = '') => {
           if (eqToPlant.has(eStr)) return eqToPlant.get(eStr);
           if (eqToPlant.has(eNorm)) return eqToPlant.get(eNorm);
+          
+          const txtUpper = String(textStr || '').toUpperCase();
+          for (const p of uniquePlants) {
+            if (txtUpper.includes(p)) return p;
+          }
+
           for (const p of uniquePlants) {
             if (eStr.includes(p) || eNorm.includes(p)) return p;
           }
           return 'Unknown';
         };
 
-        // 2. Fetch ik17_raw_data
-        const { data: rawIK17 } = await getSystemConfig('ik17_raw_data');
+        // 2. Fetch ik17_raw_data with automatic fallback to ik17_parsed_data.json
+        let { data: rawIK17 } = await getSystemConfig('ik17_raw_data');
+        if (!Array.isArray(rawIK17) || rawIK17.length === 0) {
+          try {
+            const res = await fetch('/ik17_parsed_data.json');
+            if (res.ok) {
+              rawIK17 = await res.json();
+            }
+          } catch (err) {
+            console.warn('Fallback load of ik17_parsed_data.json failed:', err);
+          }
+        }
+
         const sapHmMap = new Map(); // key: 'plant_date', value: HM
         const sapSaldoAwalMap = new Map(); // key: 'plant', value: HM Saldo Awal
 
@@ -343,10 +399,10 @@ export default function SAPVerificationView({ equipments, currentUser }) {
               const isParent = isIndukMap.has(eqStr) ? isIndukMap.get(eqStr) : (isIndukMap.has(eqNorm) ? isIndukMap.get(eqNorm) : true);
               if (isParent) {
                 if (filterJenis && !eqStr.startsWith(filterJenis) && !eqNorm.startsWith(filterJenis)) return;
-                const plant = getPlantFromEq(eqStr, eqNorm);
+                const plant = getPlantFromEq(eqStr, eqNorm, row.t || '');
                 if ((currentUser?.role === 'Unit' || currentUser?.role?.toUpperCase() === 'USER') && currentUser?.plant !== plant) return;
 
-                const groupKey = groupBy === 'plant' ? plant : (eqToPlant.has(eqStr) ? eqStr : eqNorm);
+                const groupKey = groupBy === 'plant' ? plant : (eqToPlant.has(eqStr) ? eqStr : (eqToPlant.has(eqNorm) ? eqNorm : eqStr));
 
                 if (row.s) { // is Saldo Awal
                   sapSaldoAwalMap.set(groupKey, (sapSaldoAwalMap.get(groupKey) || 0) + (row.h || 0));
@@ -365,7 +421,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
           const ik17DatesInMonth = [];
           rawIK17.forEach(r => {
             const e = String(r.e || '').trim();
-            if (getPlantFromEq(e, normEq(e)) !== 'Unknown') matched++;
+            if (getPlantFromEq(e, normEq(e), r.t || '') !== 'Unknown') matched++;
             const cleanD = cleanDateStr(r.d || '');
             if (cleanD && cleanD >= startDate && cleanD <= endDate && !r.s) {
               ik17DatesInMonth.push(cleanD);

@@ -36,6 +36,10 @@ const WA_PATTERN = `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBo
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function AfraChatbot({ currentUser }) {
+  if (currentUser?.role?.toUpperCase() !== 'DEV') {
+    return null;
+  }
+
   const [isOpen, setIsOpen] = useState(false);
   const [showFaq, setShowFaq] = useState(true);
   // conversation = array of { id, role: 'user'|'bot', text }

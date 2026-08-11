@@ -144,6 +144,8 @@ export async function fetchHierarchyData() {
   return { data: data?.data || null, error: null };
 }
 
+const memoryCache = new Map();
+
 export async function saveSystemConfig(id, dataObj) {
   if (!supabase) return { error: 'Supabase not configured' };
   let numericId = 4;
@@ -158,6 +160,10 @@ export async function saveSystemConfig(id, dataObj) {
   else if (id === 'wa_config') numericId = 12;
   else if (id === 'wa_logs') numericId = 13;
   
+  const cacheKey = `sys_cfg_${T.hierarchy_data}_${numericId}`;
+  memoryCache.set(cacheKey, dataObj);
+  try { sessionStorage.setItem(cacheKey, JSON.stringify(dataObj)); } catch (e) {}
+
   const { error } = await supabase
     .from(T.hierarchy_data)
     .upsert({ id: numericId, data: dataObj, updated_at: new Date().toISOString() });
@@ -181,7 +187,11 @@ export async function deleteSystemConfig(id) {
   else if (id === 'zvtab_data') numericId = 15;
   else if (id === 'export046_data') numericId = 16;
   else if (id === 'doc_details') numericId = 17;
-  else if (id === 'hierarchy_data') numericId = 0; // assuming 0 is hierarchy data based on App.jsx
+  else if (id === 'hierarchy_data') numericId = 0;
+
+  const cacheKey = `sys_cfg_${T.hierarchy_data}_${numericId}`;
+  memoryCache.delete(cacheKey);
+  try { sessionStorage.removeItem(cacheKey); } catch (e) {}
 
   const { error } = await supabase
     .from(T.hierarchy_data)
@@ -208,12 +218,44 @@ export async function getSystemConfig(id) {
   else if (id === 'export046_data') numericId = 16;
   else if (id === 'doc_details') numericId = 17;
 
+  const cacheKey = `sys_cfg_${T.hierarchy_data}_${numericId}`;
+  if (memoryCache.has(cacheKey)) {
+    return { data: memoryCache.get(cacheKey), error: null };
+  }
+  try {
+    const cachedItem = sessionStorage.getItem(cacheKey);
+    if (cachedItem) {
+      const parsed = JSON.parse(cachedItem);
+      memoryCache.set(cacheKey, parsed);
+      // Background revalidation
+      supabase
+        .from(T.hierarchy_data)
+        .select('data')
+        .eq('id', numericId)
+        .single()
+        .then(({ data }) => {
+          if (data?.data) {
+            memoryCache.set(cacheKey, data.data);
+            try { sessionStorage.setItem(cacheKey, JSON.stringify(data.data)); } catch (e) {}
+          }
+        }).catch(() => {});
+      return { data: parsed, error: null };
+    }
+  } catch (e) {}
+
   const { data, error } = await supabase
     .from(T.hierarchy_data)
     .select('data')
     .eq('id', numericId)
     .single();
+
   if (error) return { data: null, error };
+
+  if (data?.data) {
+    memoryCache.set(cacheKey, data.data);
+    try { sessionStorage.setItem(cacheKey, JSON.stringify(data.data)); } catch (e) {}
+  }
+
   return { data: data?.data || null, error: null };
 }
 
