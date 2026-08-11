@@ -68,7 +68,6 @@ async function main() {
         console.log('📤 Uploading fresh dist-prod/ build...');
         await uploadDir(sftp, path.resolve('./dist-prod'), '/var/www/pmreg5/dist');
         await runCmd(conn, 'cp /var/www/pmreg5/dist/index.html /var/www/pmreg5/dist/app_index.html', 'Copy React index.html to app_index.html');
-        await runCmd(conn, 'cp /var/www/pmreg5/dist/maintenance.html /var/www/pmreg5/dist/index.html', 'Set maintenance.html as index.html');
         await runCmd(conn, 'sudo chmod -R 755 /var/www/pmreg5/dist && sudo chown -R ubuntu:www-data /var/www/pmreg5/dist', 'Ensure 755 permissions on dist');
 
         await runCmd(conn, 'pm2 reload pmreg5 || pm2 restart pmreg5', 'Reloading PM2 pmreg5');
