@@ -1814,10 +1814,10 @@ export default function DailyDashboard({
                 <table className="w-full text-xs text-left border-collapse">
                 <thead className="bg-slate-800 text-white font-bold sticky top-0 z-30 shadow-sm">
                   <tr>
-                    <th className="p-2.5 text-center border-r border-slate-700 w-10 sticky left-0 bg-slate-800 z-40">No</th>
-                    <th className="p-2.5 text-center border-r border-slate-700 w-16 sticky left-10 bg-slate-800 z-40">Plant</th>
-                    <th className="p-2.5 text-left border-r border-slate-700 min-w-[120px] sticky left-26 bg-slate-800 z-40">No. Equipment</th>
-                    <th className="p-2.5 text-left border-r border-slate-700 min-w-[200px]">Deskripsi Mesin (Induk)</th>
+                    <th className="p-2.5 text-center border-r border-slate-700 w-[48px] min-w-[48px] max-w-[48px] sticky left-0 bg-slate-800 z-40">No</th>
+                    <th className="p-2.5 text-center border-r border-slate-700 w-[64px] min-w-[64px] max-w-[64px] sticky left-[48px] bg-slate-800 z-40">Plant</th>
+                    <th className="p-2.5 text-left border-r border-slate-700 w-[136px] min-w-[136px] max-w-[136px] sticky left-[112px] bg-slate-800 z-40">No. Equipment</th>
+                    <th className="p-2.5 text-left border-r border-slate-700 min-w-[320px] max-w-[450px]">Deskripsi Mesin (Induk)</th>
                     <th className="p-2.5 text-center border-r border-slate-700 min-w-[80px] bg-emerald-950 text-emerald-300">Total HM</th>
                     {matrixDaysInMonth.map(dayStr => {
                       const dateStr = `${matrixMonth}-${dayStr}`;
@@ -1857,10 +1857,10 @@ export default function DailyDashboard({
 
                       return (
                         <tr key={eqNum} className="hover:bg-emerald-50/50 transition-colors">
-                          <td className="p-2 text-center text-slate-500 font-mono border-r border-slate-200 sticky left-0 bg-white z-20">{rowNum}</td>
-                          <td className="p-2 text-center font-bold text-slate-700 border-r border-slate-200 sticky left-10 bg-white z-20">{eq.plant}</td>
-                          <td className="p-2 font-mono font-bold text-emerald-800 border-r border-slate-200 sticky left-26 bg-white z-20">{eqNum}</td>
-                          <td className="p-2 font-semibold text-slate-800 border-r border-slate-200 truncate max-w-[200px]" title={eq.description}>{eq.description}</td>
+                          <td className="p-2 text-center text-slate-500 font-mono border-r border-slate-200 w-[48px] min-w-[48px] max-w-[48px] sticky left-0 bg-white group-hover:bg-emerald-50 z-20">{rowNum}</td>
+                          <td className="p-2 text-center font-bold text-slate-700 border-r border-slate-200 w-[64px] min-w-[64px] max-w-[64px] sticky left-[48px] bg-white group-hover:bg-emerald-50 z-20">{eq.plant}</td>
+                          <td className="p-2 font-mono font-bold text-emerald-800 border-r border-slate-200 w-[136px] min-w-[136px] max-w-[136px] sticky left-[112px] bg-white group-hover:bg-emerald-50 z-20">{eqNum}</td>
+                          <td className="p-2 font-semibold text-slate-800 border-r border-slate-200 min-w-[320px] max-w-[450px] truncate" title={eq.description}>{eq.description}</td>
                           <td className="p-2 text-center font-bold font-mono text-emerald-700 bg-emerald-50/80 border-r border-slate-200">
                             {rowTotal.toFixed(1)}
                           </td>
