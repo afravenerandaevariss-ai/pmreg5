@@ -373,17 +373,23 @@ export default function SAPVerificationView({ equipments, currentUser }) {
           return 'Unknown';
         };
 
-        // 2. Fetch ik17_raw_data with automatic fallback to ik17_parsed_data.json
-        let { data: rawIK17 } = await getSystemConfig('ik17_raw_data');
-        if (!Array.isArray(rawIK17) || rawIK17.length === 0) {
-          try {
-            const res = await fetch('/ik17_parsed_data.json');
-            if (res.ok) {
-              rawIK17 = await res.json();
-            }
-          } catch (err) {
-            console.warn('Fallback load of ik17_parsed_data.json failed:', err);
+        // 2. Fetch baseline ik17_parsed_data.json + any user uploads from DB ik17_raw_data
+        let rawIK17 = [];
+        try {
+          const res = await fetch('/ik17_parsed_data.json');
+          if (res.ok) {
+            rawIK17 = await res.json();
           }
+        } catch (err) {
+          console.warn('Load of ik17_parsed_data.json failed:', err);
+        }
+
+        const { data: dbIK17 } = await getSystemConfig('ik17_raw_data');
+        if (Array.isArray(dbIK17) && dbIK17.length > 0) {
+          // Merge user-uploaded dates over baseline
+          const dbDates = new Set(dbIK17.map(r => cleanDateStr(r.d)).filter(Boolean));
+          rawIK17 = rawIK17.filter(r => !dbDates.has(cleanDateStr(r.d)));
+          rawIK17 = [...rawIK17, ...dbIK17];
         }
 
         const sapHmMap = new Map(); // key: 'plant_date', value: HM
