@@ -2745,17 +2745,18 @@ export default function DailyDashboard({
                   const filterTargetEquipments = (equipList, plantList, eqList, role, userPlant) => {
                     let res = [...equipList];
 
-                    if (plantList && plantList.length > 0) {
-                      const selectedSet = new Set(plantList.map(p => String(p).trim().toUpperCase()));
-                      res = res.filter(eq => {
-                        const p = resolveEqPlant(eq);
-                        return p ? selectedSet.has(p) : false;
-                      });
-                    } else if ((!isAdminUser || role?.toUpperCase() === 'UNIT' || role?.toUpperCase() === 'USER') && userPlant) {
+                    const isUserRole = !isAdminUser || role?.toUpperCase() === 'UNIT' || role?.toUpperCase() === 'USER';
+                    if (isUserRole && userPlant) {
                       const uPlant = String(userPlant).trim().toUpperCase();
                       res = res.filter(eq => {
                         const p = resolveEqPlant(eq);
                         return p ? p === uPlant : false;
+                      });
+                    } else if (plantList && plantList.length > 0) {
+                      const selectedSet = new Set(plantList.map(p => String(p).trim().toUpperCase()));
+                      res = res.filter(eq => {
+                        const p = resolveEqPlant(eq);
+                        return p ? selectedSet.has(p) : false;
                       });
                     }
 
@@ -2930,17 +2931,18 @@ export default function DailyDashboard({
 
                       const filterTargetEquipments = (equipList, plantList, eqList, role, userPlant) => {
                         let res = [...equipList];
-                        if (plantList && plantList.length > 0) {
-                          const selectedSet = new Set(plantList.map(p => String(p).trim().toUpperCase()));
-                          res = res.filter(eq => {
-                            const p = resolveEqPlant(eq);
-                            return p ? selectedSet.has(p) : false;
-                          });
-                        } else if ((!isAdminUser || role?.toUpperCase() === 'UNIT' || role?.toUpperCase() === 'USER') && userPlant) {
+                        const isUserRole = !isAdminUser || role?.toUpperCase() === 'UNIT' || role?.toUpperCase() === 'USER';
+                        if (isUserRole && userPlant) {
                           const uPlant = String(userPlant).trim().toUpperCase();
                           res = res.filter(eq => {
                             const p = resolveEqPlant(eq);
                             return p ? p === uPlant : false;
+                          });
+                        } else if (plantList && plantList.length > 0) {
+                          const selectedSet = new Set(plantList.map(p => String(p).trim().toUpperCase()));
+                          res = res.filter(eq => {
+                            const p = resolveEqPlant(eq);
+                            return p ? selectedSet.has(p) : false;
                           });
                         }
                         if (eqList && eqList.length > 0) {
