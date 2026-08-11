@@ -158,7 +158,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const isAdmin = isDevHost || (currentUser && (
     currentUser.role === 'Admin' || 
     currentUser.role?.toUpperCase() === 'ADMIN' || 
-    currentUser.role?.toUpperCase() === 'REGIONAL'
+    currentUser.role?.toUpperCase() === 'REGIONAL' ||
+    currentUser.role?.toUpperCase() === 'DEV'
   ));
 
   const today = new Date();
@@ -2018,9 +2019,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <div className="flex justify-between items-start mb-2 border-b border-slate-200 pb-2">
                 <div className="font-sans">
                   <h1 
-                    onDoubleClick={() => { if(currentUser?.role === 'Admin') setShowWAModal(true); }}
+                    onDoubleClick={() => { if(isAdmin) setShowWAModal(true); }}
                     className="text-xs font-extrabold text-slate-900 tracking-wide select-none cursor-default"
-                    title={currentUser?.role === 'Admin' ? "Klik ganda untuk konfigurasi WA" : ""}
+                    title={isAdmin ? "Klik ganda untuk konfigurasi WA" : ""}
                   >
                     Monitoring Transaksi Logbook tanggal 1 s.d {(() => {
                       try {

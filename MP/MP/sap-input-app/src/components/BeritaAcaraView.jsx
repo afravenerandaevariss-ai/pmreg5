@@ -106,7 +106,8 @@ export default function BeritaAcaraView({ currentUser }) {
   const isAdmin = currentUser && (
     currentUser.role === 'Admin' ||
     currentUser.role?.toUpperCase() === 'ADMIN' ||
-    currentUser.role?.toUpperCase() === 'REGIONAL'
+    currentUser.role?.toUpperCase() === 'REGIONAL' ||
+    currentUser.role?.toUpperCase() === 'DEV'
   );
 
 

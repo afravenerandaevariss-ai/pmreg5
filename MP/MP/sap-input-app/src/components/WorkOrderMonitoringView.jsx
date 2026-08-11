@@ -17,7 +17,7 @@ export default function WorkOrderMonitoringView({ currentUser }) {
   const [uploadProgress, setUploadProgress] = useState(0);
 
   // Filters state
-  const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'Regional' || currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV';
+  const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'Regional' || currentUser?.role?.toUpperCase() === 'ADMIN' || currentUser?.role?.toUpperCase() === 'REGIONAL' || currentUser?.role?.toUpperCase() === 'DEV';
 
   const [selectedPlant, setSelectedPlant] = useState(
     !isAdmin && currentUser?.plant ? currentUser.plant : ''
