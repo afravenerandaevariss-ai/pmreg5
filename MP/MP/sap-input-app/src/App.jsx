@@ -593,28 +593,7 @@ function App() {
     return null;
   });
 
-  const isProdHost = typeof window !== 'undefined' && window.location.hostname === 'pmreg5.afratarigan.my.id';
-  const [devUnlocked, setDevUnlocked] = useState(false);
-  const [showDevLoginModal, setShowDevLoginModal] = useState(false);
-  const [devUser, setDevUser] = useState('');
-  const [devPass, setDevPass] = useState('');
-  const [devLoginErr, setDevLoginErr] = useState('');
-  const [maintenanceCountdown, setMaintenanceCountdown] = useState(10);
 
-  useEffect(() => {
-    if (!isProdHost || devUnlocked) return;
-    const interval = setInterval(() => {
-      setMaintenanceCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          window.location.href = "https://devpmreg5.afratarigan.my.id/?action=login";
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [isProdHost, devUnlocked]);
 
   // True while we are checking if there is a saved session in Supabase.
   // Prevents the login screen from flashing on every refresh for logged-in users.
@@ -1013,7 +992,7 @@ function App() {
 
   const pendingEquipmentCount = totalEquipmentCount - filledEquipmentCount;
 
-  if (isProdHost && !devUnlocked) {
+  if (false) {
     return (
       <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-2xl text-slate-100 font-sans overflow-hidden">
         {/* Palm Plantation Watermark Texture */}
