@@ -1657,10 +1657,6 @@ export default function DailyDashboard({
 
         {/* Global Action Buttons */}
         <div className="flex items-center gap-2">
-          <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200/80 rounded-xl text-xs font-bold shadow-2xs">
-            <Lock size={13} className="text-emerald-600" />
-            <span>Pengaturan Jam Jalan: Terkunci &amp; Terproteksi</span>
-          </div>
           {isAfraUser && (
             <button
               onClick={handleFetchGoogleSheet}
@@ -1670,6 +1666,25 @@ export default function DailyDashboard({
             >
               <RefreshCw size={14} className={isFetchingSheet ? "animate-spin" : ""} />
               ✓ GSheet
+            </button>
+          )}
+          {!isUserRole && (
+            <button
+              onClick={() => {
+                const selDateStr = format(selectedDate, 'yyyy-MM-dd');
+                setExportSettings(prev => ({
+                  ...prev,
+                  startDate: selDateStr,
+                  endDate: selDateStr,
+                  isAccumulated: false,
+                  time: '08:00'
+                }));
+                setShowExportModal(true);
+              }}
+              className="bg-[#0f172a] hover:bg-slate-700 text-white px-3.5 py-2 rounded-xl shadow-xs transition-colors flex items-center gap-1.5 font-bold text-xs"
+            >
+              <FileDown size={14} />
+              Export SAP
             </button>
           )}
         </div>
@@ -2053,22 +2068,24 @@ export default function DailyDashboard({
               </>
             )}
 
-            <button 
-              onClick={() => {
-                const selDateStr = format(selectedDate, 'yyyy-MM-dd');
-                setExportSettings(prev => ({ 
-                  ...prev, 
-                  startDate: selDateStr,
-                  endDate: selDateStr,
-                  isAccumulated: false,
-                  time: '08:00' 
-                }));
-                setShowExportModal(true);
-              }}
-              className="bg-[#0f172a] hover:bg-slate-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
-            >
-              <FileDown size={13} /> Export SAP
-            </button>
+            {isUserRole && (
+              <button 
+                onClick={() => {
+                  const selDateStr = format(selectedDate, 'yyyy-MM-dd');
+                  setExportSettings(prev => ({ 
+                    ...prev, 
+                    startDate: selDateStr,
+                    endDate: selDateStr,
+                    isAccumulated: false,
+                    time: '08:00' 
+                  }));
+                  setShowExportModal(true);
+                }}
+                className="bg-[#0f172a] hover:bg-slate-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
+              >
+                <FileDown size={13} /> Export SAP
+              </button>
+            )}
 
             <button 
               onClick={() => setShowHistoryModal(true)}
