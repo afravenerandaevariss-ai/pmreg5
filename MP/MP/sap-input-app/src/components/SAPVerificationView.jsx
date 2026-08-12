@@ -437,9 +437,9 @@ export default function SAPVerificationView({ equipments, currentUser }) {
           const minDateStr = ik17DatesInMonth.length > 0 ? ik17DatesInMonth[0] : '-';
           const maxDateStr = ik17DatesInMonth.length > 0 ? ik17DatesInMonth[ik17DatesInMonth.length - 1] : '-';
 
-          setDebugMsg(`(Debug: ${rawIK17.length} rows IK17, Data SAP tersedia: ${minDateStr} s/d ${maxDateStr}, ${matched} matched eq dari ${eqToPlant.size} mapping)`);
+          setDebugMsg(`Data SAP IK17: ${rawIK17.length} rows, tersedia: ${minDateStr} s/d ${maxDateStr}, ${matched} equipment tercocokkan dari ${eqToPlant.size} mapping.`);
         } else {
-          setDebugMsg(`(Debug: rawIK17 is ${typeof rawIK17})`);
+          setDebugMsg(`Data SAP IK17 belum tersedia atau format tidak valid.`);
         }
         setRawSapLogs(rawIK17 && Array.isArray(rawIK17) ? rawIK17 : []);
 
