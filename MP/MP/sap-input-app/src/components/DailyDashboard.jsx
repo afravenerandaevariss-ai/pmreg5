@@ -1767,6 +1767,24 @@ export default function DailyDashboard({
               )}
 
               <button
+                onClick={() => {
+                  const selDateStr = format(selectedDate, 'yyyy-MM-dd');
+                  setExportSettings(prev => ({ 
+                    ...prev, 
+                    startDate: selDateStr,
+                    endDate: selDateStr,
+                    isAccumulated: false,
+                    time: '08:00' 
+                  }));
+                  setShowExportModal(true);
+                }}
+                className="px-3.5 py-2 bg-[#0f172a] hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
+              >
+                <FileDown size={14} />
+                Export SAP
+              </button>
+
+              <button
                 onClick={loadMatrixFromDB}
                 disabled={isMatrixLoading}
                 className="px-3.5 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
