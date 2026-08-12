@@ -12,12 +12,20 @@ import * as XLSX from 'xlsx';
 export default function SAPVerificationView({ equipments, currentUser }) {
   const [targetMonth, setTargetMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [isProcessing, setIsProcessing] = useState(false);
+  const [loadingPhase, setLoadingPhase] = useState('');
   const [isUploadingIK17, setIsUploadingIK17] = useState(false);
   const ik17InputRef = useRef(null);
   const [matrixData, setMatrixData] = useState([]); 
   const [lastUpdated, setLastUpdated] = useState('');
   const [debugMsg, setDebugMsg] = useState('');
   const [groupBy, setGroupBy] = useState('plant'); // 'plant' or 'equipment'
+
+  // ── Session-level caches (survive re-renders, reset on page refresh) ──────
+  const _cacheMasterEq    = useRef(null); // { data: [...] } — 17,277 rows, fetched once
+  const _cacheMasterMap   = useRef(null); // raw master_map entries, fetched once
+  const _cacheIK17Base    = useRef(null); // ik17_parsed_data.json — 63k rows, fetched once
+  const _cacheIK17DB      = useRef({ data: null, ts: 0 }); // ik17_raw_data — TTL 60s
+  const _cacheMonitoredEq = useRef(null); // all-time induk_eq_num+plant from daily_logs, fetched once
   const [filterPlant, setFilterPlant] = useState('ALL');
   const [filterJenis, setFilterJenis] = useState('');
   const [searchEq, setSearchEq] = useState('');
@@ -80,50 +88,60 @@ export default function SAPVerificationView({ equipments, currentUser }) {
 
       const normEq = (s) => String(s || '').replace(/^0+/, '').trim();
 
-      // Build Set of Parent / Induk equipments for "only parents yg dibaca" filter
+      const subKeywords = [
+        'ACCESSORIES', 'ACCESSORY', 'ACC ', 'ACC_', 'ACC.',
+        'PANEL', 'GEARBOX', 'GEAR BOX', 'G/BOX', 'PIPE', 'PIPING',
+        'ELECTROMOTOR', 'ELECTRO MOTOR', 'ELMOT', 'EL. MOTOR', 'E/M',
+        'HYDRAULIC', 'HIDROLIK', 'HPU', 'STRUCTURE', 'STRUKTUR',
+        'BODY', 'WHEEL', 'RODA', 'CONTROLLERS', 'CONTROLLER', 'KONTROL',
+        'AUTOMATIC', 'EXHAUST', 'VALVE', 'CHAIN', 'RANTAI', 'BEARING',
+        'SHAFT', 'POROS', 'COUPLING', 'KOPLING', 'CHUTE', 'CORONG',
+        'IMPELLER', 'NOZZLE', 'GAUGE', 'METER', 'SENSOR', 'SWITCH',
+        'BREAKER', 'KABEL', 'CABLE', 'DUCTING', 'DUCT', 'SILENCER'
+      ];
+      const isSubDesc = (desc) => {
+        if (!desc) return false;
+        const u = String(desc).toUpperCase();
+        return subKeywords.some(kw => u.includes(kw));
+      };
+
       const parentEqSet = new Set();
 
-      // 1. Populate from dbMasterEq
-      try {
-        const { data: dbMasterEq } = await fetchMasterEquipment();
-        if (Array.isArray(dbMasterEq)) {
-          dbMasterEq.forEach(eq => {
-            const eqNum = String(eq.eq_num || eq.eqNum || '').trim();
-            if (!eqNum) return;
-            const eqType = eq.eq_type || eq.type || 'Induk';
-            if (eqType === 'Induk' || eqType === 'induk' || eqType === 'Parent' || eqType === 'parent' || (!eq.induk || eq.induk === eq.description || eq.induk === eq.eq_num)) {
-              parentEqSet.add(eqNum);
-              parentEqSet.add(normEq(eqNum));
-            }
-          });
-        }
-      } catch (err) {
-        console.warn('Error fetching master equipment for IK17 parent set:', err);
-      }
-
-      // 2. Populate from master_map
-      const { data: masterMapRaw } = await getSystemConfig('master_map');
-      if (masterMapRaw) {
-        let mmEntries = Array.isArray(masterMapRaw) ? masterMapRaw : (masterMapRaw.map || []);
-        mmEntries.forEach(([eqNum, info]) => {
-          if (!eqNum || !info) return;
-          const eqNumStr = String(eqNum).trim();
-          const eqNumNorm = normEq(eqNumStr);
-          const type = typeof info === 'string' ? 'Induk' : (info.type || 'Induk');
-          if (type === 'Induk' || type === 'induk' || type === 'Parent' || type === 'parent') {
-            parentEqSet.add(eqNumStr);
-            parentEqSet.add(eqNumNorm);
+      // Populate parentEqSet from daily_logs (all monitored Parent Equipments)
+      if (supabase) {
+        try {
+          let eqFrom = 0;
+          const EQ_PAGE = 1000;
+          while (true) {
+            const { data: dbLogs, error: dbErr } = await supabase
+              .from(T_DAILY_LOGS)
+              .select('induk_eq_num')
+              .range(eqFrom, eqFrom + EQ_PAGE - 1);
+            if (dbErr || !dbLogs || dbLogs.length === 0) break;
+            dbLogs.forEach(l => {
+              if (l.induk_eq_num) {
+                const e = String(l.induk_eq_num).trim();
+                parentEqSet.add(e);
+                parentEqSet.add(normEq(e));
+              }
+            });
+            if (dbLogs.length < EQ_PAGE) break;
+            eqFrom += dbLogs.length;
           }
-        });
+        } catch (err) {
+          console.warn('Error fetching daily_logs for upload parentEqSet:', err);
+        }
       }
 
-      // 3. Populate from equipments prop
+      // Also add from equipments prop if available
       if (Array.isArray(equipments)) {
         equipments.forEach(eq => {
           const eqNum = String(eq.eqNum || eq.eq_num || '').trim();
           if (!eqNum) return;
+          const desc = eq.description || '';
           const eqType = eq.type || eq.eq_type;
-          if (eqType === 'Induk' || eqType === 'induk' || eqType === 'Parent' || eqType === 'parent' || (!eq.induk || eq.induk === eq.description || eq.induk === eq.eqNum)) {
+          const isSub = eqType === 'Sub' || eqType === 'sub' || isSubDesc(desc);
+          if (!isSub) {
             parentEqSet.add(eqNum);
             parentEqSet.add(normEq(eqNum));
           }
@@ -134,7 +152,6 @@ export default function SAPVerificationView({ equipments, currentUser }) {
       // Column D = Index 3 (Tanggal)
       // Column F = Index 5 (Nomor Equipment Induk)
       // Column H = Index 7 (Nilai HM / Hour Meter)
-      // Column L = Index 11 (Catatan / Saldo Awal)
       const parsedRows = [];
       const newDatesSet = new Set();
 
@@ -159,30 +176,49 @@ export default function SAPVerificationView({ equipments, currentUser }) {
         const dateStr = cleanDateStr(row[3]);
         if (!dateStr) continue;
 
-        const textStr = String(row[11] || '');
-        const isSaldoAwal = textStr.toLowerCase().includes('saldo') || textStr.toLowerCase().includes('awal');
         newDatesSet.add(dateStr);
 
         parsedRows.push({
-          e: eqStr,
+          e: eqNorm,
           h: valNum,
           d: dateStr,
-          s: isSaldoAwal,
-          t: textStr
+          s: false,
+          t: ''
         });
       }
 
-      // Merge with existing raw data
-      const { data: existingRaw } = await getSystemConfig('ik17_raw_data');
-      let mergedRaw = Array.isArray(existingRaw) ? existingRaw : [];
-      
-      if (newDatesSet.size > 0) {
-        mergedRaw = mergedRaw.filter(r => r.d && !newDatesSet.has(cleanDateStr(r.d)));
-      }
-      mergedRaw = [...mergedRaw, ...parsedRows];
+      // Update _cacheIK17Base in memory directly (merge new rows, replace dates)
+      const currentBase = Array.isArray(_cacheIK17Base.current) ? _cacheIK17Base.current : [];
+      let mergedBase = currentBase.filter(r => r.d && !newDatesSet.has(cleanDateStr(r.d)));
+      mergedBase = [...mergedBase, ...parsedRows];
+      _cacheIK17Base.current = mergedBase;
 
-      await saveSystemConfig('ik17_raw_data', mergedRaw);
-      alert(`Berhasil mengunggah file IK17 SAP! Terproses ${parsedRows.length} baris data pengukuran parent equipment.`);
+      // Group parsed rows by year-month key and save to system_config
+      const byMonth = {};
+      parsedRows.forEach(r => {
+        const ym = r.d ? r.d.substring(0, 7) : null;
+        if (!ym) return;
+        if (!byMonth[ym]) byMonth[ym] = [];
+        byMonth[ym].push(r);
+      });
+
+      const savePromises = Object.entries(byMonth).map(async ([ym, rows]) => {
+        try {
+          const monthKey = `ik17_${ym}`;
+          const { data: existingMonth } = await getSystemConfig(monthKey);
+          let monthData = Array.isArray(existingMonth) ? existingMonth : [];
+          const newDates = new Set(rows.map(r => r.d));
+          monthData = monthData.filter(r => !newDates.has(r.d));
+          monthData = [...monthData, ...rows];
+          await saveSystemConfig(monthKey, monthData);
+        } catch (saveErr) {
+          console.warn('Error saving IK17 month', ym, saveErr);
+        }
+      });
+      await Promise.all(savePromises);
+
+      _cacheIK17DB.current = { data: null, ts: 0 };
+      alert(`Berhasil mengunggah file IK17 SAP! Terproses ${parsedRows.length} baris data pengukuran parent equipment (${newDatesSet.size} tanggal).`);
       loadMatrixData();
     } catch (err) {
       alert('Gagal mengunggah file IK17: ' + err.message);
@@ -198,7 +234,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
 
   const isLoadingRef = useRef(false);
 
-  const loadMatrixData = async () => {
+  const loadMatrixData = async (forceRefreshMaster = false) => {
     if (isLoadingRef.current) return;
     isLoadingRef.current = true;
     setIsProcessing(true);
@@ -206,37 +242,6 @@ export default function SAPVerificationView({ equipments, currentUser }) {
        const startDate = `${targetMonth}-01`;
        const endDate = format(endOfMonth(new Date(startDate)), 'yyyy-MM-dd');
 
-        // 1. Fetch daily_logs & hMapping first to establish monitored equipments
-        const { data: h1Data } = await getSystemConfig('hierarchy_mapping');
-        const hMapping = h1Data?.mapping || {};
-
-        let allLogs = [];
-        if (supabase) {
-           let from = 0;
-           const PAGE_SIZE = 1000;
-           let iterations = 0;
-           while (iterations < 10) { // Limit to 10k rows max to avoid browser lockup
-             iterations++;
-             const { data, error } = await supabase
-               .from(T_DAILY_LOGS)
-               .select('plant, date, duration_minutes, induk_eq_num')
-               .gte('date', startDate)
-               .lte('date', endDate)
-               .range(from, from + PAGE_SIZE - 1);
-               
-             if (error) throw error;
-             if (data && data.length > 0) {
-               allLogs = allLogs.concat(data);
-               if (data.length < PAGE_SIZE) break;
-               from += PAGE_SIZE;
-             } else {
-               break;
-             }
-           }
-        }
-        setRawWebLogs(allLogs);
-
-        const monitoredEqNums = new Set(allLogs.map(l => String(l.induk_eq_num)));
         const normEq = (s) => String(s || '').replace(/^0+/, '').trim();
         const cleanDateStr = (raw) => {
           if (!raw) return '';
@@ -253,147 +258,235 @@ export default function SAPVerificationView({ equipments, currentUser }) {
           return str;
         };
 
-        // map eq to plant
-        const eqToPlant = new Map();
-        const isIndukMap = new Map();
-        const eqNameMap = new Map();
-
-        // 0. Populate from dbMasterEq (dev_master_equipment / master_equipment)
-        try {
-          const { data: dbMasterEq } = await fetchMasterEquipment();
-          if (Array.isArray(dbMasterEq)) {
-            dbMasterEq.forEach(eq => {
-              const eqNum = String(eq.eq_num || eq.eqNum || '').trim();
-              if (!eqNum) return;
-              const eqNumNorm = normEq(eqNum);
-              const plant = String(eq.plant || '').toUpperCase().trim();
-              const type = eq.eq_type || eq.type || 'Induk';
-              const isSub = type === 'Sub' || type === 'sub';
-              const desc = eq.description || eqNum;
-
-              if (plant) {
-                eqToPlant.set(eqNum, plant);
-                eqToPlant.set(eqNumNorm, plant);
-              }
-              isIndukMap.set(eqNum, !isSub);
-              isIndukMap.set(eqNumNorm, !isSub);
-              eqNameMap.set(eqNum, `${desc} [${eqNum}]`);
-              eqNameMap.set(eqNumNorm, `${desc} [${eqNum}]`);
-            });
-          }
-        } catch (e) {
-          console.warn('Could not fetch dbMasterEq:', e);
+        if (forceRefreshMaster) {
+          _cacheMasterEq.current    = null;
+          _cacheMasterMap.current   = null;
+          _cacheIK17Base.current    = null;
+          _cacheIK17DB.current      = { data: null, ts: 0 };
+          _cacheMonitoredEq.current = null;
         }
 
-        // 1. Fetch & populate from master_map (id = 2) in database (17,277 entries)
-        const { data: masterMapRaw } = await getSystemConfig('master_map');
-        if (masterMapRaw) {
-          let mmEntries = [];
-          if (Array.isArray(masterMapRaw)) {
-            mmEntries = masterMapRaw;
-          } else if (masterMapRaw.map && Array.isArray(masterMapRaw.map)) {
-            mmEntries = masterMapRaw.map;
+        setLoadingPhase('Mengambil data...');
+
+        const logsPromise = (async () => {
+          if (!supabase) return [];
+          const logs = [];
+          let from = 0;
+          const PAGE_SIZE = 1000;
+          let iterations = 0;
+          while (iterations < 20) {
+            iterations++;
+            const { data, error } = await supabase
+              .from(T_DAILY_LOGS)
+              .select('plant, date, duration_minutes, induk_eq_num')
+              .gte('date', startDate)
+              .lte('date', endDate)
+              .range(from, from + PAGE_SIZE - 1);
+            if (error) throw error;
+            if (data && data.length > 0) {
+              logs.push(...data);
+              if (data.length < PAGE_SIZE) break;
+              from += data.length;
+            } else break;
           }
-          mmEntries.forEach(([eqNum, info]) => {
-            if (!eqNum || !info) return;
-            const eqNumStr = String(eqNum).trim();
-            const eqNumNorm = normEq(eqNumStr);
-            const plant = typeof info === 'string' ? info : (info.plant || '');
-            const desc = typeof info === 'string' ? eqNumStr : (info.description || eqNumStr);
-            const type = typeof info === 'string' ? 'Induk' : (info.type || 'Induk');
-            const isSub = type === 'Sub' || type === 'sub';
+          return logs;
+        })();
 
-            if (plant) {
-              const p = String(plant).toUpperCase().trim();
-              eqToPlant.set(eqNumStr, p);
-              eqToPlant.set(eqNumNorm, p);
-            }
-            isIndukMap.set(eqNumStr, !isSub);
-            isIndukMap.set(eqNumNorm, !isSub);
-            eqNameMap.set(eqNumStr, `${desc} [${eqNumStr}]`);
-            eqNameMap.set(eqNumNorm, `${desc} [${eqNumNorm}]`);
-          });
-        }
+        const monitoredEqPromise = (async () => {
+          if (_cacheMonitoredEq.current) return _cacheMonitoredEq.current;
+          if (!supabase) return [];
+          const allEq = [];
+          let eqFrom = 0;
+          const EQ_PAGE = 1000;
+          while (true) {
+            const { data: eqPage, error: eqErr } = await supabase
+              .from(T_DAILY_LOGS)
+              .select('induk_eq_num, plant')
+              .range(eqFrom, eqFrom + EQ_PAGE - 1);
+            if (eqErr || !eqPage || eqPage.length === 0) break;
+            allEq.push(...eqPage);
+            if (eqPage.length < EQ_PAGE) break;
+            eqFrom += eqPage.length;
+          }
+          _cacheMonitoredEq.current = allEq;
+          return allEq;
+        })();
 
-        // 2. Populate from web logs (daily_logs)
-        allLogs.forEach(l => {
-          if (l.induk_eq_num && l.plant) {
+        const masterEqPromise = (async () => {
+          if (_cacheMasterEq.current) return _cacheMasterEq.current;
+          try {
+            const { data } = await fetchMasterEquipment();
+            _cacheMasterEq.current = Array.isArray(data) ? data : [];
+          } catch { _cacheMasterEq.current = []; }
+          return _cacheMasterEq.current;
+        })();
+
+        const masterMapPromise = (async () => {
+          if (_cacheMasterMap.current) return _cacheMasterMap.current;
+          const { data } = await getSystemConfig('master_map');
+          let entries = [];
+          if (data) {
+            entries = Array.isArray(data) ? data : (data.map && Array.isArray(data.map) ? data.map : []);
+          }
+          _cacheMasterMap.current = entries;
+          return entries;
+        })();
+
+        const ik17BasePromise = (async () => {
+          if (_cacheIK17Base.current) return _cacheIK17Base.current;
+          try {
+            const res = await fetch('/ik17_parsed_data.json');
+            _cacheIK17Base.current = res.ok ? await res.json() : [];
+          } catch { _cacheIK17Base.current = []; }
+          return _cacheIK17Base.current;
+        })();
+
+        const ik17DbPromise = (async () => {
+          const now = Date.now();
+          if (_cacheIK17DB.current.data !== null && now - _cacheIK17DB.current.ts < 60000) {
+            return _cacheIK17DB.current.data;
+          }
+          const monthKey = `ik17_${targetMonth}`;
+          const { data: monthData } = await getSystemConfig(monthKey);
+          const result = Array.isArray(monthData) ? monthData : [];
+          if (result.length === 0) {
+            const { data: legacyData } = await getSystemConfig('ik17_raw_data');
+            const legacyResult = Array.isArray(legacyData) ? legacyData : [];
+            _cacheIK17DB.current = { data: legacyResult, ts: now };
+            return legacyResult;
+          }
+          _cacheIK17DB.current = { data: result, ts: now };
+          return result;
+        })();
+
+        setLoadingPhase('Memuat data master & IK17...');
+
+        const [allLogs, dbMasterEq, mmEntries, ik17BaseData, dbIK17, allTimeMonitored] = await Promise.all([
+          logsPromise, masterEqPromise, masterMapPromise, ik17BasePromise, ik17DbPromise, monitoredEqPromise
+        ]);
+
+        setLoadingPhase('Memproses matrix...');
+        setRawWebLogs(allLogs);
+
+        const subKeywords = [
+          'ACCESSORIES', 'ACCESSORY', 'ACC ', 'ACC_', 'ACC.',
+          'PANEL', 'GEARBOX', 'GEAR BOX', 'G/BOX', 'PIPE', 'PIPING',
+          'ELECTROMOTOR', 'ELECTRO MOTOR', 'ELMOT', 'EL. MOTOR', 'E/M',
+          'HYDRAULIC', 'HIDROLIK', 'HPU', 'STRUCTURE', 'STRUKTUR',
+          'BODY', 'WHEEL', 'RODA', 'CONTROLLERS', 'CONTROLLER', 'KONTROL',
+          'AUTOMATIC', 'EXHAUST', 'VALVE', 'CHAIN', 'RANTAI', 'BEARING',
+          'SHAFT', 'POROS', 'COUPLING', 'KOPLING', 'CHUTE', 'CORONG',
+          'IMPELLER', 'NOZZLE', 'GAUGE', 'METER', 'SENSOR', 'SWITCH',
+          'BREAKER', 'KABEL', 'CABLE', 'DUCTING', 'DUCT', 'SILENCER'
+        ];
+        const isSubDesc = (desc) => {
+          if (!desc) return false;
+          const u = String(desc).toUpperCase();
+          return subKeywords.some(kw => u.includes(kw));
+        };
+
+        const eqToPlant  = new Map();
+        const eqNameMap  = new Map();
+        const parentEqSet = new Set();
+
+        // 1. ALL-TIME monitored induk_eq_num from daily_logs
+        allTimeMonitored.forEach(l => {
+          if (l.induk_eq_num) {
             const e = String(l.induk_eq_num).trim();
+            const eNorm = normEq(e);
+            if (eNorm) {
+              parentEqSet.add(e);
+              parentEqSet.add(eNorm);
+            }
+          }
+          if (l.induk_eq_num && l.plant) {
+            const eNorm = normEq(l.induk_eq_num);
             const p = String(l.plant).toUpperCase().trim();
-            eqToPlant.set(e, p);
-            eqToPlant.set(normEq(e), p);
+            eqToPlant.set(eNorm, p);
           }
         });
 
-        // 3. Populate from equipments master list prop
+        allLogs.forEach(l => {
+          if (l.induk_eq_num && l.plant) {
+            const eNorm = normEq(l.induk_eq_num);
+            const p = String(l.plant).toUpperCase().trim();
+            eqToPlant.set(eNorm, p);
+          }
+        });
+
+        // 2. From equipments prop
         if (Array.isArray(equipments)) {
           equipments.forEach(eq => {
             const eqNum = String(eq.eqNum || eq.eq_num || '').trim();
             if (!eqNum) return;
             const eqNumNorm = normEq(eqNum);
-
-            const eqType = eq.type || eq.eq_type;
             const desc = eq.description || '';
-            const indukUpper = (eq.induk || '').toUpperCase();
-            const eqNumStr = eqNum.toUpperCase();
-
-            let isSub = false;
-            if (eqType === 'Sub' || eqType === 'sub') {
-              isSub = true;
-            } else if (indukUpper && indukUpper !== desc.toUpperCase() && indukUpper !== eqNumStr && indukUpper !== 'INDUK') {
-              isSub = true;
+            const eqType = eq.type || eq.eq_type;
+            const isSub = eqType === 'Sub' || eqType === 'sub';
+            if (!isSub) {
+              parentEqSet.add(eqNum);
+              parentEqSet.add(eqNumNorm);
             }
-
-            const isGenuineParent = !isSub;
-
-            isIndukMap.set(eqNum, isGenuineParent);
-            isIndukMap.set(eqNumNorm, isGenuineParent);
-            eqNameMap.set(eqNum, `${desc} [${eqNum}]`);
-            eqNameMap.set(eqNumNorm, `${desc} [${eqNum}]`);
-            if (eq.plant) {
-              const p = String(eq.plant).toUpperCase().trim();
-              eqToPlant.set(eqNum, p);
-              eqToPlant.set(eqNumNorm, p);
+            if (desc) {
+              eqNameMap.set(eqNum, `${desc} [${eqNumNorm}]`);
+              eqNameMap.set(eqNumNorm, `${desc} [${eqNumNorm}]`);
             }
+            if (eq.plant) eqToPlant.set(eqNumNorm, String(eq.plant).toUpperCase().trim());
           });
         }
 
-        const getPlantFromEq = (eStr, eNorm, textStr = '') => {
-          if (eqToPlant.has(eStr)) return eqToPlant.get(eStr);
-          if (eqToPlant.has(eNorm)) return eqToPlant.get(eNorm);
-          
-          const txtUpper = String(textStr || '').toUpperCase();
-          for (const p of uniquePlants) {
-            if (txtUpper.includes(p)) return p;
+        // 3. From master_map
+        mmEntries.forEach(([eqNum, info]) => {
+          if (!eqNum || !info) return;
+          const eqNumStr  = String(eqNum).trim();
+          const eqNumNorm = normEq(eqNumStr);
+          const plant  = typeof info === 'string' ? info : (info.plant || '');
+          const desc   = typeof info === 'string' ? eqNumStr : (info.description || eqNumStr);
+          const parentName = typeof info === 'string' ? '' : (info.induk || '');
+          const isParent = !parentName || desc.toUpperCase() === parentName.toUpperCase();
+          if (isParent) {
+            parentEqSet.add(eqNumStr);
+            parentEqSet.add(eqNumNorm);
           }
+          if (plant) { const p = String(plant).toUpperCase().trim(); eqToPlant.set(eqNumStr, p); eqToPlant.set(eqNumNorm, p); }
+          eqNameMap.set(eqNumStr, `${desc} [${eqNumNorm}]`); eqNameMap.set(eqNumNorm, `${desc} [${eqNumNorm}]`);
+        });
 
-          for (const p of uniquePlants) {
-            if (eStr.includes(p) || eNorm.includes(p)) return p;
+        // 4. From dbMasterEq
+        dbMasterEq.forEach(eq => {
+          const eqNum = String(eq.eq_num || eq.eqNum || '').trim();
+          if (!eqNum) return;
+          const eqNumNorm = normEq(eqNum);
+          const plant = String(eq.plant || '').toUpperCase().trim();
+          const desc = eq.description || eqNum;
+          const parentName = (eq.induk || '').trim();
+          const isParent = eq.eq_type !== 'Sub' && (!parentName || desc.toUpperCase() === parentName.toUpperCase());
+          if (isParent) {
+            parentEqSet.add(eqNum);
+            parentEqSet.add(eqNumNorm);
           }
+          if (plant) { eqToPlant.set(eqNum, plant); eqToPlant.set(eqNumNorm, plant); }
+          eqNameMap.set(eqNum, `${desc} [${eqNumNorm}]`); eqNameMap.set(eqNumNorm, `${desc} [${eqNumNorm}]`);
+        });
+
+        const getPlantFromEq = (eStr, eNorm, textStr = '') => {
+          if (eqToPlant.has(eNorm)) return eqToPlant.get(eNorm);
+          if (eqToPlant.has(eStr)) return eqToPlant.get(eStr);
+          const txtUpper = String(textStr || '').toUpperCase();
+          for (const p of uniquePlants) { if (txtUpper.includes(p)) return p; }
+          for (const p of uniquePlants) { if (eStr.includes(p) || eNorm.includes(p)) return p; }
           return 'Unknown';
         };
 
-        // 2. Fetch baseline ik17_parsed_data.json + any user uploads from DB ik17_raw_data
-        let rawIK17 = [];
-        try {
-          const res = await fetch('/ik17_parsed_data.json');
-          if (res.ok) {
-            rawIK17 = await res.json();
-          }
-        } catch (err) {
-          console.warn('Load of ik17_parsed_data.json failed:', err);
-        }
-
-        const { data: dbIK17 } = await getSystemConfig('ik17_raw_data');
-        if (Array.isArray(dbIK17) && dbIK17.length > 0) {
-          // Merge user-uploaded dates over baseline
+        let rawIK17 = ik17BaseData;
+        if (dbIK17.length > 0) {
           const dbDates = new Set(dbIK17.map(r => cleanDateStr(r.d)).filter(Boolean));
           rawIK17 = rawIK17.filter(r => !dbDates.has(cleanDateStr(r.d)));
           rawIK17 = [...rawIK17, ...dbIK17];
         }
 
-        const sapHmMap = new Map(); // key: 'plant_date', value: HM
-        const sapSaldoAwalMap = new Map(); // key: 'plant', value: HM Saldo Awal
+        const sapHmMap       = new Map();
+        const sapSaldoAwalMap = new Map();
 
         if (Array.isArray(rawIK17)) {
           rawIK17.forEach(row => {
@@ -402,41 +495,37 @@ export default function SAPVerificationView({ equipments, currentUser }) {
               const eqStr = String(row.e || '').trim();
               const eqNorm = normEq(eqStr);
 
-              const isParent = isIndukMap.has(eqStr) ? isIndukMap.get(eqStr) : (isIndukMap.has(eqNorm) ? isIndukMap.get(eqNorm) : false);
-              if (isParent) {
-                if (filterJenis && !eqStr.startsWith(filterJenis) && !eqNorm.startsWith(filterJenis)) return;
-                const plant = getPlantFromEq(eqStr, eqNorm, row.t || '');
-                if ((currentUser?.role === 'Unit' || currentUser?.role?.toUpperCase() === 'USER') && currentUser?.plant !== plant) return;
+              // STRICT ONLY PARENT EQUIPMENT FILTER
+              const isParent = parentEqSet.has(eqStr) || parentEqSet.has(eqNorm);
+              if (!isParent) return;
 
-                const groupKey = groupBy === 'plant' ? plant : (eqToPlant.has(eqStr) ? eqStr : (eqToPlant.has(eqNorm) ? eqNorm : eqStr));
+              if (filterJenis && !eqStr.startsWith(filterJenis) && !eqNorm.startsWith(filterJenis)) return;
+              const plant = getPlantFromEq(eqStr, eqNorm, row.t || '');
+              if ((currentUser?.role === 'Unit' || currentUser?.role?.toUpperCase() === 'USER') && currentUser?.plant !== plant) return;
 
-                if (row.s) { // is Saldo Awal
-                  sapSaldoAwalMap.set(groupKey, (sapSaldoAwalMap.get(groupKey) || 0) + (row.h || 0));
-                } else {
-                  const key = `${groupKey}_${cleanD}`;
-                  if (!sapHmMap.has(key)) sapHmMap.set(key, 0);
-                  sapHmMap.set(key, sapHmMap.get(key) + (row.h || 0));
-                }
+              const groupKey = groupBy === 'plant' ? plant : eqNorm;
+              if (row.s) {
+                sapSaldoAwalMap.set(groupKey, (sapSaldoAwalMap.get(groupKey) || 0) + (row.h || 0));
+              } else {
+                const key = `${groupKey}_${cleanD}`;
+                sapHmMap.set(key, (sapHmMap.get(key) || 0) + (row.h || 0));
               }
             }
           });
-          
+
           setLastUpdated('Data terakhir yang tersimpan di server');
-          
+
           let matched = 0;
           const ik17DatesInMonth = [];
           rawIK17.forEach(r => {
             const e = String(r.e || '').trim();
             if (getPlantFromEq(e, normEq(e), r.t || '') !== 'Unknown') matched++;
             const cleanD = cleanDateStr(r.d || '');
-            if (cleanD && cleanD >= startDate && cleanD <= endDate && !r.s) {
-              ik17DatesInMonth.push(cleanD);
-            }
+            if (cleanD && cleanD >= startDate && cleanD <= endDate && !r.s) ik17DatesInMonth.push(cleanD);
           });
           ik17DatesInMonth.sort();
           const minDateStr = ik17DatesInMonth.length > 0 ? ik17DatesInMonth[0] : '-';
           const maxDateStr = ik17DatesInMonth.length > 0 ? ik17DatesInMonth[ik17DatesInMonth.length - 1] : '-';
-
           setDebugMsg(`Data SAP IK17: ${rawIK17.length} rows, tersedia: ${minDateStr} s/d ${maxDateStr}, ${matched} equipment tercocokkan dari ${eqToPlant.size} mapping.`);
         } else {
           setDebugMsg(`Data SAP IK17 belum tersedia atau format tidak valid.`);
@@ -445,30 +534,33 @@ export default function SAPVerificationView({ equipments, currentUser }) {
 
         const webHmMap = new Map();
         allLogs.forEach(log => {
-           if (filterJenis && !String(log.induk_eq_num).startsWith(filterJenis)) return;
+           const eqStr = String(log.induk_eq_num || '').trim();
+           const eqNorm = normEq(eqStr);
+
+           const isParent = parentEqSet.has(eqStr) || parentEqSet.has(eqNorm);
+           if (!isParent) return;
+
+           if (filterJenis && !eqStr.startsWith(filterJenis) && !eqNorm.startsWith(filterJenis)) return;
            const hm = (log.duration_minutes || 0) / 60;
-           const plant = log.plant || 'Unknown';
+           const plant = getPlantFromEq(eqStr, eqNorm) || log.plant || 'Unknown';
            if ((currentUser?.role === 'Unit' || currentUser?.role?.toUpperCase() === 'USER') && currentUser?.plant !== plant) return;
-           
-           const groupKey = groupBy === 'plant' ? plant : log.induk_eq_num;
-           if (!groupKey) return; // skip if induk_eq_num missing
-           
-           const date = log.date;
-           const key = `${groupKey}_${date}`;
-           if (!webHmMap.has(key)) webHmMap.set(key, 0);
-           webHmMap.set(key, webHmMap.get(key) + hm);
+           const groupKey = groupBy === 'plant' ? plant : eqNorm;
+           if (!groupKey) return;
+           const key = `${groupKey}_${log.date}`;
+           webHmMap.set(key, (webHmMap.get(key) || 0) + hm);
         });
 
-       // 3. Combine into matrix
-       const groupsToInclude = new Set([...Array.from(sapHmMap.keys()).map(k => k.split('_')[0]), ...Array.from(webHmMap.keys()).map(k => k.split('_')[0])]);
-       
+       const groupsToInclude = new Set([
+         ...Array.from(sapHmMap.keys()).map(k => k.split('_')[0]),
+         ...Array.from(webHmMap.keys()).map(k => k.split('_')[0])
+       ]);
        if (groupBy === 'plant') {
           uniquePlants.forEach(p => {
               if ((currentUser?.role === 'Unit' || currentUser?.role?.toUpperCase() === 'USER') && currentUser?.plant !== p) return;
               groupsToInclude.add(p);
           });
        }
-       
+
        const matrix = [];
        const daysInMonth = getDaysInMonth(new Date(startDate));
 
@@ -476,8 +568,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
           const dates = {};
           let hasAnyData = false;
           const saldoAwal = sapSaldoAwalMap.get(groupKey) || 0;
-          
-          for (let i=1; i<=daysInMonth; i++) {
+          for (let i = 1; i <= daysInMonth; i++) {
              const d = `${targetMonth}-${String(i).padStart(2, '0')}`;
              const key = `${groupKey}_${d}`;
              const web = Math.round((webHmMap.get(key) || 0) * 100) / 100;
@@ -485,20 +576,21 @@ export default function SAPVerificationView({ equipments, currentUser }) {
              dates[d] = { web, sap };
              if (web > 0 || sap > 0) hasAnyData = true;
           }
-          
           if (hasAnyData || saldoAwal > 0 || groupBy === 'plant') {
-             const groupName = groupBy === 'plant' ? groupKey : (eqNameMap.get(groupKey) || groupKey);
-             const eqPlant = groupBy === 'plant' ? groupKey : (eqToPlant.get(groupKey) || 'Unknown');
+             const groupName = groupBy === 'plant' ? groupKey : (eqNameMap.get(groupKey) || eqNameMap.get(normEq(groupKey)) || groupKey);
+             const eqPlant = groupBy === 'plant' ? groupKey : (eqToPlant.get(groupKey) || eqToPlant.get(normEq(groupKey)) || 'Unknown');
              matrix.push({ groupName, dates, saldoAwal, plant: eqPlant, eqNum: groupKey });
           }
        });
 
-       setMatrixData(matrix.sort((a,b) => a.groupName.localeCompare(b.groupName)));
+       setMatrixData(matrix.sort((a, b) => a.groupName.localeCompare(b.groupName)));
+       setLoadingPhase('');
     } catch (e) {
        console.error(e);
        alert("Gagal memuat data matrix: " + e.message);
     } finally {
        setIsProcessing(false);
+       setLoadingPhase('');
        isLoadingRef.current = false;
     }
   };
@@ -616,7 +708,9 @@ export default function SAPVerificationView({ equipments, currentUser }) {
           <div>
             <h2 className="text-base font-bold text-slate-800">Verifikasi Sinkronisasi SAP (Matrix)</h2>
             <p className="text-xs text-slate-400 font-medium mt-0.5">
-              {lastUpdated ? `Menggunakan data referensi SAP IK17 dari database. ${debugMsg}` : 'Memuat data...'}
+              {lastUpdated
+                ? `Menggunakan data referensi SAP IK17 dari database. ${debugMsg}`
+                : (loadingPhase || 'Memuat data...')}
             </p>
           </div>
           

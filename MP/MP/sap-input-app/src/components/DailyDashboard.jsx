@@ -78,6 +78,12 @@ export default function DailyDashboard({
     return role === 'ADMIN' || role === 'DEV' || role === 'REGIONAL' || plant === 'ALL' || plant === '5R00' || !plant.startsWith('5F');
   }, [currentUser]);
 
+  const isUserRole = useMemo(() => {
+    if (!currentUser) return true;
+    const role = String(currentUser.role || '').toUpperCase();
+    return role === 'USER' || role === 'UNIT' || !isAdminUser;
+  }, [currentUser, isAdminUser]);
+
   const defaultPlantFilter = (currentUser?.plant && String(currentUser.plant).toUpperCase().startsWith('5F'))
     ? currentUser.plant
     : '5F01';
@@ -1666,13 +1672,6 @@ export default function DailyDashboard({
               ✓ GSheet
             </button>
           )}
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 rounded-xl shadow-xs transition-colors flex items-center gap-1.5 font-bold text-xs"
-          >
-            <Download size={14} />
-            Export SAP
-          </button>
         </div>
       </div>
 
@@ -2037,6 +2036,23 @@ export default function DailyDashboard({
             )}
 
             <button 
+              onClick={() => {
+                const selDateStr = format(selectedDate, 'yyyy-MM-dd');
+                setExportSettings(prev => ({ 
+                  ...prev, 
+                  startDate: selDateStr,
+                  endDate: selDateStr,
+                  isAccumulated: false,
+                  time: '08:00' 
+                }));
+                setShowExportModal(true);
+              }}
+              className="bg-[#0f172a] hover:bg-slate-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
+            >
+              <FileDown size={13} /> Export SAP
+            </button>
+
+            <button 
               onClick={() => setShowHistoryModal(true)}
               className="bg-sky-600 hover:bg-sky-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
             >
@@ -2045,22 +2061,6 @@ export default function DailyDashboard({
 
             {isAfraUser && (
               <>
-                <button 
-                  onClick={() => {
-                    const selDateStr = format(selectedDate, 'yyyy-MM-dd');
-                    setExportSettings(prev => ({ 
-                      ...prev, 
-                      startDate: selDateStr,
-                      endDate: selDateStr,
-                      time: '08:00' 
-                    }));
-                    setShowExportModal(true);
-                  }}
-                  className="bg-[#0f172a] hover:bg-slate-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
-                >
-                  <FileDown size={13} /> Export SAP
-                </button>
-
                 <button 
                   onClick={() => setShowMassForm(true)}
                   className="bg-[#064e3b] hover:bg-[#065f46] text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
@@ -2488,20 +2488,45 @@ export default function DailyDashboard({
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Mulai Tanggal</label>
-                  <input type="date" className="w-full border border-slate-300 rounded-2xl p-2.5 bg-slate-50 text-sm focus:ring-2 focus:ring-emerald-500" value={exportSettings.startDate} onChange={e => setExportSettings({...exportSettings, startDate: e.target.value})} />
+                  <input 
+                    type="date" 
+                    className="w-full border border-slate-300 rounded-2xl p-2.5 bg-slate-50 text-sm focus:ring-2 focus:ring-emerald-500" 
+                    value={exportSettings.startDate} 
+                    onChange={e => {
+                      const newStart = e.target.value;
+                      if (isUserRole) {
+                        setExportSettings({ ...exportSettings, startDate: newStart, endDate: newStart });
+                      } else {
+                        setExportSettings({ ...exportSettings, startDate: newStart });
+                      }
+                    }} 
+                  />
                 </div>
                 <div className="flex-1">
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Sampai Tanggal</label>
-                  <input type="date" className="w-full border border-slate-300 rounded-2xl p-2.5 bg-slate-50 text-sm focus:ring-2 focus:ring-emerald-500" value={exportSettings.endDate} onChange={e => setExportSettings({...exportSettings, endDate: e.target.value})} />
+                  <input 
+                    type="date" 
+                    disabled={isUserRole}
+                    className={`w-full border border-slate-300 rounded-2xl p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 ${isUserRole ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-slate-50'}`} 
+                    value={isUserRole ? exportSettings.startDate : exportSettings.endDate} 
+                    onChange={e => {
+                      if (!isUserRole) {
+                        setExportSettings({ ...exportSettings, endDate: e.target.value });
+                      }
+                    }} 
+                  />
                 </div>
               </div>
-              <div className="flex items-start gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-2xl cursor-pointer hover:bg-emerald-100 transition-colors" onClick={() => setExportSettings({...exportSettings, isAccumulated: !exportSettings.isAccumulated})}>
-                <input type="checkbox" checked={exportSettings.isAccumulated} onChange={() => {}} className="mt-1 h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer" />
-                <div className="flex-1">
-                  <span className="text-sm font-bold text-emerald-900 block">Akumulasi Jam Jalan (Satu Baris)</span>
-                  <span className="text-xs text-emerald-700">Jika dicentang, HM dalam periode ini akan dijumlahkan jadi 1 baris per alat. Jika tidak, akan diekspor terpisah per tanggal.</span>
+
+              {!isUserRole && (
+                <div className="flex items-start gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-2xl cursor-pointer hover:bg-emerald-100 transition-colors" onClick={() => setExportSettings({...exportSettings, isAccumulated: !exportSettings.isAccumulated})}>
+                  <input type="checkbox" checked={exportSettings.isAccumulated} onChange={() => {}} className="mt-1 h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer" />
+                  <div className="flex-1">
+                    <span className="text-sm font-bold text-emerald-900 block">Akumulasi Jam Jalan (Satu Baris)</span>
+                    <span className="text-xs text-emerald-700">Jika dicentang, HM dalam periode ini akan dijumlahkan jadi 1 baris per alat. Jika tidak, akan diekspor terpisah per tanggal.</span>
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Jam Dibukukan</label>
