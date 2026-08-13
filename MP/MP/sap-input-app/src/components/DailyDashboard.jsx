@@ -9,6 +9,7 @@ import { supabase, IS_DEV_ENV } from '../lib/supabase';
 const T_DAILY_LOGS = IS_DEV_ENV ? 'dev_daily_logs' : 'daily_logs';
 
 import { insertDailyLog, insertDailyLogs, deleteDailyLog, fetchDailyLogs, saveGSheetHistory, getGSheetHistory, saveSystemConfig, getSystemConfig, saveImportLog } from '../lib/supabaseService';
+import RekapMonitoringView from './RekapMonitoringView';
 
 const PLANT_INFO = {
   // Kal-Bar
@@ -392,24 +393,16 @@ export default function DailyDashboard({
     }
   }, [matrixMonth]);
 
-  // Check if a cell date (yyyy-MM-dd) is editable based on H-1 rule & Tanggal 1-2 exception
+  // Check if a cell date (yyyy-MM-dd) is editable (unlocked for past & present dates up to today)
   const isCellEditable = (dateStr) => {
     const today = simulatedToday || new Date();
-    const todayDay = today.getDate();
-    const todayMonthStr = format(today, 'yyyy-MM');
-    const cellMonthStr = dateStr.substring(0, 7);
+    const today_str = format(today, 'yyyy-MM-dd');
 
-    // Rule 1: Tanggal 1 & 2 tiap bulan -> bisa edit semua tanggal bulan berjalan & bulan lalu
-    if (todayDay === 1 || todayDay === 2) {
-      const prevMonthStr = format(subMonths(today, 1), 'yyyy-MM');
-      return cellMonthStr === todayMonthStr || cellMonthStr === prevMonthStr;
-    }
+    // Admin, DEV, or Afra users can edit all dates
+    if (isAdminUser || isAfraUser) return true;
 
-    // Rule 2: Tanggal 3 ke atas -> Hanya bisa edit H-1 (kemarin) di bulan berjalan
-    const yesterdayObj = subDays(today, 1);
-    const yesterdayStr = format(yesterdayObj, 'yyyy-MM-dd');
-
-    return dateStr === yesterdayStr;
+    // Unit / User role can edit all dates up to today
+    return dateStr <= today_str;
   };
 
 
@@ -1642,6 +1635,17 @@ export default function DailyDashboard({
               <CalendarIcon size={16} />
               Riwayat &amp; Kalender Jam Jalan
             </button>
+            <button
+              onClick={() => setDashboardSubTab('rekap')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                dashboardSubTab === 'rekap'
+                  ? 'bg-[#7c3aed] text-white shadow-md shadow-violet-900/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+              }`}
+            >
+              <ClipboardList size={16} />
+              Rekap Monitoring Regional
+            </button>
             <a
               href="https://cmms.ptpn4.co.id/"
               target="_blank"
@@ -1781,45 +1785,51 @@ export default function DailyDashboard({
                 </span>
               )}
 
-              <button
-                onClick={() => {
-                  const selDateStr = format(selectedDate, 'yyyy-MM-dd');
-                  setExportSettings(prev => ({ 
-                    ...prev, 
-                    startDate: selDateStr,
-                    endDate: selDateStr,
-                    isAccumulated: false,
-                    time: '08:00' 
-                  }));
-                  setShowExportModal(true);
-                }}
-                className="px-3.5 py-2 bg-[#0f172a] hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
-              >
-                <FileDown size={14} />
-                Export SAP
-              </button>
+              {!isUserRole && (
+                <button
+                  onClick={() => {
+                    const selDateStr = format(selectedDate, 'yyyy-MM-dd');
+                    setExportSettings(prev => ({ 
+                      ...prev, 
+                      startDate: selDateStr,
+                      endDate: selDateStr,
+                      isAccumulated: false,
+                      time: '08:00' 
+                    }));
+                    setShowExportModal(true);
+                  }}
+                  className="px-3.5 py-2 bg-[#0f172a] hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
+                >
+                  <FileDown size={14} />
+                  Export SAP
+                </button>
+              )}
 
-              <button
-                onClick={loadMatrixFromDB}
-                disabled={isMatrixLoading}
-                className="px-3.5 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
-              >
-                <RefreshCw size={14} className={isMatrixLoading ? "animate-spin" : ""} />
-                Muat Ulang
-              </button>
+              {!isUserRole && (
+                <>
+                  <button
+                    onClick={loadMatrixFromDB}
+                    disabled={isMatrixLoading}
+                    className="px-3.5 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+                  >
+                    <RefreshCw size={14} className={isMatrixLoading ? "animate-spin" : ""} />
+                    Muat Ulang
+                  </button>
 
-              <button
-                onClick={handleSaveMatrix}
-                disabled={isSavingMatrix || unsavedMatrixCount === 0}
-                className={`px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 ${
-                  unsavedMatrixCount > 0
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                }`}
-              >
-                <Save size={16} />
-                {isSavingMatrix ? 'Menyimpan...' : `Simpan Jam Jalan ${unsavedMatrixCount > 0 ? `(${unsavedMatrixCount})` : ''}`}
-              </button>
+                  <button
+                    onClick={handleSaveMatrix}
+                    disabled={isSavingMatrix || unsavedMatrixCount === 0}
+                    className={`px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 ${
+                      unsavedMatrixCount > 0
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse'
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <Save size={16} />
+                    {isSavingMatrix ? 'Menyimpan...' : `Simpan Jam Jalan ${unsavedMatrixCount > 0 ? `(${unsavedMatrixCount})` : ''}`}
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -1855,7 +1865,7 @@ export default function DailyDashboard({
                       return (
                         <th 
                           key={dayStr} 
-                          title={editable ? "Tanggal aktif H-1 dapat diisi" : "Tanggal terkunci (Hanya H-1 yang dapat diisi)"}
+                          title={editable ? `Tanggal ${dayStr} aktif (dapat diisi)` : `Tanggal ${dayStr} belum berjalan`}
                           className={`p-2 text-center border-r border-slate-700 min-w-[48px] text-[11px] font-mono transition-all ${
                             editable ? 'bg-emerald-600 text-white font-black ring-2 ring-emerald-300 shadow-md scale-105 z-10' : 'bg-slate-800 text-slate-400'
                           }`}
@@ -1924,7 +1934,7 @@ export default function DailyDashboard({
                                   disabled={!editable}
                                   placeholder="-"
                                   onChange={e => handleMatrixCellChange(eqNum, dateStr, e.target.value)}
-                                  title={!editable ? `Tanggal ${dateStr} terkunci. Hanya H-1 (kemarin) yang dapat diisi.` : isAfraUser ? `Isi jam jalan ${dateStr} (DEV: tidak ada batas 24)` : `Isi jam jalan ${dateStr} (maks 24)`}
+                                  title={!editable ? `Tanggal ${dateStr} belum berjalan.` : `Isi jam jalan ${dateStr}`}
                                   className={`w-11 text-center py-1 text-xs font-mono rounded outline-none transition-all ${
                                     !editable
                                       ? hasRecord
@@ -1986,7 +1996,7 @@ export default function DailyDashboard({
             </div>
           </div>
         </div>
-      ) : (
+      ) : dashboardSubTab === 'riwayat' ? (
         /* SUB-TAB 2: RIWAYAT & KALENDER JAM JALAN */
         <div className="flex-1 flex p-5 gap-5 overflow-hidden">
           {/* Left Panel: Calendar */}
@@ -2211,7 +2221,15 @@ export default function DailyDashboard({
         </div>
       </div>
     </div>
-  )}
+      ) : (
+        /* SUB-TAB 3: REKAP MONITORING REGIONAL */
+        <div className="flex-1 overflow-hidden">
+          <RekapMonitoringView
+            currentUser={currentUser}
+            equipments={equipments}
+          />
+        </div>
+      )}
 
       {/* Modal Form */}
       {showForm && (
