@@ -393,16 +393,28 @@ export default function DailyDashboard({
     }
   }, [matrixMonth]);
 
-  // Check if a cell date (yyyy-MM-dd) is editable (unlocked for past & present dates up to today)
+  // Check if a cell date (yyyy-MM-dd) is editable
+  // Rule: USER and ADMIN can ONLY edit H-1 (yesterday). DEV gets full access to all dates.
   const isCellEditable = (dateStr) => {
+    // DEV role gets access to edit all dates
+    if (isAfraUser) return true;
+
     const today = simulatedToday || new Date();
-    const today_str = format(today, 'yyyy-MM-dd');
+    const todayDay = today.getDate();
+    const todayMonthStr = format(today, 'yyyy-MM');
+    const cellMonthStr = dateStr.substring(0, 7);
 
-    // Admin, DEV, or Afra users can edit all dates
-    if (isAdminUser || isAfraUser) return true;
+    // Rule 1: Tanggal 1 & 2 tiap bulan -> dapat edit bulan berjalan & bulan lalu
+    if (todayDay === 1 || todayDay === 2) {
+      const prevMonthStr = format(subMonths(today, 1), 'yyyy-MM');
+      return cellMonthStr === todayMonthStr || cellMonthStr === prevMonthStr;
+    }
 
-    // Unit / User role can edit all dates up to today
-    return dateStr <= today_str;
+    // Rule 2: Tanggal 3 ke atas -> Hanya dapat edit H-1 (kemarin) untuk USER dan ADMIN
+    const yesterdayObj = subDays(today, 1);
+    const yesterdayStr = format(yesterdayObj, 'yyyy-MM-dd');
+
+    return dateStr === yesterdayStr;
   };
 
 
@@ -1865,7 +1877,7 @@ export default function DailyDashboard({
                       return (
                         <th 
                           key={dayStr} 
-                          title={editable ? `Tanggal ${dayStr} aktif (dapat diisi)` : `Tanggal ${dayStr} belum berjalan`}
+                          title={editable ? `Tanggal ${dayStr} aktif (H-1 dapat diisi)` : `Tanggal ${dayStr} terkunci (Hanya H-1 kemarin yang dapat diisi)`}
                           className={`p-2 text-center border-r border-slate-700 min-w-[48px] text-[11px] font-mono transition-all ${
                             editable ? 'bg-emerald-600 text-white font-black ring-2 ring-emerald-300 shadow-md scale-105 z-10' : 'bg-slate-800 text-slate-400'
                           }`}
@@ -1934,7 +1946,7 @@ export default function DailyDashboard({
                                   disabled={!editable}
                                   placeholder="-"
                                   onChange={e => handleMatrixCellChange(eqNum, dateStr, e.target.value)}
-                                  title={!editable ? `Tanggal ${dateStr} belum berjalan.` : `Isi jam jalan ${dateStr}`}
+                                  title={!editable ? `Tanggal ${dateStr} terkunci. Hanya tanggal kemarin (H-1) yang dapat diisi.` : isAfraUser ? `Isi jam jalan ${dateStr} (DEV: bebas)` : `Isi jam jalan ${dateStr} (maks 24)`}
                                   className={`w-11 text-center py-1 text-xs font-mono rounded outline-none transition-all ${
                                     !editable
                                       ? hasRecord
