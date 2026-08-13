@@ -513,7 +513,12 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     }
 
     const plantCodeStr = eq.plant || '5F01';
-    let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
+    const loggedEntry = todaysLogs.find(l => {
+      const lEq = String(l.indukEqNum || l.induk_eq_num || '').trim();
+      return lEq === eqKey || eqToParentEqNum[lEq] === pEqNum;
+    });
+    const userNotes = loggedEntry?.notes || loggedEntry?.catatan || '';
+    let note = userNotes ? `${userNotes} (${plantCodeStr})` : `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
     if (note.length > 30) note = note.substring(0, 30);
     if (shortTextIdx !== -1) rowData[shortTextIdx] = note;
     for (let c = 0; c < rowData.length; c++) {
@@ -569,7 +574,8 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     }
 
     const plantCodeStr = log.plant || '5F01';
-    let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
+    const userNotes = log.notes || log.catatan || '';
+    let note = userNotes ? `${userNotes} (${plantCodeStr})` : `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
     if (note.length > 30) note = note.substring(0, 30);
     if (shortTextIdx !== -1) newRow[shortTextIdx] = note;
 
@@ -754,7 +760,8 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     exportedEqKeys.add(eqKey);
 
     const total = accDurations[eqKey] || 0;
-    if (total <= 0) return;
+    const logHasNotes = log && (log.notes || log.catatan);
+    if (total <= 0 && !logHasNotes) return;
 
     const pEqNum = eqToParentEqNum[eqKey] || eqKey;
     const isSubEq = (eqKey !== pEqNum);

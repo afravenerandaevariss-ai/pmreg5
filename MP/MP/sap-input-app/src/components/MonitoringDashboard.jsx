@@ -81,6 +81,36 @@ export default function MonitoringDashboard({
     setCurrentPage(1);
   }, [currentMonth, currentUser, selectedPlantFilter]);
 
+  // Generate days for the current month grouped by week
+  // MUST be declared before missingInputData and getLogDuration
+  const { weeks, flatDays } = useMemo(() => {
+    const start = startOfMonth(currentMonth);
+    const end = endOfMonth(currentMonth);
+    const days = eachDayOfInterval({ start, end });
+    
+    const weeksMap = new Map();
+    days.forEach(day => {
+      const weekNum = getISOWeek(day);
+      if (!weeksMap.has(weekNum)) {
+        weeksMap.set(weekNum, []);
+      }
+      weeksMap.get(weekNum).push(day);
+    });
+
+    const weeksArray = Array.from(weeksMap.entries()).map(([weekNum, daysInWeek], idx) => ({
+      label: `M${idx + 1}`,
+      days: daysInWeek
+    }));
+
+    return { weeks: weeksArray, flatDays: days };
+  }, [currentMonth]);
+
+  const getLogDuration = (eqNum, dateStr) => {
+    const logsForDay = dailyLogs[dateStr] || [];
+    const log = logsForDay.find(l => l.indukEqNum === eqNum);
+    return log ? (log.durationMinutes / 60) : 0;
+  };
+
   // Get Induk equipments filtered by selectedPlantFilter
   const indukEquipments = useMemo(() => {
     const base = equipments.filter(eq =>
@@ -95,6 +125,12 @@ export default function MonitoringDashboard({
       allLogs.some(log => log.indukEqNum === eq.eqNum && log.durationMinutes > 0)
     );
   }, [equipments, selectedPlantFilter, dailyLogs]);
+
+  const totalPages = Math.ceil(indukEquipments.length / rowsPerPage);
+  const paginatedEquipments = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerPage;
+    return indukEquipments.slice(start, start + rowsPerPage);
+  }, [indukEquipments, currentPage]);
 
   // Compute all Induk equipments and their missing days in currentMonth
   const missingInputData = useMemo(() => {
@@ -146,42 +182,6 @@ export default function MonitoringDashboard({
       (item.measuringPoint && String(item.measuringPoint).toLowerCase().includes(q))
     );
   }, [missingInputData, missingSearchQuery]);
-
-  // Generate days for the current month grouped by week
-  const { weeks, flatDays } = useMemo(() => {
-    const start = startOfMonth(currentMonth);
-    const end = endOfMonth(currentMonth);
-    const days = eachDayOfInterval({ start, end });
-    
-    const weeksMap = new Map();
-    days.forEach(day => {
-      // Using ISO week number to group days
-      const weekNum = getISOWeek(day);
-      if (!weeksMap.has(weekNum)) {
-        weeksMap.set(weekNum, []);
-      }
-      weeksMap.get(weekNum).push(day);
-    });
-
-    const weeksArray = Array.from(weeksMap.entries()).map(([weekNum, daysInWeek], idx) => ({
-      label: `M${idx + 1}`,
-      days: daysInWeek
-    }));
-
-    return { weeks: weeksArray, flatDays: days };
-  }, [currentMonth]);
-
-  const totalPages = Math.ceil(indukEquipments.length / rowsPerPage);
-  const paginatedEquipments = useMemo(() => {
-    const start = (currentPage - 1) * rowsPerPage;
-    return indukEquipments.slice(start, start + rowsPerPage);
-  }, [indukEquipments, currentPage]);
-
-  const getLogDuration = (eqNum, dateStr) => {
-    const logsForDay = dailyLogs[dateStr] || [];
-    const log = logsForDay.find(l => l.indukEqNum === eqNum);
-    return log ? (log.durationMinutes / 60) : 0;
-  };
 
   const plantRecap = useMemo(() => {
     if (activeTab === 'equipment') return [];

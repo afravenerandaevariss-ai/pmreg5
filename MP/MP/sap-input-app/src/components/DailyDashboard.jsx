@@ -132,11 +132,12 @@ export default function DailyDashboard({
   const [showImportSummary, setShowImportSummary] = useState(false);
   const [isRefreshingForExport, setIsRefreshingForExport] = useState(false);
   const [massData, setMassData] = useState({});
+  const getH1ExportDateStr = () => format(subDays(new Date(), 1), 'yyyy-MM-dd');
   const [exportSettings, setExportSettings] = useState({ 
     time: '08:00', 
     readBy: currentUser?.role === 'Unit' ? currentUser.name : 'ADMIN',
-    startDate: format(new Date(), 'yyyy-MM-dd'),
-    endDate: format(new Date(), 'yyyy-MM-dd'),
+    startDate: getH1ExportDateStr(),
+    endDate: getH1ExportDateStr(),
     isAccumulated: false
   });
   const [exportEqSearch, setExportEqSearch] = useState('');
@@ -1684,16 +1685,15 @@ export default function DailyDashboard({
               ✓ GSheet
             </button>
           )}
-          {!isUserRole && (
-            <button
+          <button
               onClick={() => {
-                const selDateStr = format(selectedDate, 'yyyy-MM-dd');
-                setExportSettings(prev => ({
-                  ...prev,
-                  startDate: selDateStr,
-                  endDate: selDateStr,
+                const h1DateStr = format(subDays(simulatedToday || new Date(), 1), 'yyyy-MM-dd');
+                setExportSettings(prev => ({ 
+                  ...prev, 
+                  startDate: h1DateStr,
+                  endDate: h1DateStr,
                   isAccumulated: false,
-                  time: '08:00'
+                  time: '08:00' 
                 }));
                 setShowExportModal(true);
               }}
@@ -1702,7 +1702,6 @@ export default function DailyDashboard({
               <FileDown size={14} />
               Export SAP
             </button>
-          )}
         </div>
       </div>
 
@@ -1800,11 +1799,11 @@ export default function DailyDashboard({
               {!isUserRole && (
                 <button
                   onClick={() => {
-                    const selDateStr = format(selectedDate, 'yyyy-MM-dd');
+                    const h1DateStr = format(subDays(simulatedToday || new Date(), 1), 'yyyy-MM-dd');
                     setExportSettings(prev => ({ 
                       ...prev, 
-                      startDate: selDateStr,
-                      endDate: selDateStr,
+                      startDate: h1DateStr,
+                      endDate: h1DateStr,
                       isAccumulated: false,
                       time: '08:00' 
                     }));
@@ -1928,9 +1927,6 @@ export default function DailyDashboard({
                             if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
                               hasRecord = true;
                               val = rawVal;
-                            } else if (dayNum <= 6) {
-                              hasRecord = true;
-                              val = 0;
                             }
 
                             const editable = isCellEditable(dateStr);
@@ -2093,11 +2089,11 @@ export default function DailyDashboard({
             {isUserRole && (
               <button 
                 onClick={() => {
-                  const selDateStr = format(selectedDate, 'yyyy-MM-dd');
+                  const h1DateStr = format(subDays(simulatedToday || new Date(), 1), 'yyyy-MM-dd');
                   setExportSettings(prev => ({ 
                     ...prev, 
-                    startDate: selDateStr,
-                    endDate: selDateStr,
+                    startDate: h1DateStr,
+                    endDate: h1DateStr,
                     isAccumulated: false,
                     time: '08:00' 
                   }));
@@ -2555,15 +2551,15 @@ export default function DailyDashboard({
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Mulai Tanggal</label>
                   <input 
                     type="date" 
-                    className="w-full border border-slate-300 rounded-2xl p-2.5 bg-slate-50 text-sm focus:ring-2 focus:ring-emerald-500" 
+                    className="w-full border border-slate-300 rounded-2xl p-2.5 bg-slate-50 text-sm focus:ring-2 focus:ring-emerald-500 cursor-pointer" 
                     value={exportSettings.startDate} 
                     onChange={e => {
                       const newStart = e.target.value;
-                      if (isUserRole) {
-                        setExportSettings({ ...exportSettings, startDate: newStart, endDate: newStart });
-                      } else {
-                        setExportSettings({ ...exportSettings, startDate: newStart });
-                      }
+                      setExportSettings(prev => ({
+                        ...prev,
+                        startDate: newStart,
+                        endDate: prev.endDate < newStart ? newStart : prev.endDate
+                      }));
                     }} 
                   />
                 </div>
@@ -2571,13 +2567,14 @@ export default function DailyDashboard({
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Sampai Tanggal</label>
                   <input 
                     type="date" 
-                    disabled={isUserRole}
-                    className={`w-full border border-slate-300 rounded-2xl p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 ${isUserRole ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-slate-50'}`} 
-                    value={isUserRole ? exportSettings.startDate : exportSettings.endDate} 
+                    className="w-full border border-slate-300 rounded-2xl p-2.5 bg-slate-50 text-sm focus:ring-2 focus:ring-emerald-500 cursor-pointer" 
+                    value={exportSettings.endDate} 
                     onChange={e => {
-                      if (!isUserRole) {
-                        setExportSettings({ ...exportSettings, endDate: e.target.value });
-                      }
+                      const newEnd = e.target.value;
+                      setExportSettings(prev => ({
+                        ...prev,
+                        endDate: newEnd < prev.startDate ? prev.startDate : newEnd
+                      }));
                     }} 
                   />
                 </div>
@@ -2744,7 +2741,7 @@ export default function DailyDashboard({
               </div>
 
               <div className="bg-slate-50 p-3 rounded-2xl text-xs text-slate-600 border border-slate-200">
-                <p><strong>Catatan:</strong> Hanya alat yang memiliki jam jalan harian &gt; 0 di periode ini yang masuk ke Excel.</p>
+                <p><strong>Catatan:</strong> Seluruh alat yang terisi (termasuk 0 HM dengan catatan/status) akan diekspor ke Excel SAP.</p>
               </div>
             </div>
             <div className="p-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex flex-col gap-3">

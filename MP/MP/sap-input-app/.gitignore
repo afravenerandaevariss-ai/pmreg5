@@ -24,3 +24,37 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Build artifacts (tidak perlu di-commit)
+dist-dev/
+dist-prod/
+
+# Debug / scratch scripts (mengandung credentials)
+scratch/
+
+# Scripts dengan credentials — jangan commit
+deploy_server.mjs
+deploy_dev_server.mjs
+sync_users_from_excel.mjs
+import_users_additive_only.mjs
+sync_vehicle_prod_to_dev.mjs
+migrate_regional_to_admin.mjs
+update_ramadhan_nik.mjs
+update_upload_filter.mjs
+seed_dev_parsed_excel.mjs
+fix_excel_sap.mjs
+clean-ik17.js
+clean.js
+fix-db.js
+update-role.cjs
+seed_users.js
+seed_users2.js
+setup-db.js
+
+# Env files (sudah ada *.local tapi tambahkan eksplisit)
+.env.dev
+.env.vercel
+.env.vercel.prod
+
+# Design critique files (lokal saja)
+.impeccable/
