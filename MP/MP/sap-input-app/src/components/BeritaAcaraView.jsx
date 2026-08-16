@@ -168,11 +168,7 @@ export default function BeritaAcaraView({ currentUser }) {
     setLoading(true);
     setStatusMsg(`Memuat data ${plantCode ? '[' + plantCode + '] ' : ''}${unitName}...`);
 
-    // headers=0 tells the GViz API to treat ALL rows as data rows.
-    // Without it, GViz auto-detects "header rows" and collapses them into
-    // cols[N].label — causing the BA text/equipment rows to vanish from
-    // data.table.rows.
-    const jsonpUrl = `https://docs.google.com/spreadsheets/d/${baSpreadsheetId}/gviz/tq?tq=&gid=${targetGid}&headers=0&_ts=${Date.now()}`;
+    const jsonpUrl = `https://docs.google.com/spreadsheets/d/${baSpreadsheetId}/gviz/tq?tq=&gid=${targetGid}&_ts=${Date.now()}`;
 
     try {
       const data = await loadGoogleSheetJSONP(jsonpUrl);
@@ -486,7 +482,7 @@ export default function BeritaAcaraView({ currentUser }) {
     });
 
     // Convert every GViz row to a flat string array
-    const rows = data.table.rows.map(r => {
+    const rows = (data.table.rows || []).map(r => {
       if (!r || !r.c) return [];
       return r.c.map(cell => {
         if (!cell) return '';
@@ -494,31 +490,39 @@ export default function BeritaAcaraView({ currentUser }) {
       });
     });
 
-    // ── Step 1: Scan rows for unit-specific header fields ──────────────────
-    let titleBA        = 'BERITA ACARA INVENTARISASI EQUIPMENT SAP';
+    const cols = data.table.cols || [];
+    const colBLabel = cols[1]?.label || '';
+
+    // ── Step 1: Scan cols[1].label and rows for unit-specific header fields ──
+    let titleBA           = 'BERITA ACARA INVENTARISASI EQUIPMENT SAP';
     let nomorBAFromSheet  = '';
     let perihalFromSheet  = '';
     let penutupFromSheet  = '';
 
-    // Signature scanning state
-    let sigBuatFromSheet      = '';
-    let sigKetahuiFromSheet   = '';
-    let jabatanBuatFromSheet  = '';
-    let jabatanKetahuiFromSheet = '';
-    let namaBuatFromSheet     = '';
-    let namaKetahuiFromSheet  = '';
+    // Extract from column B label if GViz collapsed header metadata
+    if (colBLabel.includes('BERITA ACARA')) {
+      const tMatch = colBLabel.match(/^(.*?)\s*Nomor\s*:/i);
+      if (tMatch && tMatch[1].trim()) titleBA = tMatch[1].trim();
+    }
+    if (colBLabel.includes('Nomor:')) {
+      const noMatch = colBLabel.match(/Nomor\s*:\s*(.*?)\s*Perihal/i);
+      if (noMatch) nomorBAFromSheet = 'Nomor: ' + noMatch[1].trim();
+    }
+    if (colBLabel.includes('Perihal')) {
+      const perihalMatch = colBLabel.match(/Perihal\s*:\s*(.*?)\s*Pada hari ini/i);
+      if (perihalMatch) perihalFromSheet = perihalMatch[1].trim();
+    }
 
-    // Indices that separate header / equipment / footer sections
-    let equipmentStartIdx = -1;   // first numeric-numbered equipment row
-    let closingStartIdx   = rows.length; // first closing/Demikian row
-    let sigBlockStartIdx  = rows.length; // first "Dibuat Oleh" row
+    let equipmentStartIdx = -1;
+    let closingStartIdx   = rows.length;
+    let sigBlockStartIdx  = rows.length;
 
-    // First pass: identify section boundaries and extract header text
+    // Scan rows for boundaries and cell-based headers
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
-      // col B = index 1, col C = index 2, col F = index 5
       const colB = (row[1] || '').trim();
       const colC = (row[2] || '').trim();
+      const rowStr = row.join(' ').trim();
 
       // Title row
       if (!titleBA.includes('SAP') && colB.toUpperCase().includes('BERITA ACARA')) {
@@ -535,42 +539,48 @@ export default function BeritaAcaraView({ currentUser }) {
 
       // Perihal row: "Perihal :…" or "Perihal:…"
       if (!perihalFromSheet && /^Perihal\s*:/i.test(colB)) {
-        // Normalise: extract the text after the colon
         const afterColon = colB.replace(/^Perihal\s*:\s*/i, '').trim();
-        // Re-canonicalise to the form the rest of the code expects
         perihalFromSheet = afterColon.match(/^Equipment Aktif Di Unit/i)
           ? afterColon
           : `Equipment Aktif Di Unit ${afterColon}`;
       }
 
       // Closing / Demikian row
-      if (closingStartIdx === rows.length && /Demikian/i.test(colB)) {
+      if (closingStartIdx === rows.length && /Demikian/i.test(rowStr)) {
         closingStartIdx = i;
-        // Capture the full closing text (may include HTML-bold later)
-        penutupFromSheet = colB;
+        penutupFromSheet = colB || rowStr;
       }
 
       // Signature block start: "Dibuat Oleh"
-      if (sigBlockStartIdx === rows.length && /Dibuat Oleh/i.test(colC)) {
+      if (sigBlockStartIdx === rows.length && /Dibuat Oleh/i.test(rowStr)) {
         sigBlockStartIdx = i;
       }
 
-      // Equipment rows: col B is a number AND col C has a name (≥2 chars)
+      // Equipment row start detection
       if (
         equipmentStartIdx === -1 &&
-        /^\d+$/.test(colB) &&
         colC.length >= 2 &&
-        !colC.toLowerCase().includes('nama equipment')  // skip header row
+        !colC.toLowerCase().includes('nama equipment') &&
+        !/Dibuat Oleh|Demikian|Nomor:|Perihal:/i.test(rowStr)
       ) {
-        equipmentStartIdx = i;
+        if (/^\d+$/.test(colB) || (row[3] && row[3].length >= 5)) {
+          equipmentStartIdx = i;
+        }
       }
     }
 
-    // ── Step 2: Scan signature block (rows after closingStartIdx) ──────────
+    // ── Step 2: Scan signature block ──────────────────
+    let sigBuatFromSheet      = '';
+    let sigKetahuiFromSheet   = '';
+    let jabatanBuatFromSheet  = '';
+    let jabatanKetahuiFromSheet = '';
+    let namaBuatFromSheet     = '';
+    let namaKetahuiFromSheet  = '';
+
     for (let i = sigBlockStartIdx; i < rows.length; i++) {
       const row = rows[i];
-      const colC = (row[2] || '').trim();  // left signature block
-      const colF = (row[5] || '').trim();  // right signature block
+      const colC = (row[2] || row[1] || '').trim();
+      const colF = (row[5] || row[4] || row[6] || '').trim();
 
       if (/Dibuat Oleh/i.test(colC)) {
         sigBuatFromSheet    = colC;
@@ -584,8 +594,8 @@ export default function BeritaAcaraView({ currentUser }) {
       }
     }
 
-    // ── Step 3: Validate — if we couldn't find any BA structure, error out ─
-    const foundStructure = nomorBAFromSheet || perihalFromSheet || sigBuatFromSheet;
+    // ── Step 3: Validate ──
+    const foundStructure = nomorBAFromSheet || perihalFromSheet || sigBuatFromSheet || (cols.length > 3);
     if (!foundStructure) {
       setError(`Konfigurasi Berita Acara untuk Kode Unit [${plantCode}] belum ditemukan. Pastikan sheet unit ini sudah tersedia di spreadsheet referensi.`);
       setBaData(null);
@@ -593,7 +603,7 @@ export default function BeritaAcaraView({ currentUser }) {
       return;
     }
 
-    // ── Step 4: Resolve fields — unitOverrides (Supabase) > sheet > default ─
+    // ── Step 4: Resolve fields — unitOverrides (Supabase) > sheet > default ──
     const today = new Date();
     const monthRoman = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'][today.getMonth()];
     const year = today.getFullYear();
@@ -606,30 +616,28 @@ export default function BeritaAcaraView({ currentUser }) {
       perihalFromSheet ||
       `Equipment Aktif Di Unit ${unitName.toUpperCase()}`;
 
-    const sigBuat      = unitOverrides.sig_buat      || sigBuatFromSheet      || 'Dibuat Oleh,';
-    const sigKetahui   = unitOverrides.sig_ketahui   || sigKetahuiFromSheet   || 'Diketahui Oleh,';
-    const jabatanBuat  = unitOverrides.jabatan_buat  || jabatanBuatFromSheet  || 'Asisten Teknik';
+    const sigBuat        = unitOverrides.sig_buat        || sigBuatFromSheet        || 'Dibuat Oleh,';
+    const sigKetahui     = unitOverrides.sig_ketahui     || sigKetahuiFromSheet     || 'Diketahui Oleh,';
+    const jabatanBuat    = unitOverrides.jabatan_buat    || jabatanBuatFromSheet    || 'Asisten Teknik';
     const jabatanKetahui = unitOverrides.jabatan_ketahui || jabatanKetahuiFromSheet || 'Manajer';
-    const namaBuat     = unitOverrides.nama_buat     || namaBuatFromSheet     || '(______________)';
-    const namaKetahui  = unitOverrides.nama_ketahui  || namaKetahuiFromSheet  || '(______________)';
+    const namaBuat       = unitOverrides.nama_buat       || namaBuatFromSheet       || '(______________)';
+    const namaKetahui    = unitOverrides.nama_ketahui    || namaKetahuiFromSheet    || '(______________)';
 
-    // ── Step 5: Build dynamic pembukaan (always uses today's date) ─────────
+    // ── Step 5: Build dynamic pembukaan (always uses today's date) ──
     const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
     const dayName = days[today.getDay()];
     const dateStr = today.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
     const unitNameOnly = perihal.replace(/^Equipment Aktif Di Unit\s*/i, '').trim();
     const pembukaan = `Pada hari ini, ${dayName} tanggal ${dateStr}, bertempat di Kantor ${unitNameOnly}, Asisten Teknik Menginventarisasi Equipment (Kendaraan dan Mesin) yang masih aktif atau yang masih dalam perbaikan dan Manajer mengawasi kegiatan Inventarisasi tersebut, adapun hasil inventaris dengan rincian sebagai berikut`;
 
-    // ── Step 6: Parse equipment rows ───────────────────────────────────────
-    // Equipment rows are between equipmentStartIdx (inclusive) and closingStartIdx (exclusive).
-    // If equipmentStartIdx was never found, scan all rows before closingStartIdx.
-    const scanStart = equipmentStartIdx >= 0 ? equipmentStartIdx : 0;
-    const scanEnd   = closingStartIdx;
-
+    // ── Step 6: Parse equipment rows ──
+    const endScan = Math.min(closingStartIdx, sigBlockStartIdx);
+    const startScan = equipmentStartIdx >= 0 ? equipmentStartIdx : 0;
     const equipmentRows = [];
-    for (let i = scanStart; i < scanEnd; i++) {
+
+    for (let i = startScan; i < endScan; i++) {
       const row = rows[i];
-      if (!row || row.length < 7) continue;
+      if (!row) continue;
       let no          = (row[1] || '').trim();
       let name        = (row[2] || '').trim();
       const noEq      = (row[3] || '').trim();
@@ -640,7 +648,11 @@ export default function BeritaAcaraView({ currentUser }) {
       // Skip non-equipment rows (header row, blank rows, text rows)
       if (!name || name.length < 2) continue;
       if (name.toLowerCase().includes('nama equipment')) continue;
-      if (!/^\d+$/.test(no) && !noEq) continue;  // must have a number or an equipment ID
+      if (/Dibuat Oleh|Demikian|Nomor:|Perihal:/i.test(name)) continue;
+
+      if (!no || !/^\d+$/.test(no)) {
+        no = String(equipmentRows.length + 1);
+      }
 
       // Apply per-row Supabase overrides
       if (overrideMap[noEq]) {
@@ -655,7 +667,7 @@ export default function BeritaAcaraView({ currentUser }) {
       equipmentRows.push({ no, name, noEq: currentNoEq, cc, status, kepemilikan, originalNoEq: noEq });
     }
 
-    // ── Step 7: Build penutup ──────────────────────────────────────────────
+    // ── Step 7: Build penutup ──
     const formattedUnitName = perihal.replace(/^Equipment Aktif Di Unit/i, '').trim();
     const penutup = unitOverrides.penutup ||
       (penutupFromSheet
@@ -825,53 +837,46 @@ export default function BeritaAcaraView({ currentUser }) {
           <select 
             value={selectedUnit} 
             onChange={(e) => setSelectedUnit(e.target.value)}
-            disabled={isRestricted}
-            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
+            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-sm"
           >
-            {isRestricted ? (
-              selectedUnit ? <option value={selectedUnit}>{selectedUnit.split('|')[1]} - {selectedUnit.split('|')[0]}</option> : <option value="">Loading Unit...</option>
-            ) : (
-              <>
-                <option value="">-- Pilih Unit/Kebun --</option>
-                <optgroup label="🌿 KEBUN">
-                  <option value="Gunung Meliau|5E01">5E01 - KEBUN GUNUNG MELIAU</option>
-                  <option value="Gunung Mas|5E02">5E02 - KEBUN GUNUNG MAS</option>
-                  <option value="Sungai Dekan|5E03">5E03 - KEBUN SUNGAI DEKAN</option>
-                  <option value="Rimba Belian|5E04">5E04 - KEBUN RIMBA BELIAN</option>
-                  <option value="Sintang|5E06">5E06 - KEBUN SINTANG</option>
-                  <option value="Ngabang|5E07">5E07 - KEBUN NGABANG</option>
-                  <option value="Parindu|5E08">5E08 - KEBUN PARINDU</option>
-                  <option value="Kembayan|5E09">5E09 - KEBUN KEMBAYAN</option>
-                  <option value="Danau Salak|5E11">5E11 - KEBUN DANAU SALAK</option>
-                  <option value="Kumai|5E12">5E12 - KEBUN KUMAI KARET</option>
-                  <option value="Batu Licin|5E13">5E13 - KEBUN BATULICIN</option>
-                  <option value="Pamukan|5E14">5E14 - KEBUN PAMUKAN</option>
-                  <option value="Pelaihari|5E15">5E15 - KEBUN PELAIHARI</option>
-                  <option value="Tabara|5E16">5E16 - KEBUN TABARA</option>
-                  <option value="Tajati|5E17">5E17 - KEBUN TAJATI</option>
-                  <option value="Pandawa|5E18">5E18 - KEBUN PANDAWA</option>
-                  <option value="Longkali|5E19">5E19 - KEBUN LONGKALI</option>
-                </optgroup>
-                <optgroup label="🏭 PABRIK / PKS">
-                  <option value="PKS Gunung Meliau|5F01">5F01 - PABRIK GUNUNG MELIAU</option>
-                  <option value="PKS Rimba Belian|5F04">5F04 - PABRIK RIMBA BELIAN</option>
-                  <option value="PKS Ngabang|5F07">5F07 - PABRIK NGABANG</option>
-                  <option value="PKS Parindu|5F08">5F08 - PABRIK PARINDU</option>
-                  <option value="PKS Kembayan|5F09">5F09 - PABRIK KEMBAYAN</option>
-                  <option value="Unit Proyek Batu Bara|5F11">5F11 - UNIT PROYEK BATU BARA</option>
-                  <option value="PKS Pamukan|5F14">5F14 - PABRIK PAMUKAN</option>
-                  <option value="PKS Pelaihari|5F15">5F15 - PABRIK PELAIHARI</option>
-                  <option value="Tambarangan|5F20">5F20 - PKR TAMBARANGAN</option>
-                  <option value="PKS Samuntai|5F21">5F21 - PABRIK SAMUNTAI</option>
-                  <option value="PKS Longpinang|5F22">5F22 - PABRIK LONG PINANG</option>
-                </optgroup>
-                <optgroup label="🏢 DISTRIK">
-                  <option value="Distrik Kalimantan Barat|5D01">5D01 - DISTRIK KALBAR</option>
-                  <option value="Distrik Kalimantan Timur|5D02">5D02 - DISTRIK KALTIM</option>
-                  <option value="Distrik Kalimantan Selatan|5D03">5D03 - DISTRIK KALSELTENG</option>
-                </optgroup>
-              </>
-            )}
+            <option value="">-- Pilih Unit/Kebun --</option>
+            <optgroup label="🌿 KEBUN">
+              <option value="Gunung Meliau|5E01">5E01 - KEBUN GUNUNG MELIAU</option>
+              <option value="Gunung Mas|5E02">5E02 - KEBUN GUNUNG MAS</option>
+              <option value="Sungai Dekan|5E03">5E03 - KEBUN SUNGAI DEKAN</option>
+              <option value="Rimba Belian|5E04">5E04 - KEBUN RIMBA BELIAN</option>
+              <option value="Sintang|5E06">5E06 - KEBUN SINTANG</option>
+              <option value="Ngabang|5E07">5E07 - KEBUN NGABANG</option>
+              <option value="Parindu|5E08">5E08 - KEBUN PARINDU</option>
+              <option value="Kembayan|5E09">5E09 - KEBUN KEMBAYAN</option>
+              <option value="Danau Salak|5E11">5E11 - KEBUN DANAU SALAK</option>
+              <option value="Kumai|5E12">5E12 - KEBUN KUMAI KARET</option>
+              <option value="Batu Licin|5E13">5E13 - KEBUN BATULICIN</option>
+              <option value="Pamukan|5E14">5E14 - KEBUN PAMUKAN</option>
+              <option value="Pelaihari|5E15">5E15 - KEBUN PELAIHARI</option>
+              <option value="Tabara|5E16">5E16 - KEBUN TABARA</option>
+              <option value="Tajati|5E17">5E17 - KEBUN TAJATI</option>
+              <option value="Pandawa|5E18">5E18 - KEBUN PANDAWA</option>
+              <option value="Longkali|5E19">5E19 - KEBUN LONGKALI</option>
+            </optgroup>
+            <optgroup label="🏭 PABRIK / PKS">
+              <option value="PKS Gunung Meliau|5F01">5F01 - PABRIK GUNUNG MELIAU</option>
+              <option value="PKS Rimba Belian|5F04">5F04 - PABRIK RIMBA BELIAN</option>
+              <option value="PKS Ngabang|5F07">5F07 - PABRIK NGABANG</option>
+              <option value="PKS Parindu|5F08">5F08 - PABRIK PARINDU</option>
+              <option value="PKS Kembayan|5F09">5F09 - PABRIK KEMBAYAN</option>
+              <option value="Unit Proyek Batu Bara|5F11">5F11 - UNIT PROYEK BATU BARA</option>
+              <option value="PKS Pamukan|5F14">5F14 - PABRIK PAMUKAN</option>
+              <option value="PKS Pelaihari|5F15">5F15 - PABRIK PELAIHARI</option>
+              <option value="Tambarangan|5F20">5F20 - PKR TAMBARANGAN</option>
+              <option value="PKS Samuntai|5F21">5F21 - PABRIK SAMUNTAI</option>
+              <option value="PKS Longpinang|5F22">5F22 - PABRIK LONG PINANG</option>
+            </optgroup>
+            <optgroup label="🏢 DISTRIK">
+              <option value="Distrik Kalimantan Barat|5D01">5D01 - DISTRIK KALBAR</option>
+              <option value="Distrik Kalimantan Timur|5D02">5D02 - DISTRIK KALTIM</option>
+              <option value="Distrik Kalimantan Selatan|5D03">5D03 - DISTRIK KALSELTENG</option>
+            </optgroup>
           </select>
         </div>
 
