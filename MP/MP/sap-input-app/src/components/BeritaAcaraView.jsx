@@ -168,7 +168,11 @@ export default function BeritaAcaraView({ currentUser }) {
     setLoading(true);
     setStatusMsg(`Memuat data ${plantCode ? '[' + plantCode + '] ' : ''}${unitName}...`);
 
-    const jsonpUrl = `https://docs.google.com/spreadsheets/d/${baSpreadsheetId}/gviz/tq?tq=&gid=${targetGid}&_ts=${Date.now()}`;
+    // headers=0 tells the GViz API to treat ALL rows as data rows.
+    // Without it, GViz auto-detects "header rows" and collapses them into
+    // cols[N].label — causing the BA text/equipment rows to vanish from
+    // data.table.rows.
+    const jsonpUrl = `https://docs.google.com/spreadsheets/d/${baSpreadsheetId}/gviz/tq?tq=&gid=${targetGid}&headers=0&_ts=${Date.now()}`;
 
     try {
       const data = await loadGoogleSheetJSONP(jsonpUrl);
@@ -447,127 +451,221 @@ export default function BeritaAcaraView({ currentUser }) {
     }
   };
 
+  // ─── Parse Google Sheets GViz response into BA data ───
+  // The spreadsheet layout for every unit sheet (confirmed via CSV export):
+  //
+  //  Row (col B = index 1)                           | Col F (index 5)
+  //  ─────────────────────────────────────────────────┼──────────────────────
+  //  (blank)                                          |
+  //  "BERITA ACARA INVENTARISASI EQUIPMENT SAP"       |
+  //  "Nomor: 5KTJ/BA/ M- 20 /VII/2026"               |
+  //  (blank)                                          |
+  //  "Perihal : Equipment Aktif Di Unit Kebun Tajati" |
+  //  (blank)                                          |
+  //  "Pada hari ini, ..."                             |
+  //  (blank)                                          |
+  //  No | Nama Equipment | No Equipment | CC | Status | Kepemilikan   ← header row
+  //  1  | Triton KB ...  | 2000022749  | …  |  Baik  | Sewa          ← equipment rows
+  //  …
+  //  "Demikian Berita Acara ini dibuat …"             |
+  //  (blank)                                          |
+  //  "Dibuat Oleh,"                                   | "Diketahui Oleh,"
+  //  "Asisten Teknik"                                 | "Manajer"
+  //  (blank × 4)                                      |
+  //  "(Gerry Suharno)"                                | "(Willy Budiawan Sunaryo)"
+  //  "AKHLAK-Amanah, …"                              |
+  //
+  // IMPORTANT: All unit-specific content lives in the DATA ROWS (rows[i][1..6]),
+  // NOT in the GViz column-header label (cols[1].label).  The old code read from
+  // cols[1].label which only contains GViz metadata, causing every unit to fall
+  // back to generic defaults instead of using its own sheet data.
   const parseAndSetData = (data, unitName, plantCode, overrides = [], unitOverrides = {}) => {
     const overrideMap = {};
     overrides.forEach(row => {
       overrideMap[row.no_eq] = row;
     });
 
+    // Convert every GViz row to a flat string array
     const rows = data.table.rows.map(r => {
       if (!r || !r.c) return [];
       return r.c.map(cell => {
-        if (!cell) return "";
-        return cell.f !== undefined ? String(cell.f) : (cell.v !== undefined ? String(cell.v) : "");
+        if (!cell) return '';
+        return cell.f !== undefined ? String(cell.f) : (cell.v !== undefined ? String(cell.v) : '');
       });
     });
 
-    const cols = data.table.cols;
-    const headerText = cols[1]?.label || '';
+    // ── Step 1: Scan rows for unit-specific header fields ──────────────────
+    let titleBA        = 'BERITA ACARA INVENTARISASI EQUIPMENT SAP';
+    let nomorBAFromSheet  = '';
+    let perihalFromSheet  = '';
+    let penutupFromSheet  = '';
 
-    // Extract title
-    let titleBA = 'BERITA ACARA INVENTARISASI EQUIPMENT SAP';
-    const titleMatch = headerText.match(/^(.*?)\s*Nomor\s*:/i);
-    if (titleMatch && titleMatch[1].trim()) {
-      titleBA = titleMatch[1].trim();
-    }
+    // Signature scanning state
+    let sigBuatFromSheet      = '';
+    let sigKetahuiFromSheet   = '';
+    let jabatanBuatFromSheet  = '';
+    let jabatanKetahuiFromSheet = '';
+    let namaBuatFromSheet     = '';
+    let namaKetahuiFromSheet  = '';
 
-    // Extract meta info
-    let nomorBA = unitOverrides.nomor_ba || '';
-    if (!nomorBA) {
-      const noMatch = headerText.match(/Nomor\s*:\s*(.*?)\s*Perihal/i);
-      if (noMatch) {
-        nomorBA = "Nomor: " + noMatch[1].trim();
-      } else {
-        const today = new Date();
-        const monthRoman = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'][today.getMonth()];
-        const year = today.getFullYear();
-        nomorBA = `Nomor:    /BA/ M-02/${monthRoman}/${year}`;
+    // Indices that separate header / equipment / footer sections
+    let equipmentStartIdx = -1;   // first numeric-numbered equipment row
+    let closingStartIdx   = rows.length; // first closing/Demikian row
+    let sigBlockStartIdx  = rows.length; // first "Dibuat Oleh" row
+
+    // First pass: identify section boundaries and extract header text
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      // col B = index 1, col C = index 2, col F = index 5
+      const colB = (row[1] || '').trim();
+      const colC = (row[2] || '').trim();
+
+      // Title row
+      if (!titleBA.includes('SAP') && colB.toUpperCase().includes('BERITA ACARA')) {
+        titleBA = colB;
+      }
+      if (colB.toUpperCase().includes('BERITA ACARA') && colB.toUpperCase().includes('SAP')) {
+        titleBA = colB;
+      }
+
+      // Nomor row: "Nomor: …" or "Nomor :…"
+      if (!nomorBAFromSheet && /^Nomor\s*:/i.test(colB)) {
+        nomorBAFromSheet = colB;
+      }
+
+      // Perihal row: "Perihal :…" or "Perihal:…"
+      if (!perihalFromSheet && /^Perihal\s*:/i.test(colB)) {
+        // Normalise: extract the text after the colon
+        const afterColon = colB.replace(/^Perihal\s*:\s*/i, '').trim();
+        // Re-canonicalise to the form the rest of the code expects
+        perihalFromSheet = afterColon.match(/^Equipment Aktif Di Unit/i)
+          ? afterColon
+          : `Equipment Aktif Di Unit ${afterColon}`;
+      }
+
+      // Closing / Demikian row
+      if (closingStartIdx === rows.length && /Demikian/i.test(colB)) {
+        closingStartIdx = i;
+        // Capture the full closing text (may include HTML-bold later)
+        penutupFromSheet = colB;
+      }
+
+      // Signature block start: "Dibuat Oleh"
+      if (sigBlockStartIdx === rows.length && /Dibuat Oleh/i.test(colC)) {
+        sigBlockStartIdx = i;
+      }
+
+      // Equipment rows: col B is a number AND col C has a name (≥2 chars)
+      if (
+        equipmentStartIdx === -1 &&
+        /^\d+$/.test(colB) &&
+        colC.length >= 2 &&
+        !colC.toLowerCase().includes('nama equipment')  // skip header row
+      ) {
+        equipmentStartIdx = i;
       }
     }
 
-    let perihal = unitOverrides.perihal_text || '';
-    if (!perihal) {
-      const perihalMatch = headerText.match(/Perihal\s*:\s*(.*?)\s*Pada hari ini/i);
-      if (perihalMatch) {
-        perihal = perihalMatch[1].trim();
-      } else {
-        perihal = `Equipment Aktif Di Unit ${unitName.toUpperCase()}`;
+    // ── Step 2: Scan signature block (rows after closingStartIdx) ──────────
+    for (let i = sigBlockStartIdx; i < rows.length; i++) {
+      const row = rows[i];
+      const colC = (row[2] || '').trim();  // left signature block
+      const colF = (row[5] || '').trim();  // right signature block
+
+      if (/Dibuat Oleh/i.test(colC)) {
+        sigBuatFromSheet    = colC;
+        sigKetahuiFromSheet = colF || 'Diketahui Oleh,';
+      } else if (/Asisten|Astk|Teknik/i.test(colC)) {
+        jabatanBuatFromSheet    = colC;
+        jabatanKetahuiFromSheet = colF || 'Manajer';
+      } else if (colC.startsWith('(') && colC.endsWith(')')) {
+        namaBuatFromSheet    = colC;
+        namaKetahuiFromSheet = colF || '(______________)';
       }
     }
 
-    // Dynamic pembukaan based on today's date and the unit name
-    const todayDate = new Date();
+    // ── Step 3: Validate — if we couldn't find any BA structure, error out ─
+    const foundStructure = nomorBAFromSheet || perihalFromSheet || sigBuatFromSheet;
+    if (!foundStructure) {
+      setError(`Konfigurasi Berita Acara untuk Kode Unit [${plantCode}] belum ditemukan. Pastikan sheet unit ini sudah tersedia di spreadsheet referensi.`);
+      setBaData(null);
+      setLoading(false);
+      return;
+    }
+
+    // ── Step 4: Resolve fields — unitOverrides (Supabase) > sheet > default ─
+    const today = new Date();
+    const monthRoman = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'][today.getMonth()];
+    const year = today.getFullYear();
+
+    const nomorBA = unitOverrides.nomor_ba ||
+      nomorBAFromSheet ||
+      `Nomor:    /BA/ M-02/${monthRoman}/${year}`;
+
+    const perihal = unitOverrides.perihal_text ||
+      perihalFromSheet ||
+      `Equipment Aktif Di Unit ${unitName.toUpperCase()}`;
+
+    const sigBuat      = unitOverrides.sig_buat      || sigBuatFromSheet      || 'Dibuat Oleh,';
+    const sigKetahui   = unitOverrides.sig_ketahui   || sigKetahuiFromSheet   || 'Diketahui Oleh,';
+    const jabatanBuat  = unitOverrides.jabatan_buat  || jabatanBuatFromSheet  || 'Asisten Teknik';
+    const jabatanKetahui = unitOverrides.jabatan_ketahui || jabatanKetahuiFromSheet || 'Manajer';
+    const namaBuat     = unitOverrides.nama_buat     || namaBuatFromSheet     || '(______________)';
+    const namaKetahui  = unitOverrides.nama_ketahui  || namaKetahuiFromSheet  || '(______________)';
+
+    // ── Step 5: Build dynamic pembukaan (always uses today's date) ─────────
     const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-    const dayName = days[todayDate.getDay()];
-    const dateStr = todayDate.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
+    const dayName = days[today.getDay()];
+    const dateStr = today.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
     const unitNameOnly = perihal.replace(/^Equipment Aktif Di Unit\s*/i, '').trim();
     const pembukaan = `Pada hari ini, ${dayName} tanggal ${dateStr}, bertempat di Kantor ${unitNameOnly}, Asisten Teknik Menginventarisasi Equipment (Kendaraan dan Mesin) yang masih aktif atau yang masih dalam perbaikan dan Manajer mengawasi kegiatan Inventarisasi tersebut, adapun hasil inventaris dengan rincian sebagai berikut`;
 
-    // Find signature block boundary
-    let tableEnd = rows.length;
-    for (let i = 0; i < rows.length; i++) {
-      const rowText = rows[i].join(' ').trim();
-      if (rowText.match(/Dibuat Oleh|Demikian/i)) {
-        tableEnd = i;
-        break;
-      }
-    }
+    // ── Step 6: Parse equipment rows ───────────────────────────────────────
+    // Equipment rows are between equipmentStartIdx (inclusive) and closingStartIdx (exclusive).
+    // If equipmentStartIdx was never found, scan all rows before closingStartIdx.
+    const scanStart = equipmentStartIdx >= 0 ? equipmentStartIdx : 0;
+    const scanEnd   = closingStartIdx;
 
-    // Parse equipment data
     const equipmentRows = [];
-    for (let i = 0; i < tableEnd; i++) {
+    for (let i = scanStart; i < scanEnd; i++) {
       const row = rows[i];
       if (!row || row.length < 7) continue;
-      let name = row[2] || '';
-      const noEq = row[3] || '';
-      let cc = row[4] || '';
-      let status = row[5] || '';
-      let kepemilikan = row[6] || '';
-      let no = row[1] || '';
-      if (!name || name.length < 2) continue;
+      let no          = (row[1] || '').trim();
+      let name        = (row[2] || '').trim();
+      const noEq      = (row[3] || '').trim();
+      let cc          = (row[4] || '').trim();
+      let status      = (row[5] || '').trim();
+      let kepemilikan = (row[6] || '').trim();
 
+      // Skip non-equipment rows (header row, blank rows, text rows)
+      if (!name || name.length < 2) continue;
+      if (name.toLowerCase().includes('nama equipment')) continue;
+      if (!/^\d+$/.test(no) && !noEq) continue;  // must have a number or an equipment ID
+
+      // Apply per-row Supabase overrides
       if (overrideMap[noEq]) {
-        no = overrideMap[noEq].no_urut || no;
-        name = overrideMap[noEq].name || name;
-        cc = overrideMap[noEq].cc || cc;
-        status = overrideMap[noEq].status || status;
-        kepemilikan = overrideMap[noEq].kepemilikan || kepemilikan;
+        no          = overrideMap[noEq].no_urut      || no;
+        name        = overrideMap[noEq].name         || name;
+        cc          = overrideMap[noEq].cc           || cc;
+        status      = overrideMap[noEq].status       || status;
+        kepemilikan = overrideMap[noEq].kepemilikan  || kepemilikan;
       }
 
       const currentNoEq = overrideMap[noEq]?.new_no_eq || noEq;
       equipmentRows.push({ no, name, noEq: currentNoEq, cc, status, kepemilikan, originalNoEq: noEq });
     }
 
-    // Extract signature details
-    let sigBuat = unitOverrides.sig_buat || 'Dibuat Oleh,';
-    let sigKetahui = unitOverrides.sig_ketahui || 'Diketahui Oleh,';
-    let jabatanBuat = unitOverrides.jabatan_buat || 'Asisten Teknik';
-    let jabatanKetahui = unitOverrides.jabatan_ketahui || 'Manajer';
-    let namaBuat = unitOverrides.nama_buat || '(______________)';
-    let namaKetahui = unitOverrides.nama_ketahui || '(______________)';
-
-    if (!unitOverrides.sig_buat) {
-      for (let i = tableEnd; i < rows.length; i++) {
-        const row = rows[i];
-        if (!row || row.length < 6) continue;
-        const leftVal = (row[2] || '').trim();
-        const rightVal = (row[5] || '').trim();
-
-        if (leftVal.toLowerCase().includes('dibuat oleh')) {
-          sigBuat = leftVal;
-          sigKetahui = rightVal || 'Diketahui Oleh,';
-        } else if (leftVal.toLowerCase().includes('asisten') || leftVal.toLowerCase().includes('astk') || leftVal.toLowerCase().includes('teknik')) {
-          jabatanBuat = leftVal;
-          jabatanKetahui = rightVal || 'Manajer';
-        } else if (leftVal.startsWith('(') && leftVal.endsWith(')')) {
-          namaBuat = leftVal;
-          namaKetahui = rightVal || '(______________)';
-        }
-      }
-    }
-
+    // ── Step 7: Build penutup ──────────────────────────────────────────────
     const formattedUnitName = perihal.replace(/^Equipment Aktif Di Unit/i, '').trim();
-    const penutup = unitOverrides.penutup || `Demikian Berita Acara ini dibuat dan sejak ditandatanganinya Berita Acara ini maka manajemen unit <strong>${formattedUnitName || unitName}</strong> bertanggung jawab atas keakuratan data tersebut diatas.`;
+    const penutup = unitOverrides.penutup ||
+      (penutupFromSheet
+        ? penutupFromSheet.replace(
+            // Bolden the unit name if it appears in the raw closing text
+            new RegExp(`(${formattedUnitName}|${unitNameOnly})`, 'i'),
+            `<strong>$1</strong>`
+          )
+        : `Demikian Berita Acara ini dibuat dan sejak ditandatanganinya Berita Acara ini maka manajemen unit <strong>${formattedUnitName || unitName}</strong> bertanggung jawab atas keakuratan data tersebut diatas.`
+      );
 
     setBaData({
       penutup,
