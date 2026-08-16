@@ -723,12 +723,23 @@ export default function BeritaAcaraView({ currentUser }) {
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 max-w-5xl mx-auto">
       
       <style>{`
+        @media screen {
+          .hidden-on-web, .print-only {
+            display: none !important;
+          }
+        }
         @media print {
           body {
             visibility: hidden !important;
             background: #ffffff !important;
             margin: 0 !important;
             padding: 0 !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+          .print-only {
+            display: block !important;
           }
           .print-border-bottom {
             border-bottom: 1.5px solid #000000 !important;
@@ -747,7 +758,7 @@ export default function BeritaAcaraView({ currentUser }) {
             top: 0 !important;
             width: 100% !important;
             margin: 0 !important;
-            padding: 10mm 12mm !important;
+            padding: 6mm 10mm !important;
             border: none !important;
             box-shadow: none !important;
             background: #ffffff !important;
@@ -764,56 +775,38 @@ export default function BeritaAcaraView({ currentUser }) {
           #print-area-wrapper > div.ba-document-box {
             width: 100% !important;
             min-height: unset !important;
-            border: none !important;
+            border: 2.2px solid #000000 !important;
             box-shadow: none !important;
             margin: 0 auto !important;
             display: block !important;
           }
-          #print-area-wrapper > div.ba-document-box > div:not(.table-wrapper),
-          #print-area-wrapper > div.ba-document-box > table {
-            border-left: 2.2px solid #000000 !important;
-            border-right: 2.2px solid #000000 !important;
-            box-sizing: border-box !important;
-          }
-          #print-area-wrapper > div.ba-document-box > div:first-child {
-            border-top: 2.2px solid #000000 !important;
-          }
-          #print-area-wrapper > div.ba-document-box > div:last-child {
-            border-bottom: 2.2px solid #000000 !important;
-          }
           #print-area-wrapper > div.ba-footer {
             width: 100% !important;
-            border-top: none !important;
+            border-top: 1.2px solid #000000 !important;
             margin: 4px auto 0 !important;
-          }
-          .no-print {
-            display: none !important;
           }
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
-          }
-          input, [contenteditable], select {
-            border: none !important;
-            outline: none !important;
-            background: transparent !important;
-            box-shadow: none !important;
-            appearance: none !important;
+            color-adjust: exact !important;
           }
           table {
-            font-size: 10px !important;
+            font-size: 11px !important;
+          }
+          th {
+            background-color: #ffc000 !important;
+            color: #000000 !important;
+            font-weight: bold !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           td, th {
-            padding: 3px 5px !important;
+            padding: 4px 6px !important;
+            color: #000000 !important;
           }
           @page {
             size: A4 portrait;
-            margin: 0;
-          }
-        }
-        @media screen {
-          .hidden-on-web {
-            display: none !important;
+            margin: 6mm 8mm;
           }
         }
       `}</style>
@@ -1119,77 +1112,92 @@ export default function BeritaAcaraView({ currentUser }) {
                           const idx = chunkIdx === 0 ? innerIdx : 30 + (chunkIdx - 1) * 40 + innerIdx;
                           return (
                             <tr key={idx}>
-                              <td style={{ border: '1px solid #000000', borderLeft: 'none', padding: '5px 8px', textAlign: 'center', verticalAlign: 'middle' }}>
-                                <input 
-                                  type="text" 
-                                  value={eq.no} 
-                                  onChange={(e) => {
-                                    const newRows = [...baData.equipmentRows];
-                                    newRows[idx].no = e.target.value;
-                                    setBaData({ ...baData, equipmentRows: newRows });
-                                  }}
-                                  onBlur={() => handleAutoSaveEquipment(eq.originalNoEq, baData.equipmentRows[idx])}
-                                  className="w-full text-center bg-transparent border border-transparent hover:border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-teal-500 transition-colors"
-                                />
+                              <td style={{ border: '1px solid #000000', borderLeft: 'none', padding: '4px 6px', textAlign: 'center', verticalAlign: 'middle' }}>
+                                <div className="no-print">
+                                  <input 
+                                    type="text" 
+                                    value={eq.no} 
+                                    onChange={(e) => {
+                                      const newRows = [...baData.equipmentRows];
+                                      newRows[idx].no = e.target.value;
+                                      setBaData({ ...baData, equipmentRows: newRows });
+                                    }}
+                                    onBlur={() => handleAutoSaveEquipment(eq.originalNoEq, baData.equipmentRows[idx])}
+                                    className="w-full text-center bg-transparent border border-transparent hover:border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-teal-500 transition-colors"
+                                  />
+                                </div>
+                                <span className="print-only font-medium" style={{ textAlign: 'center' }}>{eq.no}</span>
                               </td>
-                              <td style={{ border: '1px solid #000000', padding: '5px 8px', verticalAlign: 'middle', textAlign: 'left' }}>
-                                <input 
-                                  type="text" 
-                                  value={eq.name} 
-                                  onChange={(e) => {
-                                    const newRows = [...baData.equipmentRows];
-                                    newRows[idx].name = e.target.value;
-                                    setBaData({ ...baData, equipmentRows: newRows });
-                                  }}
-                                  onBlur={() => handleAutoSaveEquipment(eq.originalNoEq, baData.equipmentRows[idx])}
-                                  className="w-full text-left bg-transparent border border-transparent hover:border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-teal-500 transition-colors"
-                                />
+                              <td style={{ border: '1px solid #000000', padding: '4px 6px', verticalAlign: 'middle', textAlign: 'left' }}>
+                                <div className="no-print">
+                                  <input 
+                                    type="text" 
+                                    value={eq.name} 
+                                    onChange={(e) => {
+                                      const newRows = [...baData.equipmentRows];
+                                      newRows[idx].name = e.target.value;
+                                      setBaData({ ...baData, equipmentRows: newRows });
+                                    }}
+                                    onBlur={() => handleAutoSaveEquipment(eq.originalNoEq, baData.equipmentRows[idx])}
+                                    className="w-full text-left bg-transparent border border-transparent hover:border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-teal-500 transition-colors"
+                                  />
+                                </div>
+                                <span className="print-only" style={{ textAlign: 'left' }}>{eq.name}</span>
                               </td>
-                              <td style={{ border: '1px solid #000000', padding: '5px 8px', textAlign: 'center', verticalAlign: 'middle' }}>
-                                <input 
-                                  type="text" 
-                                  value={eq.noEq} 
-                                  onChange={(e) => {
-                                    const newRows = [...baData.equipmentRows];
-                                    newRows[idx].noEq = e.target.value;
-                                    setBaData({ ...baData, equipmentRows: newRows });
-                                  }}
-                                  onBlur={() => handleAutoSaveEquipment(eq.originalNoEq, baData.equipmentRows[idx])}
-                                  className="w-full text-center bg-transparent border border-transparent hover:border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-teal-500 transition-colors"
-                                />
+                              <td style={{ border: '1px solid #000000', padding: '4px 6px', textAlign: 'center', verticalAlign: 'middle' }}>
+                                <div className="no-print">
+                                  <input 
+                                    type="text" 
+                                    value={eq.noEq} 
+                                    onChange={(e) => {
+                                      const newRows = [...baData.equipmentRows];
+                                      newRows[idx].noEq = e.target.value;
+                                      setBaData({ ...baData, equipmentRows: newRows });
+                                    }}
+                                    onBlur={() => handleAutoSaveEquipment(eq.originalNoEq, baData.equipmentRows[idx])}
+                                    className="w-full text-center bg-transparent border border-transparent hover:border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-teal-500 transition-colors"
+                                  />
+                                </div>
+                                <span className="print-only" style={{ textAlign: 'center' }}>{eq.noEq}</span>
                               </td>
-                              <td style={{ border: '1px solid #000000', padding: '5px 8px', textAlign: 'center', verticalAlign: 'middle' }}>
-                                <input 
-                                  type="text" 
-                                  value={eq.cc} 
-                                  onChange={(e) => {
-                                    const newRows = [...baData.equipmentRows];
-                                    newRows[idx].cc = e.target.value;
-                                    setBaData({ ...baData, equipmentRows: newRows });
-                                  }}
-                                  onBlur={() => handleAutoSaveEquipment(eq.originalNoEq, baData.equipmentRows[idx])}
-                                  className="w-full text-center bg-transparent border border-transparent hover:border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-teal-500 transition-colors"
-                                />
+                              <td style={{ border: '1px solid #000000', padding: '4px 6px', textAlign: 'center', verticalAlign: 'middle' }}>
+                                <div className="no-print">
+                                  <input 
+                                    type="text" 
+                                    value={eq.cc} 
+                                    onChange={(e) => {
+                                      const newRows = [...baData.equipmentRows];
+                                      newRows[idx].cc = e.target.value;
+                                      setBaData({ ...baData, equipmentRows: newRows });
+                                    }}
+                                    onBlur={() => handleAutoSaveEquipment(eq.originalNoEq, baData.equipmentRows[idx])}
+                                    className="w-full text-center bg-transparent border border-transparent hover:border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-teal-500 transition-colors"
+                                  />
+                                </div>
+                                <span className="print-only" style={{ textAlign: 'center' }}>{eq.cc}</span>
                               </td>
-                              <td style={{ border: '1px solid #000000', padding: '5px 8px', textAlign: 'center', verticalAlign: 'middle' }}>
-                                <select 
-                                  value={eq.status || ''} 
-                                  onChange={(e) => {
-                                    const newRows = [...baData.equipmentRows];
-                                    newRows[idx].status = e.target.value;
-                                    setBaData({ ...baData, equipmentRows: newRows });
-                                    handleAutoSaveEquipment(eq.originalNoEq, newRows[idx]);
-                                  }}
-                                  className="w-full text-center bg-transparent border border-transparent hover:border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-teal-500 transition-colors cursor-pointer appearance-none"
-                                  style={{ textAlignLast: 'center' }}
-                                >
-                                  <option value="">-</option>
-                                  <option value="Baik">Baik</option>
-                                  <option value="Rusak">Rusak</option>
-                                </select>
+                              <td style={{ border: '1px solid #000000', padding: '4px 6px', textAlign: 'center', verticalAlign: 'middle' }}>
+                                <div className="no-print">
+                                  <select 
+                                    value={eq.status || ''} 
+                                    onChange={(e) => {
+                                      const newRows = [...baData.equipmentRows];
+                                      newRows[idx].status = e.target.value;
+                                      setBaData({ ...baData, equipmentRows: newRows });
+                                      handleAutoSaveEquipment(eq.originalNoEq, newRows[idx]);
+                                    }}
+                                    className="w-full text-center bg-transparent border border-transparent hover:border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-teal-500 transition-colors cursor-pointer appearance-none"
+                                    style={{ textAlignLast: 'center' }}
+                                  >
+                                    <option value="">-</option>
+                                    <option value="Baik">Baik</option>
+                                    <option value="Rusak">Rusak</option>
+                                  </select>
+                                </div>
+                                <span className="print-only" style={{ textAlign: 'center' }}>{eq.status || '-'}</span>
                               </td>
-                              <td style={{ border: '1px solid #000000', borderRight: 'none', padding: '5px 8px', textAlign: 'center', verticalAlign: 'middle' }}>
-                                <div className="flex items-center gap-1">
+                              <td style={{ border: '1px solid #000000', borderRight: 'none', padding: '4px 6px', textAlign: 'center', verticalAlign: 'middle' }}>
+                                <div className="no-print flex items-center gap-1">
                                   <select 
                                     value={eq.kepemilikan || ''} 
                                     onChange={(e) => {
@@ -1214,6 +1222,7 @@ export default function BeritaAcaraView({ currentUser }) {
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
+                                <span className="print-only" style={{ textAlign: 'center' }}>{eq.kepemilikan || '-'}</span>
                               </td>
                             </tr>
                           );
