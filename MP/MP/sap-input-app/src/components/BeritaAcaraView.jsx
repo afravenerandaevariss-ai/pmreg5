@@ -740,6 +740,9 @@ export default function BeritaAcaraView({ currentUser }) {
           }
           .print-only {
             display: block !important;
+            color: #000000 !important;
+            font-size: 11px !important;
+            line-height: 1.4 !important;
           }
           .print-border-bottom {
             border-bottom: 1.5px solid #000000 !important;
@@ -758,7 +761,7 @@ export default function BeritaAcaraView({ currentUser }) {
             top: 0 !important;
             width: 100% !important;
             margin: 0 !important;
-            padding: 6mm 10mm !important;
+            padding: 4mm 8mm !important;
             border: none !important;
             box-shadow: none !important;
             background: #ffffff !important;
@@ -779,6 +782,7 @@ export default function BeritaAcaraView({ currentUser }) {
             box-shadow: none !important;
             margin: 0 auto !important;
             display: block !important;
+            box-sizing: border-box !important;
           }
           #print-area-wrapper > div.ba-footer {
             width: 100% !important;
@@ -791,6 +795,8 @@ export default function BeritaAcaraView({ currentUser }) {
             color-adjust: exact !important;
           }
           table {
+            width: 100% !important;
+            border-collapse: collapse !important;
             font-size: 11px !important;
           }
           th {
@@ -806,7 +812,7 @@ export default function BeritaAcaraView({ currentUser }) {
           }
           @page {
             size: A4 portrait;
-            margin: 6mm 8mm;
+            margin: 4mm 6mm;
           }
         }
       `}</style>
