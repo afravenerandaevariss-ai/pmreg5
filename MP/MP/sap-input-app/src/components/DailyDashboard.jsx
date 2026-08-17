@@ -395,31 +395,20 @@ export default function DailyDashboard({
   }, [matrixMonth]);
 
   // Check if a cell date (yyyy-MM-dd) is editable
-  // Rule: USER and ADMIN can edit H-1, H-2, H-3 (last 3 days). DEV gets full access to all dates.
+  // Rule: USER and ADMIN can edit H-1, H-2, H-3, H-4 (last 4 days). DEV gets full access to all dates.
   const isCellEditable = (dateStr) => {
     // DEV role gets access to edit all dates
     if (isAfraUser) return true;
 
     const today = simulatedToday || new Date();
     const todayDay = today.getDate();
-    const todayMonthStr = format(today, 'yyyy-MM');
-    const cellMonthStr = dateStr.substring(0, 7);
 
-    // Rule 1: Tanggal 1, 2, 3 tiap bulan -> dapat edit bulan berjalan & bulan lalu
-    // (karena H-3 bisa melewati batas bulan)
-    if (todayDay <= 3) {
-      const prevMonthStr = format(subMonths(today, 1), 'yyyy-MM');
-      // Cek apakah tanggal cell masuk dalam rentang H-3 s/d H-1
-      const h3Str = format(subDays(today, 3), 'yyyy-MM-dd');
-      const h1Str = format(subDays(today, 1), 'yyyy-MM-dd');
-      return dateStr >= h3Str && dateStr <= h1Str;
-    }
-
-    // Rule 2: Tanggal 4 ke atas -> dapat edit H-1, H-2, H-3 (3 hari terakhir)
-    const h3Str = format(subDays(today, 3), 'yyyy-MM-dd');
+    // Rule 1: Tanggal 1-4 tiap bulan -> H-4 bisa melewati batas bulan, tangani cross-month
+    // Rule 2: Tanggal 5 ke atas -> dapat edit H-1, H-2, H-3, H-4 (4 hari terakhir)
+    const h4Str = format(subDays(today, 4), 'yyyy-MM-dd');
     const h1Str = format(subDays(today, 1), 'yyyy-MM-dd');
 
-    return dateStr >= h3Str && dateStr <= h1Str;
+    return dateStr >= h4Str && dateStr <= h1Str;
   };
 
 
