@@ -721,11 +721,14 @@ export default function BeritaAcaraView({ currentUser }) {
       if (name.toLowerCase().includes('nama equipment')) continue;
       if (/Dibuat Oleh|Demikian|Nomor:|Perihal:/i.test(name)) continue;
 
+      // Stable key for row: if noEq is empty, create deterministic key based on plantCode, row index, and sanitized name
+      const cleanNameKey = name.trim().toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 40);
+      const stableRowKey = noEq || `sheet_${plantCode}_r${i}_${cleanNameKey}`;
+
       // Skip rows marked as deleted in Supabase
-      // Check both noEq (sheet value) and the current display noEq in case it was renamed
       if (
-        (overrideMap[noEq] && overrideMap[noEq].status === '__DELETED__') ||
-        (noEq && overrideMap[noEq]?.status === '__DELETED__')
+        (overrideMap[stableRowKey] && overrideMap[stableRowKey].status === '__DELETED__') ||
+        (noEq && overrideMap[noEq] && overrideMap[noEq].status === '__DELETED__')
       ) {
         continue;
       }
@@ -734,19 +737,21 @@ export default function BeritaAcaraView({ currentUser }) {
         no = String(equipmentRows.length + 1);
       }
 
+      const activeOverride = overrideMap[stableRowKey] || (noEq ? overrideMap[noEq] : null);
+
       // Apply per-row Supabase overrides
-      if (overrideMap[noEq]) {
-        no          = overrideMap[noEq].no_urut      || no;
-        name        = overrideMap[noEq].name         || name;
-        cc          = overrideMap[noEq].cc           || cc;
-        status      = overrideMap[noEq].status       || status;
-        kepemilikan = overrideMap[noEq].kepemilikan  || kepemilikan;
+      if (activeOverride) {
+        no          = activeOverride.no_urut      || no;
+        name        = activeOverride.name         || name;
+        cc          = activeOverride.cc           || cc;
+        status      = activeOverride.status       || status;
+        kepemilikan = activeOverride.kepemilikan  || kepemilikan;
       }
 
-      const currentNoEq = (overrideMap[noEq]?.new_no_eq !== undefined && overrideMap[noEq]?.new_no_eq !== '') 
-        ? overrideMap[noEq].new_no_eq 
+      const currentNoEq = (activeOverride?.new_no_eq !== undefined && activeOverride?.new_no_eq !== '') 
+        ? activeOverride.new_no_eq 
         : noEq;
-      equipmentRows.push({ no, name, noEq: currentNoEq, cc, status, kepemilikan, originalNoEq: noEq });
+      equipmentRows.push({ no, name, noEq: currentNoEq, cc, status, kepemilikan, originalNoEq: stableRowKey });
     }
 
     // ── Step 6b: Append user-added custom rows (new_${plantCode}_... or legacy new_...) ──
