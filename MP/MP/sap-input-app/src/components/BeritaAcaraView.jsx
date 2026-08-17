@@ -777,7 +777,7 @@ export default function BeritaAcaraView({ currentUser }) {
           #print-area-wrapper > div.ba-document-box {
             width: 100% !important;
             min-height: unset !important;
-            border: 2.2px solid #000000 !important;
+            border: none !important;
             box-shadow: none !important;
             margin: 0 auto !important;
             display: block !important;
@@ -1036,7 +1036,7 @@ export default function BeritaAcaraView({ currentUser }) {
                 fontSize: '13px',
                 lineHeight: '1.6',
                 color: '#000000',
-                border: '2.2px solid #000000',
+                border: 'none',
                 padding: '0',
                 backgroundColor: '#ffffff',
                 width: '800px',
@@ -1051,11 +1051,15 @@ export default function BeritaAcaraView({ currentUser }) {
               <div 
                 style={{
                   textAlign: 'center',
+                  borderTop: '2.2px solid #000000',
+                  borderLeft: '2.2px solid #000000',
+                  borderRight: '2.2px solid #000000',
                   borderBottom: '1.5px solid #000000',
                   padding: '12px 16px',
                   fontWeight: 'bold',
                   backgroundColor: '#ffffff',
-                  margin: '0'
+                  margin: '0',
+                  boxSizing: 'border-box'
                 }}
               >
                 <div style={{ fontSize: '15px', textDecoration: 'underline', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.5px' }}>
@@ -1072,7 +1076,7 @@ export default function BeritaAcaraView({ currentUser }) {
               </div>
 
               {/* Perihal Box */}
-              <div style={{ borderBottom: '1.5px solid #000000', padding: '10px 16px', fontWeight: 'bold', textAlign: 'left', margin: '0' }}>
+              <div style={{ borderLeft: '2.2px solid #000000', borderRight: '2.2px solid #000000', borderBottom: '1.5px solid #000000', padding: '10px 16px', fontWeight: 'bold', textAlign: 'left', margin: '0', boxSizing: 'border-box' }}>
                 Perihal : <span
                   contentEditable suppressContentEditableWarning
                   onBlur={(e) => handleAutoSaveUnit('perihal', 'Equipment Aktif Di Unit ' + e.target.innerText, baData)}
@@ -1082,17 +1086,27 @@ export default function BeritaAcaraView({ currentUser }) {
               </div>
 
               {/* Pembukaan Box */}
-              <div style={{ borderBottom: '1.5px solid #000000', padding: '16px', textAlign: 'justify', margin: '0' }}>
+              <div style={{ borderLeft: '2.2px solid #000000', borderRight: '2.2px solid #000000', borderBottom: '1.5px solid #000000', padding: '16px', textAlign: 'justify', margin: '0', boxSizing: 'border-box' }}>
                 {baData.pembukaan}
               </div>
 
               {/* Equipment Tables (Chunked for pagination) */}
               {chunkedRows.length > 0 ? (
                 chunkedRows.map((chunk, chunkIdx) => (
-                  <div key={chunkIdx} style={{ pageBreakInside: 'avoid', pageBreakBefore: chunkIdx > 0 ? 'always' : 'auto' }} className={`table-wrapper ${chunkIdx > 0 ? "pt-0 print:pt-[10mm]" : ""}`}>
+                  <div key={chunkIdx} style={{ pageBreakInside: 'avoid', pageBreakBefore: chunkIdx > 0 ? 'always' : 'auto' }} className={`table-wrapper ${chunkIdx > 0 ? "pt-0 print:pt-0" : ""}`}>
                     <table 
-                      style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '12px', margin: '0', borderBottom: (chunkIdx === chunkedRows.length - 1) ? '1.5px solid #000000' : 'none', borderLeft: '2.2px solid #000000', borderRight: '2.2px solid #000000' }}
-                      className={chunkIdx < chunkedRows.length - 1 ? "print-border-bottom" : ""}
+                      style={{ 
+                        width: '100%', 
+                        tableLayout: 'fixed', 
+                        borderCollapse: 'collapse', 
+                        fontSize: '12px', 
+                        margin: '0', 
+                        borderLeft: '2.2px solid #000000', 
+                        borderRight: '2.2px solid #000000',
+                        borderTop: chunkIdx > 0 ? '2.2px solid #000000' : 'none',
+                        borderBottom: (chunkIdx < chunkedRows.length - 1) ? '2.2px solid #000000' : '1.5px solid #000000',
+                        boxSizing: 'border-box'
+                      }}
                     >
                       <colgroup>
                         <col style={{ width: '45px' }} />
@@ -1275,14 +1289,37 @@ export default function BeritaAcaraView({ currentUser }) {
                 onBlur={(e) => handleAutoSaveUnit('penutup', e.target.innerHTML, baData)}
                 dangerouslySetInnerHTML={{ __html: baData.penutup }}
                 className="hover:bg-slate-50 transition-colors cursor-text"
-                style={{ borderBottom: '1.5px solid #000000', padding: '16px', textAlign: 'justify', margin: '0', outline: 'none' }}
+                style={{ 
+                  borderLeft: '2.2px solid #000000',
+                  borderRight: '2.2px solid #000000',
+                  borderBottom: '1.5px solid #000000', 
+                  padding: '16px', 
+                  textAlign: 'justify', 
+                  margin: '0', 
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
               />
 
               {/* Spacer before signatures */}
-              <div style={{ height: '25px' }}></div>
+              <div style={{ 
+                height: '25px', 
+                borderLeft: '2.2px solid #000000', 
+                borderRight: '2.2px solid #000000',
+                margin: '0',
+                boxSizing: 'border-box' 
+              }}></div>
 
               {/* Signatures Block */}
-              <div style={{ padding: '0 30px 30px 30px', marginTop: 'auto', marginBottom: '0' }}>
+              <div style={{ 
+                borderLeft: '2.2px solid #000000', 
+                borderRight: '2.2px solid #000000', 
+                borderBottom: '2.2px solid #000000', 
+                padding: '0 30px 30px 30px', 
+                marginTop: 'auto', 
+                marginBottom: '0', 
+                boxSizing: 'border-box' 
+              }}>
                 <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center', width: '100%' }}>
                   <div style={{ minWidth: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', height: '140px' }}>
                     <div>
