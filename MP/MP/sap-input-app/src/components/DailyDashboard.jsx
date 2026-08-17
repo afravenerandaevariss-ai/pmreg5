@@ -2539,6 +2539,13 @@ export default function DailyDashboard({
               </button>
             </div>
             <div className="p-6 space-y-4">
+              {/* ⚠️ Notif Penting: Cek Tanggal di CMMS */}
+              <div className="flex items-start gap-3 p-3.5 bg-amber-50 border border-amber-300 rounded-xl">
+                <span className="text-amber-500 text-xl mt-0.5 flex-shrink-0">⚠️</span>
+                <p className="text-sm font-semibold text-amber-800 leading-snug">
+                  Perhatikan tanggal excel yang mau di export, cek di CMMS
+                </p>
+              </div>
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Mulai Tanggal</label>
