@@ -1809,31 +1809,28 @@ export default function DailyDashboard({
                 </button>
               )}
 
-              {!isUserRole && (
-                <>
-                  <button
-                    onClick={loadMatrixFromDB}
-                    disabled={isMatrixLoading}
-                    className="px-3.5 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
-                  >
-                    <RefreshCw size={14} className={isMatrixLoading ? "animate-spin" : ""} />
-                    Muat Ulang
-                  </button>
+              {/* Reload & Save - accessible to all roles */}
+              <button
+                onClick={loadMatrixFromDB}
+                disabled={isMatrixLoading}
+                className="px-3.5 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+              >
+                <RefreshCw size={14} className={isMatrixLoading ? "animate-spin" : ""} />
+                Muat Ulang
+              </button>
 
-                  <button
-                    onClick={handleSaveMatrix}
-                    disabled={isSavingMatrix || unsavedMatrixCount === 0}
-                    className={`px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 ${
-                      unsavedMatrixCount > 0
-                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse'
-                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                    }`}
-                  >
-                    <Save size={16} />
-                    {isSavingMatrix ? 'Menyimpan...' : `Simpan Jam Jalan ${unsavedMatrixCount > 0 ? `(${unsavedMatrixCount})` : ''}`}
-                  </button>
-                </>
-              )}
+              <button
+                onClick={handleSaveMatrix}
+                disabled={isSavingMatrix || unsavedMatrixCount === 0}
+                className={`px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 ${
+                  unsavedMatrixCount > 0
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                <Save size={16} />
+                {isSavingMatrix ? 'Menyimpan...' : `Simpan Jam Jalan ${unsavedMatrixCount > 0 ? `(${unsavedMatrixCount})` : ''}`}
+              </button>
             </div>
           </div>
 
@@ -2082,13 +2079,13 @@ export default function DailyDashboard({
             {isUserRole && (
               <button 
                 onClick={() => {
-                  const h1DateStr = format(subDays(simulatedToday || new Date(), 1), 'yyyy-MM-dd');
-                  setExportSettings(prev => ({ 
-                    ...prev, 
-                    startDate: h1DateStr,
-                    endDate: h1DateStr,
+                  // USER: biarkan tanggal kosong supaya user pilih sendiri
+                  setExportSettings(prev => ({
+                    ...prev,
+                    startDate: '',
+                    endDate: '',
                     isAccumulated: false,
-                    time: '08:00' 
+                    time: '08:00'
                   }));
                   setShowExportModal(true);
                 }}
@@ -2558,7 +2555,8 @@ export default function DailyDashboard({
                       setExportSettings(prev => ({
                         ...prev,
                         startDate: newStart,
-                        endDate: prev.endDate < newStart ? newStart : prev.endDate
+                        // end date always follows start date
+                        endDate: newStart
                       }));
                     }} 
                   />
