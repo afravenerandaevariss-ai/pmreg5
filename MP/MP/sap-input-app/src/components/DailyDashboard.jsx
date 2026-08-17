@@ -136,10 +136,22 @@ export default function DailyDashboard({
   const [exportSettings, setExportSettings] = useState({ 
     time: '08:00', 
     readBy: currentUser?.role === 'Unit' ? currentUser.name : 'ADMIN',
-    startDate: getH1ExportDateStr(),
-    endDate: getH1ExportDateStr(),
+    startDate: '',
+    endDate: '',
     isAccumulated: false
   });
+
+  const openExportModal = () => {
+    const h1DateStr = format(subDays(simulatedToday || new Date(), 1), 'yyyy-MM-dd');
+    setExportSettings(prev => ({
+      ...prev,
+      startDate: isUserRole ? '' : h1DateStr,
+      endDate: isUserRole ? '' : h1DateStr,
+      isAccumulated: false,
+      time: '08:00'
+    }));
+    setShowExportModal(true);
+  };
   const [exportEqSearch, setExportEqSearch] = useState('');
   const [showExportHourError, setShowExportHourError] = useState(false);
   const [exportHourViolations, setExportHourViolations] = useState([]);
@@ -1679,17 +1691,7 @@ export default function DailyDashboard({
             </button>
           )}
           <button
-              onClick={() => {
-                const h1DateStr = format(subDays(simulatedToday || new Date(), 1), 'yyyy-MM-dd');
-                setExportSettings(prev => ({ 
-                  ...prev, 
-                  startDate: h1DateStr,
-                  endDate: h1DateStr,
-                  isAccumulated: false,
-                  time: '08:00' 
-                }));
-                setShowExportModal(true);
-              }}
+              onClick={openExportModal}
               className="bg-[#0f172a] hover:bg-slate-700 text-white px-3.5 py-2 rounded-xl shadow-xs transition-colors flex items-center gap-1.5 font-bold text-xs"
             >
               <FileDown size={14} />
@@ -1791,17 +1793,7 @@ export default function DailyDashboard({
 
               {!isUserRole && (
                 <button
-                  onClick={() => {
-                    const h1DateStr = format(subDays(simulatedToday || new Date(), 1), 'yyyy-MM-dd');
-                    setExportSettings(prev => ({ 
-                      ...prev, 
-                      startDate: h1DateStr,
-                      endDate: h1DateStr,
-                      isAccumulated: false,
-                      time: '08:00' 
-                    }));
-                    setShowExportModal(true);
-                  }}
+                  onClick={openExportModal}
                   className="px-3.5 py-2 bg-[#0f172a] hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
                 >
                   <FileDown size={14} />
@@ -2078,17 +2070,7 @@ export default function DailyDashboard({
 
             {isUserRole && (
               <button 
-                onClick={() => {
-                  // USER: biarkan tanggal kosong supaya user pilih sendiri
-                  setExportSettings(prev => ({
-                    ...prev,
-                    startDate: '',
-                    endDate: '',
-                    isAccumulated: false,
-                    time: '08:00'
-                  }));
-                  setShowExportModal(true);
-                }}
+                onClick={openExportModal}
                 className="bg-[#0f172a] hover:bg-slate-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
               >
                 <FileDown size={13} /> Export SAP
@@ -2750,6 +2732,11 @@ export default function DailyDashboard({
                     return;
                   }
                   
+                  if (!exportSettings.startDate || !exportSettings.endDate) {
+                    alert("Silakan pilih Mulai Tanggal dan Sampai Tanggal terlebih dahulu.");
+                    return;
+                  }
+
                   if (exportSettings.startDate > exportSettings.endDate) {
                     alert("Tanggal Awal tidak boleh lebih besar dari Tanggal Akhir.");
                     return;
