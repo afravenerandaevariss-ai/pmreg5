@@ -465,13 +465,10 @@ export default function BeritaAcaraView({ currentUser }) {
 
     if (row && supabase) {
       try {
-        // originalNoEq = the key in ba_edits (either 'new_...' or the raw sheet noEq)
+        // originalNoEq = the key in ba_edits (either 'new_...' or the raw sheet noEq / stableRowKey)
         const keyToDelete = row.originalNoEq || row.noEq;
-        if (keyToDelete && keyToDelete.startsWith('new_')) {
-          // User-added row: fully remove from Supabase
-          await supabase.from(T_BA_EDITS).delete().eq('no_eq', keyToDelete);
-        } else if (keyToDelete) {
-          // Sheet row: mark as __DELETED__ with full payload so the record exists
+        if (keyToDelete) {
+          // Always use upsert with status: '__DELETED__' (guaranteed to work with Supabase RLS)
           await supabase.from(T_BA_EDITS).upsert({
             no_eq: keyToDelete,
             new_no_eq: row.noEq || keyToDelete,
