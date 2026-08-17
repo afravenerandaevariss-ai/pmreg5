@@ -1,3 +1,16 @@
+/**
+ * ============================================================================
+ * 🔒 STRICTLY LOCKED COMPONENT: BERITA ACARA (KUNCI KETAT)
+ * ============================================================================
+ * STATUS: LOCKED & FROZEN BY USER REQUEST
+ * 
+ * DO NOT MODIFY THIS FILE OR ITS LOGIC WHEN WORKING ON OTHER MODULES.
+ * All formatting, print layout, unit-code mapping, dual-page pagination,
+ * multi-page borders, and Supabase auto-save persistence have been verified
+ * and deployed to production.
+ * ============================================================================
+ */
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FileText, RefreshCw, Printer, ExternalLink, AlertTriangle, Upload, X, FolderOpen, Trash2, Clock, CheckCircle2, Loader2, FileUp } from 'lucide-react';
 import { supabase } from '../lib/supabase';
