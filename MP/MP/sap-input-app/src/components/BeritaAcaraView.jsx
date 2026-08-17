@@ -168,6 +168,17 @@ export default function BeritaAcaraView({ currentUser }) {
     setLoading(true);
     setStatusMsg(`Memuat data ${plantCode ? '[' + plantCode + '] ' : ''}${unitName}...`);
 
+    // Check localStorage cache first for immediate responsiveness
+    try {
+      const cached = localStorage.getItem('ba_draft_' + plantCode);
+      if (cached) {
+        const parsedCached = JSON.parse(cached);
+        if (parsedCached && parsedCached.plantCode === plantCode) {
+          setBaData(parsedCached);
+        }
+      }
+    } catch (e) {}
+
     const jsonpUrl = `https://docs.google.com/spreadsheets/d/${baSpreadsheetId}/gviz/tq?tq=&gid=${targetGid}&_ts=${Date.now()}`;
 
     try {
@@ -176,19 +187,20 @@ export default function BeritaAcaraView({ currentUser }) {
         throw new Error("Data Google Sheets kosong atau tidak valid.");
       }
       
-      const { data: overrides, error: sbError } = await supabase.from(T_BA_EDITS).select('*');
-      if (sbError) {
-        console.warn("Gagal memuat perubahan lokal dari Supabase:", sbError);
+      let overrides = [];
+      let unitOverrides = {};
+      if (supabase) {
+        const { data: ovData, error: sbError } = await supabase.from(T_BA_EDITS).select('*');
+        if (!sbError && ovData) overrides = ovData;
+        const { data: uOvData } = await supabase.from(T_BA_UNIT_EDITS).select('*').eq('unit_code', plantCode).maybeSingle();
+        if (uOvData) unitOverrides = uOvData;
       }
       
-      const { data: unitOverrides } = await supabase.from(T_BA_UNIT_EDITS).select('*').eq('unit_code', plantCode).maybeSingle();
-      
-      parseAndSetData(data, unitName, plantCode, overrides || [], unitOverrides || {});
+      parseAndSetData(data, unitName, plantCode, overrides, unitOverrides);
       setStatusMsg(`Data Berita Acara ${plantCode ? '[' + plantCode + '] ' : ''}${unitName} berhasil dimuat.`);
     } catch (err) {
       console.error(err);
       setError(err.message);
-      setBaData(null);
     } finally {
       setLoading(false);
     }
@@ -375,26 +387,37 @@ export default function BeritaAcaraView({ currentUser }) {
     }
   };
 
-  const handleAutoSaveEquipment = async (originalNoEq, row) => {
+  const handleAutoSaveEquipment = async (originalNoEq, row, currentPlantCode) => {
+    if (!row || !originalNoEq) return;
+    const plant = currentPlantCode || baData?.plantCode;
     try {
-      await supabase.from(T_BA_EDITS).upsert({
-        no_eq: originalNoEq,
-        new_no_eq: row.noEq,
-        no_urut: row.no,
-        name: row.name,
-        cc: row.cc,
-        status: row.status,
-        kepemilikan: row.kepemilikan,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'no_eq' });
+      if (plant && baData) {
+        try {
+          localStorage.setItem('ba_draft_' + plant, JSON.stringify(baData));
+        } catch (e) {}
+      }
+      if (supabase) {
+        await supabase.from(T_BA_EDITS).upsert({
+          no_eq: originalNoEq,
+          new_no_eq: row.noEq || '',
+          no_urut: row.no || '',
+          name: row.name || '',
+          cc: row.cc || '',
+          status: row.status || '',
+          kepemilikan: row.kepemilikan || '',
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'no_eq' });
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Error saving equipment edit to Supabase:', err);
     }
   };
 
   // ─── Add a new empty row to the table ───
   const handleAddRow = () => {
     if (!baData) return;
+    const plant = baData.plantCode || 'UNIT';
+    const newKey = `new_${plant}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const newRow = {
       no: String(baData.equipmentRows.length + 1),
       name: '',
@@ -402,30 +425,55 @@ export default function BeritaAcaraView({ currentUser }) {
       cc: '',
       status: '',
       kepemilikan: '',
-      originalNoEq: `new_${Date.now()}`
+      originalNoEq: newKey
     };
-    setBaData({ ...baData, equipmentRows: [...baData.equipmentRows, newRow] });
+    const updated = { ...baData, equipmentRows: [...baData.equipmentRows, newRow] };
+    setBaData(updated);
+    try {
+      localStorage.setItem('ba_draft_' + plant, JSON.stringify(updated));
+    } catch (e) {}
+    handleAutoSaveEquipment(newKey, newRow, plant);
   };
 
   // ─── Delete a row from the table ───
   const handleDeleteRow = async (idx) => {
     if (!baData) return;
     const row = baData.equipmentRows[idx];
-    const newRows = baData.equipmentRows.filter((_, i) => i !== idx);
-    setBaData({ ...baData, equipmentRows: newRows });
-    // Remove from supabase only if it has a real key
-    if (row.originalNoEq && !row.originalNoEq.startsWith('new_')) {
+    const plant = baData.plantCode || 'UNIT';
+    const newRows = baData.equipmentRows.filter((_, i) => i !== idx).map((r, i) => ({
+      ...r,
+      no: String(i + 1)
+    }));
+    const updated = { ...baData, equipmentRows: newRows };
+    setBaData(updated);
+    try {
+      localStorage.setItem('ba_draft_' + plant, JSON.stringify(updated));
+    } catch (e) {}
+
+    if (row && row.originalNoEq && supabase) {
       try {
-        await supabase.from(T_BA_EDITS).delete().eq('no_eq', row.originalNoEq);
+        if (row.originalNoEq.startsWith('new_')) {
+          await supabase.from(T_BA_EDITS).delete().eq('no_eq', row.originalNoEq);
+        } else {
+          await supabase.from(T_BA_EDITS).upsert({
+            no_eq: row.originalNoEq,
+            status: '__DELETED__',
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'no_eq' });
+        }
       } catch (e) {
-        console.error(e);
+        console.error('Error deleting BA equipment row:', e);
       }
     }
   };
 
   const handleAutoSaveUnit = async (field, value, currentData) => {
     if (!currentData || !currentData.plantCode) return;
-    setBaData(prev => ({ ...prev, [field]: value }));
+    const updated = { ...currentData, [field]: value };
+    setBaData(updated);
+    try {
+      localStorage.setItem('ba_draft_' + currentData.plantCode, JSON.stringify(updated));
+    } catch (e) {}
     const payload = {
       unit_code: currentData.plantCode,
       nomor_ba: field === 'nomorBA' ? value : currentData.nomorBA,
@@ -439,10 +487,12 @@ export default function BeritaAcaraView({ currentUser }) {
       nama_ketahui: field === 'namaKetahui' ? value : currentData.namaKetahui,
       updated_at: new Date().toISOString()
     };
-    try {
-      await supabase.from(T_BA_UNIT_EDITS).upsert(payload, { onConflict: 'unit_code' });
-    } catch (err) {
-      console.error(err);
+    if (supabase) {
+      try {
+        await supabase.from(T_BA_UNIT_EDITS).upsert(payload, { onConflict: 'unit_code' });
+      } catch (err) {
+        console.error('Error saving unit edit to Supabase:', err);
+      }
     }
   };
 
@@ -649,6 +699,11 @@ export default function BeritaAcaraView({ currentUser }) {
       if (name.toLowerCase().includes('nama equipment')) continue;
       if (/Dibuat Oleh|Demikian|Nomor:|Perihal:/i.test(name)) continue;
 
+      // Skip rows marked as deleted in Supabase
+      if (overrideMap[noEq] && overrideMap[noEq].status === '__DELETED__') {
+        continue;
+      }
+
       if (!no || !/^\d+$/.test(no)) {
         no = String(equipmentRows.length + 1);
       }
@@ -662,9 +717,57 @@ export default function BeritaAcaraView({ currentUser }) {
         kepemilikan = overrideMap[noEq].kepemilikan  || kepemilikan;
       }
 
-      const currentNoEq = overrideMap[noEq]?.new_no_eq || noEq;
+      const currentNoEq = (overrideMap[noEq]?.new_no_eq !== undefined && overrideMap[noEq]?.new_no_eq !== '') 
+        ? overrideMap[noEq].new_no_eq 
+        : noEq;
       equipmentRows.push({ no, name, noEq: currentNoEq, cc, status, kepemilikan, originalNoEq: noEq });
     }
+
+    // ── Step 6b: Append user-added custom rows (new_${plantCode}_... or legacy new_...) ──
+    const addedRows = overrides.filter(ov => 
+      ov && 
+      ov.no_eq && 
+      (ov.no_eq.startsWith(`new_${plantCode}_`) || ov.no_eq.startsWith(`new_${plantCode}`)) && 
+      ov.status !== '__DELETED__'
+    );
+
+    // Also include legacy new_ rows created without plantCode prefix if they exist
+    const legacyNewRows = overrides.filter(ov =>
+      ov &&
+      ov.no_eq &&
+      ov.no_eq.startsWith('new_') &&
+      !ov.no_eq.includes('_5E') &&
+      !ov.no_eq.includes('_5F') &&
+      !ov.no_eq.includes('_5D') &&
+      ov.status !== '__DELETED__' &&
+      (ov.name || ov.new_no_eq || ov.cc)
+    );
+
+    const allAdded = [...addedRows];
+    legacyNewRows.forEach(l => {
+      if (!allAdded.some(a => a.no_eq === l.no_eq)) {
+        allAdded.push(l);
+      }
+    });
+
+    allAdded.sort((a, b) => (Number(a.no_urut) || 9999) - (Number(b.no_urut) || 9999));
+
+    allAdded.forEach(ov => {
+      equipmentRows.push({
+        no: ov.no_urut || String(equipmentRows.length + 1),
+        name: ov.name || '',
+        noEq: ov.new_no_eq || '',
+        cc: ov.cc || '',
+        status: ov.status || '',
+        kepemilikan: ov.kepemilikan || '',
+        originalNoEq: ov.no_eq
+      });
+    });
+
+    // Normalize sequential row numbering (1, 2, 3...)
+    equipmentRows.forEach((r, idx) => {
+      r.no = String(idx + 1);
+    });
 
     // ── Step 7: Build penutup ──
     const formattedUnitName = perihal.replace(/^Equipment Aktif Di Unit/i, '').trim();
@@ -678,7 +781,7 @@ export default function BeritaAcaraView({ currentUser }) {
         : `Demikian Berita Acara ini dibuat dan sejak ditandatanganinya Berita Acara ini maka manajemen unit <strong>${formattedUnitName || unitName}</strong> bertanggung jawab atas keakuratan data tersebut diatas.`
       );
 
-    setBaData({
+    const finalBaData = {
       penutup,
       titleBA,
       nomorBA,
@@ -694,7 +797,12 @@ export default function BeritaAcaraView({ currentUser }) {
       formattedUnitName,
       unitName,
       plantCode
-    });
+    };
+
+    setBaData(finalBaData);
+    try {
+      localStorage.setItem('ba_draft_' + plantCode, JSON.stringify(finalBaData));
+    } catch (e) {}
   };
 
   const getChunkedRows = () => {
@@ -1139,7 +1247,11 @@ export default function BeritaAcaraView({ currentUser }) {
                                     onChange={(e) => {
                                       const newRows = [...baData.equipmentRows];
                                       newRows[idx].no = e.target.value;
-                                      setBaData({ ...baData, equipmentRows: newRows });
+                                      const updated = { ...baData, equipmentRows: newRows };
+                                      setBaData(updated);
+                                      if (baData.plantCode) {
+                                        try { localStorage.setItem('ba_draft_' + baData.plantCode, JSON.stringify(updated)); } catch (err) {}
+                                      }
                                     }}
                                     onBlur={() => handleAutoSaveEquipment(eq.originalNoEq, baData.equipmentRows[idx])}
                                     className="w-full text-center bg-transparent border border-transparent hover:border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-teal-500 transition-colors"
@@ -1155,7 +1267,11 @@ export default function BeritaAcaraView({ currentUser }) {
                                     onChange={(e) => {
                                       const newRows = [...baData.equipmentRows];
                                       newRows[idx].name = e.target.value;
-                                      setBaData({ ...baData, equipmentRows: newRows });
+                                      const updated = { ...baData, equipmentRows: newRows };
+                                      setBaData(updated);
+                                      if (baData.plantCode) {
+                                        try { localStorage.setItem('ba_draft_' + baData.plantCode, JSON.stringify(updated)); } catch (err) {}
+                                      }
                                     }}
                                     onBlur={() => handleAutoSaveEquipment(eq.originalNoEq, baData.equipmentRows[idx])}
                                     className="w-full text-left bg-transparent border border-transparent hover:border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-teal-500 transition-colors"
@@ -1171,7 +1287,11 @@ export default function BeritaAcaraView({ currentUser }) {
                                     onChange={(e) => {
                                       const newRows = [...baData.equipmentRows];
                                       newRows[idx].noEq = e.target.value;
-                                      setBaData({ ...baData, equipmentRows: newRows });
+                                      const updated = { ...baData, equipmentRows: newRows };
+                                      setBaData(updated);
+                                      if (baData.plantCode) {
+                                        try { localStorage.setItem('ba_draft_' + baData.plantCode, JSON.stringify(updated)); } catch (err) {}
+                                      }
                                     }}
                                     onBlur={() => handleAutoSaveEquipment(eq.originalNoEq, baData.equipmentRows[idx])}
                                     className="w-full text-center bg-transparent border border-transparent hover:border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-teal-500 transition-colors"
@@ -1187,7 +1307,11 @@ export default function BeritaAcaraView({ currentUser }) {
                                     onChange={(e) => {
                                       const newRows = [...baData.equipmentRows];
                                       newRows[idx].cc = e.target.value;
-                                      setBaData({ ...baData, equipmentRows: newRows });
+                                      const updated = { ...baData, equipmentRows: newRows };
+                                      setBaData(updated);
+                                      if (baData.plantCode) {
+                                        try { localStorage.setItem('ba_draft_' + baData.plantCode, JSON.stringify(updated)); } catch (err) {}
+                                      }
                                     }}
                                     onBlur={() => handleAutoSaveEquipment(eq.originalNoEq, baData.equipmentRows[idx])}
                                     className="w-full text-center bg-transparent border border-transparent hover:border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-teal-500 transition-colors"
@@ -1202,7 +1326,11 @@ export default function BeritaAcaraView({ currentUser }) {
                                     onChange={(e) => {
                                       const newRows = [...baData.equipmentRows];
                                       newRows[idx].status = e.target.value;
-                                      setBaData({ ...baData, equipmentRows: newRows });
+                                      const updated = { ...baData, equipmentRows: newRows };
+                                      setBaData(updated);
+                                      if (baData.plantCode) {
+                                        try { localStorage.setItem('ba_draft_' + baData.plantCode, JSON.stringify(updated)); } catch (err) {}
+                                      }
                                       handleAutoSaveEquipment(eq.originalNoEq, newRows[idx]);
                                     }}
                                     className="w-full text-center bg-transparent border border-transparent hover:border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-teal-500 transition-colors cursor-pointer appearance-none"
@@ -1222,7 +1350,11 @@ export default function BeritaAcaraView({ currentUser }) {
                                     onChange={(e) => {
                                       const newRows = [...baData.equipmentRows];
                                       newRows[idx].kepemilikan = e.target.value;
-                                      setBaData({ ...baData, equipmentRows: newRows });
+                                      const updated = { ...baData, equipmentRows: newRows };
+                                      setBaData(updated);
+                                      if (baData.plantCode) {
+                                        try { localStorage.setItem('ba_draft_' + baData.plantCode, JSON.stringify(updated)); } catch (err) {}
+                                      }
                                       handleAutoSaveEquipment(eq.originalNoEq, newRows[idx]);
                                     }}
                                     className="w-full text-center bg-transparent border border-transparent hover:border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-teal-500 transition-colors cursor-pointer appearance-none"
