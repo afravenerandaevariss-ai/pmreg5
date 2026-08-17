@@ -195,11 +195,10 @@ export default function BeritaAcaraView({ currentUser }) {
   };
 
   useEffect(() => {
-    if (isRestricted && selectedUnit && !autoLoadedRef.current) {
-      autoLoadedRef.current = true;
+    if (selectedUnit) {
       handleLoad(selectedUnit);
     }
-  }, [selectedUnit, isRestricted]);
+  }, [selectedUnit]);
 
   // ─── Load upload history from Supabase ───
   const loadUploadHistory = useCallback(async (plantCode) => {
