@@ -407,20 +407,9 @@ export default function DailyDashboard({
   }, [matrixMonth]);
 
   // Check if a cell date (yyyy-MM-dd) is editable
-  // Rule: USER and ADMIN can edit H-1, H-2, H-3, H-4 (last 4 days). DEV gets full access to all dates.
+  // UNLOCKED: All dates in the matrix are fully editable
   const isCellEditable = (dateStr) => {
-    // DEV role gets access to edit all dates
-    if (isAfraUser) return true;
-
-    const today = simulatedToday || new Date();
-    const todayDay = today.getDate();
-
-    // Rule 1: Tanggal 1-4 tiap bulan -> H-4 bisa melewati batas bulan, tangani cross-month
-    // Rule 2: Tanggal 5 ke atas -> dapat edit H-1, H-2, H-3, H-4 (4 hari terakhir)
-    const h4Str = format(subDays(today, 4), 'yyyy-MM-dd');
-    const h1Str = format(subDays(today, 1), 'yyyy-MM-dd');
-
-    return dateStr >= h4Str && dateStr <= h1Str;
+    return true;
   };
 
 
@@ -1791,15 +1780,13 @@ export default function DailyDashboard({
                 </span>
               )}
 
-              {!isUserRole && (
-                <button
-                  onClick={openExportModal}
-                  className="px-3.5 py-2 bg-[#0f172a] hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
-                >
-                  <FileDown size={14} />
-                  Export SAP
-                </button>
-              )}
+              <button
+                onClick={openExportModal}
+                className="px-3.5 py-2 bg-[#0f172a] hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
+              >
+                <FileDown size={14} />
+                Export SAP
+              </button>
 
               {/* Reload & Save - accessible to all roles */}
               <button
@@ -2537,19 +2524,27 @@ export default function DailyDashboard({
                       setExportSettings(prev => ({
                         ...prev,
                         startDate: newStart,
-                        // end date always follows start date
-                        endDate: newStart
+                        // Untuk role USER, Sampai Tanggal otomatis mengikuti Mulai Tanggal
+                        endDate: isUserRole ? newStart : (prev.endDate < newStart ? newStart : prev.endDate)
                       }));
                     }} 
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Sampai Tanggal</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Sampai Tanggal {isUserRole && <span className="text-[11px] text-emerald-600 font-normal">(Sama dg Mulai)</span>}
+                  </label>
                   <input 
                     type="date" 
-                    className="w-full border border-slate-300 rounded-2xl p-2.5 bg-slate-50 text-sm focus:ring-2 focus:ring-emerald-500 cursor-pointer" 
-                    value={exportSettings.endDate} 
+                    disabled={isUserRole}
+                    className={`w-full border border-slate-300 rounded-2xl p-2.5 text-sm ${
+                      isUserRole 
+                        ? 'bg-slate-100 text-slate-500 cursor-not-allowed' 
+                        : 'bg-slate-50 focus:ring-2 focus:ring-emerald-500 cursor-pointer'
+                    }`}
+                    value={isUserRole ? exportSettings.startDate : exportSettings.endDate} 
                     onChange={e => {
+                      if (isUserRole) return;
                       const newEnd = e.target.value;
                       setExportSettings(prev => ({
                         ...prev,
@@ -2732,12 +2727,15 @@ export default function DailyDashboard({
                     return;
                   }
                   
-                  if (!exportSettings.startDate || !exportSettings.endDate) {
-                    alert("Silakan pilih Mulai Tanggal dan Sampai Tanggal terlebih dahulu.");
+                  const effStartDate = exportSettings.startDate;
+                  const effEndDate = isUserRole ? exportSettings.startDate : exportSettings.endDate;
+
+                  if (!effStartDate || !effEndDate) {
+                    alert("⚠️ Perhatikan tanggal excel yang mau di export, cek di CMMS.\n\nSilakan pilih tanggal terlebih dahulu!");
                     return;
                   }
 
-                  if (exportSettings.startDate > exportSettings.endDate) {
+                  if (effStartDate > effEndDate) {
                     alert("Tanggal Awal tidak boleh lebih besar dari Tanggal Akhir.");
                     return;
                   }
