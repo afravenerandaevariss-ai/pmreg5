@@ -463,13 +463,22 @@ export default function BeritaAcaraView({ currentUser }) {
       localStorage.setItem('ba_draft_' + plant, JSON.stringify(updated));
     } catch (e) {}
 
-    if (row && row.originalNoEq && supabase) {
+    if (row && supabase) {
       try {
-        if (row.originalNoEq.startsWith('new_')) {
-          await supabase.from(T_BA_EDITS).delete().eq('no_eq', row.originalNoEq);
-        } else {
+        // originalNoEq = the key in ba_edits (either 'new_...' or the raw sheet noEq)
+        const keyToDelete = row.originalNoEq || row.noEq;
+        if (keyToDelete && keyToDelete.startsWith('new_')) {
+          // User-added row: fully remove from Supabase
+          await supabase.from(T_BA_EDITS).delete().eq('no_eq', keyToDelete);
+        } else if (keyToDelete) {
+          // Sheet row: mark as __DELETED__ with full payload so the record exists
           await supabase.from(T_BA_EDITS).upsert({
-            no_eq: row.originalNoEq,
+            no_eq: keyToDelete,
+            new_no_eq: row.noEq || keyToDelete,
+            no_urut: row.no || '',
+            name: row.name || '',
+            cc: row.cc || '',
+            kepemilikan: row.kepemilikan || '',
             status: '__DELETED__',
             updated_at: new Date().toISOString()
           }, { onConflict: 'no_eq' });
@@ -713,7 +722,11 @@ export default function BeritaAcaraView({ currentUser }) {
       if (/Dibuat Oleh|Demikian|Nomor:|Perihal:/i.test(name)) continue;
 
       // Skip rows marked as deleted in Supabase
-      if (overrideMap[noEq] && overrideMap[noEq].status === '__DELETED__') {
+      // Check both noEq (sheet value) and the current display noEq in case it was renamed
+      if (
+        (overrideMap[noEq] && overrideMap[noEq].status === '__DELETED__') ||
+        (noEq && overrideMap[noEq]?.status === '__DELETED__')
+      ) {
         continue;
       }
 
