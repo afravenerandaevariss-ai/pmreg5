@@ -319,7 +319,12 @@ export default function BeritaAcaraView({ currentUser }) {
         action: 'upload_pdf',
         parentFolderId: DRIVE_PARENT_FOLDER_ID,
         unitCode: baData.plantCode,
-        unitName: baData.unitName,
+        // ★ FIX: Prefix unitCode ke unitName agar pencarian subfolder di GDrive
+        // tidak salah karena substring match. Contoh: "Gunung Meliau" (5E01) 
+        // sebelumnya cocok dengan folder "5F01 PABRIK GUNUNG MELIAU" (5F01) 
+        // karena GAS melakukan pencarian substring. Dengan format "5E01 Gunung Meliau",
+        // pencarian menjadi unik per plant code dan tidak akan salah folder.
+        unitName: `${baData.plantCode} ${baData.unitName}`,
         fileName: fileName,
         notes: uploadNotes,
         fileData: base64Data,
