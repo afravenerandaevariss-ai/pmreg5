@@ -17,7 +17,14 @@ export default function WorkOrderMonitoringView({ currentUser }) {
   const [uploadProgress, setUploadProgress] = useState(0);
 
   // Filters state
-  const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'Regional' || currentUser?.role?.toUpperCase() === 'ADMIN' || currentUser?.role?.toUpperCase() === 'REGIONAL' || currentUser?.role?.toUpperCase() === 'DEV';
+  const isAdmin = currentUser && (
+    currentUser.role === 'Admin' || 
+    currentUser.role === 'Regional' || 
+    currentUser.role?.toUpperCase() === 'ADMIN' || 
+    currentUser.role?.toUpperCase() === 'REGIONAL' || 
+    currentUser.role?.toUpperCase() === 'DEV' ||
+    ['1', '2', '3'].includes(String(currentUser.role_id))
+  );
 
   const [selectedPlant, setSelectedPlant] = useState(
     !isAdmin && currentUser?.plant ? currentUser.plant : ''
@@ -783,14 +790,12 @@ export default function WorkOrderMonitoringView({ currentUser }) {
                 </p>
               </div>
               <div className="flex items-center gap-2 print:hidden">
-                {isAdmin && (
-                  <button 
-                    onClick={handleCopyOrders}
-                    className="flex items-center gap-2 text-xs font-bold bg-slate-100 text-slate-700 px-4 py-2 rounded-xl border border-slate-200 shadow-sm hover:bg-slate-200 transition-colors duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-slate-300"
-                  >
-                    {copiedOrders ? <><CheckCircle size={16} className="text-emerald-600" /> Disalin</> : <><Copy size={16} /> Salin No. Order</>}
-                  </button>
-                )}
+                <button 
+                  onClick={handleCopyOrders}
+                  className="flex items-center gap-2 text-xs font-bold bg-slate-100 text-slate-700 px-4 py-2 rounded-xl border border-slate-200 shadow-sm hover:bg-slate-200 transition-colors duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-slate-300"
+                >
+                  {copiedOrders ? <><CheckCircle size={16} className="text-emerald-600" /> Disalin</> : <><Copy size={16} /> Salin No. Order</>}
+                </button>
                 <button 
                   onClick={handlePrint}
                   className="flex items-center gap-2 text-xs font-bold bg-white text-slate-700 px-4 py-2 rounded-xl border border-slate-200 shadow-sm hover:bg-slate-50 transition-colors duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-slate-200"

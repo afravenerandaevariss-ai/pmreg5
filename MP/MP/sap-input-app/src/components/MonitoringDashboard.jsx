@@ -58,7 +58,7 @@ export default function MonitoringDashboard({
       try {
         if (supabase) {
           const yearMonth = format(currentMonth, 'yyyy-MM');
-          const plant = isUserPlantRestricted ? userPlant : (selectedPlantFilter !== 'ALL' ? selectedPlantFilter : null);
+          const plant = selectedPlantFilter !== 'ALL' ? selectedPlantFilter : null;
           const { data, error } = await fetchDailyLogs(plant, yearMonth);
           if (!error && data) {
             setDailyLogs(data);
@@ -75,7 +75,7 @@ export default function MonitoringDashboard({
       }
     };
     loadLogs();
-  }, [currentMonth, currentUser, selectedPlantFilter, isUserPlantRestricted, userPlant]);
+  }, [currentMonth, currentUser, selectedPlantFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -354,7 +354,7 @@ export default function MonitoringDashboard({
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Equipment_Belum_Input");
     
-    const plantCode = selectedPlantFilter.toLowerCase();
+    const plantCode = (selectedPlantFilter || 'ALL').toLowerCase();
     const monthStr = format(currentMonth, 'MM-yyyy');
     XLSX.writeFile(wb, `Detail_Belum_Input_${plantCode}_${monthStr}.xlsx`);
   };
@@ -400,10 +400,9 @@ export default function MonitoringDashboard({
             <select
               value={selectedPlantFilter}
               onChange={(e) => setSelectedPlantFilter(e.target.value)}
-              disabled={isUserPlantRestricted}
-              className="bg-transparent border-none text-slate-800 font-bold focus:outline-none cursor-pointer disabled:cursor-not-allowed text-xs"
+              className="bg-transparent border-none text-slate-800 font-bold focus:outline-none cursor-pointer text-xs"
             >
-              {!isUserPlantRestricted && <option value="ALL">Semua Plant</option>}
+              <option value="ALL">Semua Plant</option>
               {availablePlants.map(p => (
                 <option key={p} value={p}>{p}</option>
               ))}

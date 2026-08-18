@@ -43,8 +43,12 @@ const ALL_PABRIK_PLANTS = [
 
 async function fetchAllPlantsLogs(yearMonth) {
   if (!supabase) return { data: null, error: 'Supabase not configured' };
+  const parts = yearMonth.split('-');
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  const lastDay = new Date(y, m, 0).getDate();
   const startDate = `${yearMonth}-01`;
-  const endDate   = `${yearMonth}-31`;
+  const endDate   = `${yearMonth}-${String(lastDay).padStart(2, '0')}`;
   let allData = [], from = 0;
   const PAGE = 1000;
   let fetchError = null;

@@ -159,6 +159,11 @@ export async function saveSystemConfig(id, dataObj) {
   else if (id === 'live_chats') numericId = 11;
   else if (id === 'wa_config') numericId = 12;
   else if (id === 'wa_logs') numericId = 13;
+  else if (id === 'iw39_data') numericId = 14;
+  else if (id === 'zvtab_data') numericId = 15;
+  else if (id === 'export046_data') numericId = 16;
+  else if (id === 'doc_details') numericId = 17;
+  else if (id === 'hierarchy_data') numericId = 0;
   
   const cacheKey = `sys_cfg_${T.hierarchy_data}_${numericId}`;
   memoryCache.set(cacheKey, dataObj);
@@ -278,8 +283,12 @@ export async function fetchDailyLogs(plant, yearMonth) {
     let pageQuery = supabase.from(T.daily_logs).select('*');
     if (plant && plant !== 'ALL') pageQuery = pageQuery.eq('plant', plant);
     if (yearMonth) {
+      const parts = yearMonth.split('-');
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const lastDay = new Date(y, m, 0).getDate();
       const startDate = `${yearMonth}-01`;
-      const endDate = `${yearMonth}-31`;
+      const endDate = `${yearMonth}-${String(lastDay).padStart(2, '0')}`;
       pageQuery = pageQuery.gte('date', startDate).lte('date', endDate);
     }
 

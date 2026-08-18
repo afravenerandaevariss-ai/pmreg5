@@ -407,9 +407,16 @@ export default function DailyDashboard({
   }, [matrixMonth]);
 
   // Check if a cell date (yyyy-MM-dd) is editable
-  // UNLOCKED: All dates in the matrix are fully editable
+  // Rule: USER and ADMIN can edit H-1, H-2, H-3, H-4 (last 4 days). DEV gets full access to all dates.
   const isCellEditable = (dateStr) => {
-    return true;
+    // DEV role gets access to edit all dates
+    if (isAfraUser) return true;
+
+    const today = simulatedToday || new Date();
+    const h4Str = format(subDays(today, 4), 'yyyy-MM-dd');
+    const h1Str = format(subDays(today, 1), 'yyyy-MM-dd');
+
+    return dateStr >= h4Str && dateStr <= h1Str;
   };
 
 
