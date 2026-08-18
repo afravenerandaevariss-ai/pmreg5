@@ -222,11 +222,27 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     setLoading(true);
     setError(null);
     try {
+      // ★ FIX: Paksa fresh fetch dari Supabase untuk vehicle data.
+      // vehicle_logs bisa mencapai 1.7MB — sessionStorage sering gagal menyimpan
+      // data sebesar ini secara silent. Akibatnya setelah refresh, sessionStorage
+      // mengembalikan data lama/kosong dan background-revalidation tidak memperbarui
+      // React state. Solusi: hapus cache sessionStorage setiap loadData agar selalu
+      // ambil langsung dari Supabase.
+      try {
+        // Cache key format: sys_cfg_${tableName}_${numericId}
+        // vehicle_master = id 8, vehicle_logs = id 9
+        const tName = import.meta?.env?.VITE_APP_ENV === 'dev' ? 'dev_hierarchy_data' : 'hierarchy_data';
+        sessionStorage.removeItem(`sys_cfg_${tName}_8`);
+        sessionStorage.removeItem(`sys_cfg_${tName}_9`);
+      } catch (e) { /* sessionStorage mungkin tidak tersedia */ }
+
       let fetchPromise;
       if (screenshotMode) {
+        // ★ FIX: /api/vehicle-logs-slim mengembalikan 404 di server Ubuntu (bukan Vercel).
+        // Gunakan fetchVehicleLogs langsung dari Supabase untuk konsistensi.
         fetchPromise = Promise.all([
           fetchVehicleMaster(), 
-          fetch(`/api/vehicle-logs-slim?month=${targetMonth}`).then(r => r.json()).then(res => res.error ? { error: { message: res.error } } : { data: res.data || [], error: null }),
+          fetchVehicleLogs(),
           fetchMasterEquipment(), 
           Promise.resolve({ data: [], error: null }),
           getSystemConfig('master_map')
@@ -1677,8 +1693,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <select 
                 value={selectedPlant} 
                 onChange={e => setSelectedPlant(e.target.value)}
-                disabled={!isAdmin}
-                className="px-3 py-2 border border-slate-300 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-slate-50 disabled:opacity-80 font-semibold"
+                className="px-3 py-2 border border-slate-300 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-slate-50 font-semibold"
               >
                 {allPlantsList.map(p => (
                   <option key={p.code} value={p.code}>
