@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, IS_DEV_ENV } from '../lib/supabase';
 import * as XLSX from 'xlsx';
 
-const T_PARSED_EXCEL = 'parsed_excel';
+const T_PARSED_EXCEL = IS_DEV_ENV ? 'dev_parsed_excel' : 'parsed_excel';
 const BUCKET_EXCEL   = 'excel_uploads';
 
 // localStorage keys — data persists across refreshes in the same browser
@@ -63,37 +63,38 @@ export default function WorkOrderMonitoringView({ currentUser }) {
       setLoading(true);
       setError(null);
 
-      // ── 1. Try Supabase first ─────────────────────────────────────────────
-      const { data: dbData, error: dbError } = await supabase
-        .from(T_PARSED_EXCEL)
-        .select('session_id, data')
-        .in('session_id', ['global_iw39', 'global_zvtab', 'global_046exp']);
-
       let hasIw39 = false;
       let hasZvtab = false;
       let has046 = false;
 
-      if (!dbError && dbData && dbData.length > 0) {
-        const iw39Row = dbData.find(d => d.session_id === 'global_iw39');
-        if (iw39Row && Array.isArray(iw39Row.data) && iw39Row.data.length > 0) {
-          setData(iw39Row.data);
-          // Keep localStorage in sync with Supabase
-          try { localStorage.setItem(LS_IW39, JSON.stringify(iw39Row.data)); } catch (_) {}
-          hasIw39 = true;
-        }
+      // ── 1. Try Supabase first ─────────────────────────────────────────────
+      if (supabase) {
+        const { data: dbData, error: dbError } = await supabase
+          .from(T_PARSED_EXCEL)
+          .select('session_id, data')
+          .in('session_id', ['global_iw39', 'global_zvtab', 'global_046exp']);
 
-        const zvtabRow = dbData.find(d => d.session_id === 'global_zvtab');
-        if (zvtabRow && zvtabRow.data) {
-          setZvtabData(zvtabRow.data);
-          try { localStorage.setItem(LS_ZVTAB, JSON.stringify(zvtabRow.data)); } catch (_) {}
-          hasZvtab = true;
-        }
+        if (!dbError && dbData && dbData.length > 0) {
+          const iw39Row = dbData.find(d => d.session_id === 'global_iw39');
+          if (iw39Row && Array.isArray(iw39Row.data) && iw39Row.data.length > 0) {
+            setData(iw39Row.data);
+            try { localStorage.setItem(LS_IW39, JSON.stringify(iw39Row.data)); } catch (_) {}
+            hasIw39 = true;
+          }
 
-        const expRow = dbData.find(d => d.session_id === 'global_046exp');
-        if (expRow && expRow.data) {
-          setExport046Data(expRow.data);
-          try { localStorage.setItem(LS_046EXP, JSON.stringify(expRow.data)); } catch (_) {}
-          has046 = true;
+          const zvtabRow = dbData.find(d => d.session_id === 'global_zvtab');
+          if (zvtabRow && zvtabRow.data) {
+            setZvtabData(zvtabRow.data);
+            try { localStorage.setItem(LS_ZVTAB, JSON.stringify(zvtabRow.data)); } catch (_) {}
+            hasZvtab = true;
+          }
+
+          const expRow = dbData.find(d => d.session_id === 'global_046exp');
+          if (expRow && expRow.data) {
+            setExport046Data(expRow.data);
+            try { localStorage.setItem(LS_046EXP, JSON.stringify(expRow.data)); } catch (_) {}
+            has046 = true;
+          }
         }
       }
 
@@ -121,15 +122,6 @@ export default function WorkOrderMonitoringView({ currentUser }) {
           const cached = localStorage.getItem(LS_046EXP);
           if (cached) setExport046Data(JSON.parse(cached));
         } catch (_) {}
-      }
-
-      // ── 3. Last resort: static /IW39.xlsx file ───────────────────────────
-      if (!hasIw39) {
-        const res = await fetch('/IW39.xlsx');
-        if (res.ok) {
-          const parsedData = await processFileOnBackend(await res.blob(), 'iw39', 'global_iw39');
-          setData(parsedData);
-        }
       }
     } catch (err) {
       console.error(err);
@@ -533,72 +525,69 @@ export default function WorkOrderMonitoringView({ currentUser }) {
     }
   };
 
-  const convertExcelDate = (serial) => {
-    if (!serial) return '-';
-    if (typeof serial === 'string') {
-      const s = serial.trim();
-      if (/^\d{8}$/.test(s)) {
-        const year = s.substring(0, 4);
-        const month = s.substring(4, 6);
-        const day = s.substring(6, 8);
-        const date = new Date(`${year}-${month}-${day}`);
-        if (!isNaN(date.getTime())) {
-          return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
-        }
-      }
-      const d = new Date(s);
-      if (!isNaN(d.getTime())) {
-        return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
-      }
-      return serial;
-    }
-    const date = new Date((serial - 25569) * 86400 * 1000);
-    return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
-  };
-
-  const getExcelMonth = (serial) => {
+  const parseDateToObj = (serial) => {
     if (!serial) return null;
     if (typeof serial === 'number') {
-      const date = new Date((serial - 25569) * 86400 * 1000);
-      return date.getMonth() + 1; // 1-indexed
+      return new Date((serial - 25569) * 86400 * 1000);
     }
     if (typeof serial === 'string') {
       const s = serial.trim();
-      if (/^\d{8}$/.test(s)) {
-        return parseInt(s.substring(4, 6)); // 1-12
+      if (!s) return null;
+      // Numeric serial string e.g. "46055"
+      if (/^\d{5}$/.test(s)) {
+        const num = Number(s);
+        return new Date((num - 25569) * 86400 * 1000);
       }
+      // YYYYMMDD string e.g. "20260826"
+      if (/^\d{8}$/.test(s)) {
+        const y = parseInt(s.substring(0, 4), 10);
+        const m = parseInt(s.substring(4, 6), 10) - 1;
+        const d = parseInt(s.substring(6, 8), 10);
+        return new Date(y, m, d);
+      }
+      // YYYY-MM-DD or DD-MM-YYYY
       if (s.includes('-')) {
         const parts = s.split('-');
-        if (parts.length >= 2) {
-          if (parts[0].length === 4) return parseInt(parts[1]); // YYYY-MM-DD
-          if (parts[2]?.length === 4) return parseInt(parts[1]); // DD-MM-YYYY
+        if (parts.length >= 3) {
+          if (parts[0].length === 4) {
+            return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+          }
+          if (parts[2].length === 4) {
+            return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+          }
         }
       }
+      // DD/MM/YYYY or MM/DD/YYYY
       if (s.includes('/')) {
         const parts = s.split('/');
-        if (parts.length >= 2) {
-          if (parts[2]?.length === 4) return parseInt(parts[1]); // MM/DD/YYYY or DD/MM/YYYY
+        if (parts.length >= 3) {
+          if (parts[2].length === 4) {
+            return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+          }
         }
       }
       const d = new Date(s);
-      if (!isNaN(d.getTime())) return d.getMonth() + 1;
+      if (!isNaN(d.getTime())) return d;
     }
     return null;
   };
 
+  const convertExcelDate = (serial) => {
+    const d = parseDateToObj(serial);
+    if (!d || isNaN(d.getTime())) return serial ? String(serial) : '-';
+    return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const getExcelMonth = (serial) => {
+    const d = parseDateToObj(serial);
+    if (!d || isNaN(d.getTime())) return null;
+    return d.getMonth() + 1; // 1-indexed (1-12)
+  };
+
   const getRawDateTimestamp = (serial) => {
-    if (!serial) return 0;
-    if (typeof serial === 'string') {
-      const s = serial.trim();
-      if (/^\d{8}$/.test(s)) {
-        const year = s.substring(0, 4);
-        const month = s.substring(4, 6);
-        const day = s.substring(6, 8);
-        return new Date(`${year}-${month}-${day}`).getTime() || 0;
-      }
-      return 0;
-    }
-    return (serial - 25569) * 86400 * 1000;
+    const d = parseDateToObj(serial);
+    if (!d || isNaN(d.getTime())) return 0;
+    return d.getTime();
   };
 
   const formatCurrency = (val) => {
