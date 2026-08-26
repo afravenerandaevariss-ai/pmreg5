@@ -33,8 +33,7 @@ dist-prod/
 scratch/
 
 # Scripts dengan credentials — jangan commit
-deploy_server.mjs
-deploy_dev_server.mjs
+deploy_*.mjs
 sync_users_from_excel.mjs
 import_users_additive_only.mjs
 sync_vehicle_prod_to_dev.mjs
@@ -53,6 +52,7 @@ setup-db.js
 
 # Env files (sudah ada *.local tapi tambahkan eksplisit)
 .env.dev
+.env.production
 .env.vercel
 .env.vercel.prod
 
