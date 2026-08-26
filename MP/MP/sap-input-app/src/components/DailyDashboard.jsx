@@ -3,7 +3,7 @@ import { format, startOfWeek, addDays, startOfMonth, endOfMonth, isSameDay, subM
 import { id } from 'date-fns/locale';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Search, Plus, Minus, X, Save, Clock, AlertTriangle, CheckCircle, ClipboardList, Download, FileDown, Trash2, Eye, Upload, History, Flag, FileSpreadsheet, RefreshCw, Layers, Lock, ExternalLink } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { exportDailyToSAP, exportCumulativeToSAP, exportAccumulatedToSAP, validateDailyHours } from '../utils/excel';
+import { exportDailyToSAP, exportCumulativeToSAP, exportAccumulatedToSAP, validateDailyHours, DEFAULT_SAP_HEADERS, getEquipmentPlant } from '../utils/excel';
 import { supabase, IS_DEV_ENV } from '../lib/supabase';
 
 const T_DAILY_LOGS = IS_DEV_ENV ? 'dev_daily_logs' : 'daily_logs';
@@ -76,7 +76,9 @@ export default function DailyDashboard({
     if (!currentUser) return false;
     const role = String(currentUser.role || '').toUpperCase();
     const plant = String(currentUser.plant || '').toUpperCase();
-    return role === 'ADMIN' || role === 'DEV' || role === 'REGIONAL' || plant === 'ALL' || plant === '5R00' || !plant.startsWith('5F');
+    if (role === 'ADMIN' || role === 'DEV' || role === 'REGIONAL') return true;
+    if (role === 'USER' || role === 'UNIT') return false;
+    return plant === 'ALL' || plant === '5R00';
   }, [currentUser]);
 
   const isUserRole = useMemo(() => {
@@ -148,7 +150,8 @@ export default function DailyDashboard({
       startDate: isUserRole ? '' : h1DateStr,
       endDate: isUserRole ? '' : h1DateStr,
       isAccumulated: false,
-      time: '08:00'
+      time: '08:00',
+      readBy: currentUser?.name?.substring(0, 12) || 'ADMIN'
     }));
     setShowExportModal(true);
   };
@@ -193,11 +196,12 @@ export default function DailyDashboard({
     setMatrixPage(1);
   }, [matrixMonth, matrixPlantFilter, matrixSearch]);
 
-  // Load matrix data from Supabase dev_daily_logs
+  // Load matrix data from Supabase dev_daily_logs / daily_logs
   const loadMatrixFromDB = async () => {
     setIsMatrixLoading(true);
     try {
-      const { data: logsMap, error } = await fetchDailyLogs(matrixPlantFilter || 'ALL', matrixMonth);
+      const plantToFetch = isAdminUser ? (matrixPlantFilter || 'ALL') : (currentUser?.plant || matrixPlantFilter || 'ALL');
+      const { data: logsMap, error } = await fetchDailyLogs(plantToFetch, matrixMonth);
       if (error) throw error;
       
       const newMatrix = {};
@@ -258,7 +262,7 @@ export default function DailyDashboard({
       for (const key of modifiedKeys) {
         const [eqNum, dateStr] = key.split('_');
         const eq = eqMap.get(eqNum);
-        const plant = eq?.plant || matrixPlantFilter || '5F07';
+        const plant = eq?.plant || matrixPlantFilter || currentUser?.plant || '5F01';
         const hours = dataToSave[key];
 
         if (hours !== undefined && hours !== null && hours !== '') {
@@ -364,20 +368,100 @@ export default function DailyDashboard({
     return Array.from(set).sort();
   }, [templateData, equipments]);
 
+  const [internalTemplateData, setInternalTemplateData] = useState(() => {
+    try {
+      const cached = localStorage.getItem('sys_cfg_hierarchy_data_3') || sessionStorage.getItem('sys_cfg_hierarchy_data_3');
+      if (cached) return JSON.parse(cached);
+    } catch(e) {}
+    return null;
+  });
+
+  // Automatically fetch template_data if not yet available
+  useEffect(() => {
+    getSystemConfig('template_data').then(res => {
+      if (res.data && Array.isArray(res.data.equipments)) {
+        setInternalTemplateData(res.data);
+        if (typeof setEquipments === 'function') setEquipments(res.data.equipments);
+      }
+    }).catch(() => {});
+  }, [setEquipments]);
+
+  const [directPlantInduk, setDirectPlantInduk] = useState([]);
+
+  useEffect(() => {
+    let query = supabase
+      .from('master_equipment')
+      .select('*')
+      .eq('eq_type', 'Induk');
+      
+    if (matrixPlantFilter && matrixPlantFilter.startsWith('5F')) {
+      query = query.eq('plant', matrixPlantFilter);
+    } else if (!isAdminUser && currentUser?.plant && currentUser.plant.startsWith('5F')) {
+      query = query.eq('plant', currentUser.plant);
+    } else {
+      // Role DEV / ADMIN when matrixPlantFilter is empty (Semua Plant) -> query all 5F plants!
+      query = query.like('plant', '5F%');
+    }
+    
+    query.order('plant', { ascending: true })
+      .order('eq_num', { ascending: true })
+      .then(({ data }) => {
+        if (data && Array.isArray(data) && data.length > 0) {
+          const mapped = data.map(r => ({
+            eqNum: r.eq_num,
+            plant: r.plant,
+            description: r.description,
+            type: 'Induk',
+            eq_type: 'Induk',
+            induk: r.induk || r.description,
+            reading: r.reading || 0,
+            functionalLoc: r.functional_loc,
+            flDescription: r.fl_description,
+            costCenter: r.cost_center
+          }));
+          setDirectPlantInduk(mapped);
+        }
+      }).catch(() => {});
+  }, [matrixPlantFilter, currentUser, isAdminUser]);
+
   // Filter Parent Equipments strictly matching GSheet template (type Induk & 5F Pabrik)
   const parentEquipments = useMemo(() => {
-    const sourceList = (templateData && Array.isArray(templateData.equipments) && templateData.equipments.length > 0)
-      ? templateData.equipments
-      : equipments;
+    let sourceList = [];
+    if (templateData && Array.isArray(templateData.equipments) && templateData.equipments.length > 0) {
+      sourceList = templateData.equipments;
+    } else if (internalTemplateData && Array.isArray(internalTemplateData.equipments) && internalTemplateData.equipments.length > 0) {
+      sourceList = internalTemplateData.equipments;
+    } else if (Array.isArray(equipments) && equipments.length > 0) {
+      sourceList = equipments;
+    } else if (Array.isArray(directPlantInduk) && directPlantInduk.length > 0) {
+      sourceList = directPlantInduk;
+    } else {
+      try {
+        const cached = localStorage.getItem('sys_cfg_hierarchy_data_3') || sessionStorage.getItem('sys_cfg_hierarchy_data_3');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed?.equipments && Array.isArray(parsed.equipments)) {
+            sourceList = parsed.equipments;
+          }
+        }
+      } catch (e) {}
+    }
 
-    return sourceList.filter(eq => {
-      const typeStr = String(eq.type || eq.eq_type || '').trim();
-      if (typeStr !== 'Induk') return false;
+    if (directPlantInduk.length > sourceList.length) {
+      sourceList = directPlantInduk;
+    }
+
+    const filtered = sourceList.filter(eq => {
+      const typeStr = String(eq.type || eq.eq_type || '').trim().toLowerCase();
+      const isInduk = typeStr === 'induk' || typeStr === 'parent' || String(eq.type || '').toUpperCase() === 'INDUK' || String(eq.eq_type || '').toUpperCase() === 'INDUK' || (eq.induk && (eq.eqNum === eq.induk || eq.eq_num === eq.induk));
+      if (!isInduk) return false;
 
       const plant = String(eq.plant || '').trim().toUpperCase();
       if (!plant.startsWith('5F')) return false;
 
-      if (matrixPlantFilter && plant !== matrixPlantFilter) return false;
+      if (matrixPlantFilter && plant !== matrixPlantFilter.toUpperCase()) return false;
+      if (!isAdminUser && currentUser?.plant && plant !== currentUser.plant.toUpperCase()) return false;
+
       if (matrixSearch.trim()) {
         const query = matrixSearch.toLowerCase();
         const numMatch = String(eq.eqNum || eq.eq_num || '').toLowerCase().includes(query);
@@ -386,7 +470,34 @@ export default function DailyDashboard({
       }
       return true;
     });
-  }, [templateData, equipments, matrixPlantFilter, matrixSearch]);
+
+    if (filtered.length === 0 && directPlantInduk.length > 0) {
+      return directPlantInduk.filter(eq => {
+        const p = String(eq.plant || '').trim().toUpperCase();
+        if (matrixPlantFilter && p !== matrixPlantFilter.toUpperCase()) return false;
+        if (!isAdminUser && currentUser?.plant && p !== currentUser.plant.toUpperCase()) return false;
+        if (matrixSearch.trim()) {
+          const query = matrixSearch.toLowerCase();
+          const numMatch = String(eq.eqNum || eq.eq_num || '').toLowerCase().includes(query);
+          const descMatch = String(eq.description || '').toLowerCase().includes(query);
+          if (!numMatch && !descMatch) return false;
+        }
+        return true;
+      }).sort((a, b) => {
+        const pA = String(a.plant || '');
+        const pB = String(b.plant || '');
+        if (pA !== pB) return pA.localeCompare(pB);
+        return String(a.eqNum || '').localeCompare(String(b.eqNum || ''));
+      });
+    }
+
+    return filtered.sort((a, b) => {
+      const pA = String(a.plant || '');
+      const pB = String(b.plant || '');
+      if (pA !== pB) return pA.localeCompare(pB);
+      return String(a.eqNum || '').localeCompare(String(b.eqNum || ''));
+    });
+  }, [templateData, internalTemplateData, equipments, directPlantInduk, matrixPlantFilter, matrixSearch, isAdminUser, currentUser]);
 
   const totalMatrixPages = Math.ceil(parentEquipments.length / matrixPageSize) || 1;
   const paginatedParentEquipments = useMemo(() => {
@@ -683,13 +794,29 @@ export default function DailyDashboard({
     });
   }, [todaysLogs, logPlantFilter, sortCol, sortDir]);
 
+  const ALL_5F_PABRIK = ['5F01', '5F04', '5F07', '5F08', '5F09', '5F14', '5F15', '5F21', '5F22'];
+
   // Get only Induk equipments for the current plant
   const indukEquipments = useMemo(() => {
-    return equipments.filter(eq => 
-      eq.type === 'Induk' && 
-      (currentUser?.role !== 'Unit' || eq.plant === currentUser?.plant)
-    );
-  }, [equipments, currentUser]);
+    let sourceList = [];
+    if (templateData && Array.isArray(templateData.equipments) && templateData.equipments.length > 0) {
+      sourceList = templateData.equipments;
+    } else if (internalTemplateData && Array.isArray(internalTemplateData.equipments) && internalTemplateData.equipments.length > 0) {
+      sourceList = internalTemplateData.equipments;
+    } else if (Array.isArray(equipments) && equipments.length > 0) {
+      sourceList = equipments;
+    } else if (Array.isArray(directPlantInduk) && directPlantInduk.length > 0) {
+      sourceList = directPlantInduk;
+    }
+    return sourceList.filter(eq => {
+      const isInduk = eq.type === 'Induk' || eq.eq_type === 'Induk' || String(eq.type || '').toUpperCase() === 'INDUK' || String(eq.eq_type || '').toUpperCase() === 'INDUK' || (eq.induk && (eq.eqNum === eq.induk || eq.eq_num === eq.induk));
+      if (!isInduk) return false;
+      if (!isAdminUser && currentUser?.plant) {
+        return (eq.plant || '').toUpperCase() === currentUser.plant.toUpperCase();
+      }
+      return true;
+    });
+  }, [templateData, internalTemplateData, equipments, directPlantInduk, isAdminUser, currentUser]);
 
   const filteredExportEqs = useMemo(() => {
     return indukEquipments.filter(eq => 
@@ -698,15 +825,36 @@ export default function DailyDashboard({
     );
   }, [indukEquipments, exportEqSearch]);
 
-  // Unique plants from induk equipments (for Regional dropdown in mass form)
+  // Unique plants from all sources
   const uniquePlants = useMemo(() => {
-    const plants = new Set(indukEquipments.map(eq => eq.plant).filter(Boolean));
+    const plants = new Set();
+    const sourceList = (templateData && Array.isArray(templateData.equipments) && templateData.equipments.length > 0)
+      ? templateData.equipments
+      : (Array.isArray(equipments) && equipments.length > 0 ? equipments : []);
+    sourceList.forEach(eq => {
+      const p = String(eq.plant || '').trim().toUpperCase();
+      if (p) plants.add(p);
+    });
+    if (plants.size === 0) {
+      ALL_5F_PABRIK.forEach(p => plants.add(p));
+    }
     return Array.from(plants).sort();
-  }, [indukEquipments]);
+  }, [templateData, equipments]);
 
   const pabrikPlants = useMemo(() => {
-    return uniquePlants.filter(p => p.startsWith('5F'));
-  }, [uniquePlants]);
+    const plants = new Set();
+    const sourceList = (templateData && Array.isArray(templateData.equipments) && templateData.equipments.length > 0)
+      ? templateData.equipments
+      : (Array.isArray(equipments) && equipments.length > 0 ? equipments : []);
+    sourceList.forEach(eq => {
+      const p = String(eq.plant || '').trim().toUpperCase();
+      if (p.startsWith('5F')) plants.add(p);
+    });
+    if (plants.size === 0) {
+      ALL_5F_PABRIK.forEach(p => plants.add(p));
+    }
+    return Array.from(plants).sort();
+  }, [templateData, equipments]);
 
   // Equipment filtered by plant selection in mass input modal
   const massIndukEquipments = useMemo(() => {
@@ -2729,11 +2877,6 @@ export default function DailyDashboard({
             <div className="p-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex flex-col gap-3">
               <button 
                 onClick={async () => {
-                  if (!templateData) {
-                    alert("Template belum diupload. Silakan upload di Pengaturan.");
-                    return;
-                  }
-                  
                   const effStartDate = exportSettings.startDate;
                   const effEndDate = isUserRole ? exportSettings.startDate : exportSettings.endDate;
 
@@ -2752,8 +2895,8 @@ export default function DailyDashboard({
                   if (supabase) {
                     setIsRefreshingForExport(true);
                     try {
-                      const yearMonth = format(currentMonth, 'yyyy-MM');
-                      const plant = currentUser?.role === 'Unit' ? currentUser.plant : null;
+                      const yearMonth = effStartDate.substring(0, 7) || format(currentMonth, 'yyyy-MM');
+                      const plant = isUserRole ? currentUser?.plant : null;
                       const { data, error } = await fetchDailyLogs(plant, yearMonth);
                       if (!error && data) {
                         freshLogs = data;
@@ -2765,75 +2908,87 @@ export default function DailyDashboard({
                     setIsRefreshingForExport(false);
                   }
 
+                  // Ensure templateData is complete, or auto-fetch from DB
+                  let exportTpl = templateData;
+                  if (!exportTpl?.headers || !exportTpl?.originalData || exportTpl.headers.length === 0) {
+                    try {
+                      const cfgRes = await getSystemConfig('template_data');
+                      if (cfgRes?.data?.headers && cfgRes.data?.originalData) {
+                        exportTpl = cfgRes.data;
+                        setTemplateData(cfgRes.data);
+                      }
+                    } catch(e) {}
+                  }
+
+                  const exportHeaders = (exportTpl?.headers && Array.isArray(exportTpl.headers) && exportTpl.headers.length > 0) ? exportTpl.headers : DEFAULT_SAP_HEADERS;
+                  const exportOriginalData = exportTpl?.originalData || [];
+                  let exportEquipments = (exportTpl?.equipments && Array.isArray(exportTpl.equipments) && exportTpl.equipments.length > 0) 
+                    ? exportTpl.equipments 
+                    : (Array.isArray(equipments) && equipments.length > 0 ? equipments : (Array.isArray(directPlantInduk) ? directPlantInduk : []));
+
+                  if (!exportEquipments || exportEquipments.length === 0) {
+                    try {
+                      const { data: dbEqs } = await supabase.from('master_equipment').select('*');
+                      if (dbEqs && dbEqs.length > 0) {
+                        exportEquipments = dbEqs.map(r => ({
+                          eqNum: r.eq_num,
+                          plant: r.plant,
+                          description: r.description,
+                          type: r.eq_type || 'Induk',
+                          eq_type: r.eq_type || 'Induk',
+                          induk: r.induk || r.description,
+                          reading: r.reading || 0,
+                          functionalLoc: r.functional_loc,
+                          flDescription: r.fl_description,
+                          costCenter: r.cost_center
+                        }));
+                      }
+                    } catch(e) {}
+                  }
+
                   // ── Validasi: total jam jalan per induk per hari tidak boleh > 24 jam ──
                   const validation = validateDailyHours(
                     freshLogs,
-                    exportSettings.startDate,
-                    exportSettings.endDate,
+                    effStartDate,
+                    effEndDate,
                     selectedExportEqs,
-                    selectedExportPlants
+                    isUserRole ? [currentUser?.plant || '5F01'] : selectedExportPlants
                   );
                   if (!validation.valid) {
                     setExportHourViolations(validation.violations);
-                    if (isAfraUser) {
-                      // DEV: store pending payload then show warning (allow to proceed)
-                      setPendingExportPayload({ freshLogs, targetEquipments: equipments, exportPayload: null, exportSettings: { ...exportSettings }, selectedExportPlants: [...selectedExportPlants], selectedExportEqs: [...selectedExportEqs] });
-                      setShowExportHourError(true);
-                      return; // pause here — DEV can click "Export Tetap" to proceed
-                    } else {
-                      // USER/ADMIN: blocked
-                      setShowExportHourError(true);
-                      return;
-                    }
+                    // Store pending payload so user can review and click 'Tetap Ekspor'
+                    setPendingExportPayload({ freshLogs, targetEquipments: exportEquipments, exportPayload: null, exportSettings: { ...exportSettings, startDate: effStartDate, endDate: effEndDate }, selectedExportPlants: isUserRole ? [currentUser?.plant || '5F01'] : [...selectedExportPlants], selectedExportEqs: [...selectedExportEqs], exportHeaders, exportOriginalData });
+                    setShowExportHourError(true);
+                    return;
                   }
 
+                  const userPlant = (currentUser?.plant || '5F01').trim().toUpperCase();
                   const exportPayload = {
-                    date: exportSettings.endDate,
-                    startDate: exportSettings.startDate,
-                    endDate: exportSettings.endDate,
-                    time: exportSettings.time,
-                    readBy: exportSettings.readBy,
-                    plant: currentUser?.plant,
+                    date: effEndDate,
+                    startDate: effStartDate,
+                    endDate: effEndDate,
+                    time: exportSettings.time || '08:00',
+                    readBy: exportSettings.readBy || currentUser?.name?.substring(0, 12) || 'ADMIN',
+                    plant: userPlant,
                     selectedEqs: selectedExportEqs,
-                    selectedPlants: selectedExportPlants
+                    selectedPlants: isUserRole ? [userPlant] : (selectedExportPlants.length > 0 ? selectedExportPlants : [userPlant])
                   };
 
-                  const resolveEqPlant = (eq) => {
-                    const rawPlant = String(eq.plant || '').trim().toUpperCase();
-                    if (rawPlant && rawPlant !== 'UNCATEGORIZED' && rawPlant !== '-') {
-                      return rawPlant;
-                    }
-                    const text = `${eq.description || ''} ${eq.induk || ''} ${eq.functionalLoc || ''} ${eq.flDescription || ''}`;
-                    const match = text.match(/\b(5F\d{2})\b/i);
-                    if (match) return match[1].toUpperCase();
-
-                    if (masterMap) {
-                      const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
-                      const eqKeyNorm = eqKey.replace(/^0+/, '');
-                      const info = masterMap.get(eqKey) || masterMap.get(eqKeyNorm);
-                      if (info) {
-                        const p = typeof info === 'string' ? info : info.plant;
-                        if (p && p !== 'Uncategorized' && p !== '-') return String(p).trim().toUpperCase();
-                      }
-                    }
-                    return '';
-                  };
-
-                  const filterTargetEquipments = (equipList, plantList, eqList, role, userPlant) => {
+                  const filterTargetEquipments = (equipList, plantList, eqList, role, uPlantStr) => {
                     let res = [...equipList];
 
-                    const isUserRole = !isAdminUser || role?.toUpperCase() === 'UNIT' || role?.toUpperCase() === 'USER';
-                    if (isUserRole && userPlant) {
-                      const uPlant = String(userPlant).trim().toUpperCase();
+                    const isUser = !isAdminUser || role?.toUpperCase() === 'UNIT' || role?.toUpperCase() === 'USER';
+                    if (isUser && uPlantStr) {
+                      const targetP = String(uPlantStr).trim().toUpperCase();
                       res = res.filter(eq => {
-                        const p = resolveEqPlant(eq);
-                        return p ? p === uPlant : false;
+                        const p = getEquipmentPlant(eq, masterMap, targetP);
+                        return p === targetP;
                       });
                     } else if (plantList && plantList.length > 0) {
                       const selectedSet = new Set(plantList.map(p => String(p).trim().toUpperCase()));
                       res = res.filter(eq => {
-                        const p = resolveEqPlant(eq);
-                        return p ? selectedSet.has(p) : false;
+                        const p = getEquipmentPlant(eq, masterMap, '');
+                        return selectedSet.has(p);
                       });
                     }
 
@@ -2859,17 +3014,44 @@ export default function DailyDashboard({
                     return res;
                   };
 
-                  let targetEquipments = filterTargetEquipments(equipments, selectedExportPlants, selectedExportEqs, currentUser?.role, currentUser?.plant);
+                  try {
+                    let targetEquipments = filterTargetEquipments(exportEquipments, selectedExportPlants, selectedExportEqs, currentUser?.role, userPlant);
+                    if (!targetEquipments || targetEquipments.length === 0) {
+                      try {
+                        const { data: dbEqs } = await supabase.from('master_equipment').select('*').eq('plant', userPlant);
+                        if (dbEqs && dbEqs.length > 0) {
+                          targetEquipments = dbEqs.map(r => ({
+                            eqNum: r.eq_num,
+                            plant: r.plant,
+                            description: r.description,
+                            type: r.eq_type || 'Induk',
+                            eq_type: r.eq_type || 'Induk',
+                            induk: r.induk || r.description,
+                            reading: r.reading || 0,
+                            functionalLoc: r.functional_loc,
+                            flDescription: r.fl_description,
+                            costCenter: r.cost_center
+                          }));
+                        }
+                      } catch (e) {}
+                    }
+                    if (!targetEquipments || targetEquipments.length === 0) {
+                      targetEquipments = exportEquipments;
+                    }
 
-                  const exportPayloadWithMaster = { ...exportPayload, masterMap };
-                  if (exportSettings.startDate === exportSettings.endDate && !exportSettings.isAccumulated) {
-                    exportDailyToSAP(templateData.headers, templateData.originalData, targetEquipments, freshLogs, exportPayloadWithMaster, masterMap);
-                  } else if (exportSettings.isAccumulated) {
-                    exportAccumulatedToSAP(templateData.headers, templateData.originalData, targetEquipments, freshLogs, exportPayloadWithMaster, masterMap);
-                  } else {
-                    exportCumulativeToSAP(templateData.headers, templateData.originalData, targetEquipments, freshLogs, exportPayloadWithMaster, masterMap);
+                    const exportPayloadWithMaster = { ...exportPayload, masterMap };
+                    if (effStartDate === effEndDate && !exportSettings.isAccumulated) {
+                      exportDailyToSAP(exportHeaders, exportOriginalData, targetEquipments, freshLogs, exportPayloadWithMaster, masterMap);
+                    } else if (exportSettings.isAccumulated) {
+                      exportAccumulatedToSAP(exportHeaders, exportOriginalData, targetEquipments, freshLogs, exportPayloadWithMaster, masterMap);
+                    } else {
+                      exportCumulativeToSAP(exportHeaders, exportOriginalData, targetEquipments, freshLogs, exportPayloadWithMaster, masterMap);
+                    }
+                    setShowExportModal(false);
+                  } catch (err) {
+                    console.error("Export Error:", err);
+                    alert("Terjadi kendala saat mengekspor Excel: " + (err.message || err));
                   }
-                  setShowExportModal(false);
                 }}
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2"
               >
@@ -2883,20 +3065,18 @@ export default function DailyDashboard({
       {showExportHourError && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh]">
-            {/* Header — amber for DEV warning, red for blocked */}
-            <div className={`${isAfraUser ? 'bg-amber-500' : 'bg-red-600'} text-white p-4 rounded-t-2xl flex justify-between items-center`}>
+            {/* Header */}
+            <div className="bg-amber-600 text-white p-4 rounded-t-2xl flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center flex-none">
                   <AlertTriangle size={20} />
                 </div>
                 <div>
                   <h3 className="font-bold text-base leading-tight">
-                    {isAfraUser ? 'PERINGATAN — JAM > 24' : 'EXPORT DIBLOKIR'}
+                    PERINGATAN — JAM JALAN &gt; 24 JAM
                   </h3>
-                  <p className={`text-xs mt-0.5 ${isAfraUser ? 'text-amber-100' : 'text-red-100'}`}>
-                    {isAfraUser
-                      ? 'Data melebihi 24 jam/hari. DEV dapat tetap melanjutkan export.'
-                      : 'Jam jalan melebihi batas maksimum 24 jam/hari'}
+                  <p className="text-xs mt-0.5 text-amber-100">
+                    Data melebihi 24 jam/hari. Anda dapat tetap melanjutkan export ke Excel.
                   </p>
                 </div>
               </div>
@@ -2911,21 +3091,17 @@ export default function DailyDashboard({
             {/* Body */}
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
               {/* Explanation */}
-              <div className={`${isAfraUser ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200'} border rounded-xl p-3.5 flex gap-3 items-start`}>
-                <AlertTriangle size={16} className={`${isAfraUser ? 'text-amber-500' : 'text-red-500'} flex-none mt-0.5`} />
-                <p className={`text-sm ${isAfraUser ? 'text-amber-700' : 'text-red-700'} leading-relaxed`}>
-                  Ditemukan <strong>{exportHourViolations.length} pelanggaran</strong> data jam jalan.
-                  Total jam jalan per alat induk dalam satu hari <strong>melebihi 24 jam (1.440 menit)</strong>.
-                  {isAfraUser
-                    ? ' Sebagai DEV, Anda dapat tetap mengekspor data ini.'
-                    : ' Silakan periksa dan perbaiki data berikut sebelum mengekspor ke Excel.'}
+              <div className="bg-amber-50 border-amber-200 border rounded-xl p-3.5 flex gap-3 items-start">
+                <AlertTriangle size={16} className="text-amber-500 flex-none mt-0.5" />
+                <p className="text-sm text-amber-800 leading-relaxed">
+                  Ditemukan <strong>{exportHourViolations.length} data</strong> dengan total jam jalan alat <strong>melebihi 24 jam</strong> dalam satu hari (misal data akumulasi). Anda dapat tetap mengekspor file Excel ini.
                 </p>
               </div>
 
               {/* Violations list */}
               <div className="space-y-2">
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wide px-1">
-                  Daftar Pelanggaran ({exportHourViolations.length} item)
+                  Daftar Alat ({exportHourViolations.length} item)
                 </p>
                 <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
                   {exportHourViolations.map((v, idx) => {
@@ -2937,9 +3113,9 @@ export default function DailyDashboard({
                       ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`
                       : v.date;
                     return (
-                      <div key={idx} className={`flex items-start gap-3 p-3 bg-white hover:${isAfraUser ? 'bg-amber-50' : 'bg-red-50'} transition-colors`}>
+                      <div key={idx} className="flex items-start gap-3 p-3 bg-white hover:bg-amber-50 transition-colors">
                         {/* Date badge */}
-                        <div className={`${isAfraUser ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'} rounded-lg px-2.5 py-1.5 text-center flex-none min-w-[70px]`}>
+                        <div className="bg-amber-100 text-amber-700 rounded-lg px-2.5 py-1.5 text-center flex-none min-w-[70px]">
                           <p className="text-[11px] font-bold leading-tight">{displayDate}</p>
                         </div>
                         {/* Equipment info */}
@@ -2951,8 +3127,8 @@ export default function DailyDashboard({
                         </div>
                         {/* Hours info */}
                         <div className="text-right flex-none">
-                          <p className={`text-sm font-bold ${isAfraUser ? 'text-amber-600' : 'text-red-600'}`}>{totalHours} jam</p>
-                          <p className={`text-[11px] ${isAfraUser ? 'text-amber-400' : 'text-red-400'}`}>+{excessHours} jam lebih</p>
+                          <p className="text-sm font-bold text-amber-600">{totalHours} jam</p>
+                          <p className="text-[11px] text-amber-500">+{excessHours} jam lebih</p>
                         </div>
                       </div>
                     );
@@ -2965,12 +3141,12 @@ export default function DailyDashboard({
             <div className="p-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex gap-3">
               <button
                 onClick={() => { setShowExportHourError(false); setPendingExportPayload(null); }}
-                className={`${isAfraUser ? 'flex-1' : 'flex-1'} ${isAfraUser ? 'bg-slate-200 hover:bg-slate-300 text-slate-700' : 'bg-red-600 hover:bg-red-700 text-white'} font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm`}
+                className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
               >
-                <X size={16} /> {isAfraUser ? 'Tutup' : 'Tutup & Perbaiki Data'}
+                <X size={16} /> Tutup
               </button>
-              {/* DEV-only: proceed button */}
-              {isAfraUser && pendingExportPayload && (
+              {/* Proceed button for all users */}
+              {pendingExportPayload && (
                 <button
                   onClick={() => {
                     try {
@@ -3012,14 +3188,14 @@ export default function DailyDashboard({
                         if (isUserRole && userPlant) {
                           const uPlant = String(userPlant).trim().toUpperCase();
                           res = res.filter(eq => {
-                            const p = resolveEqPlant(eq);
-                            return p ? p === uPlant : false;
+                            const p = getEquipmentPlant(eq, masterMap, uPlant);
+                            return p === uPlant;
                           });
                         } else if (plantList && plantList.length > 0) {
                           const selectedSet = new Set(plantList.map(p => String(p).trim().toUpperCase()));
                           res = res.filter(eq => {
-                            const p = resolveEqPlant(eq);
-                            return p ? selectedSet.has(p) : false;
+                            const p = getEquipmentPlant(eq, masterMap, '');
+                            return selectedSet.has(p);
                           });
                         }
                         if (eqList && eqList.length > 0) {
@@ -3043,9 +3219,9 @@ export default function DailyDashboard({
                         }
                         return res;
                       };
-                      let pTargetEqs = filterTargetEquipments(equipments, pPlants, pEqs, currentUser?.role, currentUser?.plant);
-                      const headers = templateData?.headers || [];
-                      const originalData = templateData?.originalData || [];
+                      let pTargetEqs = filterTargetEquipments(pendingExportPayload?.targetEquipments || equipments, pPlants, pEqs, currentUser?.role, currentUser?.plant);
+                      const headers = pendingExportPayload?.exportHeaders || templateData?.headers || DEFAULT_SAP_HEADERS;
+                      const originalData = pendingExportPayload?.exportOriginalData || templateData?.originalData || [];
                       const pPayloadWithMaster = { ...pPayload, masterMap };
                       if (pSettings.startDate === pSettings.endDate && !pSettings.isAccumulated) {
                         exportDailyToSAP(headers, originalData, pTargetEqs, pLogs, pPayloadWithMaster, masterMap);

@@ -46,18 +46,35 @@ export async function uploadMasterEquipment(equipmentsArray) {
   return { error };
 }
 
-export async function fetchMasterEquipment() {
+export async function fetchMasterEquipment(forceRefresh = false) {
   if (!supabase) return { data: null, error: 'Supabase not configured' };
+
+  const cacheKey = `master_eq_${T.master_equipment}`;
+  if (!forceRefresh) {
+    if (memoryCache.has(cacheKey)) {
+      return { data: memoryCache.get(cacheKey), error: null };
+    }
+    try {
+      const cached = localStorage.getItem(cacheKey) || sessionStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          memoryCache.set(cacheKey, parsed);
+          return { data: parsed, error: null };
+        }
+      }
+    } catch (e) {}
+  }
 
   let allData = [];
   let from = 0;
-  const PAGE_SIZE = 1000;
+  const PAGE_SIZE = 5000;
   let fetchError = null;
 
   while (true) {
     const { data, error } = await supabase
       .from(T.master_equipment)
-      .select('*')
+      .select('eq_num, plant, description, functional_loc, fl_description, cost_center, eq_type, induk, reading')
       .order('plant')
       .order('eq_num')
       .range(from, from + PAGE_SIZE - 1);
@@ -73,7 +90,19 @@ export async function fetchMasterEquipment() {
     from += PAGE_SIZE;
   }
 
-  if (fetchError) return { data: null, error: fetchError };
+  if (fetchError) {
+    // If fetch failed or timed out, fallback to local cache if available
+    try {
+      const fallbackCached = localStorage.getItem(cacheKey);
+      if (fallbackCached) {
+        const parsed = JSON.parse(fallbackCached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return { data: parsed, error: null };
+        }
+      }
+    } catch (e) {}
+    return { data: null, error: fetchError };
+  }
 
   const equipments = allData.map(row => ({
     eqNum: row.eq_num,
@@ -86,6 +115,13 @@ export async function fetchMasterEquipment() {
     induk: row.induk,
     reading: row.reading,
   }));
+
+  memoryCache.set(cacheKey, equipments);
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify(equipments));
+  } catch (e) {
+    try { sessionStorage.setItem(cacheKey, JSON.stringify(equipments)); } catch (e2) {}
+  }
 
   return { data: equipments, error: null };
 }
@@ -140,7 +176,12 @@ export async function fetchHierarchyData() {
     .select('data')
     .eq('id', 1)
     .single();
-  if (error) return { data: null, error };
+  if (error) {
+    if (error.code === 'PGRST116' || error.status === 406) {
+      return { data: null, error: null };
+    }
+    return { data: null, error };
+  }
   return { data: data?.data || null, error: null };
 }
 
@@ -165,13 +206,16 @@ export async function saveSystemConfig(id, dataObj) {
   else if (id === 'doc_details') numericId = 17;
   else if (id === 'hierarchy_data') numericId = 0;
   
+  const SMALL_CONFIG_IDS = new Set([4, 5, 12, 13, 17]);
   const cacheKey = `sys_cfg_${T.hierarchy_data}_${numericId}`;
   memoryCache.set(cacheKey, dataObj);
-  try { sessionStorage.setItem(cacheKey, JSON.stringify(dataObj)); } catch (e) {}
+  if (SMALL_CONFIG_IDS.has(numericId)) {
+    try { sessionStorage.setItem(cacheKey, JSON.stringify(dataObj)); } catch (e) {}
+  }
 
   const { error } = await supabase
     .from(T.hierarchy_data)
-    .upsert({ id: numericId, data: dataObj, updated_at: new Date().toISOString() });
+    .upsert({ id: numericId, data: dataObj, updated_at: new Date().toISOString() }, { onConflict: 'id' });
   return { error };
 }
 
@@ -205,7 +249,7 @@ export async function deleteSystemConfig(id) {
   return { error };
 }
 
-export async function getSystemConfig(id) {
+export async function getSystemConfig(id, forceRefresh = false) {
   if (!supabase) return { data: null, error: 'Supabase not configured' };
   let numericId = 4;
   if (id === 'master_map') numericId = 2;
@@ -224,29 +268,24 @@ export async function getSystemConfig(id) {
   else if (id === 'doc_details') numericId = 17;
 
   const cacheKey = `sys_cfg_${T.hierarchy_data}_${numericId}`;
-  if (memoryCache.has(cacheKey)) {
-    return { data: memoryCache.get(cacheKey), error: null };
-  }
-  try {
-    const cachedItem = sessionStorage.getItem(cacheKey);
-    if (cachedItem) {
-      const parsed = JSON.parse(cachedItem);
-      memoryCache.set(cacheKey, parsed);
-      // Background revalidation
-      supabase
-        .from(T.hierarchy_data)
-        .select('data')
-        .eq('id', numericId)
-        .single()
-        .then(({ data }) => {
-          if (data?.data) {
-            memoryCache.set(cacheKey, data.data);
-            try { sessionStorage.setItem(cacheKey, JSON.stringify(data.data)); } catch (e) {}
-          }
-        }).catch(() => {});
-      return { data: parsed, error: null };
+  if (!forceRefresh) {
+    if (memoryCache.has(cacheKey)) {
+      const memVal = memoryCache.get(cacheKey);
+      if (memVal && (numericId !== 3 || (Array.isArray(memVal.equipments) && memVal.equipments.length > 0))) {
+        return { data: memVal, error: null };
+      }
     }
-  } catch (e) {}
+    try {
+      const cachedItem = sessionStorage.getItem(cacheKey) || localStorage.getItem(cacheKey);
+      if (cachedItem) {
+        const parsed = JSON.parse(cachedItem);
+        if (parsed && (numericId !== 3 || (Array.isArray(parsed.equipments) && parsed.equipments.length > 0))) {
+          memoryCache.set(cacheKey, parsed);
+          return { data: parsed, error: null };
+        }
+      }
+    } catch (e) {}
+  }
 
   const { data, error } = await supabase
     .from(T.hierarchy_data)
@@ -254,11 +293,31 @@ export async function getSystemConfig(id) {
     .eq('id', numericId)
     .single();
 
-  if (error) return { data: null, error };
+  if (error) {
+    if (error.code === 'PGRST116' || error.status === 406) {
+      return { data: null, error: null };
+    }
+    // Fallback to cache if available and valid
+    try {
+      const fallbackItem = localStorage.getItem(cacheKey) || sessionStorage.getItem(cacheKey);
+      if (fallbackItem) {
+        const parsed = JSON.parse(fallbackItem);
+        if (parsed && (numericId !== 3 || (Array.isArray(parsed.equipments) && parsed.equipments.length > 0))) {
+          return { data: parsed, error: null };
+        }
+      }
+    } catch (e) {}
+    return { data: null, error };
+  }
 
   if (data?.data) {
     memoryCache.set(cacheKey, data.data);
-    try { sessionStorage.setItem(cacheKey, JSON.stringify(data.data)); } catch (e) {}
+    try {
+      sessionStorage.setItem(cacheKey, JSON.stringify(data.data));
+    } catch (e) {}
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify(data.data));
+    } catch (e) {}
   }
 
   return { data: data?.data || null, error: null };
@@ -385,14 +444,42 @@ export async function deleteDailyLog(logId) {
 
 export async function loginUser(nik, password) {
   if (!supabase) return { data: null, error: 'Supabase not configured' };
-  const { data, error } = await supabase
-    .from(T.app_users)
-    .select('*')
-    .eq('nik', nik)
-    .single();
-
-  if (error) return { data: null, error: 'NIK tidak ditemukan' };
   
+  let data, error;
+  try {
+    const result = await supabase
+      .from(T.app_users)
+      .select('*')
+      .eq('nik', nik)
+      .single();
+    data = result.data;
+    error = result.error;
+  } catch (networkErr) {
+    return { data: null, error: 'Koneksi ke server gagal. Periksa jaringan internet Anda.' };
+  }
+
+  if (error) {
+    // PGRST116 = no rows found (NIK genuinely not found)
+    if (error.code === 'PGRST116') {
+      return { data: null, error: 'NIK tidak ditemukan' };
+    }
+    // 402 / Project paused
+    if (error.status === 402 || error.message?.includes('402')) {
+      return { data: null, error: 'Server database sedang tidak aktif (402). Hubungi admin.' };
+    }
+    // 401 / Invalid API key
+    if (error.status === 401 || error.message?.includes('401') || error.message?.includes('Invalid API key')) {
+      return { data: null, error: 'Konfigurasi server tidak valid (401). Hubungi admin.' };
+    }
+    // Generic DB error — log to console and show safe message
+    console.error('[loginUser] Supabase error:', error.code, error.status, error.message);
+    return { data: null, error: `Gagal terhubung ke server (${error.code || error.status || 'unknown'}). Hubungi admin.` };
+  }
+  
+  if (!data) {
+    return { data: null, error: 'NIK tidak ditemukan' };
+  }
+
   if (data.password !== password) {
     return { data: null, error: 'Password salah' };
   }

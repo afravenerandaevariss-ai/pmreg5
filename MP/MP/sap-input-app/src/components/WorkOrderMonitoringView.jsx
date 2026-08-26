@@ -5,6 +5,12 @@ import * as XLSX from 'xlsx';
 const T_PARSED_EXCEL = 'parsed_excel';
 const BUCKET_EXCEL   = 'excel_uploads';
 
+// localStorage keys — data persists across refreshes in the same browser
+const LS_IW39   = 'wo_iw39_data';
+const LS_ZVTAB  = 'wo_zvtab_data';
+const LS_046EXP = 'wo_046exp_data';
+
+
 import { Search, Filter, FileSpreadsheet, RefreshCw, Layers, DollarSign, X, Info, AlertTriangle, CheckCircle, Printer, ChevronDown, Copy, ArrowUpDown } from 'lucide-react';
 
 export default function WorkOrderMonitoringView({ currentUser }) {
@@ -56,28 +62,68 @@ export default function WorkOrderMonitoringView({ currentUser }) {
     try {
       setLoading(true);
       setError(null);
-      // Fetch from Supabase FIRST
+
+      // ── 1. Try Supabase first ─────────────────────────────────────────────
       const { data: dbData, error: dbError } = await supabase
         .from(T_PARSED_EXCEL)
         .select('session_id, data')
         .in('session_id', ['global_iw39', 'global_zvtab', 'global_046exp']);
-        
+
       let hasIw39 = false;
+      let hasZvtab = false;
+      let has046 = false;
+
       if (!dbError && dbData && dbData.length > 0) {
         const iw39Row = dbData.find(d => d.session_id === 'global_iw39');
         if (iw39Row && Array.isArray(iw39Row.data) && iw39Row.data.length > 0) {
           setData(iw39Row.data);
+          // Keep localStorage in sync with Supabase
+          try { localStorage.setItem(LS_IW39, JSON.stringify(iw39Row.data)); } catch (_) {}
           hasIw39 = true;
         }
-        
+
         const zvtabRow = dbData.find(d => d.session_id === 'global_zvtab');
-        if (zvtabRow) setZvtabData(zvtabRow.data);
-        
+        if (zvtabRow && zvtabRow.data) {
+          setZvtabData(zvtabRow.data);
+          try { localStorage.setItem(LS_ZVTAB, JSON.stringify(zvtabRow.data)); } catch (_) {}
+          hasZvtab = true;
+        }
+
         const expRow = dbData.find(d => d.session_id === 'global_046exp');
-        if (expRow) setExport046Data(expRow.data);
+        if (expRow && expRow.data) {
+          setExport046Data(expRow.data);
+          try { localStorage.setItem(LS_046EXP, JSON.stringify(expRow.data)); } catch (_) {}
+          has046 = true;
+        }
       }
-      
-      // Fallback for IW39 if not in DB
+
+      // ── 2. Fallback to localStorage (survives refresh even if Supabase fails) ─
+      if (!hasIw39) {
+        try {
+          const cached = localStorage.getItem(LS_IW39);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setData(parsed);
+              hasIw39 = true;
+            }
+          }
+        } catch (_) {}
+      }
+      if (!hasZvtab) {
+        try {
+          const cached = localStorage.getItem(LS_ZVTAB);
+          if (cached) setZvtabData(JSON.parse(cached));
+        } catch (_) {}
+      }
+      if (!has046) {
+        try {
+          const cached = localStorage.getItem(LS_046EXP);
+          if (cached) setExport046Data(JSON.parse(cached));
+        } catch (_) {}
+      }
+
+      // ── 3. Last resort: static /IW39.xlsx file ───────────────────────────
       if (!hasIw39) {
         const res = await fetch('/IW39.xlsx');
         if (res.ok) {
@@ -92,6 +138,7 @@ export default function WorkOrderMonitoringView({ currentUser }) {
       setLoading(false);
     }
   };
+
 
   const parseIw39Sheet = (sheet) => {
     const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
@@ -301,62 +348,93 @@ export default function WorkOrderMonitoringView({ currentUser }) {
       try {
         const sessionId = customSessionId || `global_${type}`;
         const fileName = `${sessionId}.xlsx`;
-        
+
+        // Map type → localStorage key
+        const lsKey = type === 'iw39' ? LS_IW39 : type === 'zvtab' ? LS_ZVTAB : LS_046EXP;
+
         setUploadProgress(20);
 
-        // Try direct browser parsing first as robust fallback
+        // ── Step 1: Parse file in browser ─────────────────────────────────
+        let clientParsed = null;
         try {
-          const clientParsed = await parseFileInBrowser(fileBlob, type);
-          if (clientParsed) {
-            setUploadProgress(70);
-            await supabase
-              .from(T_PARSED_EXCEL)
-              .upsert({ session_id: sessionId, type, data: clientParsed }, { onConflict: 'session_id' });
-            setUploadProgress(100);
-            return resolve(clientParsed);
-          }
+          clientParsed = await parseFileInBrowser(fileBlob, type);
         } catch (_clientErr) {
-          console.warn("Client parsing fallback failed, trying backend upload...", _clientErr);
+          console.warn('Client-side parsing failed:', _clientErr);
         }
 
-        // Upload directly to Supabase Storage if bucket exists
+        if (clientParsed) {
+          // ── Step 2: Save to localStorage IMMEDIATELY (guaranteed persistence) ──
+          try { localStorage.setItem(lsKey, JSON.stringify(clientParsed)); } catch (_) {}
+          setUploadProgress(50);
+
+          // ── Step 3: Try Supabase upsert (cross-device sync) ───────────────
+          const { error: upsertError } = await supabase
+            .from(T_PARSED_EXCEL)
+            .upsert({ session_id: sessionId, type, data: clientParsed }, { onConflict: 'session_id' });
+
+          if (!upsertError) {
+            // Verify the Supabase save actually stuck
+            const { data: verify } = await supabase
+              .from(T_PARSED_EXCEL)
+              .select('session_id')
+              .eq('session_id', sessionId)
+              .single();
+
+            if (verify) {
+              setUploadProgress(100);
+              return resolve(clientParsed);
+            }
+            console.warn('Supabase upsert reported success but read-back failed. Data is in localStorage.');
+          } else {
+            console.warn('Supabase upsert failed. Data saved to localStorage only.', upsertError.message);
+          }
+
+          // localStorage already saved — resolve with parsed data
+          setUploadProgress(100);
+          return resolve(clientParsed);
+        }
+
+        // ── Step 4: No client parse result — try backend API path ─────────
+        setUploadProgress(60);
         const { error: uploadError } = await supabase.storage
           .from(BUCKET_EXCEL)
-          .upload(fileName, fileBlob, {
-            cacheControl: '3600',
-            upsert: true
-          });
+          .upload(fileName, fileBlob, { cacheControl: '3600', upsert: true });
 
         if (uploadError) {
           throw new Error(`Gagal mengunggah file ke Storage: ${uploadError.message}`);
         }
-        
+
         setUploadProgress(75);
 
-        // Trigger backend processing
         const processRes = await fetch('/api/process-excel', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ session_id: sessionId, type })
         });
-        
+
         if (!processRes.ok) {
           const errBody = await processRes.text();
           throw new Error(`Gagal memproses data di server: ${errBody}`);
         }
+
         setUploadProgress(90);
 
-        // Fetch result from Supabase
-        const { data, error } = await supabase
+        // Read back from DB
+        const { data: savedRow, error: readError } = await supabase
           .from(T_PARSED_EXCEL)
           .select('data')
           .eq('session_id', sessionId)
           .single();
-          
-        if (error || !data) throw new Error('Gagal mengambil hasil pemrosesan dari server');
+
+        if (readError || !savedRow) {
+          throw new Error('Gagal menyimpan data ke database. Cek izin RLS tabel parsed_excel.');
+        }
+
+        // Save backend result to localStorage too
+        try { localStorage.setItem(lsKey, JSON.stringify(savedRow.data)); } catch (_) {}
 
         setUploadProgress(100);
-        resolve(data.data);
+        resolve(savedRow.data);
       } catch (err) {
         reject(err);
       } finally {
@@ -364,6 +442,8 @@ export default function WorkOrderMonitoringView({ currentUser }) {
       }
     });
   };
+
+
 
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
@@ -374,15 +454,16 @@ export default function WorkOrderMonitoringView({ currentUser }) {
     try {
       const parsedData = await processFileOnBackend(file, 'iw39');
       setData(parsedData);
-      setSuccessMsg("Data IW39 berhasil diperbarui!");
+      setSuccessMsg("✅ Data IW39 berhasil disimpan! Data akan tetap ada setelah refresh.");
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err) {
       console.error(err);
-      setError("Gagal membaca file IW39. Pastikan format file Excel (XLSX).");
+      setError(`Gagal menyimpan file IW39: ${err.message || 'Pastikan format file Excel (XLSX).'}`);
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleZvtabUpload = async (e) => {
     const file = e.target.files[0];

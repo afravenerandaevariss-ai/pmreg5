@@ -1,6 +1,20 @@
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 
+export const DEFAULT_SAP_HEADERS = [
+  'No. Urut',
+  'Equipment Number\n(10-11 char)\nR',
+  'Equipment Description\n(max 40 char)\nR',
+  'Measuring point\n(numeric, 10 digit)\nR',
+  'Measurement Date\n(DD.MM.YYYY)\nR',
+  'Measurement Time\n(HH:MM:SS)\nR',
+  'Counter Reading/\nReading Difference\n(numerik, 9)\nR',
+  'Unit of Measure\n(dikosongkan)',
+  'Difference\n(1 char)\nC',
+  'Read By\n(max 12 char)\nO',
+  'Short Text\n(char, max 30)\nO'
+];
+
 export const EXCLUDED_SAP_EQS = new Set([
   '1000204985',
   '1000204982',
@@ -33,6 +47,33 @@ function forceColumnsAsText(ws, colIndices) {
       }
     }
   });
+}
+
+/**
+ * Accurately resolve plant code (e.g. 5F01, 5F08, etc.) from equipment object, functional location, or masterMap
+ */
+export function getEquipmentPlant(eq, masterMap, defaultPlant) {
+  if (!eq) return defaultPlant || '5F01';
+  let p = String(eq.plant || '').trim().toUpperCase();
+  if (p && p !== 'UNCATEGORIZED' && p !== '-' && p !== 'UNKNOWN' && p.startsWith('5F')) {
+    return p;
+  }
+  const text = `${eq.functionalLoc || ''} ${eq.functional_loc || ''} ${eq.flDescription || ''} ${eq.fl_description || ''} ${eq.costCenter || ''} ${eq.description || ''} ${eq.induk || ''}`;
+  const m = text.match(/\b(5F\d{2})\b/i);
+  if (m) return m[1].toUpperCase();
+
+  if (masterMap) {
+    const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+    const info = masterMap.get(eqKey) || masterMap.get(eqKey.replace(/^0+/, ''));
+    if (info) {
+      const pInfo = typeof info === 'string' ? info : info.plant;
+      if (pInfo && pInfo !== 'Uncategorized' && pInfo !== '-' && pInfo !== 'Unknown') {
+        const pUpper = String(pInfo).trim().toUpperCase();
+        if (pUpper.startsWith('5F')) return pUpper;
+      }
+    }
+  }
+  return (defaultPlant && defaultPlant !== 'ALL' && defaultPlant.startsWith('5F')) ? defaultPlant.toUpperCase() : '5F01';
 }
 
 /**
@@ -264,24 +305,26 @@ export function validateDailyHours(dailyLogsMap, startDate, endDate, selectedEqs
  * Generate Export Excel file
  */
 export function exportToSAP(headers, originalData, updatedEquipments, docDetails) {
+  const safeHeaders = (Array.isArray(headers) && headers.length > 0) ? headers : DEFAULT_SAP_HEADERS;
   // Strip \r from headers to prevent double \r\r\n corruption
-  const cleanHeaders = headers.map(h => typeof h === 'string' ? h.replace(/\r/g, '') : h);
+  const cleanHeaders = safeHeaders.map(h => typeof h === 'string' ? h.replace(/\r/g, '') : h);
   const wsData = [cleanHeaders];
   
   // Clone original data to avoid mutating state directly
-  const dataToExport = JSON.parse(JSON.stringify(originalData));
+  const safeOriginalData = Array.isArray(originalData) ? originalData : [];
+  const dataToExport = JSON.parse(JSON.stringify(safeOriginalData));
   
   // Format dates for SAP (DD.MM.YYYY)
   const dateParts = docDetails.date.split('-');
   const sapDate = dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` : docDetails.date;
   const sapTime = docDetails.time.length === 5 ? `${docDetails.time}:00` : docDetails.time;
   
-  const dateIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Measurement Date'));
-  const timeIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Measurement Time'));
-  const readingIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Counter Reading'));
-  const diffIdx = headers.findIndex(h => typeof h === 'string' && h.startsWith('Difference'));
-  const readByIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Read By'));
-  const shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Short Text'));
+  const dateIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Measurement Date'));
+  const timeIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Measurement Time'));
+  const readingIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Counter Reading'));
+  const diffIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.startsWith('Difference'));
+  const readByIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Read By'));
+  const shortTextIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Short Text'));
   
   // Update dataToExport with new values
   updatedEquipments.forEach(eq => {
@@ -312,8 +355,8 @@ export function exportToSAP(headers, originalData, updatedEquipments, docDetails
 
   const ws = XLSX.utils.aoa_to_sheet(wsData);
   // Force Equipment Number and Measuring Point columns as text to prevent 1E+11 scientific notation
-  const _eqNumIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Equipment Number'));
-  const _mpIdx = headers.findIndex(h => typeof h === 'string' && h.includes('Measuring point'));
+  const _eqNumIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Equipment Number'));
+  const _mpIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Measuring point'));
   forceColumnsAsText(ws, [_eqNumIdx, _mpIdx]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
@@ -343,7 +386,7 @@ function buildParentChildMaps(equipments) {
   const SUB_PREFIXES = ['BODY', 'PIPE', 'ACCESSORIES', 'HYD SYS', 'PUMP HYD', 'ELMOT HYD', 'ACC HYD', 'PANEL HYD', 'STIRRER', 'COUPLING', 'GEARBOX', 'ELECTROMOTOR', 'PANEL', 'VALVE', 'MOTOR'];
 
   // Pass 1: Register true parents with plant isolation key: `${plant}_${parentDesc}`
-  equipments.forEach(eq => {
+  (equipments || []).forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     const desc = String(eq.description || '').trim();
     const pDesc = String(eq.induk || eq.parentEquipment || desc).trim();
@@ -360,7 +403,7 @@ function buildParentChildMaps(equipments) {
 
   // Pass 2: Map every eqKey -> Parent EqNum in O(1) time
   const eqToParentEqNum = {};
-  equipments.forEach(eq => {
+  (equipments || []).forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     const desc = String(eq.description || '').trim();
     const pDesc = String(eq.induk || eq.parentEquipment || desc).trim();
@@ -391,13 +434,15 @@ function buildParentChildMaps(equipments) {
 
 export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap, docDetails, masterMapParam) {
   const masterMap = masterMapParam || docDetails?.masterMap || null;
+  const safeHeaders = (Array.isArray(headers) && headers.length > 0) ? headers : DEFAULT_SAP_HEADERS;
   // Strip \r from headers to prevent double \r\r\n corruption
-  const cleanHeaders = headers.map(h => typeof h === 'string' ? h.replace(/\r/g, '') : h);
+  const cleanHeaders = safeHeaders.map(h => typeof h === 'string' ? h.replace(/\r/g, '') : h);
   const wsData = [cleanHeaders];
+  const safeOriginalData = Array.isArray(originalData) ? originalData : [];
 
   // Only use logs from the selected date
   const selectedDate = docDetails.date; // format 'yyyy-MM-dd'
-  const todaysLogs = dailyLogsMap[selectedDate] || [];
+  const todaysLogs = (dailyLogsMap && dailyLogsMap[selectedDate]) || [];
 
   const { eqToParentEqNum } = buildParentChildMaps(equipments);
 
@@ -419,7 +464,7 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
 
   // STEP 2: Resolve HM per template row — parent and all sub-equipments get parentHmMap[pEqNum]
   const dailyDurations = {};
-  equipments.forEach(eq => {
+  (equipments || []).forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     if (!eqKey) return;
     const pEqNum = eqToParentEqNum[eqKey] || eqKey;
@@ -430,17 +475,17 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   const sapDate = dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` : docDetails.date;
   const sapTime = docDetails.time.length === 5 ? `${docDetails.time}:00` : docDetails.time;
   
-  const dateIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measurement Date') || h.toLowerCase().includes('date')));
-  const timeIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measurement Time') || h.toLowerCase().includes('time')));
-  const readingIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Counter Reading') || h.toLowerCase().includes('reading')));
-  const readByIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Read By') || h.toLowerCase().includes('read by')));
-  const measuringPtIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measuring point') || h.toLowerCase().includes('meas. point') || h.toLowerCase().includes('measuring pt')));
-  let shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
+  const dateIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Measurement Date') || h.toLowerCase().includes('date')));
+  const timeIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Measurement Time') || h.toLowerCase().includes('time')));
+  const readingIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Counter Reading') || h.toLowerCase().includes('reading')));
+  const readByIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Read By') || h.toLowerCase().includes('read by')));
+  const measuringPtIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Measuring point') || h.toLowerCase().includes('meas. point') || h.toLowerCase().includes('measuring pt')));
+  let shortTextIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
   if (shortTextIdx === -1) shortTextIdx = 10;
 
   // STEP 1.5: Build Parent & Sub Measuring Point Map
   const parentMpMap = {};
-  equipments.forEach(eq => {
+  (equipments || []).forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     if (!eqKey) return;
     const pEqNum = eqToParentEqNum[eqKey] || eqKey;
@@ -449,8 +494,8 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     let mp = '';
     if (masterMap && (masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint)) {
       mp = masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint;
-    } else if (rowIdx !== undefined && originalData[rowIdx] && measuringPtIdx !== -1) {
-      mp = String(originalData[rowIdx][measuringPtIdx] || '').trim();
+    } else if (rowIdx !== undefined && safeOriginalData[rowIdx] && measuringPtIdx !== -1) {
+      mp = String(safeOriginalData[rowIdx][measuringPtIdx] || '').trim();
     } else if (eq.measuringPoint || eq.measuring_point) {
       mp = String(eq.measuringPoint || eq.measuring_point).trim();
     }
@@ -468,25 +513,34 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   const processedRowIndices = new Set();
   const exportedEqKeys = new Set();
 
-  equipments.forEach((eq) => {
-    const rowIdx = eq.rowIndex;
-    if (rowIdx === undefined || !originalData[rowIdx]) return;
-    if (processedRowIndices.has(rowIdx)) return;
+  const eqColIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Equipment Number') || h.toLowerCase().includes('equipment')));
+  const descColIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Equipment Description') || h.toLowerCase().includes('description')));
 
+  (equipments || []).forEach((eq) => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     if (!eqKey) return;
     const eqKeyNorm = eqKey.replace(/^0+/, '');
     if (EXCLUDED_SAP_EQS.has(eqKey) || EXCLUDED_SAP_EQS.has(eqKeyNorm)) return;
 
-    processedRowIndices.add(rowIdx);
+    const rowIdx = eq.rowIndex;
+    if (rowIdx !== undefined && safeOriginalData[rowIdx] && processedRowIndices.has(rowIdx)) return;
+    if (rowIdx !== undefined && safeOriginalData[rowIdx]) processedRowIndices.add(rowIdx);
+    if (exportedEqKeys.has(eqKey)) return;
     exportedEqKeys.add(eqKey);
 
     const pEqNum = eqToParentEqNum[eqKey] || eqKey;
-
     const duration = dailyDurations[eqKey] || 0;
-    const rowData = [...originalData[rowIdx]]; 
+
+    let rowData;
+    if (rowIdx !== undefined && safeOriginalData[rowIdx]) {
+      rowData = [...safeOriginalData[rowIdx]]; 
+    } else {
+      rowData = new Array(cleanHeaders.length).fill('');
+      if (eqColIdx !== -1) rowData[eqColIdx] = eqKey;
+      if (descColIdx !== -1) rowData[descColIdx] = eq.description || eq.induk || eqKey;
+    }
     
-    const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx, measuringPtIdx);
+    const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx, measuringPtIdx, eqColIdx, descColIdx);
     while (rowData.length <= maxColIdx) {
       rowData.push("");
     }
@@ -498,6 +552,8 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     }
     readingStr = readingStr.replace('.', ',');
     
+    if (eqColIdx !== -1 && !rowData[eqColIdx]) rowData[eqColIdx] = eqKey;
+    if (descColIdx !== -1 && !rowData[descColIdx]) rowData[descColIdx] = eq.description || eq.induk || eqKey;
     if (dateIdx !== -1) rowData[dateIdx] = sapDate;
     if (timeIdx !== -1) rowData[timeIdx] = sapTime;
     if (readingIdx !== -1) rowData[readingIdx] = readingStr;
@@ -506,23 +562,17 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     
     // Ensure measuring point column is 100% fully populated for all parent & sub-equipments
     if (measuringPtIdx !== -1) {
-      const origMp = (rowIdx !== undefined && originalData[rowIdx]) ? String(originalData[rowIdx][measuringPtIdx] || '').trim() : '';
+      const origMp = (rowIdx !== undefined && safeOriginalData[rowIdx]) ? String(safeOriginalData[rowIdx][measuringPtIdx] || '').trim() : '';
       const masterMp = masterMap ? (masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint) : '';
       const finalMp = masterMp || origMp || parentMpMap[eqKey] || parentMpMap[pEqNum] || eq.measuringPoint || '';
       rowData[measuringPtIdx] = finalMp;
     }
 
-    const plantCodeStr = eq.plant || '5F01';
-    const loggedEntry = todaysLogs.find(l => {
-      const lEq = String(l.indukEqNum || l.induk_eq_num || '').trim();
-      return lEq === eqKey || eqToParentEqNum[lEq] === pEqNum;
-    });
-    const userNotes = loggedEntry?.notes || loggedEntry?.catatan || '';
-    let note = userNotes ? `${userNotes} (${plantCodeStr})` : `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
-    if (note.length > 30) note = note.substring(0, 30);
+    const plantCodeStr = getEquipmentPlant(eq, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || '5F01');
+    const note = `HM Mesin ${plantCodeStr} tgl ${sapDate}`;
     if (shortTextIdx !== -1) rowData[shortTextIdx] = note;
     for (let c = 0; c < rowData.length; c++) {
-      if (typeof rowData[c] === 'string' && rowData[c].toLowerCase().includes('import gsheet')) {
+      if (typeof rowData[c] === 'string' && (rowData[c].toLowerCase().includes('import') || rowData[c].toLowerCase().includes('ik17') || rowData[c].toLowerCase().includes('ib sd'))) {
         rowData[c] = note;
       }
     }
@@ -546,8 +596,6 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     exportedEqKeys.add(logEqNum);
 
     const pEqNum = eqToParentEqNum[logEqNum] || logEqNum;
-    const isSubEq = (logEqNum !== pEqNum);
-
     const duration = dailyDurations[logEqNum] || (log.durationMinutes / 60) || 0;
     const newRow = new Array(cleanHeaders.length).fill('');
 
@@ -573,10 +621,8 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
       newRow[measuringPtIdx] = finalMp;
     }
 
-    const plantCodeStr = log.plant || '5F01';
-    const userNotes = log.notes || log.catatan || '';
-    let note = userNotes ? `${userNotes} (${plantCodeStr})` : `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
-    if (note.length > 30) note = note.substring(0, 30);
+    const plantCodeStr = getEquipmentPlant(log, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || '5F01');
+    const note = `HM Mesin ${plantCodeStr} tgl ${sapDate}`;
     if (shortTextIdx !== -1) newRow[shortTextIdx] = note;
 
     wsData.push(newRow);
@@ -599,9 +645,10 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   const wb2 = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb2, ws2, "Sheet1");
   
-  const plantCode = (docDetails.plant || 'ALL').toLowerCase();
-  const selectedDateObj = new Date(docDetails.date);
-  const dateStr = format(selectedDateObj, 'ddMMyy');
+  const plantCode = (docDetails.selectedPlants && docDetails.selectedPlants.length === 1 ? docDetails.selectedPlants[0] : (docDetails.plant || 'ALL')).toLowerCase();
+  const cleanDate = (docDetails.date || '').split('T')[0];
+  const parts = cleanDate.split('-');
+  const dateStr = parts.length === 3 ? `${parts[2]}${parts[1]}${parts[0].slice(-2)}` : format(new Date(), 'ddMMyy');
   const fileName = `hm${plantCode}-${dateStr}.xlsx`;
   
   XLSX.writeFile(wb2, fileName);
@@ -612,8 +659,10 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
  */
 export function exportAccumulatedToSAP(headers, originalData, equipments, dailyLogsMap, docDetails, masterMapParam) {
   const masterMap = masterMapParam || docDetails?.masterMap || null;
-  const cleanHeaders = headers.map(h => typeof h === 'string' ? h.replace(/\r/g, '') : h);
+  const safeHeaders = (Array.isArray(headers) && headers.length > 0) ? headers : DEFAULT_SAP_HEADERS;
+  const cleanHeaders = safeHeaders.map(h => typeof h === 'string' ? h.replace(/\r/g, '') : h);
   const wsData = [cleanHeaders];
+  const safeOriginalData = Array.isArray(originalData) ? originalData : [];
 
   const startDate = docDetails.startDate || docDetails.date;
   const endDate = docDetails.endDate || docDetails.date;
@@ -625,9 +674,9 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
 
   // STEP 1: Aggregate HM per parent eq num across the date range
   const parentHmMap = {}; // { [parentEqNum]: totalHours }
-  Object.entries(dailyLogsMap).forEach(([dateStr, logs]) => {
+  Object.entries(dailyLogsMap || {}).forEach(([dateStr, logs]) => {
     if (dateStr < startDate || dateStr > endDate) return;
-    logs.forEach(log => {
+    (logs || []).forEach(log => {
       const logEqNum = String(log.indukEqNum || log.induk_eq_num || '').trim();
       if (!logEqNum) return;
       if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(logEqNum)) return;
@@ -644,7 +693,7 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
   });
 
   // STEP 2: Resolve HM per template row — parent and all sub-equipments get parentHmMap[pEqNum]
-  equipments.forEach(eq => {
+  (equipments || []).forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     if (!eqKey) return;
     const pEqNum = eqToParentEqNum[eqKey] || eqKey;
@@ -655,17 +704,17 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
   const sapDate = dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` : endDate;
   const sapTime = docDetails.time.length === 5 ? `${docDetails.time}:00` : docDetails.time;
 
-  const dateIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measurement Date') || h.toLowerCase().includes('date')));
-  const timeIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measurement Time') || h.toLowerCase().includes('time')));
-  const readingIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Counter Reading') || h.toLowerCase().includes('reading')));
-  const readByIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Read By') || h.toLowerCase().includes('read by')));
-  const measuringPtIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measuring point') || h.toLowerCase().includes('meas. point') || h.toLowerCase().includes('measuring pt')));
-  let shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
+  const dateIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Measurement Date') || h.toLowerCase().includes('date')));
+  const timeIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Measurement Time') || h.toLowerCase().includes('time')));
+  const readingIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Counter Reading') || h.toLowerCase().includes('reading')));
+  const readByIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Read By') || h.toLowerCase().includes('read by')));
+  const measuringPtIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Measuring point') || h.toLowerCase().includes('meas. point') || h.toLowerCase().includes('measuring pt')));
+  let shortTextIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
   if (shortTextIdx === -1) shortTextIdx = 10;
 
   // STEP 1.5: Build Parent & Sub Measuring Point Map
   const parentMpMap = {};
-  equipments.forEach(eq => {
+  (equipments || []).forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     if (!eqKey) return;
     const pEqNum = eqToParentEqNum[eqKey] || eqKey;
@@ -674,8 +723,8 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     let mp = '';
     if (masterMap && (masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint)) {
       mp = masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint;
-    } else if (rowIdx !== undefined && originalData[rowIdx] && measuringPtIdx !== -1) {
-      mp = String(originalData[rowIdx][measuringPtIdx] || '').trim();
+    } else if (rowIdx !== undefined && safeOriginalData[rowIdx] && measuringPtIdx !== -1) {
+      mp = String(safeOriginalData[rowIdx][measuringPtIdx] || '').trim();
     } else if (eq.measuringPoint || eq.measuring_point) {
       mp = String(eq.measuringPoint || eq.measuring_point).trim();
     }
@@ -692,31 +741,42 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
 
   const processedRowIndices = new Set();
   const exportedEqKeys = new Set();
+  const eqColIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Equipment Number') || h.toLowerCase().includes('equipment')));
+  const descColIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Equipment Description') || h.toLowerCase().includes('description')));
 
-  equipments.forEach((eq) => {
-    const rowIdx = eq.rowIndex;
-    if (rowIdx === undefined || !originalData[rowIdx]) return;
-    if (processedRowIndices.has(rowIdx)) return;
-
+  (equipments || []).forEach((eq) => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     if (!eqKey) return;
     const eqKeyNorm = eqKey.replace(/^0+/, '');
     if (EXCLUDED_SAP_EQS.has(eqKey) || EXCLUDED_SAP_EQS.has(eqKeyNorm)) return;
 
-    processedRowIndices.add(rowIdx);
+    const rowIdx = eq.rowIndex;
+    if (rowIdx !== undefined && safeOriginalData[rowIdx] && processedRowIndices.has(rowIdx)) return;
+    if (rowIdx !== undefined && safeOriginalData[rowIdx]) processedRowIndices.add(rowIdx);
+    if (exportedEqKeys.has(eqKey)) return;
     exportedEqKeys.add(eqKey);
 
     const pEqNum = eqToParentEqNum[eqKey] || eqKey;
-
     const total = accDurations[eqKey] || 0;
-    const rowData = [...originalData[rowIdx]];
-    const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx, measuringPtIdx);
+
+    let rowData;
+    if (rowIdx !== undefined && safeOriginalData[rowIdx]) {
+      rowData = [...safeOriginalData[rowIdx]];
+    } else {
+      rowData = new Array(cleanHeaders.length).fill('');
+      if (eqColIdx !== -1) rowData[eqColIdx] = eqKey;
+      if (descColIdx !== -1) rowData[descColIdx] = eq.description || eq.induk || eqKey;
+    }
+
+    const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx, measuringPtIdx, eqColIdx, descColIdx);
     while (rowData.length <= maxColIdx) rowData.push('');
 
     let readingStr = total.toString();
     if (!Number.isInteger(total)) readingStr = total.toFixed(2);
     readingStr = readingStr.replace('.', ',');
 
+    if (eqColIdx !== -1 && !rowData[eqColIdx]) rowData[eqColIdx] = eqKey;
+    if (descColIdx !== -1 && !rowData[descColIdx]) rowData[descColIdx] = eq.description || eq.induk || eqKey;
     if (dateIdx !== -1) rowData[dateIdx] = sapDate;
     if (timeIdx !== -1) rowData[timeIdx] = sapTime;
     if (readingIdx !== -1) rowData[readingIdx] = readingStr;
@@ -725,14 +785,14 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
 
     // Ensure measuring point column is 100% fully populated for all parent & sub-equipments
     if (measuringPtIdx !== -1) {
-      const origMp = (rowIdx !== undefined && originalData[rowIdx]) ? String(originalData[rowIdx][measuringPtIdx] || '').trim() : '';
+      const origMp = (rowIdx !== undefined && safeOriginalData[rowIdx]) ? String(safeOriginalData[rowIdx][measuringPtIdx] || '').trim() : '';
       const masterMp = masterMap ? (masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint) : '';
       const finalMp = masterMp || origMp || parentMpMap[eqKey] || parentMpMap[pEqNum] || eq.measuringPoint || '';
       rowData[measuringPtIdx] = finalMp;
     }
 
-    const plantCodeStr = eq.plant || '5F01';
-    let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
+    const plantCodeStr = getEquipmentPlant(eq, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || '5F01');
+    let note = `HM Mesin ${plantCodeStr} tgl ${sapDate}`;
     if (note.length > 30) note = note.substring(0, 30);
     if (shortTextIdx !== -1) rowData[shortTextIdx] = note;
     for (let c = 0; c < rowData.length; c++) {
@@ -764,7 +824,6 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     if (total <= 0 && !logHasNotes) return;
 
     const pEqNum = eqToParentEqNum[eqKey] || eqKey;
-    const isSubEq = (eqKey !== pEqNum);
     const newRow = new Array(cleanHeaders.length).fill('');
 
     const eqColIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Equipment Number'));
@@ -789,8 +848,9 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
       newRow[measuringPtIdx] = finalMp;
     }
 
-    const plantCodeStr = log.plant || '5F01';
-    let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
+    const plantCodeStr = getEquipmentPlant(log, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || '5F01');
+    const userNotes = (log?.notes || log?.catatan || '').trim();
+    let note = userNotes ? userNotes : `HM Mesin ${plantCodeStr} tgl ${sapDate}`;
     if (note.length > 30) note = note.substring(0, 30);
     if (shortTextIdx !== -1) newRow[shortTextIdx] = note;
 
@@ -802,15 +862,17 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     if (wsData[i] && wsData[i].length > 0) wsData[i][0] = i;
   }
   const ws = XLSX.utils.aoa_to_sheet(wsData);
-  const _eqIdx1 = headers.findIndex(h => typeof h === 'string' && h.includes('Equipment Number'));
-  const _mpIdx1 = headers.findIndex(h => typeof h === 'string' && h.includes('Measuring point'));
+  const _eqIdx1 = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Equipment Number'));
+  const _mpIdx1 = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Measuring point'));
   forceColumnsAsText(ws, [_eqIdx1, _mpIdx1]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
 
-  const plantCode = (docDetails.plant || 'ALL').toLowerCase();
-  const dateStrStart = format(new Date(startDate), 'ddMMyy');
-  const dateStrEnd = format(new Date(endDate), 'ddMMyy');
+  const plantCode = (docDetails.selectedPlants && docDetails.selectedPlants.length === 1 ? docDetails.selectedPlants[0] : (docDetails.plant || 'ALL')).toLowerCase();
+  const cleanStart = (startDate || '').split('T')[0].split('-');
+  const cleanEnd = (endDate || '').split('T')[0].split('-');
+  const dateStrStart = cleanStart.length === 3 ? `${cleanStart[2]}${cleanStart[1]}${cleanStart[0].slice(-2)}` : format(new Date(startDate), 'ddMMyy');
+  const dateStrEnd = cleanEnd.length === 3 ? `${cleanEnd[2]}${cleanEnd[1]}${cleanEnd[0].slice(-2)}` : format(new Date(endDate), 'ddMMyy');
   const fileName = `hm${plantCode}-akum_${dateStrStart}-${dateStrEnd}.xlsx`;
   XLSX.writeFile(wb, fileName);
 }
@@ -820,29 +882,34 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
  */
 export function exportCumulativeToSAP(headers, originalData, equipments, dailyLogsMap, docDetails, masterMapParam) {
   const masterMap = masterMapParam || docDetails?.masterMap || null;
+  const safeHeaders = (Array.isArray(headers) && headers.length > 0) ? headers : DEFAULT_SAP_HEADERS;
   // Strip \r from headers to prevent double \r\r\n corruption
-  const cleanHeaders = headers.map(h => typeof h === 'string' ? h.replace(/\r/g, '') : h);
+  const cleanHeaders = safeHeaders.map(h => typeof h === 'string' ? h.replace(/\r/g, '') : h);
   const wsData = [cleanHeaders];
+  const safeOriginalData = Array.isArray(originalData) ? originalData : [];
 
   const startDate = docDetails.startDate || docDetails.date;
   const endDate = docDetails.endDate || docDetails.date; // format 'yyyy-MM-dd'
   const sapTime = docDetails.time.length === 5 ? `${docDetails.time}:00` : docDetails.time;
 
-  const dateIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measurement Date') || h.toLowerCase().includes('date')));
-  const timeIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measurement Time') || h.toLowerCase().includes('time')));
-  const readingIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Counter Reading') || h.toLowerCase().includes('reading')));
-  const readByIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Read By') || h.toLowerCase().includes('read by')));
-  let shortTextIdx = headers.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
+  const dateIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Measurement Date') || h.toLowerCase().includes('date')));
+  const timeIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Measurement Time') || h.toLowerCase().includes('time')));
+  const readingIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Counter Reading') || h.toLowerCase().includes('reading')));
+  const readByIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Read By') || h.toLowerCase().includes('read by')));
+  const measuringPtIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Measuring point') || h.toLowerCase().includes('meas. point') || h.toLowerCase().includes('measuring pt')));
+  let shortTextIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
   if (shortTextIdx === -1) shortTextIdx = 10;
 
+  const eqColIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Equipment Number') || h.toLowerCase().includes('equipment')));
+  const descColIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Equipment Description') || h.toLowerCase().includes('description')));
+
   // Iterate each date in sorted order, up to and including selected date
-  const dates = (startDate === endDate) ? [endDate] : Object.keys(dailyLogsMap).sort();
+  const dates = (startDate === endDate) ? [endDate] : Object.keys(dailyLogsMap || {}).sort();
 
   dates.forEach(dateStr => {
     if (dateStr < startDate || dateStr > endDate) return; // only within range
 
-    const logsForDate = dailyLogsMap[dateStr];
-    if (!logsForDate || logsForDate.length === 0) return;
+    const logsForDate = (dailyLogsMap && dailyLogsMap[dateStr]) || [];
 
     const dailyDurations = {};
     const loggedEquipmentsMap = {};
@@ -867,11 +934,11 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
     });
 
     // STEP 2: Resolve HM per template row for this date
-    equipments.forEach(eq => {
+    (equipments || []).forEach(eq => {
       const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
       if (!eqKey) return;
       const pEqNum = eqToParentEqNum[eqKey] || eqKey;
-      dailyDurations[eqKey] = parentHmMapDate[pEqNum] || 0;
+      dailyDurations[eqKey] = parentHmMap[pEqNum] || 0;
     });
 
     const dateParts = dateStr.split('-');
@@ -880,11 +947,9 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
     const processedRowIndices = new Set();
     const exportedEqKeys = new Set();
 
-    const measuringPtIdx = headers.findIndex(h => typeof h === 'string' && (h.includes('Measuring point') || h.toLowerCase().includes('meas. point') || h.toLowerCase().includes('measuring pt')));
-
     // STEP 1.5: Build Parent & Sub Measuring Point Map
     const parentMpMap = {};
-    equipments.forEach(eq => {
+    (equipments || []).forEach(eq => {
       const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
       if (!eqKey) return;
       const pEqNum = eqToParentEqNum[eqKey] || eqKey;
@@ -893,8 +958,8 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       let mp = '';
       if (masterMap && (masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint)) {
         mp = masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint;
-      } else if (rowIdx !== undefined && originalData[rowIdx] && measuringPtIdx !== -1) {
-        mp = String(originalData[rowIdx][measuringPtIdx] || '').trim();
+      } else if (rowIdx !== undefined && safeOriginalData[rowIdx] && measuringPtIdx !== -1) {
+        mp = String(safeOriginalData[rowIdx][measuringPtIdx] || '').trim();
       } else if (eq.measuringPoint || eq.measuring_point) {
         mp = String(eq.measuringPoint || eq.measuring_point).trim();
       }
@@ -909,30 +974,39 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       }
     });
 
-    equipments.forEach((eq) => {
-      const rowIdx = eq.rowIndex;
-      if (rowIdx === undefined || !originalData[rowIdx]) return;
-      if (processedRowIndices.has(rowIdx)) return;
-
+    (equipments || []).forEach((eq) => {
       const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
       if (!eqKey) return;
       const eqKeyNorm = eqKey.replace(/^0+/, '');
       if (EXCLUDED_SAP_EQS.has(eqKey) || EXCLUDED_SAP_EQS.has(eqKeyNorm)) return;
 
-      processedRowIndices.add(rowIdx);
+      const rowIdx = eq.rowIndex;
+      if (rowIdx !== undefined && safeOriginalData[rowIdx] && processedRowIndices.has(rowIdx)) return;
+      if (rowIdx !== undefined && safeOriginalData[rowIdx]) processedRowIndices.add(rowIdx);
+      if (exportedEqKeys.has(eqKey)) return;
       exportedEqKeys.add(eqKey);
 
       const pEqNum = eqToParentEqNum[eqKey] || eqKey;
-
       const duration = dailyDurations[eqKey] || 0;
-      const rowData = [...originalData[rowIdx]];
-      const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx, measuringPtIdx);
+
+      let rowData;
+      if (rowIdx !== undefined && safeOriginalData[rowIdx]) {
+        rowData = [...safeOriginalData[rowIdx]];
+      } else {
+        rowData = new Array(cleanHeaders.length).fill('');
+        if (eqColIdx !== -1) rowData[eqColIdx] = eqKey;
+        if (descColIdx !== -1) rowData[descColIdx] = eq.description || eq.induk || eqKey;
+      }
+
+      const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx, measuringPtIdx, eqColIdx, descColIdx);
       while (rowData.length <= maxColIdx) rowData.push('');
 
       let readingStr = duration.toString();
       if (!Number.isInteger(duration)) readingStr = duration.toFixed(2);
       readingStr = readingStr.replace('.', ',');
 
+      if (eqColIdx !== -1 && !rowData[eqColIdx]) rowData[eqColIdx] = eqKey;
+      if (descColIdx !== -1 && !rowData[descColIdx]) rowData[descColIdx] = eq.description || eq.induk || eqKey;
       if (dateIdx !== -1) rowData[dateIdx] = sapDate;
       if (timeIdx !== -1) rowData[timeIdx] = sapTime;
       if (readingIdx !== -1) rowData[readingIdx] = readingStr;
@@ -941,18 +1015,17 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       
       // Ensure measuring point column is 100% fully populated for all parent & sub-equipments
       if (measuringPtIdx !== -1) {
-        const origMp = (rowIdx !== undefined && originalData[rowIdx]) ? String(originalData[rowIdx][measuringPtIdx] || '').trim() : '';
+        const origMp = (rowIdx !== undefined && safeOriginalData[rowIdx]) ? String(safeOriginalData[rowIdx][measuringPtIdx] || '').trim() : '';
         const masterMp = masterMap ? (masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint) : '';
         const finalMp = masterMp || origMp || parentMpMap[eqKey] || parentMpMap[pEqNum] || eq.measuringPoint || '';
         rowData[measuringPtIdx] = finalMp;
       }
 
-      const plantCodeStr = eq.plant || '5F01';
-      let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
-      if (note.length > 30) note = note.substring(0, 30);
+      const plantCodeStr = getEquipmentPlant(eq, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || '5F01');
+      const note = `HM Mesin ${plantCodeStr} tgl ${sapDate}`;
       if (shortTextIdx !== -1) rowData[shortTextIdx] = note;
       for (let c = 0; c < rowData.length; c++) {
-        if (typeof rowData[c] === 'string' && rowData[c].toLowerCase().includes('import gsheet')) {
+        if (typeof rowData[c] === 'string' && (rowData[c].toLowerCase().includes('import') || rowData[c].toLowerCase().includes('ik17') || rowData[c].toLowerCase().includes('ib sd'))) {
           rowData[c] = note;
         }
       }
@@ -979,7 +1052,6 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       if (duration <= 0) return;
 
       const pEqNum = eqToParentEqNum[eqKey] || eqKey;
-      const isSubEq = (eqKey !== pEqNum);
       const newRow = new Array(cleanHeaders.length).fill('');
 
       const eqColIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Equipment Number'));
@@ -1004,8 +1076,8 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
         newRow[measuringPtIdx] = finalMp;
       }
 
-      const plantCodeStr = log.plant || '5F01';
-      let note = `HM Mesin ${plantCodeStr} tgl ${sapDate.replace(/\./g, '-')}`;
+      const plantCodeStr = getEquipmentPlant(log, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || '5F01');
+      let note = `HM Mesin ${plantCodeStr} tgl ${sapDate}`;
       if (note.length > 30) note = note.substring(0, 30);
       if (shortTextIdx !== -1) newRow[shortTextIdx] = note;
 
@@ -1018,15 +1090,18 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
     if (wsData[i] && wsData[i].length > 0) wsData[i][0] = i;
   }
   const ws = XLSX.utils.aoa_to_sheet(wsData);
-  const _eqIdx2 = headers.findIndex(h => typeof h === 'string' && h.includes('Equipment Number'));
-  const _mpIdx2 = headers.findIndex(h => typeof h === 'string' && h.includes('Measuring point'));
+  const _eqIdx2 = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Equipment Number'));
+  const _mpIdx2 = cleanHeaders.findIndex(h => typeof h === 'string' && h.includes('Measuring point'));
   forceColumnsAsText(ws, [_eqIdx2, _mpIdx2]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
 
-  const plantCode = (docDetails.plant || 'ALL').toLowerCase();
-  const dateStr = format(new Date(docDetails.date), 'ddMMyy');
-  const fileName = `hm${plantCode}-sd${dateStr}.xlsx`;
+  const plantCode = (docDetails.selectedPlants && docDetails.selectedPlants.length === 1 ? docDetails.selectedPlants[0] : (docDetails.plant || 'ALL')).toLowerCase();
+  const cleanStart = (startDate || '').split('T')[0].split('-');
+  const cleanEnd = (endDate || '').split('T')[0].split('-');
+  const dateStrStart = cleanStart.length === 3 ? `${cleanStart[2]}${cleanStart[1]}${cleanStart[0].slice(-2)}` : format(new Date(startDate), 'ddMMyy');
+  const dateStrEnd = cleanEnd.length === 3 ? `${cleanEnd[2]}${cleanEnd[1]}${cleanEnd[0].slice(-2)}` : format(new Date(endDate), 'ddMMyy');
+  const fileName = `hm${plantCode}-kumulatif_${dateStrStart}-${dateStrEnd}.xlsx`;
   XLSX.writeFile(wb, fileName);
 }
 

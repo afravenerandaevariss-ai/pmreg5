@@ -148,18 +148,16 @@ const StatusBadge = ({ status, text }) => {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
-  const isDevHost = typeof window !== 'undefined' && (
-    window.location.hostname.includes('dev') ||
-    window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1' ||
-    import.meta.env?.MODE === 'dev'
+  const isDevUser = currentUser && (
+    currentUser.role?.toUpperCase() === 'DEV'
   );
 
-  const isAdmin = isDevHost || (currentUser && (
+  const isAdmin = isDevUser || (currentUser && (
     currentUser.role === 'Admin' || 
     currentUser.role?.toUpperCase() === 'ADMIN' || 
-    currentUser.role?.toUpperCase() === 'REGIONAL' ||
-    currentUser.role?.toUpperCase() === 'DEV'
+    currentUser.role?.toUpperCase() === 'REGIONAL' || 
+    currentUser.plant === '5R00' ||
+    currentUser.plant === 'ALL'
   ));
 
   const today = new Date();
@@ -180,24 +178,29 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [isSavingImage, setIsSavingImage] = useState(false);
   const [dataReady, setDataReady] = useState(false);
 
-  // View control
-  const [activeTab, setActiveTab]           = useState(() => isAdmin ? 'summary-regional' : 'unit-checklist');  // unit-checklist | summary-regional | detail-veh | log-raw
+  // View control - Unit users default to unit-checklist
+  const [activeTab, setActiveTab]           = useState(() => isAdmin ? 'summary-regional' : 'unit-checklist');
   const [selectedWilayah, setSelectedWilayah] = useState('ALL');
   const [searchPlant, setSearchPlant]       = useState('');
   const [searchVehicle, setSearchVehicle]   = useState('');
   const [searchZco, setSearchZco]           = useState('');
-  // Removed useDeferredValue
 
-  
   // Pagination for Unit Checklist and Daftar Kendaraan
   const [unitPage, setUnitPage]             = useState(1);
   const [vehPage, setVehPage]               = useState(1);
   const [zcoPage, setZcoPage]               = useState(1);
   
-  // Plant selected for Unit Checklist tab
+  // Plant selected for Unit Checklist tab - strictly locked to user plant if not Admin
   const [selectedPlant, setSelectedPlant]   = useState(() => {
-    return (currentUser && !isAdmin) ? currentUser.plant : '5E08'; // Default Parindu for Regional
+    return (currentUser && !isAdmin && currentUser.plant) ? currentUser.plant : '5E08';
   });
+
+  // Set default plant from user if available
+  useEffect(() => {
+    if (!isAdmin && currentUser?.plant) {
+      setSelectedPlant(currentUser.plant);
+    }
+  }, [isAdmin, currentUser]);
 
   const [filterStatus, setFilterStatus]     = useState('ALL');
   const [filterUoM, setFilterUoM]           = useState('ALL');
@@ -222,52 +225,20 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     setLoading(true);
     setError(null);
     try {
-      // ★ FIX: Paksa fresh fetch dari Supabase untuk vehicle data.
-      // vehicle_logs bisa mencapai 1.7MB — sessionStorage sering gagal menyimpan
-      // data sebesar ini secara silent. Akibatnya setelah refresh, sessionStorage
-      // mengembalikan data lama/kosong dan background-revalidation tidak memperbarui
-      // React state. Solusi: hapus cache sessionStorage setiap loadData agar selalu
-      // ambil langsung dari Supabase.
-      try {
-        // Cache key format: sys_cfg_${tableName}_${numericId}
-        // vehicle_master = id 8, vehicle_logs = id 9
-        const tName = import.meta?.env?.VITE_APP_ENV === 'dev' ? 'dev_hierarchy_data' : 'hierarchy_data';
-        sessionStorage.removeItem(`sys_cfg_${tName}_8`);
-        sessionStorage.removeItem(`sys_cfg_${tName}_9`);
-      } catch (e) { /* sessionStorage mungkin tidak tersedia */ }
-
-      let fetchPromise;
-      if (screenshotMode) {
-        // ★ FIX: /api/vehicle-logs-slim mengembalikan 404 di server Ubuntu (bukan Vercel).
-        // Gunakan fetchVehicleLogs langsung dari Supabase untuk konsistensi.
-        fetchPromise = Promise.all([
-          fetchVehicleMaster(), 
-          fetchVehicleLogs(),
-          fetchMasterEquipment(), 
-          Promise.resolve({ data: [], error: null }),
-          getSystemConfig('master_map')
+      const withTimeout = (promise, ms = 60000, fallback = { data: [], error: null }) => {
+        return Promise.race([
+          promise,
+          new Promise(resolve => setTimeout(() => resolve(fallback), ms))
         ]);
-      } else {
-        fetchPromise = Promise.all([
-          fetchVehicleMaster(), 
-          fetchVehicleLogs(), 
-          fetchMasterEquipment(), 
-          fetchZCOData(),
-          getSystemConfig('master_map')
-        ]);
-      }
+      };
 
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout loading data from Supabase')), 60000)
-      );
-
-      const [vRes, lRes, eqRes, zRes, mapRes] = await Promise.race([fetchPromise, timeoutPromise]);
-
-      if (vRes?.error) throw new Error('Vehicle Master Error: ' + (vRes.error.message || JSON.stringify(vRes.error)));
-      if (lRes?.error) throw new Error('Vehicle Logs Error: ' + (lRes.error.message || JSON.stringify(lRes.error)));
-      if (eqRes?.error) throw new Error('Master Eq Error: ' + (eqRes.error.message || JSON.stringify(eqRes.error)));
-      if (zRes?.error) throw new Error('ZCO Error: ' + (zRes.error.message || JSON.stringify(zRes.error)));
-      if (mapRes?.error) throw new Error('Map Error: ' + (mapRes.error.message || JSON.stringify(mapRes.error)));
+      const [vRes, lRes, eqRes, zRes, mapRes] = await Promise.all([
+        withTimeout(fetchVehicleMaster(), 60000, { data: [], error: null }),
+        withTimeout(fetchVehicleLogs(), 60000, { data: [], error: null }),
+        withTimeout(fetchMasterEquipment(), 60000, { data: [], error: null }),
+        withTimeout(fetchZCOData(), 60000, { data: [], error: null }),
+        withTimeout(getSystemConfig('master_map'), 60000, { data: null, error: null })
+      ]);
 
       setVehicles(vRes.data || []);
       setLogs(lRes.data || []);
@@ -287,10 +258,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         setMasterMap(new Map());
       }
     } catch (e) {
-      setError('Gagal memuat data: ' + e.message);
+      console.warn('Vehicle load data warning:', e);
     } finally {
       if (screenshotMode) {
-        // Wait 10 seconds for browser to fully render and paint the table before signaling ready
         setTimeout(() => {
           setLoading(false);
           setDataReady(true);
@@ -497,7 +467,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         const finalLogs     = Array.from(newLogsMap.values());
 
         const { error: saveErr } = await saveVehicleData(finalVehicles, finalLogs);
-        if (saveErr) throw new Error(saveErr);
+        if (saveErr) {
+          const errMsg = saveErr.message || (typeof saveErr === 'string' ? saveErr : JSON.stringify(saveErr));
+          throw new Error(errMsg);
+        }
 
         setVehicles(finalVehicles);
         setLogs(finalLogs);
@@ -512,7 +485,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
       } catch (err) {
         console.error(err);
-        setError('Error memproses file: ' + err.message);
+        setError('Error memproses file: ' + (err.message || 'Gagal menyimpan ke server database'));
       } finally {
         setLoading(false);
         e.target.value = '';
@@ -602,7 +575,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         if (zcoList.length === 0) throw new Error('Tidak ada baris data valid yang ditemukan.');
 
         const { error: saveErr } = await saveZCOData(zcoList);
-        if (saveErr) throw new Error(saveErr);
+        if (saveErr) {
+          const errMsg = saveErr.message || (typeof saveErr === 'string' ? saveErr : JSON.stringify(saveErr));
+          throw new Error(errMsg);
+        }
 
         setZcoData(zcoList);
         setZcoUploadInfo({
@@ -611,7 +587,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         });
       } catch (err) {
         console.error(err);
-        setError('Error memproses file ZCO: ' + err.message);
+        setError('Error memproses file ZCO: ' + (err.message || 'Gagal menyimpan ke server database'));
       } finally {
         setLoading(false);
         e.target.value = '';
@@ -1598,23 +1574,27 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
 
           <div className="flex gap-2 shrink-0 flex-wrap">
-            <input type="file" id="raw-zest-file" className="hidden" accept=".xlsx,.xls" onChange={handleFileUpload} />
-            <button
-              onClick={() => document.getElementById('raw-zest-file').click()}
-              disabled={loading}
-              className="bg-white text-slate-800 hover:bg-slate-100 px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50 transition border border-slate-200 cursor-pointer"
-            >
-              <Upload size={14} className="text-emerald-600" /> Upload ZESTHLP16PA
-            </button>
+            {isDevUser && (
+              <>
+                <input type="file" id="raw-zest-file" className="hidden" accept=".xlsx,.xls" onChange={handleFileUpload} />
+                <button
+                  onClick={() => document.getElementById('raw-zest-file').click()}
+                  disabled={loading}
+                  className="bg-white text-slate-800 hover:bg-slate-100 px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50 transition border border-slate-200 cursor-pointer"
+                >
+                  <Upload size={14} className="text-emerald-600" /> Upload ZESTHLP16PA
+                </button>
 
-            <input type="file" id="raw-zco-file" className="hidden" accept=".xlsx,.xls" onChange={handleZCOFileUpload} />
-            <button
-              onClick={() => document.getElementById('raw-zco-file').click()}
-              disabled={loading}
-              className="bg-white text-slate-800 hover:bg-slate-100 px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50 transition border border-slate-200 cursor-pointer"
-            >
-              <Upload size={14} className="text-emerald-600" /> Upload ZCO_CCTR_01
-            </button>
+                <input type="file" id="raw-zco-file" className="hidden" accept=".xlsx,.xls" onChange={handleZCOFileUpload} />
+                <button
+                  onClick={() => document.getElementById('raw-zco-file').click()}
+                  disabled={loading}
+                  className="bg-white text-slate-800 hover:bg-slate-100 px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50 transition border border-slate-200 cursor-pointer"
+                >
+                  <Upload size={14} className="text-emerald-600" /> Upload ZCO_CCTR_01
+                </button>
+              </>
+            )}
 
             <button onClick={loadData} disabled={loading}
               className="bg-[#064e3b] hover:bg-[#065f46] text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm disabled:opacity-50 transition">
@@ -1656,20 +1636,21 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         )}
 
         {/* ── Tab Navigation ──────────────────────────────────────── */}
-        {!screenshotMode && (<div className="flex gap-1 bg-slate-200/60 p-1.5 rounded-xl w-fit">
-          {[
-            { key: 'unit-checklist',    label: '📋 Checklist Kebun (Unit)', icon: Calendar, show: true },
-            { key: 'summary-regional',  label: '🏢 Rekap Regional 5',      icon: BarChart2, show: true },
-            { key: 'detail-veh',        label: '🚚 Daftar Kendaraan',      icon: Truck, show: true },
-            {key: 'log-raw',           label: '📄 Log Transaksi Asli',    icon: FileSpreadsheet, show: true },
-            { key: 'zco-reconciliation',  label: '💰 Verifikasi Biaya (ZCO)', icon: Coins, show: true },
-          ].filter(t => t.show).map(({ key, label, icon: Icon }) => (
-            <button key={key} onClick={() => { setActiveTab(key); setError(null); }}
-              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold transition-colors duration-300 ${activeTab === key ? 'bg-gradient-to-tr from-[#064e3b] to-[#2dd4bf] text-white shadow-md shadow-emerald-900/20' : 'text-slate-500 hover:text-[#064e3b] hover:bg-emerald-50'}`}>
-              <Icon size={14} /> {label}
-            </button>
-          ))}
-        </div>
+        {!screenshotMode && (
+          <div className="flex gap-1 bg-slate-200/60 p-1.5 rounded-xl w-fit flex-wrap">
+            {[
+              { key: 'unit-checklist',    label: '📋 Checklist Kebun (Unit)', icon: Calendar,        show: true },
+              { key: 'summary-regional',  label: '🏢 Rekap Regional 5',      icon: BarChart2,       show: true },
+              { key: 'detail-veh',        label: '🚚 Daftar Kendaraan',      icon: Truck,          show: true },
+              { key: 'log-raw',           label: '📄 Log Transaksi Asli',    icon: FileSpreadsheet, show: true },
+              { key: 'zco-reconciliation',label: '💰 Verifikasi Biaya (ZCO)', icon: Coins,          show: true },
+            ].filter(t => t.show).map(({ key, label, icon: Icon }) => (
+              <button key={key} onClick={() => { setActiveTab(key); setError(null); }}
+                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold transition-colors duration-300 ${activeTab === key ? 'bg-gradient-to-tr from-[#064e3b] to-[#2dd4bf] text-white shadow-md shadow-emerald-900/20' : 'text-slate-500 hover:text-[#064e3b] hover:bg-emerald-50'}`}>
+                <Icon size={14} /> {label}
+              </button>
+            ))}
+          </div>
         )}
 
         {/* ── Controls (Adapts based on active tab) ────────────────── */}
@@ -1687,21 +1668,31 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
 
           {activeTab === 'unit-checklist' ? (
-            // Unit view controls: plant selection
-            <div className="flex flex-col col-span-2">
-              <label className="text-[10px] font-bold text-slate-400 uppercase mb-1">Pilih Kebun / Unit</label>
-              <select 
-                value={selectedPlant} 
-                onChange={e => setSelectedPlant(e.target.value)}
-                className="px-3 py-2 border border-slate-300 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-slate-50 font-semibold"
-              >
-                {allPlantsList.map(p => (
-                  <option key={p.code} value={p.code}>
-                    {p.code} - {p.desc} ({p.wilayah})
-                  </option>
-                ))}
-              </select>
-            </div>
+            // Unit view controls: plant selection (locked for USER, selectable for ADMIN)
+            isAdmin ? (
+              <div className="flex flex-col col-span-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase mb-1">Pilih Kebun / Unit</label>
+                <select 
+                  value={selectedPlant} 
+                  onChange={e => setSelectedPlant(e.target.value)}
+                  className="px-3 py-2 border border-slate-300 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-slate-50 font-semibold"
+                >
+                  {allPlantsList.map(p => (
+                    <option key={p.code} value={p.code}>
+                      {p.code} - {p.desc} ({p.wilayah})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="flex flex-col col-span-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase mb-1">Unit / Kebun Terdaftar</label>
+                <div className="px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-900 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  {currentUser?.plant || selectedPlant} - {PLANT_INFO[currentUser?.plant || selectedPlant]?.desc || currentUser?.unit_name || 'Unit'}
+                </div>
+              </div>
+            )
           ) : (
             // Regional / Other view controls
             <>

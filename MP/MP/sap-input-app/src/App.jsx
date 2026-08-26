@@ -471,9 +471,36 @@ const getUnitName = (plant, existingName) => {
 };
 
 function App() {
-  const [masterMap, setMasterMap] = useState(null);
-  const [templateData, setTemplateData] = useState(null);
-  const [equipments, setEquipments] = useState([]);
+  const [masterMap, setMasterMap] = useState(() => {
+    try {
+      const cached = localStorage.getItem('sys_cfg_hierarchy_data_2') || sessionStorage.getItem('sys_cfg_hierarchy_data_2');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return new Map(parsed);
+        if (parsed?.map && Array.isArray(parsed.map)) return new Map(parsed.map);
+      }
+    } catch(e) {}
+    return null;
+  });
+  const [templateData, setTemplateData] = useState(() => {
+    try {
+      const cached = localStorage.getItem('sys_cfg_hierarchy_data_3') || sessionStorage.getItem('sys_cfg_hierarchy_data_3');
+      if (cached) return JSON.parse(cached);
+    } catch(e) {}
+    return null;
+  });
+  const [equipments, setEquipments] = useState(() => {
+    try {
+      const cachedTpl = localStorage.getItem('sys_cfg_hierarchy_data_3') || sessionStorage.getItem('sys_cfg_hierarchy_data_3');
+      if (cachedTpl) {
+        const parsed = JSON.parse(cachedTpl);
+        if (parsed?.equipments && Array.isArray(parsed.equipments)) return parsed.equipments;
+      }
+      const cachedEq = localStorage.getItem('master_eq_master_equipment') || sessionStorage.getItem('master_eq_master_equipment');
+      if (cachedEq) return JSON.parse(cachedEq);
+    } catch(e) {}
+    return [];
+  });
   const [sapSyncedDates, setSapSyncedDates] = useState([]);
   const [hierarchyData, setHierarchyData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -623,9 +650,10 @@ function App() {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
+
       try {
         if (supabase) {
-          // --- Restore Session from Supabase ---
+          // --- PHASE 1: Session + Critical Config (keeps spinner until done) ---
           const urlParams = new URLSearchParams(window.location.search);
           const isForceLogin = urlParams.get('action') === 'login';
           if (isForceLogin) {
@@ -634,28 +662,62 @@ function App() {
           }
           const sessionNik = isForceLogin ? null : localStorage.getItem('sapApp_session_nik');
           if (sessionNik) {
-            const userRes = await getUserByNik(sessionNik);
-            if (userRes.data) {
-              setCurrentUser(userRes.data);
-            } else {
-              localStorage.removeItem('sapApp_session_nik'); // invalid session
+            try {
+              const userRes = await getUserByNik(sessionNik);
+              if (userRes.data) {
+                setCurrentUser(userRes.data);
+              } else {
+                localStorage.removeItem('sapApp_session_nik');
+              }
+            } catch (sessionErr) {
+              console.warn('Session restore error:', sessionErr);
+              localStorage.removeItem('sapApp_session_nik');
             }
           }
-          setIsSessionLoading(false); // session check done, login screen can now render if needed
+          setIsSessionLoading(false);
 
-          // --- Load from Supabase ---
-          const [eqResult, hResult, masterMapResult, templateResult, syncResult, docDetailsRes] = await Promise.all([
-            fetchMasterEquipment(),
-            fetchHierarchyData(),
-            getSystemConfig('master_map'),
-            getSystemConfig('template_data'),
-            getSystemConfig('sap_synced_dates'),
-            getSystemConfig('doc_details')
+          // Load template_data, sap_synced_dates, doc_details (fast cached ~0ms)
+          const withTimeout = (promise, ms = 60000, fallback = { data: null, error: null }) => {
+            return Promise.race([
+              promise,
+              new Promise(resolve => setTimeout(() => resolve(fallback), ms))
+            ]);
+          };
+
+          const [templateResult, syncResult, docDetailsRes] = await Promise.all([
+            withTimeout(getSystemConfig('template_data'), 60000, { data: null, error: null }),
+            withTimeout(getSystemConfig('sap_synced_dates'), 60000, { data: null, error: null }),
+            withTimeout(getSystemConfig('doc_details'), 60000, { data: null, error: null }),
           ]);
 
           if (docDetailsRes.data && typeof docDetailsRes.data === 'object') {
             setDocDetails(prev => ({ ...prev, ...docDetailsRes.data }));
           }
+
+          const hasValidTemplate = templateResult.data && Array.isArray(templateResult.data.equipments) && templateResult.data.equipments.length > 0;
+          if (hasValidTemplate) {
+            setTemplateData(templateResult.data);
+            // Set equipments from template immediately so dashboard renders now
+            const templateEqs = templateResult.data.equipments;
+            setEquipments(prev => {
+              if (prev.length > 0) return prev; // already loaded
+              return templateEqs;
+            });
+          }
+
+          if (syncResult.data) {
+            setSapSyncedDates(syncResult.data);
+          }
+
+          // ✅ Clear loading spinner — dashboard will now render with template data
+          setLoading(false);
+
+          // --- PHASE 2: Load remaining data in background (master_equipment, hierarchy, masterMap) ---
+          const [eqResult, hResult, masterMapResult] = await Promise.all([
+            withTimeout(fetchMasterEquipment(), 60000, { data: [], error: null }),
+            withTimeout(fetchHierarchyData(), 60000, { data: null, error: null }),
+            withTimeout(getSystemConfig('master_map'), 60000, { data: null, error: null }),
+          ]);
 
           if (masterMapResult.data) {
             if (Array.isArray(masterMapResult.data)) {
@@ -669,15 +731,6 @@ function App() {
 
           if (hResult.data) {
             setHierarchyData(hResult.data);
-          }
-
-          const hasValidTemplate = templateResult.data && Array.isArray(templateResult.data.equipments) && templateResult.data.equipments.length > 0;
-          if (hasValidTemplate) {
-            setTemplateData(templateResult.data);
-          }
-
-          if (syncResult.data) {
-            setSapSyncedDates(syncResult.data);
           }
 
           // Merge template equipments with master_equipment from Supabase AND masterMap
@@ -727,7 +780,7 @@ function App() {
                 const existing = mergedMap.get(eqNum);
                 if (!existing.plant && plant) existing.plant = plant;
               } else {
-                mergedMap.set(eqNum, { eqNum, plant, description, type: 'Induk', reading: 0, induk: description });
+                mergedMap.set(eqNum, { eqNum, plant, description, type: 'Sub', reading: 0, induk: description });
               }
             });
           }
@@ -735,28 +788,20 @@ function App() {
           const mergedEquipments = Array.from(mergedMap.values());
           if (mergedEquipments.length > 0) {
             setEquipments(mergedEquipments);
-            if (!hasValidTemplate) {
-              setTemplateData({ headers: {}, originalData: [], equipments: mergedEquipments });
-            }
-          } else if (!hasValidTemplate && eqResult.data && eqResult.data.length > 0) {
-            // Fallback: if no template data but master_equipment exists
-            const eqs = eqResult.data;
-            const hData = hResult.data || null;
-            const finalEqs = hData ? applyHierarchy(eqs, hData) : eqs;
-            setEquipments(finalEqs);
-            setTemplateData({ headers: {}, originalData: [], equipments: finalEqs });
           }
         }
       } catch (e) {
         console.error('Failed to load data', e);
       } finally {
-        setIsSessionLoading(false); // always mark session as done even on error
+        setIsSessionLoading(false);
         setLoading(false);
       }
     };
 
     loadData();
   }, []);
+
+
 
   // Sync equipment readings to Supabase only when modified explicitly
   // (Do not run automatic 17,000 HTTP update loop on page load)
@@ -1135,39 +1180,35 @@ function App() {
             <p className={`text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-2 ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
               Sinkronisasi & Laporan
             </p>
-            {currentUser?.role?.toUpperCase() === 'DEV' && (
-              <>
-                <button 
-                  onClick={() => {
-                    setActiveTab('verifikasi');
-                    window.history.pushState({}, '', '?tab=verifikasi');
-                    setIsMobileMenuOpen(false);
-                  }} 
-                  className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'verifikasi' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
-                  title="Verifikasi Sinkronisasi SAP"
-                >
-                  <CheckCircle size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4" : "mx-auto group-hover:mr-4 group-hover:mx-0"} />
-                  <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
-                    Verifikasi SAP
-                  </span>
-                </button>
+            <button 
+              onClick={() => {
+                setActiveTab('verifikasi');
+                window.history.pushState({}, '', '?tab=verifikasi');
+                setIsMobileMenuOpen(false);
+              }} 
+              className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'verifikasi' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
+              title="Verifikasi Sinkronisasi SAP"
+            >
+              <CheckCircle size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4" : "mx-auto group-hover:mr-4 group-hover:mx-0"} />
+              <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
+                Verifikasi SAP
+              </span>
+            </button>
 
-                <button 
-                  onClick={() => {
-                    setActiveTab('table');
-                    window.history.pushState({}, '', window.location.pathname);
-                    setIsMobileMenuOpen(false);
-                  }} 
-                  className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'table' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
-                  title="Tabel & Ekspor SAP"
-                >
-                  <ClipboardList size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4" : "mx-auto group-hover:mr-4 group-hover:mx-0"} />
-                  <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
-                    Tabel & Ekspor SAP
-                  </span>
-                </button>
-              </>
-            )}
+            <button 
+              onClick={() => {
+                setActiveTab('table');
+                window.history.pushState({}, '', window.location.pathname);
+                setIsMobileMenuOpen(false);
+              }} 
+              className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'table' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
+              title="Tabel & Ekspor SAP"
+            >
+              <ClipboardList size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4" : "mx-auto group-hover:mr-4 group-hover:mx-0"} />
+              <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
+                Tabel & Ekspor SAP
+              </span>
+            </button>
 
             <button 
               onClick={() => {
@@ -1280,8 +1321,8 @@ function App() {
               </button>
             )}
 
-            {/* Inbox Tab - Only for DEV */}
-            {currentUser?.role?.toUpperCase() === 'DEV' && (
+            {/* Inbox Tab - visible for all logged-in users */}
+            {currentUser && (
               <button
                 onClick={() => { setActiveTab('inbox'); setIsMobileMenuOpen(false); }}
                 className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'inbox' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
@@ -1417,14 +1458,6 @@ function App() {
                     <h3 className="text-lg font-bold text-slate-800">Memuat Data PM Regional 5...</h3>
                     <p className="text-xs text-slate-500 font-medium">Mohon tunggu sebentar, sedang mengunduh master data & logbook dari server.</p>
                   </div>
-                </div>
-              ) : !templateData ? (
-                <div className="text-center py-24 bg-white rounded-xl shadow-sm border border-slate-200 m-8">
-                  <LayoutDashboard size={64} className="mx-auto text-slate-300 mb-4" />
-                  <h2 className="text-2xl font-bold text-slate-700">Data Belum Siap</h2>
-                  <p className="text-slate-500 mt-2 max-w-md mx-auto">
-                    Silakan pastikan Master Data dan Template telah diunggah.
-                  </p>
                 </div>
               ) : (
                 <DailyDashboard 
@@ -2092,7 +2125,7 @@ function App() {
             <AdminInbox currentUser={currentUser} />
           )}
 
-          {/* AI Assistant (DEV only) */}
+          {/* AI Assistant Help (Only for role DEV) */}
           {currentUser?.role?.toUpperCase() === 'DEV' && <AfraChatbot currentUser={currentUser} />}
 
         </main>
