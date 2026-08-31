@@ -582,14 +582,14 @@ export async function getGSheetHistory() {
 // VEHICLES (ZESTHLP16PA)
 // ============================================================
 
-export async function fetchVehicleMaster() {
-  const { data, error } = await getSystemConfig('vehicle_master');
+export async function fetchVehicleMaster(forceRefresh = false) {
+  const { data, error } = await getSystemConfig('vehicle_master', forceRefresh);
   if (error || !Array.isArray(data)) { const errorMsg = error ? error.message : `Not array: type=${typeof data}, isNull=${data === null}, preview=${typeof data === "string" ? data.substring(0, 30) : JSON.stringify(data).substring(0, 30)}`; return { data: [], error: errorMsg }; }
   return { data, error: null };
 }
 
-export async function fetchVehicleLogs() {
-  const { data, error } = await getSystemConfig('vehicle_logs');
+export async function fetchVehicleLogs(forceRefresh = false) {
+  const { data, error } = await getSystemConfig('vehicle_logs', forceRefresh);
   if (error || !Array.isArray(data)) { const errorMsg = error ? error.message : `Not array: type=${typeof data}, isNull=${data === null}, preview=${typeof data === "string" ? data.substring(0, 30) : JSON.stringify(data).substring(0, 30)}`; return { data: [], error: errorMsg }; }
   return { data, error: null };
 }
@@ -601,8 +601,8 @@ export async function saveVehicleData(vehicles, logs) {
   return { error: lErr.error || null };
 }
 
-export async function fetchZCOData() {
-  const { data, error } = await getSystemConfig('zco_data');
+export async function fetchZCOData(forceRefresh = false) {
+  const { data, error } = await getSystemConfig('zco_data', forceRefresh);
   if (error || !Array.isArray(data)) { const errorMsg = error ? error.message : `Not array: type=${typeof data}, isNull=${data === null}, preview=${typeof data === "string" ? data.substring(0, 30) : JSON.stringify(data).substring(0, 30)}`; return { data: [], error: errorMsg }; }
   return { data, error: null };
 }

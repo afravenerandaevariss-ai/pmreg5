@@ -148,17 +148,25 @@ const StatusBadge = ({ status, text }) => {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
-  const isDevUser = currentUser && (
-    currentUser.role?.toUpperCase() === 'DEV'
-  );
+  // ─── Role Detection ────────────────────────────────────────────────────────
+  // Normalize role string — handles all DB variants: 'USER','Unit','unit','UNIT'
+  const roleUpper = currentUser?.role?.toUpperCase() || '';
 
-  const isAdmin = isDevUser || (currentUser && (
-    currentUser.role === 'Admin' || 
-    currentUser.role?.toUpperCase() === 'ADMIN' || 
-    currentUser.role?.toUpperCase() === 'REGIONAL' || 
+  const isDevUser = roleUpper === 'DEV';
+
+  // Explicit USER/UNIT check — blocks regardless of plant value
+  const isUserRole = roleUpper === 'USER' || roleUpper === 'UNIT';
+
+  // ADMIN if: role is Admin/ADMIN/REGIONAL/DEV OR plant is ALL/5R00
+  // BUT never admin if explicitly USER or UNIT role
+  const isAdmin = !isUserRole && (isDevUser || (currentUser && (
+    currentUser.role === 'Admin' ||
+    roleUpper === 'ADMIN' ||
+    roleUpper === 'REGIONAL' ||
     currentUser.plant === '5R00' ||
     currentUser.plant === 'ALL'
-  ));
+  )));
+
 
   const today = new Date();
   const [targetMonth, setTargetMonth]           = useState(format(today, 'yyyy-MM'));
@@ -195,12 +203,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return (currentUser && !isAdmin && currentUser.plant) ? currentUser.plant : '5E08';
   });
 
-  // Set default plant from user if available
-  useEffect(() => {
-    if (!isAdmin && currentUser?.plant) {
-      setSelectedPlant(currentUser.plant);
-    }
-  }, [isAdmin, currentUser]);
 
   const [filterStatus, setFilterStatus]     = useState('ALL');
   const [filterUoM, setFilterUoM]           = useState('ALL');
@@ -220,24 +222,31 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [showWAModal, setShowWAModal]       = useState(false);
   const LOG_PAGE_SIZE = 50;
 
+  const [lastRefreshed, setLastRefreshed] = useState(null);
+
   // ── Load Data ────────────────────────────────────────────────────────────────
-  const loadData = useCallback(async () => {
+  // isManualRefresh: true  → tombol Refresh diklik, force-fetch vehicle_logs & master_map dari server
+  //                  false → initial load, prioritaskan cache dulu agar cepat
+  const loadData = useCallback(async (isManualRefresh = false) => {
     setLoading(true);
     setError(null);
     try {
-      const withTimeout = (promise, ms = 60000, fallback = { data: [], error: null }) => {
-        return Promise.race([
+      const TIMEOUT_MS = 15000; // 15s — lebih responsif dari 60s
+      const withTimeout = (promise, fallback = { data: [], error: null }) =>
+        Promise.race([
           promise,
-          new Promise(resolve => setTimeout(() => resolve(fallback), ms))
+          new Promise(resolve => setTimeout(() => resolve(fallback), TIMEOUT_MS))
         ]);
-      };
 
+      // vehicle_logs → selalu force-fetch saat manual refresh (transaksi aktif berubah sering)
+      // vehicle_master, zco → force saat manual refresh
+      // masterEquipment → cukup cache (jarang berubah, data besar)
       const [vRes, lRes, eqRes, zRes, mapRes] = await Promise.all([
-        withTimeout(fetchVehicleMaster(), 60000, { data: [], error: null }),
-        withTimeout(fetchVehicleLogs(), 60000, { data: [], error: null }),
-        withTimeout(fetchMasterEquipment(), 60000, { data: [], error: null }),
-        withTimeout(fetchZCOData(), 60000, { data: [], error: null }),
-        withTimeout(getSystemConfig('master_map'), 60000, { data: null, error: null })
+        withTimeout(fetchVehicleMaster(isManualRefresh),            { data: [], error: null }),
+        withTimeout(fetchVehicleLogs(true),                         { data: [], error: null }),
+        withTimeout(fetchMasterEquipment(),                         { data: [], error: null }),
+        withTimeout(fetchZCOData(isManualRefresh),                  { data: [], error: null }),
+        withTimeout(getSystemConfig('master_map', isManualRefresh), { data: null, error: null }),
       ]);
 
       setVehicles(vRes.data || []);
@@ -257,6 +266,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       } else {
         setMasterMap(new Map());
       }
+      setLastRefreshed(new Date());
     } catch (e) {
       console.warn('Vehicle load data warning:', e);
     } finally {
@@ -271,14 +281,15 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
   }, [screenshotMode]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { loadData(false); }, [loadData]);
 
-  // If user is not admin, force selectedPlant to user's plant
+
+  // Default selectedPlant to user's plant on initial load if available
   useEffect(() => {
-    if (currentUser && !isAdmin && currentUser.plant) {
-      setSelectedPlant(currentUser.plant);
+    if (currentUser?.plant && currentUser.plant !== 'ALL' && currentUser.plant !== '5R00') {
+      setSelectedPlant(prev => prev || currentUser.plant);
     }
-  }, [currentUser, isAdmin]);
+  }, [currentUser?.plant]);
 
   // ── Excel Upload ─────────────────────────────────────────────────────────────
   const handleFileUpload = (e) => {
@@ -657,20 +668,23 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     const list = [];
 
     Object.entries(PLANT_INFO).forEach(([plantCode, info]) => {
-      // 1. Jumlah Veh. Code: Prioritize hardcoded KPI targets (which exclude broken vehicles), fallback to DB
-      const plantVehicles = masterEquipments.filter(e => e.plant === plantCode && String(e.eqNum || '').startsWith('20000'));
-      // Calculate vehicleCount from masterMap as single source of truth
-      let vehicleCount = 0;
-      if (masterMap && masterMap.size > 0) {
-        masterMap.forEach((info, eqNum) => {
-          if (!info) return;
-          const p = typeof info === 'string' ? info : (info.plant || '');
-          if (p === plantCode && String(eqNum).startsWith('20000')) {
-            vehicleCount++;
-          }
-        });
-      } else {
-        vehicleCount = plantVehicles.length;
+      // 1. Jumlah Veh. Code: Count from uploaded vehicle master data (vehicles), fallback to masterEquipments / masterMap
+      const plantFromVehicles = vehicles.filter(v => v.plant === plantCode);
+      let vehicleCount = plantFromVehicles.length;
+
+      if (vehicleCount === 0) {
+        const plantVehicles = masterEquipments.filter(e => e.plant === plantCode && String(e.eqNum || '').startsWith('20000'));
+        if (masterMap && masterMap.size > 0) {
+          masterMap.forEach((info, eqNum) => {
+            if (!info) return;
+            const p = typeof info === 'string' ? info : (info.plant || '');
+            if (p === plantCode && String(eqNum).startsWith('20000')) {
+              vehicleCount++;
+            }
+          });
+        } else {
+          vehicleCount = plantVehicles.length;
+        }
       }
 
       // Include cancelled logs in the main calculation since they still count as input activity KPI
@@ -1574,7 +1588,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
 
           <div className="flex gap-2 shrink-0 flex-wrap">
-            {isDevUser && (
+            {(isDevUser || isAdmin) && (
               <>
                 <input type="file" id="raw-zest-file" className="hidden" accept=".xlsx,.xls" onChange={handleFileUpload} />
                 <button
@@ -1595,11 +1609,17 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 </button>
               </>
             )}
-
-            <button onClick={loadData} disabled={loading}
-              className="bg-[#064e3b] hover:bg-[#065f46] text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm disabled:opacity-50 transition">
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
-            </button>
+            <div className="flex items-center gap-2">
+              {lastRefreshed && !loading && (
+                <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+                  Update: {format(lastRefreshed, 'HH:mm:ss')}
+                </span>
+              )}
+              <button onClick={() => loadData(true)} disabled={loading}
+                className="bg-[#064e3b] hover:bg-[#065f46] text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm disabled:opacity-50 transition">
+                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1640,10 +1660,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           <div className="flex gap-1 bg-slate-200/60 p-1.5 rounded-xl w-fit flex-wrap">
             {[
               { key: 'unit-checklist',    label: '📋 Checklist Kebun (Unit)', icon: Calendar,        show: true },
-              { key: 'summary-regional',  label: '🏢 Rekap Regional 5',      icon: BarChart2,       show: true },
-              { key: 'detail-veh',        label: '🚚 Daftar Kendaraan',      icon: Truck,          show: true },
-              { key: 'log-raw',           label: '📄 Log Transaksi Asli',    icon: FileSpreadsheet, show: true },
-              { key: 'zco-reconciliation',label: '💰 Verifikasi Biaya (ZCO)', icon: Coins,          show: true },
+              { key: 'summary-regional',  label: '🏢 Rekap Regional 5',      icon: BarChart2,       show: isAdmin },
+              { key: 'detail-veh',        label: '🚚 Daftar Kendaraan',      icon: Truck,           show: isAdmin },
+              { key: 'log-raw',           label: '📄 Log Transaksi Asli',    icon: FileSpreadsheet, show: isAdmin },
+              { key: 'zco-reconciliation',label: '💰 Verifikasi Biaya (ZCO)', icon: Coins,          show: isAdmin },
             ].filter(t => t.show).map(({ key, label, icon: Icon }) => (
               <button key={key} onClick={() => { setActiveTab(key); setError(null); }}
                 className={`flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold transition-colors duration-300 ${activeTab === key ? 'bg-gradient-to-tr from-[#064e3b] to-[#2dd4bf] text-white shadow-md shadow-emerald-900/20' : 'text-slate-500 hover:text-[#064e3b] hover:bg-emerald-50'}`}>
@@ -1668,12 +1688,15 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
 
           {activeTab === 'unit-checklist' ? (
-            // Unit view controls: plant selection (locked for USER, selectable for ADMIN)
-            isAdmin ? (
-              <div className="flex flex-col col-span-2">
-                <label className="text-[10px] font-bold text-slate-400 uppercase mb-1">Pilih Kebun / Unit</label>
-                <select 
-                  value={selectedPlant} 
+            // Unit view controls: plant selection
+            // ADMIN/DEV → full dropdown; USER → locked read-only badge
+            <div className="flex flex-col col-span-2">
+              <label className="text-[10px] font-bold text-slate-400 uppercase mb-1">
+                {isAdmin ? 'Pilih Kebun / Unit' : 'Unit / Kebun Anda'}
+              </label>
+              {isAdmin ? (
+                <select
+                  value={selectedPlant}
                   onChange={e => setSelectedPlant(e.target.value)}
                   className="px-3 py-2 border border-slate-300 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-slate-50 font-semibold"
                 >
@@ -1683,16 +1706,15 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     </option>
                   ))}
                 </select>
-              </div>
-            ) : (
-              <div className="flex flex-col col-span-2">
-                <label className="text-[10px] font-bold text-slate-400 uppercase mb-1">Unit / Kebun Terdaftar</label>
-                <div className="px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-900 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                  {currentUser?.plant || selectedPlant} - {PLANT_INFO[currentUser?.plant || selectedPlant]?.desc || currentUser?.unit_name || 'Unit'}
+              ) : (
+                // USER role: read-only locked badge showing their plant
+                <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-2xl h-[34px]">
+                  <span className="font-mono text-[11px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded">{selectedPlant}</span>
+                  <span className="text-xs font-semibold text-slate-700 truncate">{PLANT_INFO[selectedPlant]?.desc || selectedPlant}</span>
+                  <span className="text-[10px] text-slate-400 font-medium ml-auto whitespace-nowrap">{PLANT_INFO[selectedPlant]?.wilayah}</span>
                 </div>
-              </div>
-            )
+              )}
+            </div>
           ) : (
             // Regional / Other view controls
             <>
@@ -1809,10 +1831,44 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   <tbody className="divide-y divide-slate-100">
                     {unitFocusedData.vehiclesList.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-16 text-center text-slate-400 font-medium">
-                          Tidak ada kendaraan terdaftar di Kebun/Unit ini. Silakan upload file ZESTHLP16PA SAP untuk mendaftarkan data.
+                        <td colSpan={8} className="py-10 px-6">
+                          <div className="flex flex-col items-center gap-4">
+                            {/* Role + Plant badge */}
+                            <div className="flex items-center gap-3">
+                              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border ${
+                                isAdmin
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                  : 'bg-slate-100 text-slate-600 border-slate-300'
+                              }`}>
+                                <span className="w-2 h-2 rounded-full bg-current opacity-70 inline-block" />
+                                Role: {currentUser?.role?.toUpperCase() || 'USER'}
+                              </span>
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span className="font-mono">{selectedPlant}</span>
+                                <span className="text-emerald-500">·</span>
+                                {PLANT_INFO[selectedPlant]?.desc || selectedPlant}
+                              </span>
+                              {PLANT_INFO[selectedPlant]?.wilayah && (
+                                <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 border border-slate-200 px-2 py-1 rounded-full">
+                                  {PLANT_INFO[selectedPlant].wilayah}
+                                </span>
+                              )}
+                            </div>
+                            {/* Info message */}
+                            <div className="text-center">
+                              <p className="text-sm font-semibold text-slate-500">Belum ada data kendaraan terdaftar</p>
+                              <p className="text-xs text-slate-400 mt-1">
+                                Unit <span className="font-bold text-slate-600">{selectedPlant}</span> belum memiliki master kendaraan.{' '}
+                                {!isAdmin && 'Hubungi Admin/Keyuser PM untuk sinkronisasi data '}
+                                {!isAdmin && <span className="font-mono font-bold text-slate-600">ZESTHLP16PA</span>}
+                                {!isAdmin && ' dari SAP.'}
+                                {isAdmin && 'Silakan upload file ZESTHLP16PA untuk plant ini.'}
+                              </p>
+                            </div>
+                          </div>
                         </td>
                       </tr>
+
                     ) : unitFocusedData.vehiclesList.slice((unitPage - 1) * LOG_PAGE_SIZE, unitPage * LOG_PAGE_SIZE).map(v => (
                       <React.Fragment key={v.vehicle_code}>
                         <tr className={`hover:bg-emerald-50/40  hover:shadow-sm transition-colors duration-200 border-b border-slate-50 group ${expandedVehicleId === v.vehicle_code ? 'bg-emerald-50/10' : ''}`}>
@@ -1864,18 +1920,41 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             </div>
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <button 
-                              onClick={() => {
-                                setSearchVehicle(v.vehicle_code);
-                                setLogPage(1);
-                                setActiveTab('log-raw');
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                              }}
-                              className="text-[#064e3b] hover:text-emerald-700 font-bold text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-lg transition shadow-xs flex items-center justify-center gap-1 mx-auto"
-                              title={`Lihat Log Transaksi Asli untuk ${v.vehicle_code}`}
-                            >
-                              Detail
-                            </button>
+                            <div className="flex flex-col items-center gap-1">
+                              {/* Toggle inline detail — available for all roles */}
+                              <button
+                                onClick={() => setExpandedVehicleId(
+                                  expandedVehicleId === v.vehicle_code ? null : v.vehicle_code
+                                )}
+                                className={`font-bold text-xs px-3 py-1 rounded-lg transition shadow-xs flex items-center justify-center gap-1 mx-auto border ${
+                                  expandedVehicleId === v.vehicle_code
+                                    ? 'bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700'
+                                    : 'text-[#064e3b] hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200'
+                                }`}
+                                title={expandedVehicleId === v.vehicle_code ? 'Tutup detail' : `Lihat detail transaksi ${v.vehicle_code}`}
+                              >
+                                {expandedVehicleId === v.vehicle_code ? (
+                                  <><ChevronUp size={11} /> Tutup</>
+                                ) : (
+                                  <><Eye size={11} /> Detail</>
+                                )}
+                              </button>
+                              {/* Full log tab link — ADMIN & DEV only */}
+                              {isAdmin && (
+                                <button
+                                  onClick={() => {
+                                    setSearchVehicle(v.vehicle_code);
+                                    setLogPage(1);
+                                    setActiveTab('log-raw');
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                  }}
+                                  className="text-[10px] text-slate-400 hover:text-[#064e3b] font-semibold underline underline-offset-2 transition"
+                                  title="Buka Log Transaksi Asli lengkap"
+                                >
+                                  Log Lengkap ↗
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
 
@@ -1977,9 +2056,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         )}
 
         {/* ─────────────────────────────────────────────────────────── */}
-        {/* TAB 2: Summary Regional (Semua Kebun)                      */}
+        {/* TAB 2: Summary Regional (Semua Kebun) — ADMIN & DEV only  */}
         {/* ─────────────────────────────────────────────────────────── */}
-        {activeTab === 'summary-regional' && (
+        {activeTab === 'summary-regional' && isAdmin && (
           <div className="space-y-4">
 
 
@@ -2134,9 +2213,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                                   setActiveTab('unit-checklist');
                                   window.scrollTo(0, 0);
                                 }}
-                                disabled={!isAdmin && item.plant !== currentUser?.plant}
-                                title={(!isAdmin && item.plant !== currentUser?.plant) ? 'Anda hanya bisa melihat detail unit Anda sendiri' : 'Lihat Detail'}
-                                className={`transition-all duration-200 ${(isAdmin || item.plant === currentUser?.plant) ? 'text-[#064e3b] hover:text-[#065f46] hover:scale-110' : 'text-slate-200 cursor-not-allowed opacity-50'}`}
+                                title="Lihat Detail Checklist Kebun"
+                                className="transition-all duration-200 text-[#064e3b] hover:text-[#065f46] hover:scale-110 cursor-pointer"
                               >
                                 <Eye size={13} />
                               </button>
@@ -2192,9 +2270,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         )}
 
         {/* ─────────────────────────────────────────────────────────── */}
-        {/* TAB 3: Daftar Kendaraan                                    */}
+        {/* TAB 3: Daftar Kendaraan — ADMIN & DEV only                 */}
         {/* ─────────────────────────────────────────────────────────── */}
-        {activeTab === 'detail-veh' && (
+        {activeTab === 'detail-veh' && isAdmin && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3">
               <div className="relative">
@@ -2302,9 +2380,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         )}
 
         {/* ─────────────────────────────────────────────────────────── */}
-        {/* TAB 4: Log Transaksi Asli (Tabel Detail 31 Kolom)          */}
+        {/* TAB 4: Log Transaksi Asli — ADMIN & DEV only               */}
         {/* ─────────────────────────────────────────────────────────── */}
-        {activeTab === 'log-raw' && (
+        {activeTab === 'log-raw' && isAdmin && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 flex-wrap bg-slate-50/50">
               <div className="flex gap-2 flex-wrap items-center">
@@ -2429,7 +2507,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       </div>
     )}
 
-    {activeTab === 'zco-reconciliation' && (
+    {activeTab === 'zco-reconciliation' && isAdmin && (
       <div className="bg-white rounded-2xl border border-slate-300 shadow-sm overflow-hidden max-w-[1150px] mx-auto w-full font-sans">
         <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 flex-wrap bg-slate-50/50 no-print">
           <div className="flex gap-2 flex-wrap items-center">
