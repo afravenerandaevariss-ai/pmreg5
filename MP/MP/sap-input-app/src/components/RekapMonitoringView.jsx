@@ -134,15 +134,25 @@ export default function RekapMonitoringView({ currentUser, equipments }) {
   const [fetchError,   setFetchError]   = useState(null);
   const [lastUpdated,  setLastUpdated]  = useState(null);
 
+  const roleUpper = currentUser?.role?.toUpperCase() || '';
+  const isAdmin = roleUpper === 'ADMIN' || roleUpper === 'DEV' || roleUpper === 'REGIONAL';
+  const userPlant = currentUser?.plant;
+
   /* Plant list */
   const pabrikList = useMemo(() => {
-    if (!equipments || equipments.length === 0) return ALL_PABRIK_PLANTS;
-    const set = new Set(
-      equipments.filter(e => e.plant && String(e.plant).startsWith('5F')).map(e => String(e.plant))
-    );
-    const hit = ALL_PABRIK_PLANTS.filter(p => set.has(p.code));
-    return hit.length > 0 ? hit : ALL_PABRIK_PLANTS;
-  }, [equipments]);
+    let baseList = ALL_PABRIK_PLANTS;
+    if (equipments && equipments.length > 0) {
+      const set = new Set(
+        equipments.filter(e => e.plant && String(e.plant).startsWith('5F')).map(e => String(e.plant))
+      );
+      const hit = ALL_PABRIK_PLANTS.filter(p => set.has(p.code));
+      if (hit.length > 0) baseList = hit;
+    }
+    if (!isAdmin && userPlant && userPlant !== 'ALL' && userPlant !== '5R00') {
+      return baseList.filter(p => p.code === userPlant);
+    }
+    return baseList;
+  }, [equipments, isAdmin, userPlant]);
 
   const [year, month] = rekapMonth.split('-').map(Number);
   const daysInMonth   = getDaysInMonth(new Date(year, month - 1, 1));

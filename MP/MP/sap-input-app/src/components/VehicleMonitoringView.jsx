@@ -203,6 +203,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return (currentUser && !isAdmin && currentUser.plant) ? currentUser.plant : '5E08';
   });
 
+  // Effective plant: non-admins are permanently locked to their assigned plant
+  const effectivePlant = (!isAdmin && currentUser?.plant && currentUser.plant !== 'ALL' && currentUser.plant !== '5R00')
+    ? currentUser.plant
+    : selectedPlant;
+
 
   const [filterStatus, setFilterStatus]     = useState('ALL');
   const [filterUoM, setFilterUoM]           = useState('ALL');
@@ -284,12 +289,19 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   useEffect(() => { loadData(false); }, [loadData]);
 
 
-  // Default selectedPlant to user's plant on initial load if available
+  // Strictly lock selectedPlant to user's plant for non-admins
   useEffect(() => {
-    if (currentUser?.plant && currentUser.plant !== 'ALL' && currentUser.plant !== '5R00') {
-      setSelectedPlant(prev => prev || currentUser.plant);
+    if (!isAdmin && currentUser?.plant && currentUser.plant !== 'ALL' && currentUser.plant !== '5R00') {
+      setSelectedPlant(currentUser.plant);
     }
-  }, [currentUser?.plant]);
+  }, [currentUser?.plant, isAdmin]);
+
+  // Strictly lock activeTab to 'unit-checklist' for non-admins
+  useEffect(() => {
+    if (!isAdmin && activeTab !== 'unit-checklist') {
+      setActiveTab('unit-checklist');
+    }
+  }, [isAdmin, activeTab]);
 
   // ── Excel Upload ─────────────────────────────────────────────────────────────
   const handleFileUpload = (e) => {
@@ -565,7 +577,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           };
 
           const rawCC = String(getVal(CC_COL) || '').trim();
-          if (!rawCC || rawCC.toLowerCase().startsWith('total') || rawCC.toLowerCase().startsWith('logbook distrik') || rawCC.toLowerCase().startsWith('grand total')) continue;
+          if (!rawCC ||
+              rawCC.toLowerCase().startsWith('total') ||
+              rawCC.toLowerCase().startsWith('logbook distrik') ||
+              rawCC.toLowerCase().startsWith('grand total') ||
+              rawCC.toLowerCase().startsWith('plant') ||        // filter "PLANT 5Exx LOG RATE" subtotals dari SAP
+              rawCC.toLowerCase() === 'cost center'             // filter baris grand total SAP yang memakai label header
+          ) continue;
 
           const ccCode = rawCC.split(/\s+/)[0];
           if (!ccCode) continue;
@@ -793,6 +811,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     });
 
     let result = list;
+    // Strict plant restriction for USER role: only show own plant
+    if (!isAdmin && currentUser?.plant && currentUser.plant !== 'ALL' && currentUser.plant !== '5R00') {
+      result = result.filter(r => r.plant === currentUser.plant);
+    }
     if (selectedWilayah !== 'ALL') result = result.filter(r => r.wilayah === selectedWilayah);
     if (searchPlant.trim()) {
       const q = searchPlant.toLowerCase();
@@ -808,14 +830,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     });
 
     return result;
-  }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetMonth, targetInputDate, autoWorkingDays, selectedWilayah, searchPlant, filterStatus, sortBy, sortAsc, masterEquipments, masterMap]);
+  }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetMonth, targetInputDate, autoWorkingDays, selectedWilayah, searchPlant, filterStatus, sortBy, sortAsc, masterEquipments, masterMap, isAdmin, currentUser]);
 
   // ── Unit Focused Mode calculations ──────────────────────────────────────────
   const unitFocusedData = useMemo(() => {
-    if (!selectedPlant) return { vehiclesList: [], kpis: { total: 0, active: 0, avgDays: 0, lastUpdate: '-', statusColor: 'grey', statusText: 'Belum Ada Data' } };
+    if (!effectivePlant) return { vehiclesList: [], kpis: { total: 0, active: 0, avgDays: 0, lastUpdate: '-', statusColor: 'grey', statusText: 'Belum Ada Data' } };
 
-    const plantVehicles = vehicles.filter(v => v.plant === selectedPlant);
-    const plantLogs     = activeMonthLogs.filter(l => l.plant === selectedPlant);
+    const plantVehicles = vehicles.filter(v => v.plant === effectivePlant);
+    const plantLogs     = activeMonthLogs.filter(l => l.plant === effectivePlant);
     const targetDate    = new Date(targetInputDate);
 
     let totalVeh = plantVehicles.length;

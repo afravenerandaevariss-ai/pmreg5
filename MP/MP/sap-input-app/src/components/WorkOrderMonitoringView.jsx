@@ -662,7 +662,10 @@ export default function WorkOrderMonitoringView({ currentUser }) {
       const descVal = String(item['Description'] || '').toLowerCase();
       const desc2Val = String(item['Description_2'] || '').toLowerCase();
 
-      const matchesPlant = !selectedPlant || plantVal === selectedPlant.toLowerCase();
+      const effectivePlant = (!isAdmin && currentUser?.plant && currentUser.plant !== 'ALL' && currentUser.plant !== '5R00')
+        ? currentUser.plant
+        : selectedPlant;
+      const matchesPlant = !effectivePlant || plantVal === effectivePlant.toLowerCase();
       const matchesType = !selectedType || typeVal === selectedType.toLowerCase();
       
       const firstStatusToken = statusVal.trim().split(/\s+/)[0].toUpperCase();
@@ -997,9 +1000,10 @@ export default function WorkOrderMonitoringView({ currentUser }) {
               <select
                 value={selectedPlant}
                 onChange={(e) => setSelectedPlant(e.target.value)}
-                className="bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs text-slate-700 font-semibold focus:ring-2 focus:ring-[#064e3b]/20 focus:border-[#064e3b] focus:outline-none hover:border-slate-300 transition-colors duration-200 ease-out cursor-pointer"
+                disabled={!isAdmin}
+                className="bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs text-slate-700 font-semibold focus:ring-2 focus:ring-[#064e3b]/20 focus:border-[#064e3b] focus:outline-none hover:border-slate-300 transition-colors duration-200 ease-out cursor-pointer disabled:bg-slate-100 disabled:cursor-not-allowed"
               >
-                <option value="">Semua Unit (Plant)</option>
+                {isAdmin && <option value="">Semua Unit (Plant)</option>}
                 {uniquePlants.map(p => (
                   <option key={p} value={p}>{p}</option>
                 ))}

@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send } from 'lucide-react';
-import { fetchLiveChats, saveLiveChats } from '../lib/supabaseService';
+import { fetchLiveChats, saveLiveChats, fetchKnowledgeBase } from '../lib/supabaseService';
 import { supabase, IS_DEV_ENV } from '../lib/supabase';
 
 const T_HIERARCHY = IS_DEV_ENV ? 'dev_hierarchy_data' : 'hierarchy_data';
 
 
-// ─── Knowledge Base ──────────────────────────────────────────────────────────
-const FAQ = [
+// ─── Knowledge Base (Fallback default) ───────────────────────────────────────
+const DEFAULT_FAQ = [
   {
     q: "Batas waktu pengisian Logbook?",
     a: "Pengisian logbook harian wajib diselesaikan maksimal H+1 pukul 09:00 pagi setiap harinya untuk memastikan sinkronisasi berjalan lancar."
@@ -42,11 +42,21 @@ export default function AfraChatbot({ currentUser }) {
 
   const [isOpen, setIsOpen] = useState(false);
   const [showFaq, setShowFaq] = useState(true);
+  const [faqList, setFaqList] = useState(DEFAULT_FAQ);
   // conversation = array of { id, role: 'user'|'bot', text }
   const [conversation, setConversation] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
+
+  // Load knowledge base
+  useEffect(() => {
+    fetchKnowledgeBase().then(({ data }) => {
+      if (data && Array.isArray(data) && data.length > 0) {
+        setFaqList(data);
+      }
+    });
+  }, []);
 
   // Load persisted chats from Supabase on open
   const loadMessages = async () => {
@@ -85,7 +95,10 @@ export default function AfraChatbot({ currentUser }) {
     setInputValue('');
 
     const userEntry = { id: crypto.randomUUID(), role: 'user', text: userText };
-    const faqMatch = FAQ.find(f => f.q === userText);
+    const faqMatch = faqList.find(f => 
+      f.q.trim().toLowerCase() === userText.trim().toLowerCase() ||
+      (Array.isArray(f.tags) && f.tags.some(t => userText.toLowerCase().includes(t.toLowerCase())))
+    ) || faqList.find(f => userText.toLowerCase().includes(f.q.toLowerCase()) || f.q.toLowerCase().includes(userText.toLowerCase()));
 
     // Hide FAQ chips when a question is sent
     setShowFaq(false);
@@ -209,12 +222,12 @@ export default function AfraChatbot({ currentUser }) {
               {conversation.length === 0 && (
                 <div className="flex flex-col gap-0">
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest px-1 mb-2">Contoh pertanyaan</p>
-                  {FAQ.map((faq, idx) => (
+                  {faqList.slice(0, 6).map((faq, idx) => (
                     <button key={idx}
                       onClick={() => handleSend(faq.q)}
                       className="text-left bg-white/90 hover:bg-white border border-slate-200 hover:border-emerald-400 text-slate-700 hover:text-emerald-700 px-4 py-3 text-xs font-semibold transition-all shadow-sm hover:shadow-md hover:-translate-y-px"
                       style={{
-                        borderRadius: idx === 0 ? '12px 12px 0 0' : idx === FAQ.length - 1 ? '0 0 12px 12px' : '0',
+                        borderRadius: idx === 0 ? '12px 12px 0 0' : idx === Math.min(faqList.length, 6) - 1 ? '0 0 12px 12px' : '0',
                         borderTopWidth: idx === 0 ? '1px' : '0',
                       }}
                     >

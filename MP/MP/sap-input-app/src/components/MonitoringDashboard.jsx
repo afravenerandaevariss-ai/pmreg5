@@ -19,8 +19,6 @@ export default function MonitoringDashboard({
   
   const [activeTab, setActiveTab] = useState('plant'); // 'plant' | 'equipment' | 'grafik'
   const [selectedCellDetail, setSelectedCellDetail] = useState(null);
-  const [chartPlantFilter, setChartPlantFilter] = useState('ALL');
-
   // Plant filtering logic based on logged in user
   const userPlant = currentUser?.plant || '';
   const isAdminUser = currentUser && (
@@ -31,17 +29,19 @@ export default function MonitoringDashboard({
   );
 
   const isUserPlantRestricted = !isAdminUser && userPlant && userPlant !== '5R00' && userPlant !== 'ALL';
-  const initialPlantFilter = userPlant && userPlant !== '5R00' && userPlant !== 'ALL' ? userPlant : 'ALL';
+  const initialPlantFilter = isUserPlantRestricted ? userPlant : 'ALL';
 
   const [selectedPlantFilter, setSelectedPlantFilter] = useState(initialPlantFilter);
+  const [chartPlantFilter, setChartPlantFilter] = useState(initialPlantFilter);
   const [showMissingModal, setShowMissingModal] = useState(false);
   const [missingSearchQuery, setMissingSearchQuery] = useState('');
 
   useEffect(() => {
-    if (userPlant && userPlant !== '5R00' && userPlant !== 'ALL') {
+    if (isUserPlantRestricted) {
       setSelectedPlantFilter(userPlant);
+      setChartPlantFilter(userPlant);
     }
-  }, [userPlant]);
+  }, [isUserPlantRestricted, userPlant]);
 
   const availablePlants = useMemo(() => {
     const plants = new Set();
@@ -400,10 +400,11 @@ export default function MonitoringDashboard({
             <select
               value={selectedPlantFilter}
               onChange={(e) => setSelectedPlantFilter(e.target.value)}
-              className="bg-transparent border-none text-slate-800 font-bold focus:outline-none cursor-pointer text-xs"
+              disabled={isUserPlantRestricted}
+              className="bg-transparent border-none text-slate-800 font-bold focus:outline-none cursor-pointer text-xs disabled:cursor-not-allowed"
             >
-              <option value="ALL">Semua Plant</option>
-              {availablePlants.map(p => (
+              {!isUserPlantRestricted && <option value="ALL">Semua Plant</option>}
+              {availablePlants.filter(p => !isUserPlantRestricted || p === userPlant).map(p => (
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>
@@ -453,10 +454,11 @@ export default function MonitoringDashboard({
                   <select 
                     value={chartPlantFilter}
                     onChange={(e) => setChartPlantFilter(e.target.value)}
-                    className="border border-slate-300 rounded-2xl px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                    disabled={isUserPlantRestricted}
+                    className="border border-slate-300 rounded-2xl px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer disabled:cursor-not-allowed"
                   >
-                    <option value="ALL">Semua Pabrik (Gabungan)</option>
-                    {plantRecap.map(p => (
+                    {!isUserPlantRestricted && <option value="ALL">Semua Pabrik (Gabungan)</option>}
+                    {plantRecap.filter(p => !isUserPlantRestricted || p.plant === userPlant).map(p => (
                       <option key={p.plant} value={p.plant}>{p.plant}</option>
                     ))}
                   </select>

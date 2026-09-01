@@ -14,6 +14,8 @@ import Dendrogram from './components/ui/Dendrogram';
 import AfraChatbot from './components/AfraChatbot';
 import WorkOrderMonitoringView from './components/WorkOrderMonitoringView';
 import AdminInbox from './components/AdminInbox';
+import KnowledgeBaseManager from './components/KnowledgeBaseManager';
+import DocsKnowledgeBaseView from './components/DocsKnowledgeBaseView';
 import { supabase, IS_DEV_ENV } from './lib/supabase';
 
 const T_MASTER_EQ   = IS_DEV_ENV ? 'dev_master_equipment' : 'master_equipment';
@@ -1018,7 +1020,7 @@ function App() {
     }
     
     return groups;
-  }, [filteredEquipments, currentUser]);
+  }, [filteredEquipments, currentUser, isAdmin]);
 
   // Calculate summary metrics for the Input Harian
   const totalEquipmentCount = useMemo(() => {
@@ -1069,6 +1071,18 @@ function App() {
       <div className="bg-white">
         <VehicleMonitoringView currentUser={currentUser} screenshotMode={true} />
       </div>
+    );
+  }
+
+  if (activeTab === 'knowledge-base') {
+    return (
+      <DocsKnowledgeBaseView 
+        currentUser={currentUser} 
+        onBackToApp={() => {
+          setActiveTab('dashboard');
+          window.history.pushState({}, '', window.location.pathname);
+        }} 
+      />
     );
   }
 
@@ -1276,6 +1290,22 @@ function App() {
               </span>
             </button>
 
+            <button 
+              onClick={() => {
+                setActiveTab('knowledge-base');
+                window.history.pushState({}, '', '?tab=knowledge-base');
+                setIsMobileMenuOpen(false);
+              }} 
+              className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'knowledge-base' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
+              title="Knowledge Base & CMMS Docs"
+            >
+              <BookOpen size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4 text-amber-400" : "mx-auto text-amber-400 group-hover:mr-4 group-hover:mx-0"} />
+              <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
+                Knowledge Base
+              </span>
+              {activeTab === 'knowledge-base' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-[#10b981] rounded-r-full" />}
+            </button>
+
             <a 
               href="https://cmms.ptpn4.co.id/"
               target="_blank"
@@ -1387,31 +1417,67 @@ function App() {
                     className="fixed inset-0 z-40" 
                     onClick={() => setIsProfileDropdownOpen(false)}
                   ></div>
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="p-1">
+                  <div className="absolute right-0 mt-2 w-64 bg-[#12141c] text-white rounded-2xl shadow-2xl border border-neutral-800 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="p-3.5 border-b border-neutral-800/80 bg-neutral-900/60 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center font-bold text-emerald-400 text-xs">
+                        {getInitials(currentUser.name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-xs font-bold text-white uppercase truncate">{currentUser.name}</h4>
+                        <p className="text-[11px] text-neutral-400 font-mono truncate">{currentUser.nik}@ptpn4.id</p>
+                      </div>
+                    </div>
+                    <div className="p-1.5 space-y-0.5">
                       <button 
                         onClick={() => {
                           setActiveTab('settings');
                           setIsProfileDropdownOpen(false);
                           setIsMobileMenuOpen(false);
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-emerald-600 rounded-lg transition-colors text-left"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors text-left cursor-pointer"
                       >
-                        <User size={16} className="text-slate-400" />
-                        <span className="truncate">{currentUser.name}</span>
+                        <Settings size={14} className="text-neutral-400" />
+                        <span>Settings</span>
                       </button>
+
+                      <button 
+                        onClick={() => {
+                          setActiveTab('knowledge-base');
+                          window.history.pushState({}, '', '?tab=knowledge-base');
+                          setIsProfileDropdownOpen(false);
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-amber-300 hover:text-amber-200 hover:bg-neutral-800 rounded-xl transition-colors text-left cursor-pointer bg-neutral-900/40"
+                      >
+                        <BookOpen size={14} className="text-amber-400" />
+                        <span>Dictionary / Knowledge Base</span>
+                      </button>
+
+                      {isAdmin && (
+                        <button 
+                          onClick={() => {
+                            setActiveTab('monitoring');
+                            setIsProfileDropdownOpen(false);
+                            setIsMobileMenuOpen(false);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors text-left cursor-pointer"
+                        >
+                          <LayoutDashboard size={14} className="text-neutral-400" />
+                          <span>Go to Admin Regional Dashboard</span>
+                        </button>
+                      )}
                     </div>
-                    <div className="p-1 border-t border-slate-100">
+                    <div className="p-1.5 border-t border-neutral-800/80">
                       <button 
                         onClick={() => {
                           setCurrentUser(null);
                           localStorage.removeItem('sapApp_session_nik');
                           setIsProfileDropdownOpen(false);
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-red-600 font-bold hover:bg-red-50 rounded-lg transition-colors text-left"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 font-semibold hover:bg-red-950/40 rounded-xl transition-colors text-left cursor-pointer"
                       >
-                        <LogOut size={16} />
-                        Keluar
+                        <LogOut size={14} />
+                        <span>Log out</span>
                       </button>
                     </div>
                   </div>
@@ -1424,7 +1490,7 @@ function App() {
         {/* Scrollable Content */}
         <main className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 print:overflow-visible print:block print:p-0">
           
-          {activeTab !== 'dashboard' && activeTab !== 'monitoring' && activeTab !== 'verifikasi' && activeTab !== 'berita-acara' && activeTab !== 'sap-guide' && activeTab !== 'work-order' && activeTab !== 'inbox' && (
+          {activeTab !== 'dashboard' && activeTab !== 'monitoring' && activeTab !== 'verifikasi' && activeTab !== 'berita-acara' && activeTab !== 'sap-guide' && activeTab !== 'work-order' && activeTab !== 'inbox' && activeTab !== 'knowledge-base' && (
             <div className="flex justify-between items-end mb-8">
               <h2 className="text-[26px] font-light text-slate-800 tracking-tight">
                 {activeTab === 'table' && 'Tabel & Ekspor SAP'}
@@ -1518,6 +1584,13 @@ function App() {
           {activeTab === 'work-order' && (
             <div className="-mx-3 -my-3 sm:-mx-6 sm:-my-6 lg:-mx-8 lg:-my-8 min-h-[calc(100vh-100px)]">
               <WorkOrderMonitoringView currentUser={currentUser} />
+            </div>
+          )}
+
+          {/* TAB: KNOWLEDGE BASE / CMMS DOCS */}
+          {activeTab === 'knowledge-base' && (
+            <div className="-mx-3 -my-3 sm:-mx-6 sm:-my-6 lg:-mx-8 lg:-my-8 min-h-screen">
+              <DocsKnowledgeBaseView currentUser={currentUser} onBackToApp={() => setActiveTab('dashboard')} />
             </div>
           )}
 
@@ -1669,6 +1742,32 @@ function App() {
               {/* Only show Manajemen File Dasar to DEV */}
               {currentUser?.role?.toUpperCase() === 'DEV' && (
                 <div className="space-y-6 pt-4 border-t border-slate-200">
+                  {/* Knowledge Base Quick Banner (DEV ONLY) */}
+                  <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 rounded-2xl p-6 border border-emerald-500/30 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-md">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 shadow-inner shrink-0">
+                        <BookOpen size={24} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-extrabold text-white">CMMS Documentation & Knowledge Base</h3>
+                          <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">DEV ONLY</span>
+                        </div>
+                        <p className="text-xs text-neutral-300 mt-0.5">Pusat dokumentasi standar CMMS PTPN IV, T-Code SAP PM, dan editor basis pengetahuan cloud.</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setActiveTab('knowledge-base');
+                        window.history.pushState({}, '', '?tab=knowledge-base');
+                      }}
+                      className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold text-xs rounded-xl flex items-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
+                    >
+                      <BookOpen size={15} />
+                      Buka CMMS Docs
+                    </button>
+                  </div>
+
                   <div className="flex justify-between items-center mb-2 bg-white p-5 rounded-xl shadow-sm border border-slate-200">
                     <h3 className="text-lg font-bold text-slate-800">Manajemen File Dasar</h3>
                     {(masterMap || templateData || hierarchyData) && (
@@ -1952,6 +2051,9 @@ function App() {
                       </div>
                     </div>
                   )}
+
+                  {/* ===== KNOWLEDGE BASE & FAQ ENGINE (DEV ONLY) ===== */}
+                  <KnowledgeBaseManager currentUser={currentUser} />
                 </div>
               )}
             </div>
@@ -1965,7 +2067,7 @@ function App() {
           )}
 
           {/* TAB: TABEL & EKSPOR SAP */}
-          {activeTab === 'table' && currentUser?.role !== 'Unit' && (
+          {activeTab === 'table' && (
             <>
               {!templateData ? (
                 <div className="text-center py-24 bg-white rounded-xl shadow-sm border border-slate-200 mt-4">
@@ -2336,8 +2438,11 @@ function MasterDataView({ masterMap, equipments = [], currentUser }) {
 
   const filteredData = useMemo(() => {
     let result = dataList;
-    if (plantFilter) {
-      result = result.filter(item => item.plant === plantFilter);
+    const effectivePlant = (!isAdmin && currentUser?.plant && currentUser.plant !== 'ALL' && currentUser.plant !== '5R00')
+      ? currentUser.plant
+      : plantFilter;
+    if (effectivePlant) {
+      result = result.filter(item => item.plant === effectivePlant);
     }
     if (vhcFilter) {
       result = result.filter(item => item.eqNum && String(item.eqNum).startsWith(vhcFilter));
@@ -2349,7 +2454,7 @@ function MasterDataView({ masterMap, equipments = [], currentUser }) {
       });
     }
     return result;
-  }, [dataList, plantFilter, vhcFilter, searchQuery]);
+  }, [dataList, plantFilter, vhcFilter, searchQuery, isAdmin, currentUser]);
 
   // Reset page when filter changes
   useEffect(() => {
@@ -2358,7 +2463,7 @@ function MasterDataView({ masterMap, equipments = [], currentUser }) {
 
   // Set default plantFilter for Unit role
   useEffect(() => {
-    if (currentUser && !isAdmin) {
+    if (currentUser && !isAdmin && currentUser.plant && currentUser.plant !== 'ALL' && currentUser.plant !== '5R00') {
       setPlantFilter(currentUser.plant);
     }
   }, [currentUser, isAdmin]);
@@ -2438,13 +2543,13 @@ function MasterDataView({ masterMap, equipments = [], currentUser }) {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-2"><Filter size={16} className="text-slate-400" /> Filter Plant</label>
             <select 
-              value={plantFilter} 
+              value={!isAdmin && currentUser?.plant ? currentUser.plant : plantFilter} 
               onChange={(e) => setPlantFilter(e.target.value)}
               disabled={!isAdmin}
               className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed transition-shadow hover:border-slate-400"
             >
-              <option value="">Semua Plant</option>
-              {uniquePlants.map(p => (
+              {isAdmin && <option value="">Semua Plant</option>}
+              {uniquePlants.filter(p => isAdmin || p === currentUser?.plant).map(p => (
                 <option key={p} value={p}>
                   {p} {PLANT_INFO[p] ? PLANT_INFO[p].desc : ''}
                 </option>

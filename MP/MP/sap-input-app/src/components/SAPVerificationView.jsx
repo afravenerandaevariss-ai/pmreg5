@@ -20,13 +20,24 @@ export default function SAPVerificationView({ equipments, currentUser }) {
   const [debugMsg, setDebugMsg] = useState('');
   const [groupBy, setGroupBy] = useState('plant'); // 'plant' or 'equipment'
 
+  const roleUpper = currentUser?.role?.toUpperCase() || '';
+  const isDevUser = roleUpper === 'DEV';
+  const isUserRole = roleUpper === 'USER' || roleUpper === 'UNIT';
+  const isAdmin = !isUserRole && (isDevUser || (currentUser && (
+    currentUser.role === 'Admin' ||
+    roleUpper === 'ADMIN' ||
+    roleUpper === 'REGIONAL' ||
+    currentUser.plant === '5R00' ||
+    currentUser.plant === 'ALL'
+  )));
+
   // ── Session-level caches (survive re-renders, reset on page refresh) ──────
   const _cacheMasterEq    = useRef(null); // { data: [...] } — 17,277 rows, fetched once
   const _cacheMasterMap   = useRef(null); // raw master_map entries, fetched once
   const _cacheIK17Base    = useRef(null); // ik17_parsed_data.json — 63k rows, fetched once
   const _cacheIK17DB      = useRef({ data: null, ts: 0 }); // ik17_raw_data — TTL 60s
   const _cacheMonitoredEq = useRef(null); // all-time induk_eq_num+plant from daily_logs, fetched once
-  const [filterPlant, setFilterPlant] = useState('ALL');
+  const [filterPlant, setFilterPlant] = useState(() => (!isAdmin && currentUser?.plant ? currentUser.plant : 'ALL'));
   const [filterJenis, setFilterJenis] = useState('');
   const [searchEq, setSearchEq] = useState('');
   const [showOnlySelisih, setShowOnlySelisih] = useState(false);
@@ -35,6 +46,12 @@ export default function SAPVerificationView({ equipments, currentUser }) {
   const [rawWebLogs, setRawWebLogs] = useState([]);
   const [rawSapLogs, setRawSapLogs] = useState([]);
   const [detailModal, setDetailModal] = useState(null); // { plant, dateKey, selisihTotal }
+
+  useEffect(() => {
+    if (!isAdmin && currentUser?.plant && currentUser.plant !== 'ALL' && currentUser.plant !== '5R00') {
+      setFilterPlant(currentUser.plant);
+    }
+  }, [isAdmin, currentUser?.plant]);
 
   const handleIK17Upload = async (e) => {
     const file = e.target.files[0];
@@ -759,12 +776,13 @@ export default function SAPVerificationView({ equipments, currentUser }) {
                 <div className="flex flex-col">
                   <label className="text-xs font-bold text-slate-500 mb-1">Filter Plant</label>
                   <select 
-                    value={filterPlant}
+                    value={!isAdmin && currentUser?.plant ? currentUser.plant : filterPlant}
                     onChange={e => setFilterPlant(e.target.value)}
-                    className="px-3 py-2 border border-slate-200 rounded-2xl text-xs font-medium bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b]"
+                    disabled={!isAdmin}
+                    className="px-3 py-2 border border-slate-200 rounded-2xl text-xs font-medium bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] disabled:bg-slate-100 disabled:cursor-not-allowed"
                   >
-                    <option value="ALL">Semua Plant</option>
-                    {uniquePlants.map(p => (
+                    {isAdmin && <option value="ALL">Semua Plant</option>}
+                    {uniquePlants.filter(p => isAdmin || p === currentUser?.plant).map(p => (
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
@@ -794,22 +812,26 @@ export default function SAPVerificationView({ equipments, currentUser }) {
               </label>
             </div>
 
-            <input
-              type="file"
-              ref={ik17InputRef}
-              accept=".xlsx,.xls"
-              className="hidden"
-              onChange={handleIK17Upload}
-            />
-            <button
-              onClick={() => ik17InputRef.current?.click()}
-              disabled={isProcessing || isUploadingIK17}
-              title="Upload file IK17 dari SAP untuk sinkronisasi matrik verifikasi"
-              className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 sm:py-2.5 mt-5 sm:mt-0 rounded-2xl font-bold flex items-center justify-center transition-colors shadow-sm disabled:opacity-50 text-xs gap-1.5"
-            >
-              <Upload size={14} className={isUploadingIK17 ? 'animate-pulse' : ''} />
-              {isUploadingIK17 ? 'Memproses IK17...' : 'Upload IK17'}
-            </button>
+            {isAdmin && (
+              <>
+                <input
+                  type="file"
+                  ref={ik17InputRef}
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={handleIK17Upload}
+                />
+                <button
+                  onClick={() => ik17InputRef.current?.click()}
+                  disabled={isProcessing || isUploadingIK17}
+                  title="Upload file IK17 dari SAP untuk sinkronisasi matrik verifikasi"
+                  className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 sm:py-2.5 mt-5 sm:mt-0 rounded-2xl font-bold flex items-center justify-center transition-colors shadow-sm disabled:opacity-50 text-xs gap-1.5"
+                >
+                  <Upload size={14} className={isUploadingIK17 ? 'animate-pulse' : ''} />
+                  {isUploadingIK17 ? 'Memproses IK17...' : 'Upload IK17'}
+                </button>
+              </>
+            )}
 
             <button
               onClick={loadMatrixData}

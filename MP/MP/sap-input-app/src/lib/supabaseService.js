@@ -204,9 +204,10 @@ export async function saveSystemConfig(id, dataObj) {
   else if (id === 'zvtab_data') numericId = 15;
   else if (id === 'export046_data') numericId = 16;
   else if (id === 'doc_details') numericId = 17;
+  else if (id === 'knowledge_base') numericId = 18;
   else if (id === 'hierarchy_data') numericId = 0;
   
-  const SMALL_CONFIG_IDS = new Set([4, 5, 12, 13, 17]);
+  const SMALL_CONFIG_IDS = new Set([4, 5, 12, 13, 17, 18]);
   const cacheKey = `sys_cfg_${T.hierarchy_data}_${numericId}`;
   memoryCache.set(cacheKey, dataObj);
   if (SMALL_CONFIG_IDS.has(numericId)) {
@@ -236,6 +237,7 @@ export async function deleteSystemConfig(id) {
   else if (id === 'zvtab_data') numericId = 15;
   else if (id === 'export046_data') numericId = 16;
   else if (id === 'doc_details') numericId = 17;
+  else if (id === 'knowledge_base') numericId = 18;
   else if (id === 'hierarchy_data') numericId = 0;
 
   const cacheKey = `sys_cfg_${T.hierarchy_data}_${numericId}`;
@@ -266,6 +268,7 @@ export async function getSystemConfig(id, forceRefresh = false) {
   else if (id === 'zvtab_data') numericId = 15;
   else if (id === 'export046_data') numericId = 16;
   else if (id === 'doc_details') numericId = 17;
+  else if (id === 'knowledge_base') numericId = 18;
 
   const cacheKey = `sys_cfg_${T.hierarchy_data}_${numericId}`;
   if (!forceRefresh) {
@@ -725,4 +728,18 @@ export async function getImportLogs() {
   const { data, error } = await getSystemConfig('import_logs');
   if (error || !Array.isArray(data)) return { data: [], error: null };
   return { data, error: null };
+}
+
+// ============================================================
+// KNOWLEDGE BASE (id=18)
+// Stores Q&A knowledge base & FAQ items for DEV settings and Chatbot
+// ============================================================
+export async function fetchKnowledgeBase(forceRefresh = false) {
+  const { data, error } = await getSystemConfig('knowledge_base', forceRefresh);
+  if (error || !Array.isArray(data)) return { data: null, error };
+  return { data, error: null };
+}
+
+export async function saveKnowledgeBase(dataList) {
+  return await saveSystemConfig('knowledge_base', dataList);
 }

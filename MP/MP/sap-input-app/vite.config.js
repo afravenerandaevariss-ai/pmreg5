@@ -8,6 +8,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  build: {
+    sourcemap: false, // Disable source maps in production (prevents .map file 404 in nginx logs)
+  },
   server: {
     proxy: {
       '/api': {
