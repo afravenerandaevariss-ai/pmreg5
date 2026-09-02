@@ -474,6 +474,10 @@ export async function loginUser(nik, password) {
     if (error.status === 401 || error.message?.includes('401') || error.message?.includes('Invalid API key')) {
       return { data: null, error: 'Konfigurasi server tidak valid (401). Hubungi admin.' };
     }
+    // Network / CORS / fetch error (TypeError: Failed to fetch)
+    if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError') || error.message?.includes('fetch')) {
+      return { data: null, error: 'Koneksi ke server gagal. Periksa jaringan internet Anda.' };
+    }
     // Generic DB error — log to console and show safe message
     console.error('[loginUser] Supabase error:', error.code, error.status, error.message);
     return { data: null, error: `Gagal terhubung ke server (${error.code || error.status || 'unknown'}). Hubungi admin.` };
