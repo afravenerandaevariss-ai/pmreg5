@@ -6,7 +6,7 @@ import {
   CheckCircle, AlertCircle, AlertTriangle, ChevronDown, ChevronUp,
   Filter, BarChart2, Layers, TrendingUp, Activity, Truck, Calendar,
   XCircle, Info, Eye, EyeOff, FileDown, Check, X, ArrowRight,
-  Copy, Printer, Coins, ShieldAlert, Send
+  Copy, Printer, Coins, ShieldAlert, Send, Lock
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toPng } from 'html-to-image';
@@ -815,10 +815,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     });
 
     let result = list;
-    // Strict plant restriction for USER role: only show own plant
-    if (!isAdmin && currentUser?.plant && currentUser.plant !== 'ALL' && currentUser.plant !== '5R00') {
-      result = result.filter(r => r.plant === currentUser.plant);
-    }
     if (selectedWilayah !== 'ALL') result = result.filter(r => r.wilayah === selectedWilayah);
     if (searchPlant.trim()) {
       const q = searchPlant.toLowerCase();
@@ -2232,18 +2228,24 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                               {item.lastLogDate ? format(new Date(item.lastLogDate + 'T00:00:00'), 'dd/MM/yyyy') : '-'}
                             </td>
                             <td className="px-2 py-0.5 font-black text-slate-800">{item.rank}</td>
-                            <td className="px-2 py-0.5 no-print">
-                              <button 
-                                onClick={() => {
-                                  setSelectedPlant(item.plant);
-                                  setActiveTab('unit-checklist');
-                                  window.scrollTo(0, 0);
-                                }}
-                                title="Lihat Detail Checklist Kebun"
-                                className="transition-all duration-200 text-[#064e3b] hover:text-[#065f46] hover:scale-110 cursor-pointer"
-                              >
-                                <Eye size={13} />
-                              </button>
+                            <td className="px-2 py-0.5 no-print text-center">
+                              {(!isAdmin && currentUser?.plant && item.plant !== currentUser.plant) ? (
+                                <span className="inline-flex items-center justify-center text-slate-300 cursor-not-allowed" title="Akses detail unit lain dibatasi">
+                                  <Lock size={12} className="opacity-40" />
+                                </span>
+                              ) : (
+                                <button 
+                                  onClick={() => {
+                                    setSelectedPlant(item.plant);
+                                    setActiveTab('unit-checklist');
+                                    window.scrollTo(0, 0);
+                                  }}
+                                  title="Lihat Detail Checklist Kebun"
+                                  className="transition-all duration-200 text-[#064e3b] hover:text-[#065f46] hover:scale-110 cursor-pointer"
+                                >
+                                  <Eye size={13} />
+                                </button>
+                              )}
                             </td>
                           </tr>
                         </React.Fragment>
