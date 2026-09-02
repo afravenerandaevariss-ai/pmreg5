@@ -517,6 +517,8 @@ function App() {
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('ALL');
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [userForm, setUserForm] = useState({
@@ -844,17 +846,18 @@ function App() {
     return () => clearTimeout(timer);
   }, [docDetails]);
 
-  // Auto-load user list when master tab is active (DEV/ADMIN only)
+  // Auto-load user list for DEV / ADMIN (on settings tab, master tab, or initial login)
   useEffect(() => {
     const role = currentUser?.role?.toUpperCase();
-    if (activeTab === 'master' && (role === 'DEV' || role === 'ADMIN') && allUsers.length === 0) {
+    if ((role === 'DEV' || role === 'ADMIN') && allUsers.length === 0) {
       setLoadingUsers(true);
       fetchAllUsers().then(({ data }) => {
         if (data) setAllUsers(data);
         setLoadingUsers(false);
       });
     }
-  }, [activeTab, currentUser]);
+  }, [currentUser, activeTab, allUsers.length]);
+
 
 
   const applyHierarchy = (eqs, hData) => {
@@ -1881,16 +1884,16 @@ function App() {
                     </div>
                   </div>
 
-                  {/* ===== DAFTAR USER (Admin Only) ===== */}
+                    {/* ===== DAFTAR USER (Admin Only) ===== */}
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/40">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-[#064e3b]/10 flex items-center justify-center">
                           <User size={18} className="text-[#064e3b]" />
                         </div>
                         <div>
                           <h3 className="text-sm font-bold text-slate-800">Daftar User Terdaftar</h3>
-                          <p className="text-[11px] text-slate-400">Total: {allUsers.length} akun aktif</p>
+                          <p className="text-[11px] text-slate-400">Total: {allUsers.length} akun aktif di database</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1901,52 +1904,80 @@ function App() {
                               setUserForm({ nik: '', name: '', password: '123', role: 'USER', plant: '', jabatan: '', unit_name: '' });
                               setIsUserModalOpen(true);
                             }}
-                            className="flex items-center gap-2 text-[11px] font-bold text-white bg-[#064e3b] hover:bg-[#047857] px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+                            className="flex items-center gap-2 text-[11px] font-bold text-white bg-[#064e3b] hover:bg-[#047857] px-3.5 py-1.5 rounded-lg transition-colors shadow-sm"
                           >
                             <Plus size={12} />
                             Tambah User
                           </button>
                         )}
                         <button
-                        onClick={async () => {
-                          setLoadingUsers(true);
-                          const { data } = await fetchAllUsers();
-                          if (data) setAllUsers(data);
-                          setLoadingUsers(false);
-                        }}
-                        className="flex items-center gap-2 text-[11px] font-bold text-[#064e3b] bg-[#064e3b]/10 hover:bg-[#064e3b]/20 px-3 py-1.5 rounded-lg transition-colors"
-                      >
-                        {loadingUsers ? (
-                          <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                        ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
-                        )}
-                        Muat Daftar
-                      </button>
-                    </div>
+                          onClick={async () => {
+                            setLoadingUsers(true);
+                            const { data } = await fetchAllUsers();
+                            if (data) setAllUsers(data);
+                            setLoadingUsers(false);
+                          }}
+                          className="flex items-center gap-2 text-[11px] font-bold text-[#064e3b] bg-[#064e3b]/10 hover:bg-[#064e3b]/20 px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          {loadingUsers ? (
+                            <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+                          )}
+                          Muat Ulang
+                        </button>
+                      </div>
                     </div>
 
-                    {allUsers.length === 0 ? (
+                    {/* Filter & Search Bar */}
+                    <div className="p-4 border-b border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                      <div className="flex gap-2 items-center w-full sm:w-auto">
+                        <div className="relative flex-1 sm:w-72">
+                          <Search className="absolute left-3 top-2.5 text-slate-400" size={14} />
+                          <input 
+                            type="text" 
+                            placeholder="Cari user (nama, NIK, plant, jabatan)..." 
+                            value={userSearchQuery} 
+                            onChange={e => setUserSearchQuery(e.target.value)}
+                            className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white"
+                          />
+                        </div>
+                        {userSearchQuery && (
+                          <button onClick={() => setUserSearchQuery('')} className="text-slate-400 hover:text-slate-600 text-xs font-semibold px-2 py-1">
+                            Reset
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex gap-1.5 flex-wrap">
+                        {['ALL', 'DEV', 'ADMIN', 'USER'].map(r => (
+                          <button
+                            key={r}
+                            onClick={() => setUserRoleFilter(r)}
+                            className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                              userRoleFilter === r
+                                ? 'bg-[#064e3b] text-white shadow-sm'
+                                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                            }`}
+                          >
+                            {r === 'ALL' ? `Semua (${allUsers.length})` : `${r} (${allUsers.filter(u => u.role === r).length})`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {loadingUsers ? (
+                      <div className="py-12 text-center text-slate-500 text-sm space-y-2">
+                        <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto"></div>
+                        <p className="font-semibold text-xs text-slate-600">Memuat daftar user dari database...</p>
+                      </div>
+                    ) : allUsers.length === 0 ? (
                       <div className="py-10 text-center text-slate-400 text-sm">
                         <User size={36} className="mx-auto mb-2 opacity-30" />
-                        <p>Klik <strong>"Muat Daftar"</strong> untuk menampilkan user</p>
+                        <p>Klik <strong>"Muat Ulang"</strong> untuk memuat daftar user</p>
                       </div>
                     ) : (
                       <div className="overflow-x-auto">
-                        <div className="flex gap-3 px-6 pt-4 pb-2 flex-wrap">
-                          <span className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 text-emerald-700 text-[11px] font-bold px-3 py-1 rounded-full">
-                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-                            DEV: {allUsers.filter(u => u.role === 'DEV').length} user
-                          </span>
-                          <span className="inline-flex items-center gap-1.5 bg-purple-50 border border-purple-100 text-purple-700 text-[11px] font-bold px-3 py-1 rounded-full">
-                            <span className="w-1.5 h-1.5 bg-purple-500 rounded-full"></span>
-                            ADMIN: {allUsers.filter(u => u.role === 'ADMIN').length} user
-                          </span>
-                          <span className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-100 text-blue-700 text-[11px] font-bold px-3 py-1 rounded-full">
-                            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                            USER: {allUsers.filter(u => u.role === 'USER').length} user
-                          </span>
-                        </div>
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="bg-slate-50 border-b border-slate-100">
@@ -1961,7 +1992,20 @@ function App() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-50">
-                            {allUsers.map((u, idx) => (
+                            {allUsers
+                              .filter(u => {
+                                if (userRoleFilter !== 'ALL' && u.role !== userRoleFilter) return false;
+                                if (!userSearchQuery.trim()) return true;
+                                const q = userSearchQuery.toLowerCase();
+                                return (
+                                  (u.name || '').toLowerCase().includes(q) ||
+                                  (u.nik || '').toLowerCase().includes(q) ||
+                                  (u.plant || '').toLowerCase().includes(q) ||
+                                  (u.jabatan || '').toLowerCase().includes(q) ||
+                                  (u.unit_name || '').toLowerCase().includes(q)
+                                );
+                              })
+                              .map((u, idx) => (
                               <tr key={u.nik} className="hover:bg-slate-50/70 transition-colors">
                                 <td className="px-6 py-3 text-slate-400 text-[11px]">{idx + 1}</td>
                                 <td className="px-6 py-3">
@@ -1978,6 +2022,7 @@ function App() {
                                 <td className="px-6 py-3 text-xs text-slate-500 font-medium">
                                   {u.plant ? `${u.plant} - ${getUnitName(u.plant, u.unit_name)}` : '-'}
                                 </td>
+
                                 <td className="px-6 py-3">
                                   <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full ${
                                     u.role === 'DEV' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
