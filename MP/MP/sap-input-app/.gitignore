@@ -10,7 +10,6 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
-*.local
 
 # Editor directories and files
 .vscode/*
@@ -32,8 +31,7 @@ dist-prod/
 # Debug / scratch scripts (mengandung credentials)
 scratch/
 
-# Scripts dengan credentials — jangan commit
-deploy_*.mjs
+# Scripts dengan credentials
 sync_users_from_excel.mjs
 import_users_additive_only.mjs
 sync_vehicle_prod_to_dev.mjs
@@ -50,11 +48,10 @@ seed_users.js
 seed_users2.js
 setup-db.js
 
-# Env files (sudah ada *.local tapi tambahkan eksplisit)
-.env.dev
-.env.production
+# Env files (Vercel credentials tetap di-ignore)
 .env.vercel
 .env.vercel.prod
 
 # Design critique files (lokal saja)
 .impeccable/
+
