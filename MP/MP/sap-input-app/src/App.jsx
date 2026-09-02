@@ -1290,21 +1290,23 @@ function App() {
               </span>
             </button>
 
-            <button 
-              onClick={() => {
-                setActiveTab('knowledge-base');
-                window.history.pushState({}, '', '?tab=knowledge-base');
-                setIsMobileMenuOpen(false);
-              }} 
-              className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'knowledge-base' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
-              title="Knowledge Base & CMMS Docs"
-            >
-              <BookOpen size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4 text-amber-400" : "mx-auto text-amber-400 group-hover:mr-4 group-hover:mx-0"} />
-              <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
-                Knowledge Base
-              </span>
-              {activeTab === 'knowledge-base' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-[#10b981] rounded-r-full" />}
-            </button>
+            {currentUser?.role?.toUpperCase() === 'DEV' && (
+              <button 
+                onClick={() => {
+                  setActiveTab('knowledge-base');
+                  window.history.pushState({}, '', '?tab=knowledge-base');
+                  setIsMobileMenuOpen(false);
+                }} 
+                className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'knowledge-base' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
+                title="Knowledge Base & CMMS Docs"
+              >
+                <BookOpen size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4 text-amber-400" : "mx-auto text-amber-400 group-hover:mr-4 group-hover:mx-0"} />
+                <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
+                  Knowledge Base
+                </span>
+                {activeTab === 'knowledge-base' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-[#10b981] rounded-r-full" />}
+              </button>
+            )}
 
             <a 
               href="https://cmms.ptpn4.co.id/"
@@ -1440,18 +1442,20 @@ function App() {
                         <span>Settings</span>
                       </button>
 
-                      <button 
-                        onClick={() => {
-                          setActiveTab('knowledge-base');
-                          window.history.pushState({}, '', '?tab=knowledge-base');
-                          setIsProfileDropdownOpen(false);
-                          setIsMobileMenuOpen(false);
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-amber-300 hover:text-amber-200 hover:bg-neutral-800 rounded-xl transition-colors text-left cursor-pointer bg-neutral-900/40"
-                      >
-                        <BookOpen size={14} className="text-amber-400" />
-                        <span>Dictionary / Knowledge Base</span>
-                      </button>
+                      {currentUser?.role?.toUpperCase() === 'DEV' && (
+                        <button 
+                          onClick={() => {
+                            setActiveTab('knowledge-base');
+                            window.history.pushState({}, '', '?tab=knowledge-base');
+                            setIsProfileDropdownOpen(false);
+                            setIsMobileMenuOpen(false);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-amber-300 hover:text-amber-200 hover:bg-neutral-800 rounded-xl transition-colors text-left cursor-pointer bg-neutral-900/40"
+                        >
+                          <BookOpen size={14} className="text-amber-400" />
+                          <span>Dictionary / Knowledge Base</span>
+                        </button>
+                      )}
 
                       {isAdmin && (
                         <button 
