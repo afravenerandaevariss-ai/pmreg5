@@ -296,12 +296,16 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
   }, [currentUser?.plant, isAdmin]);
 
-  // Strictly lock activeTab to 'unit-checklist' for non-admins
+  // Lock activeTab to allowed tabs based on role
+  // USER: can see unit-checklist, summary-regional, log-raw (filtered by their plant)
+  // ADMIN/DEV: can see all tabs
   useEffect(() => {
-    if (!isAdmin && activeTab !== 'unit-checklist') {
+    const allowedUserTabs = ['unit-checklist', 'summary-regional', 'log-raw'];
+    if (!isAdmin && !allowedUserTabs.includes(activeTab)) {
       setActiveTab('unit-checklist');
     }
   }, [isAdmin, activeTab]);
+
 
   // ── Excel Upload ─────────────────────────────────────────────────────────────
   const handleFileUpload = (e) => {
@@ -1682,9 +1686,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           <div className="flex gap-1 bg-slate-200/60 p-1.5 rounded-xl w-fit flex-wrap">
             {[
               { key: 'unit-checklist',    label: '📋 Checklist Kebun (Unit)', icon: Calendar,        show: true },
-              { key: 'summary-regional',  label: '🏢 Rekap Regional 5',      icon: BarChart2,       show: isAdmin },
+              { key: 'summary-regional',  label: '🏢 Rekap Regional 5',      icon: BarChart2,       show: true },
               { key: 'detail-veh',        label: '🚚 Daftar Kendaraan',      icon: Truck,           show: isAdmin },
-              { key: 'log-raw',           label: '📄 Log Transaksi Asli',    icon: FileSpreadsheet, show: isAdmin },
+              { key: 'log-raw',           label: '📄 Log Transaksi Asli',    icon: FileSpreadsheet, show: true },
               { key: 'zco-reconciliation',label: '💰 Verifikasi Biaya (ZCO)', icon: Coins,          show: isAdmin },
             ].filter(t => t.show).map(({ key, label, icon: Icon }) => (
               <button key={key} onClick={() => { setActiveTab(key); setError(null); }}
