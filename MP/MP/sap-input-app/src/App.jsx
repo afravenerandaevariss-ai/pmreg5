@@ -830,6 +830,19 @@ function App() {
     return () => clearTimeout(timer);
   }, [docDetails]);
 
+  // Auto-load user list when master tab is active (DEV/ADMIN only)
+  useEffect(() => {
+    const role = currentUser?.role?.toUpperCase();
+    if (activeTab === 'master' && (role === 'DEV' || role === 'ADMIN') && allUsers.length === 0) {
+      setLoadingUsers(true);
+      fetchAllUsers().then(({ data }) => {
+        if (data) setAllUsers(data);
+        setLoadingUsers(false);
+      });
+    }
+  }, [activeTab, currentUser]);
+
+
   const applyHierarchy = (eqs, hData) => {
     if (!hData || !hData.mapping) return eqs;
     const subKeywords = [
