@@ -297,10 +297,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   }, [currentUser?.plant, isAdmin]);
 
   // Lock activeTab to allowed tabs based on role
-  // USER: can see unit-checklist, summary-regional, log-raw (filtered by their plant)
+  // USER: can see unit-checklist, summary-regional, log-raw, zco-reconciliation (filtered by their plant)
   // ADMIN/DEV: can see all tabs
   useEffect(() => {
-    const allowedUserTabs = ['unit-checklist', 'summary-regional', 'log-raw'];
+    const allowedUserTabs = ['unit-checklist', 'summary-regional', 'log-raw', 'zco-reconciliation'];
     if (!isAdmin && !allowedUserTabs.includes(activeTab)) {
       setActiveTab('unit-checklist');
     }
@@ -1689,7 +1689,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               { key: 'summary-regional',  label: '🏢 Rekap Regional 5',      icon: BarChart2,       show: true },
               { key: 'detail-veh',        label: '🚚 Daftar Kendaraan',      icon: Truck,           show: isAdmin },
               { key: 'log-raw',           label: '📄 Log Transaksi Asli',    icon: FileSpreadsheet, show: true },
-              { key: 'zco-reconciliation',label: '💰 Verifikasi Biaya (ZCO)', icon: Coins,          show: isAdmin },
+              { key: 'zco-reconciliation',label: '💰 Verifikasi Biaya (ZCO)', icon: Coins,          show: true },
             ].filter(t => t.show).map(({ key, label, icon: Icon }) => (
               <button key={key} onClick={() => { setActiveTab(key); setError(null); }}
                 className={`flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold transition-colors duration-300 ${activeTab === key ? 'bg-gradient-to-tr from-[#064e3b] to-[#2dd4bf] text-white shadow-md shadow-emerald-900/20' : 'text-slate-500 hover:text-[#064e3b] hover:bg-emerald-50'}`}>
@@ -2082,9 +2082,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         )}
 
         {/* ─────────────────────────────────────────────────────────── */}
-        {/* TAB 2: Summary Regional (Semua Kebun) — ADMIN & DEV only  */}
+        {/* TAB 2: Summary Regional (Semua Kebun)                      */}
         {/* ─────────────────────────────────────────────────────────── */}
-        {activeTab === 'summary-regional' && isAdmin && (
+        {activeTab === 'summary-regional' && (
           <div className="space-y-4">
 
 
@@ -2406,9 +2406,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         )}
 
         {/* ─────────────────────────────────────────────────────────── */}
-        {/* TAB 4: Log Transaksi Asli — ADMIN & DEV only               */}
+        {/* TAB 4: Log Transaksi Asli                                 */}
         {/* ─────────────────────────────────────────────────────────── */}
-        {activeTab === 'log-raw' && isAdmin && (
+        {activeTab === 'log-raw' && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 flex-wrap bg-slate-50/50">
               <div className="flex gap-2 flex-wrap items-center">
@@ -2533,7 +2533,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       </div>
     )}
 
-    {activeTab === 'zco-reconciliation' && isAdmin && (
+    {activeTab === 'zco-reconciliation' && (
       <div className="bg-white rounded-2xl border border-slate-300 shadow-sm overflow-hidden max-w-[1150px] mx-auto w-full font-sans">
         <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 flex-wrap bg-slate-50/50 no-print">
           <div className="flex gap-2 flex-wrap items-center">
