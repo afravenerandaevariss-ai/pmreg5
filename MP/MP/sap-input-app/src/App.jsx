@@ -639,6 +639,20 @@ function App() {
     currentUser.role?.toUpperCase() === 'REGIONAL' ||
     currentUser.role?.toUpperCase() === 'DEV'
   );
+
+  const isDev = currentUser && currentUser.role?.toUpperCase() === 'DEV';
+
+  // Guard: Automatically redirect non-DEV users away from DEV-only tabs
+  useEffect(() => {
+    if (!currentUser) return;
+    const userIsDev = currentUser.role?.toUpperCase() === 'DEV';
+    const devOnlyTabs = ['verifikasi', 'table', 'monitoring', 'inbox', 'knowledge-base'];
+    if (!userIsDev && devOnlyTabs.includes(activeTab)) {
+      setActiveTab('dashboard');
+      window.history.pushState({}, '', window.location.pathname);
+    }
+  }, [activeTab, currentUser]);
+
   
   
   const [docDetails, setDocDetails] = useState({
@@ -1207,35 +1221,39 @@ function App() {
             <p className={`text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-2 ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
               Sinkronisasi & Laporan
             </p>
-            <button 
-              onClick={() => {
-                setActiveTab('verifikasi');
-                window.history.pushState({}, '', '?tab=verifikasi');
-                setIsMobileMenuOpen(false);
-              }} 
-              className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'verifikasi' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
-              title="Verifikasi Sinkronisasi SAP"
-            >
-              <CheckCircle size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4" : "mx-auto group-hover:mr-4 group-hover:mx-0"} />
-              <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
-                Verifikasi SAP
-              </span>
-            </button>
+            {isDev && (
+              <button 
+                onClick={() => {
+                  setActiveTab('verifikasi');
+                  window.history.pushState({}, '', '?tab=verifikasi');
+                  setIsMobileMenuOpen(false);
+                }} 
+                className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'verifikasi' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
+                title="Verifikasi Sinkronisasi SAP"
+              >
+                <CheckCircle size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4" : "mx-auto group-hover:mr-4 group-hover:mx-0"} />
+                <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
+                  Verifikasi SAP
+                </span>
+              </button>
+            )}
 
-            <button 
-              onClick={() => {
-                setActiveTab('table');
-                window.history.pushState({}, '', window.location.pathname);
-                setIsMobileMenuOpen(false);
-              }} 
-              className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'table' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
-              title="Tabel & Ekspor SAP"
-            >
-              <ClipboardList size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4" : "mx-auto group-hover:mr-4 group-hover:mx-0"} />
-              <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
-                Tabel & Ekspor SAP
-              </span>
-            </button>
+            {isDev && (
+              <button 
+                onClick={() => {
+                  setActiveTab('table');
+                  window.history.pushState({}, '', window.location.pathname);
+                  setIsMobileMenuOpen(false);
+                }} 
+                className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'table' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
+                title="Tabel & Ekspor SAP"
+              >
+                <ClipboardList size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4" : "mx-auto group-hover:mr-4 group-hover:mx-0"} />
+                <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
+                  Tabel & Ekspor SAP
+                </span>
+              </button>
+            )}
 
             <button 
               onClick={() => {
@@ -1252,20 +1270,22 @@ function App() {
               </span>
             </button>
 
-            <button 
-              onClick={() => {
-                setActiveTab('monitoring');
-                window.history.pushState({}, '', window.location.pathname);
-                setIsMobileMenuOpen(false);
-              }} 
-              className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'monitoring' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
-              title="Monitoring & Kepatuhan Bulanan"
-            >
-              <Activity size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4" : "mx-auto group-hover:mr-4 group-hover:mx-0"} />
-              <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
-                Monitoring Bulanan
-              </span>
-            </button>
+            {isDev && (
+              <button 
+                onClick={() => {
+                  setActiveTab('monitoring');
+                  window.history.pushState({}, '', window.location.pathname);
+                  setIsMobileMenuOpen(false);
+                }} 
+                className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'monitoring' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
+                title="Monitoring & Kepatuhan Bulanan"
+              >
+                <Activity size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4" : "mx-auto group-hover:mr-4 group-hover:mx-0"} />
+                <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
+                  Monitoring Bulanan
+                </span>
+              </button>
+            )}
             
             <button 
               onClick={() => {
@@ -1303,7 +1323,7 @@ function App() {
               </span>
             </button>
 
-            {currentUser?.role?.toUpperCase() === 'DEV' && (
+            {isDev && (
               <button 
                 onClick={() => {
                   setActiveTab('knowledge-base');
@@ -1366,8 +1386,8 @@ function App() {
               </button>
             )}
 
-            {/* Inbox Tab - visible for all logged-in users */}
-            {currentUser && (
+            {/* Inbox Tab - visible only for DEV */}
+            {isDev && (
               <button
                 onClick={() => { setActiveTab('inbox'); setIsMobileMenuOpen(false); }}
                 className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'inbox' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
@@ -1455,7 +1475,7 @@ function App() {
                         <span>Settings</span>
                       </button>
 
-                      {currentUser?.role?.toUpperCase() === 'DEV' && (
+                      {isDev && (
                         <button 
                           onClick={() => {
                             setActiveTab('knowledge-base');
@@ -1470,7 +1490,7 @@ function App() {
                         </button>
                       )}
 
-                      {isAdmin && (
+                      {isDev && (
                         <button 
                           onClick={() => {
                             setActiveTab('monitoring');
