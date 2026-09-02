@@ -589,24 +589,65 @@ export async function getGSheetHistory() {
 // VEHICLES (ZESTHLP16PA)
 // ============================================================
 
+// ── Vehicle Master (dedicated table) ─────────────────────────────────────────
+
 export async function fetchVehicleMaster(forceRefresh = false) {
-  const { data, error } = await getSystemConfig('vehicle_master', forceRefresh);
-  if (error || !Array.isArray(data)) { const errorMsg = error ? error.message : `Not array: type=${typeof data}, isNull=${data === null}, preview=${typeof data === "string" ? data.substring(0, 30) : JSON.stringify(data).substring(0, 30)}`; return { data: [], error: errorMsg }; }
-  return { data, error: null };
+  if (!supabase) return { data: [], error: 'Supabase not configured' };
+  const { data, error } = await supabase
+    .from('vehicle_master')
+    .select('*')
+    .order('plant')
+    .order('vehicle_code');
+  if (error) return { data: [], error: error.message };
+  return { data: data || [], error: null };
 }
+
+// ── Vehicle Logs (dedicated table) ───────────────────────────────────────────
 
 export async function fetchVehicleLogs(forceRefresh = false) {
-  const { data, error } = await getSystemConfig('vehicle_logs', forceRefresh);
-  if (error || !Array.isArray(data)) { const errorMsg = error ? error.message : `Not array: type=${typeof data}, isNull=${data === null}, preview=${typeof data === "string" ? data.substring(0, 30) : JSON.stringify(data).substring(0, 30)}`; return { data: [], error: errorMsg }; }
-  return { data, error: null };
+  if (!supabase) return { data: [], error: 'Supabase not configured' };
+  const { data, error } = await supabase
+    .from('vehicle_logs')
+    .select('*')
+    .order('date', { ascending: false })
+    .order('vehicle_code');
+  if (error) return { data: [], error: error.message };
+  return { data: data || [], error: null };
 }
 
+// ── Save Vehicle Data (upsert to dedicated tables) ───────────────────────────
+
 export async function saveVehicleData(vehicles, logs) {
-  const vErr = await saveSystemConfig('vehicle_master', vehicles);
-  if (vErr.error) return { error: vErr.error };
-  const lErr = await saveSystemConfig('vehicle_logs', logs);
-  return { error: lErr.error || null };
+  if (!supabase) return { error: 'Supabase not configured' };
+
+  // Handle clear (empty arrays) — truncate both tables
+  if (vehicles.length === 0 && logs.length === 0) {
+    const { error: e1 } = await supabase.from('vehicle_master').delete().neq('vehicle_code', '___NEVER___');
+    const { error: e2 } = await supabase.from('vehicle_logs').delete().neq('activity_number', '___NEVER___');
+    return { error: e1 || e2 || null };
+  }
+
+  // Upsert vehicle_master
+  if (vehicles.length > 0) {
+    const { error: vErr } = await supabase
+      .from('vehicle_master')
+      .upsert(vehicles, { onConflict: 'vehicle_code' });
+    if (vErr) return { error: vErr.message || vErr };
+  }
+
+  // Upsert vehicle_logs in chunks of 500 to avoid payload limits
+  const CHUNK_SIZE = 500;
+  for (let i = 0; i < logs.length; i += CHUNK_SIZE) {
+    const chunk = logs.slice(i, i + CHUNK_SIZE);
+    const { error: lErr } = await supabase
+      .from('vehicle_logs')
+      .upsert(chunk, { onConflict: 'activity_number' });
+    if (lErr) return { error: lErr.message || lErr };
+  }
+
+  return { error: null };
 }
+
 
 export async function fetchZCOData(forceRefresh = false) {
   const { data, error } = await getSystemConfig('zco_data', forceRefresh);
