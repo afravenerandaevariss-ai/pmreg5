@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Upload, FileSpreadsheet, Download, ChevronDown, ChevronUp, ChevronRight, CheckCircle, AlertCircle, Trash2, Calendar, Clock, User, FileText, Search, Filter, LogOut, Menu, Bell, MessageSquare, Database, ClipboardList, Settings, ChevronsLeft, ChevronsRight, LayoutDashboard, Plus, Minus, Activity, Share2, Copy, ClipboardCheck, Truck, Leaf, Flame, Zap, Cog, Wind, Hammer, Wrench, BookOpen, Eye, EyeOff, RefreshCw, ExternalLink, Lock, X } from 'lucide-react';
+import { Upload, FileSpreadsheet, Download, ChevronDown, ChevronUp, ChevronRight, CheckCircle, AlertCircle, Trash2, Calendar, Clock, User, FileText, Search, Filter, LogOut, Menu, Bell, MessageSquare, Database, ClipboardList, Settings, ChevronsLeft, ChevronsRight, LayoutDashboard, Plus, Minus, Activity, Share2, Copy, ClipboardCheck, Truck, Leaf, Flame, Zap, Cog, Wind, Hammer, Wrench, BookOpen, Eye, EyeOff, RefreshCw, ExternalLink, Lock, X, Edit3, Key, Check, ArrowRight } from 'lucide-react';
 import { parseMasterEQ, parseRegionalMP, exportToSAP, parseHierarchyReference } from './utils/excel';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -1652,64 +1652,131 @@ function App() {
 
           {/* TAB: SETTINGS & PROFILE */}
           {activeTab === 'settings' && (
-            <div className="space-y-6 max-w-6xl mx-auto">
+            <div className="space-y-8 max-w-6xl mx-auto pb-12">
               
-              {/* Profile Header (SSO Style - Light Mode) */}
-              <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 relative">
-                {/* Decorative background grid/dots */}
-                <div className="absolute inset-0 opacity-[0.02]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, #0f172a 1px, transparent 0)', backgroundSize: '24px 24px' }}></div>
-                
-                <div className="p-8 flex flex-col md:flex-row gap-8 items-start md:items-center relative z-10">
-                  <div className="w-28 h-28 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0 border-4 border-white shadow-md">
-                    <span className="text-3xl font-light text-emerald-600">
-                      {getInitials(currentUser.name)}
-                    </span>
+              {/* Page Title & Breadcrumb */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-[#064e3b]/10 border border-[#064e3b]/20 flex items-center justify-center text-[#064e3b] shadow-inner">
+                    <Settings size={24} />
                   </div>
-                  <div className="flex-1 space-y-2">
-                    <h2 className="text-3xl font-bold text-slate-800 uppercase tracking-tight">{currentUser.name || 'User'}</h2>
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
-                      <span className="font-mono text-slate-500">NIK SAP {currentUser.nik}</span>
-                    </div>
-                    <div className="flex items-center gap-3 pt-1">
-                      <span className="text-emerald-600 font-semibold text-sm flex items-center gap-1.5">
-                        <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                        {currentUser.plant || '-'} {getUnitName(currentUser.plant, currentUser.unit_name)} I {isAdmin ? 'ADMIN' : 'USER'}
-                      </span>
-                    </div>
+                  <div>
+                    <h2 className="text-xl font-black text-slate-800 tracking-tight">Pengaturan & Profil Pengguna</h2>
+                    <p className="text-xs text-slate-500 mt-0.5">Kelola informasi akun, kredensial sandi, dan manajemen konfigurasi sistem PM Regional 5.</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Database Cloud Aktif
+                  </span>
+                </div>
+              </div>
+
+              {/* Profile Card (Executive ID Style) */}
+              <div className="bg-white rounded-3xl overflow-hidden shadow-md border border-slate-200 relative">
+                {/* Subtle emerald mesh header glow */}
+                <div className="h-32 bg-gradient-to-r from-[#064e3b] via-[#0f766e] to-[#064e3b] relative overflow-hidden">
+                  <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '20px 20px' }}></div>
+                  <div className="absolute right-6 top-6 flex items-center gap-2">
+                    <span className={`text-[10px] font-black tracking-widest px-3 py-1 rounded-full uppercase shadow-sm border ${
+                      currentUser?.role?.toUpperCase() === 'DEV' ? 'bg-emerald-400 text-emerald-950 border-emerald-300' :
+                      currentUser?.role?.toUpperCase() === 'ADMIN' ? 'bg-purple-400 text-purple-950 border-purple-300' :
+                      'bg-blue-400 text-blue-950 border-blue-300'
+                    }`}>
+                      ROLE {currentUser?.role || 'USER'}
+                    </span>
                   </div>
                 </div>
                 
-                <div className="px-8 pb-8 relative z-10">
-                  <div className="bg-emerald-50/50 rounded-xl p-4 flex gap-3 border border-emerald-100">
-                    <svg aria-hidden="true" className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <div>
-                      <h4 className="text-sm font-bold text-emerald-900">Profile Sync Active</h4>
-                      <p className="text-xs text-emerald-700/80 mt-1 leading-relaxed">Your profile is managed by your organization's Key User. Any profile changes must be requested through your system administrator.</p>
+                <div className="px-8 pb-8 pt-0 relative">
+                  {/* Avatar & Header Info */}
+                  <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-end -mt-16 mb-6">
+                    <div className="w-28 h-28 rounded-3xl bg-white p-1.5 shadow-xl border-2 border-slate-100 flex-shrink-0">
+                      <div className="w-full h-full rounded-2xl bg-gradient-to-tr from-[#064e3b] to-[#2dd4bf] flex items-center justify-center text-white font-extrabold text-3xl shadow-inner">
+                        {getInitials(currentUser.name)}
+                      </div>
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h2 className="text-2xl font-black text-slate-900 tracking-tight">{currentUser.name || 'Pengguna'}</h2>
+                        <span className="font-mono text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-md border border-slate-200">
+                          NIK: {currentUser.nik}
+                        </span>
+                      </div>
+                      <p className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        {currentUser.jabatan || 'Personil PM Regional 5'} • {currentUser.plant ? `${currentUser.plant} - ${getUnitName(currentUser.plant, currentUser.unit_name)}` : 'Regional Office'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Profile Meta Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-100/80 text-[#064e3b] flex items-center justify-center shrink-0">
+                        <User size={18} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Hak Akses Sistem</p>
+                        <p className="text-xs font-black text-slate-800">{currentUser?.role?.toUpperCase() || 'USER'} Level</p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-teal-100/80 text-teal-800 flex items-center justify-center shrink-0">
+                        <FileSpreadsheet size={18} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Unit / Kebun Induk</p>
+                        <p className="text-xs font-black text-slate-800">{currentUser.plant || 'ALL'} ({getUnitName(currentUser.plant, currentUser.unit_name)})</p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-blue-100/80 text-blue-800 flex items-center justify-center shrink-0">
+                        <CheckCircle size={18} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Status Akun</p>
+                        <p className="text-xs font-black text-emerald-600 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span> Terverifikasi Aktif
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* PASSWORD CHANGE SECTION */}
-                <div className="px-8 pb-8 relative z-10">
-                  <div className="flex flex-col lg:flex-row gap-8 pt-8 border-t border-slate-100">
-                    <div className="lg:w-1/3">
-                      <h3 className="text-lg font-bold text-slate-800 mb-2">Password</h3>
-                      <p className="text-sm text-slate-500">Must be at least 8 characters long.</p>
+                <div className="px-8 pb-8 pt-4 bg-slate-50/50 border-t border-slate-100">
+                  <div className="flex flex-col lg:flex-row gap-8 items-start">
+                    <div className="lg:w-1/3 space-y-2">
+                      <div className="inline-flex p-2 rounded-xl bg-emerald-100/60 text-[#064e3b]">
+                        <Key size={20} />
+                      </div>
+                      <h3 className="text-base font-black text-slate-800">Ubah Kata Sandi</h3>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        Pastikan menggunakan kombinasi sandi yang aman. Minimal panjang 8 karakter untuk menjaga keamanan akun Anda.
+                      </p>
                     </div>
-                    <div className="lg:w-2/3">
-                      <form onSubmit={handleUpdatePassword} className="bg-slate-50 rounded-xl border border-slate-200 p-6 space-y-5">
+
+                    <div className="lg:w-2/3 w-full">
+                      <form onSubmit={handleUpdatePassword} className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-sm space-y-4">
                         {passwordError && (
-                          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
-                            {passwordError}
+                          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-xs flex items-center gap-2 font-medium">
+                            <AlertCircle size={16} className="shrink-0 text-red-500" />
+                            <span>{passwordError}</span>
                           </div>
                         )}
                         {passwordSuccess && (
-                          <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg text-sm">
-                            {passwordSuccess}
+                          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-xs flex items-center gap-2 font-medium">
+                            <CheckCircle size={16} className="shrink-0 text-emerald-600" />
+                            <span>{passwordSuccess}</span>
                           </div>
                         )}
+
                         <div>
-                          <label htmlFor="currentPassword" className="block text-sm font-semibold text-slate-700 mb-2">Current password</label>
+                          <label htmlFor="currentPassword" className="block text-xs font-bold text-slate-700 mb-1.5">Kata Sandi Saat Ini *</label>
                           <div className="relative">
                             <input 
                               id="currentPassword"
@@ -1717,69 +1784,84 @@ function App() {
                               required
                               value={passwordForm.current}
                               onChange={e => setPasswordForm({...passwordForm, current: e.target.value})}
-                              className="w-full bg-white border border-slate-300 rounded-lg pl-4 pr-10 py-2.5 text-slate-800 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all outline-none"
-                              placeholder="Current password"
+                              className="w-full bg-slate-50/50 border border-slate-300 rounded-xl pl-4 pr-10 py-2.5 text-slate-800 text-xs focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-medium"
+                              placeholder="Masukkan kata sandi saat ini"
                             />
                             <button
                               type="button"
                               onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1 cursor-pointer"
                             >
-                              {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                              {showCurrentPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                             </button>
                           </div>
                         </div>
-                        <div>
-                          <label htmlFor="newPassword" className="block text-sm font-semibold text-slate-700 mb-2">New password</label>
-                          <div className="relative">
-                            <input 
-                              id="newPassword"
-                              type={showNewPassword ? 'text' : 'password'} 
-                              required
-                              minLength={8}
-                              value={passwordForm.new}
-                              onChange={e => setPasswordForm({...passwordForm, new: e.target.value})}
-                              className="w-full bg-white border border-slate-300 rounded-lg pl-4 pr-10 py-2.5 text-slate-800 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all outline-none"
-                              placeholder="New password"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowNewPassword(!showNewPassword)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
-                            >
-                              {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                            </button>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label htmlFor="newPassword" className="block text-xs font-bold text-slate-700 mb-1.5">Kata Sandi Baru *</label>
+                            <div className="relative">
+                              <input 
+                                id="newPassword"
+                                type={showNewPassword ? 'text' : 'password'} 
+                                required
+                                minLength={8}
+                                value={passwordForm.new}
+                                onChange={e => setPasswordForm({...passwordForm, new: e.target.value})}
+                                className="w-full bg-slate-50/50 border border-slate-300 rounded-xl pl-4 pr-10 py-2.5 text-slate-800 text-xs focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-medium"
+                                placeholder="Minimal 8 karakter"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowNewPassword(!showNewPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1 cursor-pointer"
+                              >
+                                {showNewPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label htmlFor="confirmPassword" className="block text-xs font-bold text-slate-700 mb-1.5">Konfirmasi Kata Sandi Baru *</label>
+                            <div className="relative">
+                              <input 
+                                id="confirmPassword"
+                                type={showConfirmPassword ? 'text' : 'password'} 
+                                required
+                                minLength={8}
+                                value={passwordForm.confirm}
+                                onChange={e => setPasswordForm({...passwordForm, confirm: e.target.value})}
+                                className="w-full bg-slate-50/50 border border-slate-300 rounded-xl pl-4 pr-10 py-2.5 text-slate-800 text-xs focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-medium"
+                                placeholder="Ketik ulang sandi baru"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1 cursor-pointer"
+                              >
+                                {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                              </button>
+                            </div>
                           </div>
                         </div>
-                        <div>
-                          <label htmlFor="confirmPassword" className="block text-sm font-semibold text-slate-700 mb-2">Confirm password</label>
-                          <div className="relative">
-                            <input 
-                              id="confirmPassword"
-                              type={showConfirmPassword ? 'text' : 'password'} 
-                              required
-                              minLength={8}
-                              value={passwordForm.confirm}
-                              onChange={e => setPasswordForm({...passwordForm, confirm: e.target.value})}
-                              className="w-full bg-white border border-slate-300 rounded-lg pl-4 pr-10 py-2.5 text-slate-800 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all outline-none"
-                              placeholder="Confirm password"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
-                            >
-                              {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                            </button>
-                          </div>
-                        </div>
+
                         <div className="flex justify-end pt-2">
                           <button 
                             type="submit" 
                             disabled={isUpdatingPassword}
-                            className="bg-[#10b981] hover:bg-[#059669] text-white font-semibold text-sm px-6 py-3 rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+                            className="bg-[#064e3b] hover:bg-[#047857] text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                           >
-                            {isUpdatingPassword ? 'Updating...' : 'Update'}
+                            {isUpdatingPassword ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                <span>Menyimpan Sandi...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Check size={15} />
+                                <span>Perbarui Kata Sandi</span>
+                              </>
+                            )}
                           </button>
                         </div>
                       </form>
@@ -1790,19 +1872,20 @@ function App() {
 
               {/* Only show Manajemen File Dasar to DEV */}
               {currentUser?.role?.toUpperCase() === 'DEV' && (
-                <div className="space-y-6 pt-4 border-t border-slate-200">
-                  {/* Knowledge Base Quick Banner (DEV ONLY) */}
-                  <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 rounded-2xl p-6 border border-emerald-500/30 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-md">
+                <div className="space-y-8 pt-2">
+                  
+                  {/* Knowledge Base Quick Banner (DEV ONLY - Modern Light Card) */}
+                  <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100/70 rounded-3xl p-6 border border-emerald-200/90 text-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 shadow-inner shrink-0">
-                        <BookOpen size={24} />
+                      <div className="w-14 h-14 rounded-2xl bg-[#064e3b] text-white flex items-center justify-center shadow-lg shadow-emerald-950/20 shrink-0">
+                        <BookOpen size={26} />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="text-base font-extrabold text-white">CMMS Documentation & Knowledge Base</h3>
-                          <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">DEV ONLY</span>
+                          <h3 className="text-base font-black text-slate-900">CMMS Documentation & Knowledge Base</h3>
+                          <span className="bg-emerald-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">DEV ONLY</span>
                         </div>
-                        <p className="text-xs text-neutral-300 mt-0.5">Pusat dokumentasi standar CMMS PTPN IV, T-Code SAP PM, dan editor basis pengetahuan cloud.</p>
+                        <p className="text-xs text-slate-600 mt-1">Pusat dokumentasi standar CMMS PTPN IV, referensi T-Code SAP PM, dan live chatbot knowledge base.</p>
                       </div>
                     </div>
                     <button
@@ -1810,102 +1893,137 @@ function App() {
                         setActiveTab('knowledge-base');
                         window.history.pushState({}, '', '?tab=knowledge-base');
                       }}
-                      className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold text-xs rounded-xl flex items-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
+                      className="px-5 py-2.5 bg-[#064e3b] hover:bg-[#047857] text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
                     >
                       <BookOpen size={15} />
-                      Buka CMMS Docs
+                      <span>Buka Knowledge Base</span>
+                      <ArrowRight size={14} />
                     </button>
                   </div>
 
-                  <div className="flex justify-between items-center mb-2 bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-                    <h3 className="text-lg font-bold text-slate-800">Manajemen File Dasar</h3>
-                    {(masterMap || templateData || hierarchyData) && (
-                      <button 
-                        onClick={handleClearData}
-                        className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 transition-colors px-4 py-2 rounded-lg flex items-center gap-2 font-medium text-sm shadow-sm"
-                      >
-                        <Trash2 size={16} />
-                        Hapus Data Tersimpan
-                      </button>
-                    )}
-                  </div>
-                  
-                  <div className="grid md:grid-cols-3 gap-6">
-                    {/* Upload Cards */}
-                    {/* Master EQ */}
-                    <div className={`p-6 rounded-2xl border-2 border-dashed transition-colors ${masterMap ? 'border-green-400 bg-green-50' : 'border-slate-300 bg-white hover:border-blue-400'}`}>
-                      <label className="flex flex-col items-center justify-center cursor-pointer h-full min-h-[160px]">
-                        {masterMap ? (
-                          <>
-                            <CheckCircle size={40} className="text-green-500 mb-3" />
-                            <span className="font-semibold text-green-700">Master EQ Tersimpan</span>
-                            <span className="text-sm text-green-600 mt-1">{masterMap.size} equipment dimuat</span>
-                          </>
-                        ) : (
-                          <>
-                            <Upload size={40} className="text-slate-400 mb-3" />
-                            <span className="font-semibold text-slate-700 text-center">1. Upload Master EQ.xlsx</span>
-                            <span className="text-sm text-slate-500 mt-1 text-center">Klik atau drag file ke sini</span>
-                          </>
-                        )}
-                        <input type="file" className="hidden" accept=".xlsx, .xls" onClick={(e) => { e.target.value = ''; }} onChange={handleMasterUpload} />
-                      </label>
-                    </div>
-
-                    {/* Hierarchy */}
-                    <div className={`p-6 rounded-2xl border-2 border-dashed transition-colors ${hierarchyData ? 'border-green-400 bg-green-50' : 'border-slate-300 bg-white hover:border-blue-400'}`}>
-                      <label className="flex flex-col items-center justify-center cursor-pointer h-full min-h-[160px]">
-                        {hierarchyData ? (
-                          <>
-                            <CheckCircle size={40} className="text-green-500 mb-3" />
-                            <span className="font-semibold text-green-700 text-center">Referensi Dimuat</span>
-                            <span className="text-sm text-green-600 mt-1 text-center">{Object.keys(hierarchyData.mapping).length} item dikenali</span>
-                          </>
-                        ) : (
-                          <>
-                            <Upload size={40} className="text-slate-400 mb-3" />
-                            <span className="font-semibold text-slate-700 text-center">2. Referensi Pengelompokan</span>
-                            <span className="text-sm text-slate-500 mt-1 text-center">Upload data mesin pabrik.xlsx</span>
-                          </>
-                        )}
-                        <input type="file" className="hidden" accept=".xlsx, .xls" onClick={(e) => { e.target.value = ''; }} onChange={handleHierarchyUpload} />
-                      </label>
-                    </div>
-
-                    {/* Template */}
-                    <div className={`p-6 rounded-2xl border-2 border-dashed transition-colors ${templateData ? 'border-green-400 bg-green-50' : 'border-slate-300 bg-white hover:border-blue-400'} ${!masterMap ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                      <label className={`flex flex-col items-center justify-center h-full min-h-[160px] ${masterMap ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
-                        {templateData ? (
-                          <>
-                            <CheckCircle size={40} className="text-green-500 mb-3" />
-                            <span className="font-semibold text-green-700 text-center">Template Regional Dimuat</span>
-                            <span className="text-sm text-green-600 mt-1 text-center">{equipments.length} equipment siap diisi</span>
-                          </>
-                        ) : (
-                          <>
-                            <FileSpreadsheet size={40} className="text-slate-400 mb-3" />
-                            <span className="font-semibold text-slate-700 text-center">3. Upload REGIONAL 5 MP.xlsx</span>
-                            <span className="text-sm text-slate-500 mt-1 text-center">Template yang akan di-export</span>
-                          </>
-                        )}
-                        <input type="file" className="hidden" accept=".xlsx, .xls" onClick={(e) => { e.target.value = ''; }} onChange={handleTemplateUpload} disabled={!masterMap} />
-                      </label>
-                    </div>
-                  </div>
-
-                    {/* ===== DAFTAR USER (Admin Only) ===== */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/40">
+                  {/* Manajemen File Dasar Section */}
+                  <div className="bg-white rounded-3xl p-7 border border-slate-200 shadow-sm space-y-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-5">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-[#064e3b]/10 flex items-center justify-center">
-                          <User size={18} className="text-[#064e3b]" />
+                        <div className="w-11 h-11 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-700 shadow-inner">
+                          <FileSpreadsheet size={22} />
                         </div>
                         <div>
-                          <h3 className="text-sm font-bold text-slate-800">Daftar User Terdaftar</h3>
-                          <p className="text-[11px] text-slate-400">Total: {allUsers.length} akun aktif di database</p>
+                          <h3 className="text-base font-black text-slate-800">Manajemen File Master & Template SAP</h3>
+                          <p className="text-xs text-slate-500 mt-0.5">Konfigurasi database file Excel referensi untuk parser dan template ekspor regional.</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      {(masterMap || templateData || hierarchyData) && (
+                        <button 
+                          onClick={handleClearData}
+                          className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200/80 transition-all px-4 py-2 rounded-xl flex items-center gap-2 font-bold text-xs shadow-sm cursor-pointer active:scale-95"
+                        >
+                          <Trash2 size={14} />
+                          <span>Hapus File Tersimpan</span>
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div className="grid md:grid-cols-3 gap-5">
+                      {/* Step 1: Master EQ */}
+                      <div className={`p-6 rounded-2xl border-2 transition-all relative overflow-hidden ${masterMap ? 'border-emerald-500/40 bg-emerald-50/40 shadow-sm' : 'border-dashed border-slate-300 bg-slate-50/50 hover:border-emerald-400 hover:bg-white'}`}>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-200/80 text-slate-700">Langkah 1</span>
+                          {masterMap && <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1"><CheckCircle size={10} /> Aktif</span>}
+                        </div>
+                        <label className="flex flex-col items-center justify-center cursor-pointer min-h-[140px] text-center">
+                          {masterMap ? (
+                            <>
+                              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2 shadow-inner">
+                                <CheckCircle size={24} />
+                              </div>
+                              <span className="font-bold text-slate-800 text-sm">Master EQ Tersimpan</span>
+                              <span className="text-xs text-emerald-700 font-semibold mt-1 bg-white px-2.5 py-1 rounded-lg border border-emerald-200/60 shadow-xs">{masterMap.size} equipment dimuat</span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-2">
+                                <Upload size={22} />
+                              </div>
+                              <span className="font-bold text-slate-700 text-xs">Upload Master EQ.xlsx</span>
+                              <span className="text-[11px] text-slate-400 mt-1">Klik atau drag file master ke sini</span>
+                            </>
+                          )}
+                          <input type="file" className="hidden" accept=".xlsx, .xls" onClick={(e) => { e.target.value = ''; }} onChange={handleMasterUpload} />
+                        </label>
+                      </div>
+
+                      {/* Step 2: Hierarchy */}
+                      <div className={`p-6 rounded-2xl border-2 transition-all relative overflow-hidden ${hierarchyData ? 'border-emerald-500/40 bg-emerald-50/40 shadow-sm' : 'border-dashed border-slate-300 bg-slate-50/50 hover:border-emerald-400 hover:bg-white'}`}>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-200/80 text-slate-700">Langkah 2</span>
+                          {hierarchyData && <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1"><CheckCircle size={10} /> Aktif</span>}
+                        </div>
+                        <label className="flex flex-col items-center justify-center cursor-pointer min-h-[140px] text-center">
+                          {hierarchyData ? (
+                            <>
+                              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2 shadow-inner">
+                                <CheckCircle size={24} />
+                              </div>
+                              <span className="font-bold text-slate-800 text-sm">Referensi Pengelompokan</span>
+                              <span className="text-xs text-emerald-700 font-semibold mt-1 bg-white px-2.5 py-1 rounded-lg border border-emerald-200/60 shadow-xs">{Object.keys(hierarchyData.mapping).length} item dikenali</span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-2">
+                                <Upload size={22} />
+                              </div>
+                              <span className="font-bold text-slate-700 text-xs">Upload data mesin pabrik.xlsx</span>
+                              <span className="text-[11px] text-slate-400 mt-1">Hierarki kelompok mesin</span>
+                            </>
+                          )}
+                          <input type="file" className="hidden" accept=".xlsx, .xls" onClick={(e) => { e.target.value = ''; }} onChange={handleHierarchyUpload} />
+                        </label>
+                      </div>
+
+                      {/* Step 3: Template */}
+                      <div className={`p-6 rounded-2xl border-2 transition-all relative overflow-hidden ${templateData ? 'border-emerald-500/40 bg-emerald-50/40 shadow-sm' : 'border-dashed border-slate-300 bg-slate-50/50 hover:border-emerald-400 hover:bg-white'} ${!masterMap ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-200/80 text-slate-700">Langkah 3</span>
+                          {templateData && <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1"><CheckCircle size={10} /> Siap</span>}
+                        </div>
+                        <label className={`flex flex-col items-center justify-center min-h-[140px] text-center ${masterMap ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
+                          {templateData ? (
+                            <>
+                              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2 shadow-inner">
+                                <CheckCircle size={24} />
+                              </div>
+                              <span className="font-bold text-slate-800 text-sm">Template Regional Siap</span>
+                              <span className="text-xs text-emerald-700 font-semibold mt-1 bg-white px-2.5 py-1 rounded-lg border border-emerald-200/60 shadow-xs">{equipments.length} equipment terisi</span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-2">
+                                <FileSpreadsheet size={22} />
+                              </div>
+                              <span className="font-bold text-slate-700 text-xs">Upload REGIONAL 5 MP.xlsx</span>
+                              <span className="text-[11px] text-slate-400 mt-1">Template output format SAP</span>
+                            </>
+                          )}
+                          <input type="file" className="hidden" accept=".xlsx, .xls" onClick={(e) => { e.target.value = ''; }} onChange={handleTemplateUpload} disabled={!masterMap} />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ===== DAFTAR USER (Admin Only) ===== */}
+                  <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-7 py-5 border-b border-slate-100 bg-slate-50/50 gap-4">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-11 h-11 rounded-2xl bg-[#064e3b]/10 border border-[#064e3b]/20 flex items-center justify-center text-[#064e3b] shadow-inner">
+                          <User size={20} />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-black text-slate-800">Daftar Pengguna Terdaftar</h3>
+                          <p className="text-xs text-slate-500 mt-0.5">Total: <strong className="text-slate-700">{allUsers.length}</strong> akun aktif terdaftar di database cloud Supabase</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2.5">
                         {currentUser?.role?.toUpperCase() !== 'USER' && (
                           <button
                             onClick={() => {
@@ -1913,10 +2031,10 @@ function App() {
                               setUserForm({ nik: '', name: '', password: '123', role: 'USER', plant: '', jabatan: '', unit_name: '' });
                               setIsUserModalOpen(true);
                             }}
-                            className="flex items-center gap-2 text-[11px] font-bold text-white bg-[#064e3b] hover:bg-[#047857] px-3.5 py-1.5 rounded-lg transition-colors shadow-sm"
+                            className="flex items-center gap-2 text-xs font-bold text-white bg-[#064e3b] hover:bg-[#047857] px-4 py-2 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
                           >
-                            <Plus size={12} />
-                            Tambah User
+                            <Plus size={14} />
+                            <span>Tambah User</span>
                           </button>
                         )}
                         <button
@@ -1926,46 +2044,46 @@ function App() {
                             if (data) setAllUsers(data);
                             setLoadingUsers(false);
                           }}
-                          className="flex items-center gap-2 text-[11px] font-bold text-[#064e3b] bg-[#064e3b]/10 hover:bg-[#064e3b]/20 px-3 py-1.5 rounded-lg transition-colors"
+                          className="flex items-center gap-2 text-xs font-bold text-[#064e3b] bg-[#064e3b]/10 hover:bg-[#064e3b]/20 px-3.5 py-2 rounded-xl transition-all cursor-pointer active:scale-95"
                         >
                           {loadingUsers ? (
-                            <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                            <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
                           ) : (
-                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
                           )}
-                          Muat Ulang
+                          <span>Muat Ulang</span>
                         </button>
                       </div>
                     </div>
 
                     {/* Filter & Search Bar */}
-                    <div className="p-4 border-b border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                      <div className="flex gap-2 items-center w-full sm:w-auto">
-                        <div className="relative flex-1 sm:w-72">
-                          <Search className="absolute left-3 top-2.5 text-slate-400" size={14} />
+                    <div className="p-5 border-b border-slate-100 bg-slate-50/70 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <div className="flex gap-2 items-center w-full sm:w-80">
+                        <div className="relative flex-1">
+                          <Search className="absolute left-3.5 top-3 text-slate-400" size={15} />
                           <input 
                             type="text" 
-                            placeholder="Cari user (nama, NIK, plant, jabatan)..." 
+                            placeholder="Cari nama, NIK, plant, jabatan..." 
                             value={userSearchQuery} 
                             onChange={e => setUserSearchQuery(e.target.value)}
-                            className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white"
+                            className="w-full pl-10 pr-8 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white font-medium shadow-xs"
                           />
+                          {userSearchQuery && (
+                            <button onClick={() => setUserSearchQuery('')} className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600">
+                              <X size={14} />
+                            </button>
+                          )}
                         </div>
-                        {userSearchQuery && (
-                          <button onClick={() => setUserSearchQuery('')} className="text-slate-400 hover:text-slate-600 text-xs font-semibold px-2 py-1">
-                            Reset
-                          </button>
-                        )}
                       </div>
 
-                      <div className="flex gap-1.5 flex-wrap">
+                      <div className="flex gap-2 flex-wrap items-center">
                         {['ALL', 'DEV', 'ADMIN', 'USER'].map(r => (
                           <button
                             key={r}
                             onClick={() => setUserRoleFilter(r)}
-                            className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                               userRoleFilter === r
-                                ? 'bg-[#064e3b] text-white shadow-sm'
+                                ? 'bg-[#064e3b] text-white shadow-sm ring-2 ring-[#064e3b]/30'
                                 : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                             }`}
                           >
@@ -1976,31 +2094,33 @@ function App() {
                     </div>
 
                     {loadingUsers ? (
-                      <div className="py-12 text-center text-slate-500 text-sm space-y-2">
-                        <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto"></div>
-                        <p className="font-semibold text-xs text-slate-600">Memuat daftar user dari database...</p>
+                      <div className="py-16 text-center text-slate-500 text-sm space-y-3">
+                        <div className="w-10 h-10 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto"></div>
+                        <p className="font-bold text-xs text-slate-700">Memuat daftar user dari database...</p>
                       </div>
                     ) : allUsers.length === 0 ? (
-                      <div className="py-10 text-center text-slate-400 text-sm">
-                        <User size={36} className="mx-auto mb-2 opacity-30" />
-                        <p>Klik <strong>"Muat Ulang"</strong> untuk memuat daftar user</p>
+                      <div className="py-12 text-center text-slate-400 text-sm space-y-2">
+                        <User size={40} className="mx-auto text-slate-300" />
+                        <p className="font-semibold text-slate-600">Belum ada data user termuat</p>
+                        <p className="text-xs text-slate-400">Klik tombol <strong>"Muat Ulang"</strong> di atas untuk memuat daftar akun</p>
                       </div>
                     ) : (
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
                         <table className="w-full text-sm">
-                          <thead>
-                            <tr className="bg-slate-50 border-b border-slate-100">
-                              <th className="text-left px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">#</th>
-                              <th className="text-left px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Nama</th>
-                              <th className="text-left px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">NIK / User ID</th>
-                              <th className="text-left px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Unit / Plant</th>
-                              <th className="text-left px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Role</th>
+                          <thead className="sticky top-0 bg-slate-50/95 backdrop-blur-xs z-10">
+                            <tr className="border-b border-slate-200">
+                              <th className="text-left px-6 py-3.5 text-[11px] font-black text-slate-500 uppercase tracking-wider">#</th>
+                              <th className="text-left px-6 py-3.5 text-[11px] font-black text-slate-500 uppercase tracking-wider">Nama Pengguna</th>
+                              <th className="text-left px-6 py-3.5 text-[11px] font-black text-slate-500 uppercase tracking-wider">NIK / User ID</th>
+                              <th className="text-left px-6 py-3.5 text-[11px] font-black text-slate-500 uppercase tracking-wider">Unit / Kebun</th>
+                              <th className="text-left px-6 py-3.5 text-[11px] font-black text-slate-500 uppercase tracking-wider">Jabatan</th>
+                              <th className="text-left px-6 py-3.5 text-[11px] font-black text-slate-500 uppercase tracking-wider">Role</th>
                               {currentUser?.role?.toUpperCase() !== 'USER' && (
-                                <th className="text-right px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Aksi</th>
+                                <th className="text-right px-6 py-3.5 text-[11px] font-black text-slate-500 uppercase tracking-wider">Aksi</th>
                               )}
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-50">
+                          <tbody className="divide-y divide-slate-100">
                             {allUsers
                               .filter(u => {
                                 if (userRoleFilter !== 'ALL' && u.role !== userRoleFilter) return false;
@@ -2015,36 +2135,38 @@ function App() {
                                 );
                               })
                               .map((u, idx) => (
-                              <tr key={u.nik} className="hover:bg-slate-50/70 transition-colors">
-                                <td className="px-6 py-3 text-slate-400 text-[11px]">{idx + 1}</td>
-                                <td className="px-6 py-3">
-                                  <div className="flex items-center gap-2.5">
-                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 ${u.role === 'DEV' ? 'bg-emerald-600' : u.role === 'ADMIN' ? 'bg-purple-500' : 'bg-blue-500'}`}>
+                              <tr key={u.nik} className="hover:bg-emerald-50/30 transition-colors">
+                                <td className="px-6 py-3.5 text-slate-400 text-xs font-mono">{idx + 1}</td>
+                                <td className="px-6 py-3.5">
+                                  <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-black flex-shrink-0 shadow-xs ${u.role === 'DEV' ? 'bg-emerald-700' : u.role === 'ADMIN' ? 'bg-purple-600' : 'bg-teal-600'}`}>
                                       {(u.name || u.nik).charAt(0).toUpperCase()}
                                     </div>
-                                    <span className="font-semibold text-slate-700 text-xs">{u.name || '-'}</span>
+                                    <span className="font-bold text-slate-800 text-xs">{u.name || '-'}</span>
                                   </div>
                                 </td>
-                                <td className="px-6 py-3">
-                                  <code className="bg-slate-100 text-slate-700 text-[11px] font-bold px-2 py-0.5 rounded-md">{u.nik}</code>
+                                <td className="px-6 py-3.5">
+                                  <code className="bg-slate-100 text-slate-700 text-xs font-bold font-mono px-2.5 py-1 rounded-lg border border-slate-200/80">{u.nik}</code>
                                 </td>
-                                <td className="px-6 py-3 text-xs text-slate-500 font-medium">
+                                <td className="px-6 py-3.5 text-xs text-slate-600 font-semibold">
                                   {u.plant ? `${u.plant} - ${getUnitName(u.plant, u.unit_name)}` : '-'}
                                 </td>
-
-                                <td className="px-6 py-3">
-                                  <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                                    u.role === 'DEV' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                                    u.role === 'ADMIN' ? 'bg-purple-50 text-purple-700 border border-purple-100' : 
-                                    'bg-blue-50 text-blue-700 border border-blue-100'
+                                <td className="px-6 py-3.5 text-xs text-slate-500 font-medium">
+                                  {u.jabatan || '-'}
+                                </td>
+                                <td className="px-6 py-3.5">
+                                  <span className={`inline-flex items-center gap-1.5 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider ${
+                                    u.role === 'DEV' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
+                                    u.role === 'ADMIN' ? 'bg-purple-50 text-purple-800 border border-purple-200' : 
+                                    'bg-teal-50 text-teal-800 border border-teal-200'
                                   }`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${u.role === 'DEV' ? 'bg-emerald-500' : u.role === 'ADMIN' ? 'bg-purple-500' : 'bg-blue-500'}`}></span>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${u.role === 'DEV' ? 'bg-emerald-600' : u.role === 'ADMIN' ? 'bg-purple-600' : 'bg-teal-600'}`}></span>
                                     {u.role}
                                   </span>
                                 </td>
                                 {currentUser?.role?.toUpperCase() !== 'USER' && (
-                                  <td className="px-6 py-3 text-right">
-                                    <div className="flex items-center justify-end gap-2">
+                                  <td className="px-6 py-3.5 text-right">
+                                    <div className="flex items-center justify-end gap-1.5">
                                       <button 
                                         onClick={() => {
                                           setEditingUser(u);
@@ -2055,17 +2177,17 @@ function App() {
                                           });
                                           setIsUserModalOpen(true);
                                         }}
-                                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        className="p-2 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer"
                                         title="Edit User"
                                       >
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                                        <Edit3 size={15} />
                                       </button>
                                       <button 
                                         onClick={() => handleDeleteUser(u.nik)}
-                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
                                         title="Hapus User"
                                       >
-                                        <Trash2 size={16} />
+                                        <Trash2 size={15} />
                                       </button>
                                     </div>
                                   </td>
@@ -2081,61 +2203,79 @@ function App() {
                   {/* User Modal */}
                   {isUserModalOpen && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !isSavingUser && setIsUserModalOpen(false)}></div>
-                      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden relative z-10 animate-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
-                          <h3 className="text-lg font-bold text-slate-800">{editingUser ? 'Edit User' : 'Tambah User Baru'}</h3>
-                          <button onClick={() => setIsUserModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                          </button>
-                        </div>
-                        <form onSubmit={handleSaveUser} className="p-6 space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs font-bold text-slate-700 mb-1">NIK SAP *</label>
-                              <input required type="text" value={userForm.nik} onChange={e => setUserForm({...userForm, nik: e.target.value})} disabled={!!editingUser} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 disabled:bg-slate-100" placeholder="1300xxxx" />
+                      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => !isSavingUser && setIsUserModalOpen(false)}></div>
+                      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden relative z-10 animate-in zoom-in-95 duration-200 border border-slate-200">
+                        <div className="flex items-center justify-between px-7 py-5 border-b border-slate-100 bg-slate-50/70">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-2xl bg-[#064e3b]/10 text-[#064e3b] flex items-center justify-center font-bold">
+                              <User size={18} />
                             </div>
                             <div>
-                              <label className="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap *</label>
-                              <input required type="text" value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" placeholder="Nama..." />
+                              <h3 className="text-base font-black text-slate-800">{editingUser ? 'Edit Akun Pengguna' : 'Tambah Pengguna Baru'}</h3>
+                              <p className="text-[11px] text-slate-400">Pastikan NIK SAP dan Kode Plant terdaftar sesuai standar.</p>
+                            </div>
+                          </div>
+                          <button onClick={() => setIsUserModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition-colors">
+                            <X size={18} />
+                          </button>
+                        </div>
+                        <form onSubmit={handleSaveUser} className="p-7 space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-700 mb-1.5">NIK SAP *</label>
+                              <input required type="text" value={userForm.nik} onChange={e => setUserForm({...userForm, nik: e.target.value})} disabled={!!editingUser} className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:bg-slate-100 outline-none" placeholder="1300xxxx" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-700 mb-1.5">Nama Lengkap *</label>
+                              <input required type="text" value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-bold focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none" placeholder="Nama..." />
                             </div>
                           </div>
                           
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <label className="block text-xs font-bold text-slate-700 mb-1">Role *</label>
-                              <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 bg-white">
+                              <label className="block text-xs font-bold text-slate-700 mb-1.5">Role *</label>
+                              <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-bold focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 bg-white outline-none">
                                 <option value="USER">USER</option>
                                 <option value="ADMIN">ADMIN</option>
                                 {currentUser?.role?.toUpperCase() === 'DEV' && <option value="DEV">DEV</option>}
                               </select>
                             </div>
                             <div>
-                              <label className="block text-xs font-bold text-slate-700 mb-1">Password</label>
-                              <input type="text" value={userForm.password} onChange={e => setUserForm({...userForm, password: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" placeholder="Default: 123" />
+                              <label className="block text-xs font-bold text-slate-700 mb-1.5">Password</label>
+                              <input type="text" value={userForm.password} onChange={e => setUserForm({...userForm, password: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none" placeholder="Default: 123" />
                             </div>
                           </div>
 
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <label className="block text-xs font-bold text-slate-700 mb-1">Kode Unit / Plant</label>
-                              <input type="text" value={userForm.plant} onChange={e => setUserForm({...userForm, plant: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" placeholder="5Fxx" />
+                              <label className="block text-xs font-bold text-slate-700 mb-1.5">Kode Unit / Plant</label>
+                              <input type="text" value={userForm.plant} onChange={e => setUserForm({...userForm, plant: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none" placeholder="5Fxx" />
                             </div>
                             <div>
-                              <label className="block text-xs font-bold text-slate-700 mb-1">Nama Unit Panjang</label>
-                              <input type="text" value={userForm.unit_name} onChange={e => setUserForm({...userForm, unit_name: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" placeholder="PABRIK..." />
+                              <label className="block text-xs font-bold text-slate-700 mb-1.5">Nama Unit Kebun</label>
+                              <input type="text" value={userForm.unit_name} onChange={e => setUserForm({...userForm, unit_name: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-bold focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none" placeholder="PABRIK..." />
                             </div>
                           </div>
                           
                           <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1">Jabatan</label>
-                            <input type="text" value={userForm.jabatan} onChange={e => setUserForm({...userForm, jabatan: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" placeholder="Asisten Teknik..." />
+                            <label className="block text-xs font-bold text-slate-700 mb-1.5">Jabatan</label>
+                            <input type="text" value={userForm.jabatan} onChange={e => setUserForm({...userForm, jabatan: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-medium focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none" placeholder="Asisten Teknik..." />
                           </div>
 
-                          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                            <button type="button" onClick={() => setIsUserModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">Batal</button>
-                            <button type="submit" disabled={isSavingUser} className="px-4 py-2 text-sm font-medium text-white bg-[#064e3b] hover:bg-[#047857] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2">
-                              {isSavingUser ? 'Menyimpan...' : 'Simpan User'}
+                          <div className="flex justify-end gap-3 pt-5 border-t border-slate-100">
+                            <button type="button" onClick={() => setIsUserModalOpen(false)} className="px-5 py-2.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all cursor-pointer">Batal</button>
+                            <button type="submit" disabled={isSavingUser} className="px-5 py-2.5 text-xs font-bold text-white bg-[#064e3b] hover:bg-[#047857] disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-2 cursor-pointer">
+                              {isSavingUser ? (
+                                <>
+                                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                  <span>Menyimpan...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Check size={14} />
+                                  <span>Simpan Data User</span>
+                                </>
+                              )}
                             </button>
                           </div>
                         </form>
