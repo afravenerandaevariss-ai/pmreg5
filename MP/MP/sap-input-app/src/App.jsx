@@ -1501,20 +1501,6 @@ function App() {
                           <span>Dictionary / Knowledge Base</span>
                         </button>
                       )}
-
-                      {isDev && (
-                        <button 
-                          onClick={() => {
-                            setActiveTab('monitoring');
-                            setIsProfileDropdownOpen(false);
-                            setIsMobileMenuOpen(false);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-[#064e3b] hover:bg-emerald-50/60 rounded-xl transition-colors text-left cursor-pointer"
-                        >
-                          <LayoutDashboard size={14} className="text-slate-400" />
-                          <span>Go to Admin Regional Dashboard</span>
-                        </button>
-                      )}
                     </div>
                     <div className="p-1.5 border-t border-slate-100 bg-slate-50/40">
                       <button 
