@@ -1455,14 +1455,23 @@ function App() {
                     className="fixed inset-0 z-40" 
                     onClick={() => setIsProfileDropdownOpen(false)}
                   ></div>
-                  <div className="absolute right-0 mt-2 w-64 bg-[#12141c] text-white rounded-2xl shadow-2xl border border-neutral-800 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="p-3.5 border-b border-neutral-800/80 bg-neutral-900/60 flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center font-bold text-emerald-400 text-xs">
+                  <div className="absolute right-0 mt-2 w-64 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200/90 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 ring-1 ring-black/5">
+                    <div className="p-3.5 border-b border-slate-100 bg-slate-50/70 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#064e3b]/10 border border-[#064e3b]/20 flex items-center justify-center font-bold text-[#064e3b] text-xs shadow-inner shrink-0">
                         {getInitials(currentUser.name)}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h4 className="text-xs font-bold text-white uppercase truncate">{currentUser.name}</h4>
-                        <p className="text-[11px] text-neutral-400 font-mono truncate">{currentUser.nik}@ptpn4.id</p>
+                        <div className="flex items-center gap-1.5">
+                          <h4 className="text-xs font-bold text-slate-800 uppercase truncate">{currentUser.name}</h4>
+                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${
+                            currentUser?.role?.toUpperCase() === 'DEV' ? 'bg-emerald-100 text-emerald-800' :
+                            currentUser?.role?.toUpperCase() === 'ADMIN' ? 'bg-purple-100 text-purple-800' :
+                            'bg-blue-100 text-blue-800'
+                          }`}>
+                            {currentUser?.role || 'USER'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 font-mono truncate">{currentUser.nik}@ptpn4.id</p>
                       </div>
                     </div>
                     <div className="p-1.5 space-y-0.5">
@@ -1472,9 +1481,9 @@ function App() {
                           setIsProfileDropdownOpen(false);
                           setIsMobileMenuOpen(false);
                         }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors text-left cursor-pointer"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-[#064e3b] hover:bg-emerald-50/60 rounded-xl transition-colors text-left cursor-pointer"
                       >
-                        <Settings size={14} className="text-neutral-400" />
+                        <Settings size={14} className="text-slate-400" />
                         <span>Settings</span>
                       </button>
 
@@ -1486,9 +1495,9 @@ function App() {
                             setIsProfileDropdownOpen(false);
                             setIsMobileMenuOpen(false);
                           }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-amber-300 hover:text-amber-200 hover:bg-neutral-800 rounded-xl transition-colors text-left cursor-pointer bg-neutral-900/40"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-amber-800 bg-amber-50/60 hover:bg-amber-100/70 border border-amber-200/50 rounded-xl transition-colors text-left cursor-pointer"
                         >
-                          <BookOpen size={14} className="text-amber-400" />
+                          <BookOpen size={14} className="text-amber-600" />
                           <span>Dictionary / Knowledge Base</span>
                         </button>
                       )}
@@ -1500,21 +1509,21 @@ function App() {
                             setIsProfileDropdownOpen(false);
                             setIsMobileMenuOpen(false);
                           }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors text-left cursor-pointer"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-[#064e3b] hover:bg-emerald-50/60 rounded-xl transition-colors text-left cursor-pointer"
                         >
-                          <LayoutDashboard size={14} className="text-neutral-400" />
+                          <LayoutDashboard size={14} className="text-slate-400" />
                           <span>Go to Admin Regional Dashboard</span>
                         </button>
                       )}
                     </div>
-                    <div className="p-1.5 border-t border-neutral-800/80">
+                    <div className="p-1.5 border-t border-slate-100 bg-slate-50/40">
                       <button 
                         onClick={() => {
                           setCurrentUser(null);
                           localStorage.removeItem('sapApp_session_nik');
                           setIsProfileDropdownOpen(false);
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 font-semibold hover:bg-red-950/40 rounded-xl transition-colors text-left cursor-pointer"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-colors text-left cursor-pointer"
                       >
                         <LogOut size={14} />
                         <span>Log out</span>
