@@ -60,7 +60,11 @@ export default function DailyDashboard({
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   // Sub-Tab State for Jam Jalan Mesin Pabrik: 'isi' (Isi Jam Jalan Web Matrix) vs 'riwayat' (Calendar & History)
-  const [dashboardSubTab, setDashboardSubTab] = useState('isi');
+  // Role USER starts on 'riwayat' — they only have access to Export SAP there
+  const roleCheck = String(currentUser?.role || '').toUpperCase();
+  const [dashboardSubTab, setDashboardSubTab] = useState(
+    (roleCheck === 'USER' || roleCheck === 'UNIT') ? 'riwayat' : 'isi'
+  );
   const [matrixMonth, setMatrixMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [simulatedToday, setSimulatedToday] = useState(new Date());
 
@@ -1775,17 +1779,20 @@ export default function DailyDashboard({
       <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between flex-wrap gap-3 flex-shrink-0 shadow-xs z-30">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl border border-slate-200/70">
-            <button
-              onClick={() => setDashboardSubTab('isi')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
-                dashboardSubTab === 'isi'
-                  ? 'bg-[#064e3b] text-white shadow-md shadow-emerald-900/20'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-              }`}
-            >
-              <FileSpreadsheet size={16} />
-              Isi Jam Jalan Pabrik
-            </button>
+            {!isUserRole && (
+
+              <button
+                onClick={() => setDashboardSubTab('isi')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                  dashboardSubTab === 'isi'
+                    ? 'bg-[#064e3b] text-white shadow-md shadow-emerald-900/20'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                }`}
+              >
+                <FileSpreadsheet size={16} />
+                Isi Jam Jalan Pabrik
+              </button>
+            )}
             <button
               onClick={() => setDashboardSubTab('riwayat')}
               className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
@@ -1797,17 +1804,19 @@ export default function DailyDashboard({
               <CalendarIcon size={16} />
               Riwayat &amp; Kalender Jam Jalan
             </button>
-            <button
-              onClick={() => setDashboardSubTab('rekap')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
-                dashboardSubTab === 'rekap'
-                  ? 'bg-[#7c3aed] text-white shadow-md shadow-violet-900/20'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-              }`}
-            >
-              <ClipboardList size={16} />
-              Rekap Monitoring Regional
-            </button>
+            {!isUserRole && (
+              <button
+                onClick={() => setDashboardSubTab('rekap')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                  dashboardSubTab === 'rekap'
+                    ? 'bg-[#7c3aed] text-white shadow-md shadow-violet-900/20'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                }`}
+              >
+                <ClipboardList size={16} />
+                Rekap Monitoring Regional
+              </button>
+            )}
             <a
               href="https://cmms.ptpn4.co.id/"
               target="_blank"
@@ -1819,6 +1828,7 @@ export default function DailyDashboard({
               <span>CMMS PTPN IV</span>
             </a>
           </div>
+
         </div>
 
         {/* Global Action Buttons */}
@@ -2219,12 +2229,14 @@ export default function DailyDashboard({
               </button>
             )}
 
-            <button 
-              onClick={() => setShowHistoryModal(true)}
-              className="bg-sky-600 hover:bg-sky-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
-            >
-              <History size={13} /> Riwayat Alat
-            </button>
+            {!isUserRole && (
+              <button 
+                onClick={() => setShowHistoryModal(true)}
+                className="bg-sky-600 hover:bg-sky-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
+              >
+                <History size={13} /> Riwayat Alat
+              </button>
+            )}
 
             {isAfraUser && (
               <>
@@ -2282,20 +2294,23 @@ export default function DailyDashboard({
                           Tidak ada data input logbook mesin pabrik tercatat untuk tanggal {format(new Date(selectedDate), 'dd MMMM yyyy', { locale: id })}. Silakan mulai dengan salah satu aksi di bawah ini.
                         </p>
                       </div>
-                      <div className="flex justify-center gap-3 pt-2">
-                        <button 
-                          onClick={() => document.getElementById('daily-upload-input').click()} 
-                          className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors flex items-center gap-2"
-                        >
-                          <Upload size={14} className="text-slate-400" /> Impor Excel Logbook
-                        </button>
-                        <button 
-                          onClick={() => setShowForm(true)} 
-                          className="bg-[#064e3b] hover:bg-[#065f46] text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors flex items-center gap-2"
-                        >
-                          <Plus size={14} /> Input Baru
-                        </button>
-                      </div>
+                      {!isUserRole && (
+                        <div className="flex justify-center gap-3 pt-2">
+                          <button 
+                            onClick={() => document.getElementById('daily-upload-input').click()} 
+                            className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors flex items-center gap-2"
+                          >
+                            <Upload size={14} className="text-slate-400" /> Impor Excel Logbook
+                          </button>
+                          <button 
+                            onClick={() => setShowForm(true)} 
+                            className="bg-[#064e3b] hover:bg-[#065f46] text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors flex items-center gap-2"
+                          >
+                            <Plus size={14} /> Input Baru
+                          </button>
+                        </div>
+                      )}
+
                     </div>
                   </td>
                 </tr>
@@ -2318,23 +2333,26 @@ export default function DailyDashboard({
                     <td className="px-5 py-3.5 font-mono font-black text-slate-700 group-hover:text-[#064e3b] transition-colors">{Math.floor(log.durationMinutes / 60)}h {String(log.durationMinutes % 60).padStart(2, '0')}m</td>
                     <td className="px-4 py-2.5 text-slate-500 max-w-[160px] truncate text-[11px]" title={log.notes}>{log.notes || <span className="text-slate-400">—</span>}</td>
                     <td className="px-4 py-2.5 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button 
-                          onClick={() => setViewLog(log)}
-                          className="text-slate-400 hover:text-[#064e3b] p-1.5 hover:bg-emerald-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                          title="Lihat Detail"
-                        >
-                          <Eye size={14} />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteLog(log)}
-                          className="text-slate-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/20"
-                          title="Hapus"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      {!isUserRole && (
+                        <div className="flex items-center justify-end gap-1">
+                          <button 
+                            onClick={() => setViewLog(log)}
+                            className="text-slate-400 hover:text-[#064e3b] p-1.5 hover:bg-emerald-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                            title="Lihat Detail"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteLog(log)}
+                            className="text-slate-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                            title="Hapus"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
                     </td>
+
                   </tr>
                 ))
               )}
