@@ -1959,41 +1959,18 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             </div>
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <div className="flex flex-col items-center gap-1">
-                              {/* Toggle inline detail — available for all roles */}
-                              <button
-                                onClick={() => setExpandedVehicleId(
-                                  expandedVehicleId === v.vehicle_code ? null : v.vehicle_code
-                                )}
-                                className={`font-bold text-xs px-3 py-1 rounded-lg transition shadow-xs flex items-center justify-center gap-1 mx-auto border ${
-                                  expandedVehicleId === v.vehicle_code
-                                    ? 'bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700'
-                                    : 'text-[#064e3b] hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200'
-                                }`}
-                                title={expandedVehicleId === v.vehicle_code ? 'Tutup detail' : `Lihat detail transaksi ${v.vehicle_code}`}
-                              >
-                                {expandedVehicleId === v.vehicle_code ? (
-                                  <><ChevronUp size={11} /> Tutup</>
-                                ) : (
-                                  <><Eye size={11} /> Detail</>
-                                )}
-                              </button>
-                              {/* Full log tab link — ADMIN & DEV only */}
-                              {isAdmin && (
-                                <button
-                                  onClick={() => {
-                                    setSearchVehicle(v.vehicle_code);
-                                    setLogPage(1);
-                                    setActiveTab('log-raw');
-                                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                                  }}
-                                  className="text-[10px] text-slate-400 hover:text-[#064e3b] font-semibold underline underline-offset-2 transition"
-                                  title="Buka Log Transaksi Asli lengkap"
-                                >
-                                  Log Lengkap ↗
-                                </button>
-                              )}
-                            </div>
+                            <button
+                              onClick={() => {
+                                setSearchVehicle(v.vehicle_code);
+                                setLogPage(1);
+                                setActiveTab('log-raw');
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className="font-bold text-xs px-3 py-1.5 rounded-lg transition shadow-xs flex items-center justify-center gap-1.5 mx-auto border text-[#064e3b] hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200 cursor-pointer"
+                              title={`Buka Log Transaksi Asli untuk kendaraan ${v.vehicle_code}`}
+                            >
+                              <Eye size={12} /> Detail
+                            </button>
                           </td>
                         </tr>
 
@@ -2431,10 +2408,19 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 flex-wrap bg-slate-50/50">
               <div className="flex gap-2 flex-wrap items-center">
-                <div className="relative">
+                <div className="relative flex items-center">
                   <Search className="absolute left-3 top-2.5 text-slate-400" size={14} />
                   <input type="text" placeholder="Cari kendaraan, supir..." value={searchVehicle} onChange={e => { setSearchVehicle(e.target.value); setLogPage(1); }}
-                    className="pl-9 pr-3 py-2 border border-slate-200 rounded-2xl text-xs w-52 focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white" />
+                    className="pl-9 pr-8 py-2 border border-slate-200 rounded-2xl text-xs w-52 focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white" />
+                  {searchVehicle && (
+                    <button 
+                      onClick={() => { setSearchVehicle(''); setLogPage(1); }} 
+                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      title="Hapus filter kendaraan"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
                 </div>
                 <select value={filterUoM} onChange={e => { setFilterUoM(e.target.value); setLogPage(1); }}
                   className="px-3 py-2 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white">

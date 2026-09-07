@@ -123,11 +123,12 @@ export default function BeritaAcaraView({ currentUser }) {
     currentUser.role?.toUpperCase() === 'DEV'
   );
 
+  const isUserRole = !isAdmin || currentUser?.role?.toUpperCase() === 'USER' || currentUser?.role?.toUpperCase() === 'UNIT';
 
   const isRestricted = currentUser && (currentUser.plant !== '5R00' && currentUser.plant !== 'ALL');
 
   useEffect(() => {
-    if (isRestricted && currentUser.plant) {
+    if ((isRestricted || isUserRole) && currentUser?.plant) {
       const allOptions = [
         "Gunung Meliau|5E01",
         "Gunung Mas|5E02",
@@ -156,14 +157,17 @@ export default function BeritaAcaraView({ currentUser }) {
         "PKS Pelaihari|5F15",
         "Tambarangan|5F20",
         "PKS Samuntai|5F21",
-        "PKS Longpinang|5F22"
+        "PKS Longpinang|5F22",
+        "Distrik Kalimantan Barat|5D01",
+        "Distrik Kalimantan Timur|5D02",
+        "Distrik Kalimantan Selatan|5D03"
       ];
-      const match = allOptions.find(opt => opt.endsWith(`|${currentUser.plant}`));
+      const match = allOptions.find(opt => opt.endsWith(`|${currentUser.plant}`)) || `${currentUser.unit_name || currentUser.plant}|${currentUser.plant}`;
       if (match) {
         setSelectedUnit(match);
       }
     }
-  }, [currentUser, isRestricted]);
+  }, [currentUser, isRestricted, isUserRole]);
 
   const handleLoad = async (overrideUnit = null) => {
     const unitToLoad = overrideUnit || selectedUnit;
@@ -1112,14 +1116,23 @@ export default function BeritaAcaraView({ currentUser }) {
           </select>
         </div>
 
-        <button 
-          onClick={() => handleLoad(selectedUnit)} 
-          disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm px-4 py-2 rounded-lg transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
-        >
-          {loading ? <RefreshCw className="animate-spin" size={16} /> : <RefreshCw size={16} />}
-          Muat Data
-        </button>
+        {!isUserRole && (
+          <button 
+            onClick={() => handleLoad(selectedUnit)} 
+            disabled={loading}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm px-4 py-2 rounded-lg transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
+          >
+            {loading ? <RefreshCw className="animate-spin" size={16} /> : <RefreshCw size={16} />}
+            Muat Data
+          </button>
+        )}
+
+        {isUserRole && loading && (
+          <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-2 rounded-lg animate-pulse">
+            <RefreshCw className="animate-spin text-blue-600" size={14} />
+            <span>Memuat data unit otomatis...</span>
+          </div>
+        )}
 
         <button 
           onClick={() => window.print()} 
@@ -1662,7 +1675,17 @@ export default function BeritaAcaraView({ currentUser }) {
         ) : (
           <div className="text-center py-20 text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
             <FileText size={48} className="mx-auto text-slate-300 mb-3" />
-            <p className="text-sm">Pilih unit dan klik <strong>Muat Data</strong> untuk menampilkan Berita Acara</p>
+            <p className="text-sm">
+              {loading ? (
+                <span className="flex items-center justify-center gap-2 text-teal-600 font-semibold">
+                  <RefreshCw className="animate-spin" size={16} /> Memuat data Berita Acara...
+                </span>
+              ) : isUserRole ? (
+                "Memuat data Berita Acara unit Anda..."
+              ) : (
+                <>Pilih unit dan klik <strong>Muat Data</strong> untuk menampilkan Berita Acara</>
+              )}
+            </p>
           </div>
         )}
       </div>
