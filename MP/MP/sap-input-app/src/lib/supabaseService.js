@@ -187,25 +187,41 @@ export async function fetchHierarchyData() {
 
 const memoryCache = new Map();
 
+export function resolveConfigNumericId(id) {
+  if (typeof id === 'number') return id;
+  const strId = String(id || '').trim();
+  if (strId === 'hierarchy_data') return 0;
+  if (strId === 'master_map') return 2;
+  if (strId === 'template_data') return 3;
+  if (strId === 'sap_synced_dates') return 5;
+  if (strId === 'ik17_raw_data') return 7;
+  if (strId === 'vehicle_master') return 8;
+  if (strId === 'vehicle_logs') return 9;
+  if (strId === 'zco_data') return 10;
+  if (strId === 'live_chats') return 11;
+  if (strId === 'wa_config') return 12;
+  if (strId === 'wa_logs') return 13;
+  if (strId === 'iw39_data') return 14;
+  if (strId === 'zvtab_data') return 15;
+  if (strId === 'export046_data') return 16;
+  if (strId === 'doc_details') return 17;
+  if (strId === 'knowledge_base') return 18;
+  if (strId === 'import_logs') return 19;
+
+  // Dynamic monthly IK17 keys: e.g. "ik17_2026-09" -> 202609
+  if (strId.startsWith('ik17_')) {
+    const ym = strId.replace('ik17_', '').replace(/[^0-9]/g, '');
+    if (ym && ym.length >= 4) {
+      return parseInt(ym);
+    }
+  }
+
+  return 4;
+}
+
 export async function saveSystemConfig(id, dataObj) {
   if (!supabase) return { error: 'Supabase not configured' };
-  let numericId = 4;
-  if (id === 'master_map') numericId = 2;
-  else if (id === 'template_data') numericId = 3;
-  else if (id === 'sap_synced_dates') numericId = 5;
-  else if (id === 'ik17_raw_data') numericId = 7;
-  else if (id === 'vehicle_master') numericId = 8;
-  else if (id === 'vehicle_logs') numericId = 9;
-  else if (id === 'zco_data') numericId = 10;
-  else if (id === 'live_chats') numericId = 11;
-  else if (id === 'wa_config') numericId = 12;
-  else if (id === 'wa_logs') numericId = 13;
-  else if (id === 'iw39_data') numericId = 14;
-  else if (id === 'zvtab_data') numericId = 15;
-  else if (id === 'export046_data') numericId = 16;
-  else if (id === 'doc_details') numericId = 17;
-  else if (id === 'knowledge_base') numericId = 18;
-  else if (id === 'hierarchy_data') numericId = 0;
+  const numericId = resolveConfigNumericId(id);
   
   const SMALL_CONFIG_IDS = new Set([4, 5, 12, 13, 17, 18]);
   const cacheKey = `sys_cfg_${T.hierarchy_data}_${numericId}`;
@@ -222,23 +238,7 @@ export async function saveSystemConfig(id, dataObj) {
 
 export async function deleteSystemConfig(id) {
   if (!supabase) return { error: 'Supabase not configured' };
-  let numericId = 4;
-  if (id === 'master_map') numericId = 2;
-  else if (id === 'template_data') numericId = 3;
-  else if (id === 'sap_synced_dates') numericId = 5;
-  else if (id === 'ik17_raw_data') numericId = 7;
-  else if (id === 'vehicle_master') numericId = 8;
-  else if (id === 'vehicle_logs') numericId = 9;
-  else if (id === 'zco_data') numericId = 10;
-  else if (id === 'live_chats') numericId = 11;
-  else if (id === 'wa_config') numericId = 12;
-  else if (id === 'wa_logs') numericId = 13;
-  else if (id === 'iw39_data') numericId = 14;
-  else if (id === 'zvtab_data') numericId = 15;
-  else if (id === 'export046_data') numericId = 16;
-  else if (id === 'doc_details') numericId = 17;
-  else if (id === 'knowledge_base') numericId = 18;
-  else if (id === 'hierarchy_data') numericId = 0;
+  const numericId = resolveConfigNumericId(id);
 
   const cacheKey = `sys_cfg_${T.hierarchy_data}_${numericId}`;
   memoryCache.delete(cacheKey);
@@ -253,22 +253,7 @@ export async function deleteSystemConfig(id) {
 
 export async function getSystemConfig(id, forceRefresh = false) {
   if (!supabase) return { data: null, error: 'Supabase not configured' };
-  let numericId = 4;
-  if (id === 'master_map') numericId = 2;
-  else if (id === 'template_data') numericId = 3;
-  else if (id === 'sap_synced_dates') numericId = 5;
-  else if (id === 'ik17_raw_data') numericId = 7;
-  else if (id === 'vehicle_master') numericId = 8;
-  else if (id === 'vehicle_logs') numericId = 9;
-  else if (id === 'zco_data') numericId = 10;
-  else if (id === 'live_chats') numericId = 11;
-  else if (id === 'wa_config') numericId = 12;
-  else if (id === 'wa_logs') numericId = 13;
-  else if (id === 'iw39_data') numericId = 14;
-  else if (id === 'zvtab_data') numericId = 15;
-  else if (id === 'export046_data') numericId = 16;
-  else if (id === 'doc_details') numericId = 17;
-  else if (id === 'knowledge_base') numericId = 18;
+  const numericId = resolveConfigNumericId(id);
 
   const cacheKey = `sys_cfg_${T.hierarchy_data}_${numericId}`;
   if (!forceRefresh) {

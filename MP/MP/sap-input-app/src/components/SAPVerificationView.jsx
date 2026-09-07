@@ -148,6 +148,40 @@ export default function SAPVerificationView({ equipments, currentUser }) {
         } catch (err) {
           console.warn('Error fetching daily_logs for upload parentEqSet:', err);
         }
+
+        // Also query master_equipment for parent equipments
+        try {
+          const { data: mEq } = await supabase.from('master_equipment').select('eq_num, eq_type, induk, description');
+          if (Array.isArray(mEq)) {
+            mEq.forEach(e => {
+              const isParent = e.eq_type !== 'Sub' && (!e.induk || (e.description && e.description.toUpperCase() === e.induk.toUpperCase()));
+              if (isParent && e.eq_num) {
+                parentEqSet.add(String(e.eq_num).trim());
+                parentEqSet.add(normEq(e.eq_num));
+              }
+            });
+          }
+        } catch (err) {
+          console.warn('Error fetching master_equipment for parentEqSet:', err);
+        }
+
+        // Also query master_map
+        try {
+          const { data: mmRes } = await getSystemConfig('master_map');
+          const mmEntries = Array.isArray(mmRes) ? mmRes : (mmRes?.map && Array.isArray(mmRes.map) ? mmRes.map : (mmRes && typeof mmRes === 'object' ? Object.entries(mmRes) : []));
+          mmEntries.forEach(([k, info]) => {
+            if (!k) return;
+            const desc = typeof info === 'string' ? k : (info?.description || k);
+            const induk = typeof info === 'string' ? '' : (info?.induk || '');
+            const isParent = !induk || desc.toUpperCase() === induk.toUpperCase();
+            if (isParent) {
+              parentEqSet.add(String(k).trim());
+              parentEqSet.add(normEq(k));
+            }
+          });
+        } catch (err) {
+          console.warn('Error fetching master_map for parentEqSet:', err);
+        }
       }
 
       // Also add from equipments prop if available
@@ -169,6 +203,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
       // Column D = Index 3 (Tanggal)
       // Column F = Index 5 (Nomor Equipment Induk)
       // Column H = Index 7 (Nilai HM / Hour Meter)
+      // Column L = Index 11 (Keterangan / Text)
       const parsedRows = [];
       const newDatesSet = new Set();
 
@@ -195,12 +230,15 @@ export default function SAPVerificationView({ equipments, currentUser }) {
 
         newDatesSet.add(dateStr);
 
+        const textStr = String(row[11] || '').trim();
+        const isSaldoAwal = textStr.toLowerCase().includes('ib sd') || textStr.toLowerCase().includes('ib s.d') || textStr.toLowerCase().includes('saldo awal');
+
         parsedRows.push({
           e: eqNorm,
           h: valNum,
           d: dateStr,
-          s: false,
-          t: ''
+          s: isSaldoAwal,
+          t: textStr
         });
       }
 
@@ -219,7 +257,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
         byMonth[ym].push(r);
       });
 
-      const savePromises = Object.entries(byMonth).map(async ([ym, rows]) => {
+      for (const [ym, rows] of Object.entries(byMonth)) {
         try {
           const monthKey = `ik17_${ym}`;
           const { data: existingMonth } = await getSystemConfig(monthKey);
@@ -231,8 +269,19 @@ export default function SAPVerificationView({ equipments, currentUser }) {
         } catch (saveErr) {
           console.warn('Error saving IK17 month', ym, saveErr);
         }
-      });
-      await Promise.all(savePromises);
+      }
+
+      // Also merge into legacy/all-time ik17_raw_data
+      try {
+        const { data: existingRaw } = await getSystemConfig('ik17_raw_data');
+        let mergedRaw = Array.isArray(existingRaw) ? existingRaw : [];
+        const newKeys = new Set(parsedRows.map(r => `${r.d}_${r.e}`));
+        mergedRaw = mergedRaw.filter(r => !newKeys.has(`${r.d}_${r.e}`));
+        mergedRaw = [...mergedRaw, ...parsedRows];
+        await saveSystemConfig('ik17_raw_data', mergedRaw);
+      } catch (rawErr) {
+        console.warn('Error saving ik17_raw_data:', rawErr);
+      }
 
       _cacheIK17DB.current = { data: null, ts: 0 };
       alert(`Berhasil mengunggah file IK17 SAP! Terproses ${parsedRows.length} baris data pengukuran parent equipment (${newDatesSet.size} tanggal).`);
@@ -261,7 +310,11 @@ export default function SAPVerificationView({ equipments, currentUser }) {
 
         const normEq = (s) => String(s || '').replace(/^0+/, '').trim();
         const cleanDateStr = (raw) => {
-          if (!raw) return '';
+          if (raw === undefined || raw === null || raw === '') return '';
+          if (typeof raw === 'number') {
+            const dateObj = XLSX.SSF.parse_date_code(raw);
+            if (dateObj) return `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
+          }
           let str = String(raw).trim();
           if (str.includes(' ')) str = str.split(' ')[0];
           if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
