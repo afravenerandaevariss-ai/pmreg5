@@ -1835,13 +1835,15 @@ export default function DailyDashboard({
               ✓ GSheet
             </button>
           )}
-          <button
+          {!isUserRole && (
+            <button
               onClick={openExportModal}
               className="bg-[#0f172a] hover:bg-slate-700 text-white px-3.5 py-2 rounded-xl shadow-xs transition-colors flex items-center gap-1.5 font-bold text-xs"
             >
               <FileDown size={14} />
               Export SAP
             </button>
+          )}
         </div>
       </div>
 
@@ -2211,14 +2213,12 @@ export default function DailyDashboard({
               </>
             )}
 
-            {isUserRole && (
-              <button 
-                onClick={openExportModal}
-                className="bg-[#0f172a] hover:bg-slate-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm"
-              >
-                <FileDown size={13} /> Export SAP
-              </button>
-            )}
+            <button 
+              onClick={openExportModal}
+              className="bg-[#0f172a] hover:bg-slate-700 text-white px-2.5 py-1.5 rounded-2xl font-semibold flex items-center gap-1.5 transition-colors text-xs whitespace-nowrap shadow-sm cursor-pointer"
+            >
+              <FileDown size={13} /> Export SAP
+            </button>
 
             {!isUserRole && (
               <button 
