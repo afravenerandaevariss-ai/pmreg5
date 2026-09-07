@@ -1498,7 +1498,7 @@ function App() {
                           className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-amber-800 bg-amber-50/60 hover:bg-amber-100/70 border border-amber-200/50 rounded-xl transition-colors text-left cursor-pointer"
                         >
                           <BookOpen size={14} className="text-amber-600" />
-                          <span>Dictionary / Knowledge Base</span>
+                          <span>Knowledge Base</span>
                         </button>
                       )}
                     </div>

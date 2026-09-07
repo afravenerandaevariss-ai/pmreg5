@@ -3,9 +3,40 @@ import {
   BookOpen, Search, Copy, Check, ChevronRight, ArrowLeft,
   Sparkles, FileText, Database, Shield, Settings, Activity, Truck, Hammer,
   Plus, Edit3, Trash2, Tag, CheckCircle, AlertCircle, Bookmark, Compass,
-  MessageSquare, X, Sun, Moon
+  MessageSquare, X, Sun, Moon, Terminal, Code, Server, Layers, Cpu,
+  FileSpreadsheet, ExternalLink, RefreshCw, Key, Clock, HelpCircle, HardDrive
 } from 'lucide-react';
 import { fetchKnowledgeBase, saveKnowledgeBase } from '../lib/supabaseService';
+
+function CodeSnippet({ code, language = 'sql', title = '' }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="rounded-xl overflow-hidden border border-slate-800 bg-[#0f172a] shadow-md my-3 font-mono text-xs text-left">
+      <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800 text-slate-400">
+        <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+          <Terminal size={12} className="text-emerald-500" />
+          {title || language}
+        </span>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 text-[11px] text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded transition-colors cursor-pointer"
+        >
+          {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+          <span>{copied ? 'Tersalin!' : 'Salin Kodingan'}</span>
+        </button>
+      </div>
+      <pre className="p-4 overflow-x-auto text-slate-200 leading-relaxed text-[12px] scrollbar-thin scrollbar-thumb-slate-700">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
 
 export default function DocsKnowledgeBaseView({ currentUser, onBackToApp }) {
   const isDev = currentUser?.role?.toUpperCase() === 'DEV';
@@ -272,7 +303,29 @@ export default function DocsKnowledgeBaseView({ currentUser, onBackToApp }) {
               </p>
             </div>
 
-            {/* Section 1: Modul Utama */}
+            {/* Architecture Overview */}
+            <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-3">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Server size={16} className="text-[#064e3b]" />
+                Arsitektur Sistem &amp; Stack Teknologi
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Aplikasi dibangun dengan arsitektur micro-service modern: Frontend React 19 + Vite, Backend REST API PostgREST v12.2, Database PostgreSQL 18.4, Reverse Proxy Nginx, dan Process Manager PM2 Cluster di server Cloud Ubuntu 24.04.
+              </p>
+              <CodeSnippet
+                language="bash"
+                title="PostgREST REST API — Query Data via HTTP cURL"
+                code={`# Mengambil data logbook kendaraan plant 5F01 bulan berjalan
+curl -X GET "https://pmreg5.afratarigan.my.id/postgrest/vehicle_logs?plant=eq.5F01&date=gte.2026-09-01&order=date.desc" \\
+  -H "Authorization: Bearer YOUR_ANON_TOKEN" \\
+  -H "Accept: application/json"
+
+# Response HTTP 200 OK:
+# [{"activity_number":"ACT-1001","vehicle_code":"2000015518","date":"2026-09-07","hm_km":8.5,"uom":"HM"}]`}
+              />
+            </div>
+
+            {/* Modul Utama */}
             <div id="what-you-can-do" className="space-y-4 pt-2">
               <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                 Modul Utama &amp; Ruang Lingkup Sistem
@@ -310,38 +363,12 @@ export default function DocsKnowledgeBaseView({ currentUser, onBackToApp }) {
                       <td className="px-5 py-3.5 font-bold text-rose-700">Berita Acara Online</td>
                       <td className="px-5 py-3.5 leading-relaxed">Penerbitan dokumen Berita Acara jam operasi bulanan via integrasi Google Sheets &amp; Cetak PDF resmi.</td>
                     </tr>
-                    <tr className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-5 py-3.5 font-bold text-yellow-700">Developer &amp; Key User Tools</td>
-                      <td className="px-5 py-3.5 leading-relaxed">Manajemen Master Data Equipment, Template Regional, Manajemen User, dan Knowledge Base Editor.</td>
-                    </tr>
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {/* Section 2: Tiga Pilar */}
-            <div id="three-dashboards" className="space-y-4 pt-4 border-t border-slate-200">
-              <h2 className="text-xl font-bold text-slate-900">Tiga Pilar Monitoring PM Regional 5</h2>
-              <div className="grid sm:grid-cols-3 gap-4">
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-black flex items-center justify-center">1</div>
-                  <h3 className="text-sm font-bold text-slate-900">Input Harian Pabrik</h3>
-                  <p className="text-xs text-slate-600 leading-relaxed">Formulir pengisian jam jalan mesin pabrik dengan validasi durasi (maks 24 jam) dan batas waktu H+1 pukul 09:00 WIB.</p>
-                </div>
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 text-xs font-black flex items-center justify-center">2</div>
-                  <h3 className="text-sm font-bold text-slate-900">Logbook Kendaraan</h3>
-                  <p className="text-xs text-slate-600 leading-relaxed">Pusat monitoring 235 armada alat berat &amp; kendaraan kebun/pabrik dari T-Code ZESTHLP16PA dan ZCO_CCTR_01.</p>
-                </div>
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-800 text-xs font-black flex items-center justify-center">3</div>
-                  <h3 className="text-sm font-bold text-slate-900">Kepatuhan Regional</h3>
-                  <p className="text-xs text-slate-600 leading-relaxed">Matriks kepatuhan 28 unit pabrik &amp; kebun dengan sinkronisasi IK17 serta pelacakan realisasi Work Order.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Section 3: Need Help */}
+            {/* Need Help */}
             <div id="need-help" className="space-y-4 pt-4 border-t border-slate-200">
               <h2 className="text-xl font-bold text-slate-900">Layanan Bantuan &amp; Dukungan Teknis</h2>
               <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50/60 to-white border border-emerald-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xs">
@@ -371,17 +398,17 @@ export default function DocsKnowledgeBaseView({ currentUser, onBackToApp }) {
             <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">Panduan Memulai</p>
             <h1 className="text-3xl font-black text-slate-900">Hak Akses &amp; Otorisasi Pengguna (RBAC)</h1>
             <p className="text-sm text-slate-600 leading-relaxed">
-              Sistem menerapkan <strong>Role-Based Access Control (RBAC)</strong> ketat untuk menjamin keamanan dan privasi data operasional masing-masing unit kebun dan pabrik di Regional V.
+              Sistem menerapkan <strong>Role-Based Access Control (RBAC)</strong> ketat untuk menjamin keamanan dan isolasi data operasional masing-masing unit kebun dan pabrik di Regional V.
             </p>
 
             <div className="space-y-4">
               <div className="p-5 rounded-2xl bg-white border border-slate-200 space-y-2 shadow-xs">
                 <div className="flex items-center gap-2">
                   <span className="px-3 py-0.5 text-xs font-black rounded-full bg-amber-100 text-amber-800 border border-amber-200">ROLE DEV</span>
-                  <span className="text-xs text-slate-500 font-mono">AFRA VENERANDA EVARIS, EKO PUJI CAHYONO</span>
+                  <span className="text-xs text-slate-500 font-mono">Super Admin / Pengembang</span>
                 </div>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Hak akses tertinggi (Super Admin / Developer). Memiliki akses ke seluruh 28 unit, manajemen file dasar, upload template master regional, manajemen akun pengguna, reset password, simulasi jam jalan bebas batas, dan <strong>Knowledge Base Live Editor</strong>.
+                  Hak akses tertinggi tanpa batasan: Akses seluruh 28 unit, manajemen master data alat, upload template regional, manajemen user, reset password, simulasi jam jalan bebas batas tanggal, serta akses ke Knowledge Base Live Editor.
                 </p>
               </div>
 
@@ -391,7 +418,7 @@ export default function DocsKnowledgeBaseView({ currentUser, onBackToApp }) {
                   <span className="text-xs text-slate-500 font-mono">Tim Bagian Teknik, Pengolahan &amp; Akuntansi Regional</span>
                 </div>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Akses tingkat regional. Dapat melihat dan memverifikasi data seluruh pabrik dan kebun, upload berkas verifikasi IK17, upload Work Order IW39, upload ZCO, dan mengesahkan Berita Acara.
+                  Akses tingkat regional: Dapat memonitor dan memverifikasi seluruh unit, upload ZESTHLP16PA, upload IW39, upload ZCO, serta validasi rekonsiliasi biaya.
                 </p>
               </div>
 
@@ -401,10 +428,101 @@ export default function DocsKnowledgeBaseView({ currentUser, onBackToApp }) {
                   <span className="text-xs text-slate-500 font-mono">124 Petugas Unit Kebun &amp; Pabrik</span>
                 </div>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  <strong>Lockdown Unit Milik Sendiri:</strong> User dikunci secara permanen hanya dapat melihat, menginput, dan mencetak data unit tempatnya bertugas (contoh: user SUISWADI hanya dapat mengakses data Pabrik Parindu 5F08). Seluruh dropdown unit lain dinonaktifkan secara otomatis.
+                  <strong>Lockdown Unit Milik Sendiri:</strong> Pengguna hanya dapat mengakses data unit tempatnya bertugas. Dropdown plant lain dikunci otomatis. Pada rekap regional, unit lain hanya dapat dilihat status kepatuhannya tanpa bisa mengubah detail.
                 </p>
               </div>
             </div>
+
+            <CodeSnippet
+              language="javascript"
+              title="Implementasi Frontend: Role Evaluation & Plant Guard"
+              code={`// Logika penentuan hak akses pengguna
+const isDev = currentUser?.role?.toUpperCase() === 'DEV';
+const isAdmin = isDev || ['ADMIN', 'REGIONAL'].includes(currentUser?.role?.toUpperCase());
+const isUserRole = !isAdmin || ['USER', 'UNIT'].includes(currentUser?.role?.toUpperCase());
+
+// Guard filter data unit:
+const filterByUserPlant = (logs, currentUser) => {
+  if (isAdmin) return logs; // Admin & Dev dapat melihat semua
+  return logs.filter(l => l.plant === currentUser?.plant);
+};`}
+            />
+
+            <CodeSnippet
+              language="sql"
+              title="Implementasi Database: Row-Level Plant Filtering di PostgreSQL"
+              code={`-- Kueri server-side memastikan role USER hanya membaca log unitnya sendiri:
+SELECT activity_number, vehicle_code, plant, date, hm_km, unit_value, uom
+FROM vehicle_logs
+WHERE (
+  -- Jika Admin/Dev (:role = 'DEV' / 'ADMIN'), ambil semua plant
+  (:role IN ('DEV', 'ADMIN', 'REGIONAL'))
+  OR
+  -- Jika User biasa, kunci hanya ke unitnya
+  (plant = :userPlant)
+)
+AND date >= '2026-09-01'
+ORDER BY date DESC;`}
+            />
+          </div>
+        );
+
+      case 'quick-start':
+        return (
+          <div className="space-y-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">Panduan Memulai</p>
+            <h1 className="text-3xl font-black text-slate-900">Alur Kerja Harian Petugas Unit</h1>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Setiap petugas unit kebun/pabrik wajib menjalankan alur operasional standar harian berikut untuk memastikan data jam operasi dan logbook kendaraan tersinkronisasi ke SAP secara akurat.
+            </p>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="p-5 bg-white rounded-2xl border border-slate-200 space-y-2 shadow-xs">
+                <span className="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-800 font-black text-xs flex items-center justify-center">01</span>
+                <h3 className="font-bold text-slate-800 text-sm">Pukul 07:00 - 08:30 WIB</h3>
+                <p className="text-xs text-slate-600 leading-relaxed">Kumpulkan formulir jam jalan operator mesin pabrik (turbin, boiler, genset) dan SPBS angkutan harian kendaraan.</p>
+              </div>
+
+              <div className="p-5 bg-white rounded-2xl border border-slate-200 space-y-2 shadow-xs">
+                <span className="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-800 font-black text-xs flex items-center justify-center">02</span>
+                <h3 className="font-bold text-slate-800 text-sm">Pukul 08:30 - 09:00 WIB</h3>
+                <p className="text-xs text-slate-600 leading-relaxed">Buka menu <strong>Jam Jalan Mesin Pabrik</strong> &gt; isi matriks jam jalan &gt; klik <strong>Simpan Jam Jalan</strong> sebelum batas cut-off H+1.</p>
+              </div>
+
+              <div className="p-5 bg-white rounded-2xl border border-slate-200 space-y-2 shadow-xs">
+                <span className="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-800 font-black text-xs flex items-center justify-center">03</span>
+                <h3 className="font-bold text-slate-800 text-sm">Pukul 09:30 - 11:00 WIB</h3>
+                <p className="text-xs text-slate-600 leading-relaxed">Buka menu <strong>Logbook Kendaraan</strong> &gt; periksa <strong>Checklist Kebun (Unit)</strong> untuk memastikan seluruh armada aktif telah terisi.</p>
+              </div>
+
+              <div className="p-5 bg-white rounded-2xl border border-slate-200 space-y-2 shadow-xs">
+                <span className="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-800 font-black text-xs flex items-center justify-center">04</span>
+                <h3 className="font-bold text-slate-800 text-sm">Akhir Bulan (Tgl 28 - 31)</h3>
+                <p className="text-xs text-slate-600 leading-relaxed">Buka menu <strong>Berita Acara</strong> &gt; periksa rekonsiliasi jam operasi bulanan &gt; cetak dokumen PDF &gt; upload bukti bertandatangan.</p>
+              </div>
+            </div>
+
+            <CodeSnippet
+              language="json"
+              title="Format Payload Simpan Jam Jalan Matriks (Web Matrix)"
+              code={`{
+  "plant": "5F01",
+  "year_month": "2026-09",
+  "equipment_code": "2000015518",
+  "equipment_desc": "DORONG TBS PKS MELIAU",
+  "daily_hours": {
+    "2026-09-01": 8.5,
+    "2026-09-02": 9.0,
+    "2026-09-03": 7.5,
+    "2026-09-04": 8.0,
+    "2026-09-05": 8.5,
+    "2026-09-06": 0.0,
+    "2026-09-07": 8.0
+  },
+  "status": "Normal",
+  "updated_by": "ANDHI HARTADI (13004627)"
+}`}
+            />
           </div>
         );
 
@@ -414,12 +532,12 @@ export default function DocsKnowledgeBaseView({ currentUser, onBackToApp }) {
             <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">Logbook Mesin Pabrik</p>
             <h1 className="text-3xl font-black text-slate-900">SOP Input Jam Jalan Mesin Pabrik (IK11)</h1>
             <p className="text-sm text-slate-600 leading-relaxed">
-              Pencatatan jam operasi harian mesin pabrik wajib dilakukan setiap hari kerja dengan ketentuan operasional sebagai berikut:
+              Pencatatan jam operasi harian mesin pabrik mengacu pada standar T-Code SAP <code>IK11</code> (Enter Measurement Reading for Point).
             </p>
 
             <div className="space-y-3 text-xs text-slate-700">
               <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-1 shadow-xs">
-                <h4 className="font-bold text-emerald-700">1. Batas Waktu Pengisian (Deadline)</h4>
+                <h4 className="font-bold text-emerald-700">1. Batas Waktu Pengisian (Cut-Off)</h4>
                 <p>Pengisian data logbook harian wajib diselesaikan paling lambat <strong>H+1 pukul 09:00 WIB</strong> setiap paginya.</p>
               </div>
               <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-1 shadow-xs">
@@ -431,6 +549,158 @@ export default function DocsKnowledgeBaseView({ currentUser, onBackToApp }) {
                 <p>Untuk role USER, sistem hanya membuka tanggal aktif kemarin (H-1) dan hari ini untuk mencegah manipulasi data historis tanpa persetujuan.</p>
               </div>
             </div>
+
+            <CodeSnippet
+              language="sql"
+              title="Struktur Tabel PostgreSQL daily_logs (Penyimpanan Jam Jalan Mesin)"
+              code={`CREATE TABLE IF NOT EXISTS daily_logs (
+  id BIGSERIAL PRIMARY KEY,
+  plant VARCHAR(10) NOT NULL,
+  date DATE NOT NULL,
+  equipment VARCHAR(50) NOT NULL,
+  duration_minutes INTEGER NOT NULL DEFAULT 0,
+  status VARCHAR(20) DEFAULT 'Normal',
+  notes TEXT,
+  read_by VARCHAR(50),
+  synced_to_sap BOOLEAN DEFAULT false,
+  sap_doc_num VARCHAR(30),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT uq_plant_eq_date UNIQUE (plant, equipment, date)
+);
+
+-- Index performa tinggi untuk pencarian matriks per bulan dan plant:
+CREATE INDEX IF NOT EXISTS idx_daily_logs_plant_date ON daily_logs (plant, date);
+CREATE INDEX IF NOT EXISTS idx_daily_logs_equipment ON daily_logs (equipment);`}
+            />
+
+            <CodeSnippet
+              language="sql"
+              title="Kueri Agregasi Total Jam Jalan Mesin Pabrik per Bulan"
+              code={`-- Menghitung total jam operasi (Jam & Menit) per equipment selama bulan berjalan:
+SELECT 
+  plant,
+  equipment,
+  COUNT(date) AS hari_terisi,
+  SUM(duration_minutes) / 60.0 AS total_jam_operasi,
+  ROUND(AVG(duration_minutes) / 60.0, 2) AS rata_rata_jam_per_hari
+FROM daily_logs
+WHERE plant = '5F01' 
+  AND date >= '2026-09-01' AND date <= '2026-09-30'
+GROUP BY plant, equipment
+ORDER BY total_jam_operasi DESC;`}
+            />
+          </div>
+        );
+
+      case 'stasiun-pabrik':
+        return (
+          <div className="space-y-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">Logbook Mesin Pabrik</p>
+            <h1 className="text-3xl font-black text-slate-900">Hierarki Stasiun &amp; Equipment PKS</h1>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Struktur peralatan mesin pada Pabrik Kelapa Sawit (PKS) di lingkungan PTPN IV Regional V dibagi ke dalam 9 stasiun proses utama yang terhubung secara serial.
+            </p>
+
+            <div className="grid sm:grid-cols-3 gap-3">
+              {[
+                { no: '01', name: 'Loading Ramp & Timbangan', eq: 'Hopper, Hydraulic Door, Transfer Carriage' },
+                { no: '02', name: 'Stasiun Sterilizer', eq: 'Sterilizer Door, Cantilever Rail, Blow-down Silencer' },
+                { no: '03', name: 'Stasiun Threshing', eq: 'Auto Feeder, Rotary Drum Thresher, Bottom Conveyor' },
+                { no: '04', name: 'Stasiun Press', eq: 'Digester, Screw Press, Cake Breaker Conveyor (CBC)' },
+                { no: '05', name: 'Stasiun Klarifikasi', eq: 'Sand Trap, Vibrating Screen, Continuous Settling Tank' },
+                { no: '06', name: 'Stasiun Nut & Kernel', eq: 'Depericarper, Polishing Drum, Ripple Mill, Claybath' },
+                { no: '07', name: 'Stasiun Boiler', eq: 'Feed Water Pump, Induced Draft Fan (IDF), Forced Draft Fan' },
+                { no: '08', name: 'Power House', eq: 'Steam Turbine Generator, Diesel Genset, Synchronizing Panel' },
+                { no: '09', name: 'Water Treatment & IPAL', eq: 'Clarifier Water, Sand Filter, Anaerobic Pond Mixer' },
+              ].map(st => (
+                <div key={st.no} className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black flex items-center justify-center">{st.no}</span>
+                    <h4 className="text-xs font-bold text-slate-800">{st.name}</h4>
+                  </div>
+                  <p className="text-[11px] text-slate-500">{st.eq}</p>
+                </div>
+              ))}
+            </div>
+
+            <CodeSnippet
+              language="javascript"
+              title="Pemetaan Hierarki Equipment Induk & Anak di JavaScript"
+              code={`export const PKS_STATION_HIERARCHY = {
+  '5F01': {
+    plantName: 'PKS GUNUNG MELIAU',
+    stations: [
+      {
+        id: 'ST-01',
+        name: 'STASIUN LOADING RAMP',
+        equipments: [
+          { eqNum: '10000101', desc: 'Hydraulic Loading Ramp 01', type: 'Induk' },
+          { eqNum: '10000102', desc: 'Fruit Transfer Conveyor', type: 'Anak', parent: '10000101' }
+        ]
+      },
+      {
+        id: 'ST-07',
+        name: 'STASIUN BOILER',
+        equipments: [
+          { eqNum: '10000701', desc: 'Boiler No. 1 (Kapasitas 30 Ton/h)', type: 'Induk' },
+          { eqNum: '10000702', desc: 'Induced Draft Fan (IDF) 01', type: 'Anak', parent: '10000701' }
+        ]
+      }
+    ]
+  }
+};`}
+            />
+          </div>
+        );
+
+      case 'ik11-deadline':
+        return (
+          <div className="space-y-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">Logbook Mesin Pabrik</p>
+            <h1 className="text-3xl font-black text-slate-900">Ketentuan Batas Waktu H+1 &amp; Kepatuhan</h1>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Ketepatan waktu penginputan jam jalan mesin pabrik merupakan KPI penting operasional Regional 5. Batas waktu toleransi penginputan diatur ketat oleh sistem.
+            </p>
+
+            <div className="p-5 bg-amber-50 border border-amber-200 rounded-2xl space-y-2 text-xs text-amber-900 shadow-xs">
+              <h4 className="font-bold flex items-center gap-1.5 text-sm">
+                <AlertCircle size={16} className="text-amber-700" />
+                Aturan Cut-Off Pukul 09:00 WIB
+              </h4>
+              <p className="leading-relaxed">
+                Data jam jalan mesin tanggal <code>D</code> wajib disimpan paling lambat tanggal <code>D+1 pukul 09:00 WIB</code>. Jika melebihi batas waktu tersebut:
+              </p>
+              <ul className="list-disc list-inside space-y-1 pl-1">
+                <li>Status pada Matriks Regional akan otomatis ditandai sebagai <strong>KOSONG / TERLAMBAT</strong>.</li>
+                <li>Persetujuan pembukaan tanggal lewat batas waktu memerlukan verifikasi izin dari Key User DEV.</li>
+              </ul>
+            </div>
+
+            <CodeSnippet
+              language="javascript"
+              title="Logika Validasi Deadline Pengisian Jam Jalan"
+              code={`// Pengecekan apakah penginputan tanggal target sudah melewati deadline
+export function isInputLocked(targetDateStr, userRole, maxAllowedTime = '09:00') {
+  if (userRole === 'DEV') return false; // DEV bebas simulasi tanggal
+
+  const now = new Date();
+  const todayStr = format(now, 'yyyy-MM-dd');
+  const yesterdayStr = format(subDays(now, 1), 'yyyy-MM-dd');
+
+  // Input untuk hari ini selalu dibuka
+  if (targetDateStr === todayStr) return false;
+
+  // Input untuk kemarin dibuka sebelum jam cut-off
+  if (targetDateStr === yesterdayStr) {
+    const currentHourMin = format(now, 'HH:mm');
+    return currentHourMin > maxAllowedTime;
+  }
+
+  // Tanggal lebih lampau (H-2 kebawah) terkunci untuk USER
+  return targetDateStr < yesterdayStr;
+}`}
+            />
           </div>
         );
 
@@ -440,25 +710,197 @@ export default function DocsKnowledgeBaseView({ currentUser, onBackToApp }) {
             <p className="text-xs font-bold uppercase tracking-wider text-amber-700 mb-1">Kendaraan &amp; Alat Berat</p>
             <h1 className="text-3xl font-black text-slate-900">Petunjuk T-Code ZESTHLP16PA</h1>
             <p className="text-sm text-slate-600 leading-relaxed">
-              T-Code <code>ZESTHLP16PA</code> digunakan pada SAP Front End untuk mengekstrak dan memverifikasi logbook kendaraan &amp; alat berat 28 unit Regional 5.
+              T-Code <code>ZESTHLP16PA</code> digunakan pada SAP GUI untuk mengekstrak data operasional logbook harian armada kendaraan dan alat berat 28 unit Regional 5.
             </p>
+
             <div className="space-y-3">
-              <h3 className="text-base font-bold text-slate-900">Langkah Ekstraksi:</h3>
+              <h3 className="text-base font-bold text-slate-900">Langkah Ekstraksi di SAP GUI:</h3>
               <ol className="space-y-2 list-decimal list-inside text-xs text-slate-700">
                 <li className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs">
-                  Ketik <code>ZESTHLP16PA</code> pada command bar SAP GUI.
+                  Buka SAP GUI &gt; ketik <code>ZESTHLP16PA</code> pada command bar &gt; tekan Enter.
                 </li>
                 <li className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs">
-                  Tentukan periode bulan (contoh: <code>01.08.2026 s/d 31.08.2026</code>) dan kode Plant.
+                  Masukkan parameter: <strong>Company Code: 2000</strong>, <strong>Plant: [Kode Unit misal 5F01]</strong>, dan periode tanggal satu bulan penuh.
                 </li>
                 <li className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs">
-                  Ekspor file ke format spreadsheet (Excel <code>.xlsx</code>).
+                  Jalankan laporan (tekan <code>F8</code>) &gt; klik Menu <code>List &gt; Export &gt; Spreadsheet (*.xlsx)</code>.
                 </li>
                 <li className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs">
-                  Upload file pada menu <strong>Logbook Kendaraan</strong> &gt; tombol <em>Upload ZESTHLP16PA</em>.
+                  Buka menu <strong>Logbook Kendaraan</strong> &gt; klik tombol <strong>Upload ZESTHLP16PA</strong> untuk sinkronisasi otomatis ke cloud.
                 </li>
               </ol>
             </div>
+
+            <CodeSnippet
+              language="sql"
+              title="Skema Database PostgreSQL untuk ZESTHLP16PA (vehicle_logs)"
+              code={`CREATE TABLE IF NOT EXISTS vehicle_master (
+  vehicle_code VARCHAR(30) PRIMARY KEY,
+  description TEXT,
+  plant VARCHAR(10) NOT NULL,
+  cost_center VARCHAR(30),
+  wilayah VARCHAR(30),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS vehicle_logs (
+  activity_number VARCHAR(50) PRIMARY KEY,
+  vehicle_code VARCHAR(30) REFERENCES vehicle_master(vehicle_code),
+  plant VARCHAR(10) NOT NULL,
+  date DATE NOT NULL,
+  vehicle_time VARCHAR(20),
+  job_code VARCHAR(30),
+  hm_km NUMERIC(10,2) DEFAULT 0,
+  unit_value NUMERIC(10,2) DEFAULT 0,
+  uom VARCHAR(20),
+  location_code VARCHAR(50),
+  operator VARCHAR(100),
+  reference TEXT,
+  remarks TEXT,
+  measurement_doc VARCHAR(50),
+  document_number VARCHAR(50),
+  spbs_number VARCHAR(50),
+  cancelled BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_vlogs_plant_date ON vehicle_logs (plant, date);
+CREATE INDEX IF NOT EXISTS idx_vlogs_vehicle_code ON vehicle_logs (vehicle_code);`}
+            />
+          </div>
+        );
+
+      case 'master-kendaraan':
+        return (
+          <div className="space-y-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-700 mb-1">Kendaraan &amp; Alat Berat</p>
+            <h1 className="text-3xl font-black text-slate-900">Master 235 Kendaraan Regional 5</h1>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Database Master Kendaraan memuat <strong>235 unit armada</strong> kendaraan angkut dan alat berat yang beroperasi aktif di seluruh wilayah Kalimantan Barat, Kalimantan Tengah, dan Kalimantan Timur.
+            </p>
+
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Kategori 1</span>
+                <h4 className="text-sm font-bold text-slate-800 mt-1">Dump Truck &amp; Tangki</h4>
+                <p className="text-xs text-slate-500 mt-1">Armada pengangkutan TBS, CPO, kernel, pupuk, dan tankos solid.</p>
+              </div>
+              <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Kategori 2</span>
+                <h4 className="text-sm font-bold text-slate-800 mt-1">Alat Berat (Heavy Eq.)</h4>
+                <p className="text-xs text-slate-500 mt-1">Wheel Loader, Bulldozer, Excavator, Vibratory Roller untuk pemeliharaan jalan kebun.</p>
+              </div>
+              <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Kategori 3</span>
+                <h4 className="text-sm font-bold text-slate-800 mt-1">Traktor &amp; Operasional</h4>
+                <p className="text-xs text-slate-500 mt-1">Traktor pertanian, genset mobile, dan kendaraan dinas kebun.</p>
+              </div>
+            </div>
+
+            <CodeSnippet
+              language="javascript"
+              title="Kueri Pengambilan Data Master Kendaraan dengan Cache"
+              code={`import { supabase } from '../lib/supabase';
+
+// Cache memory untuk respon instan tanpa query berulang
+const masterCache = new Map();
+
+export async function fetchVehicleMaster(forceRefresh = false) {
+  if (!forceRefresh && masterCache.has('all_vehicles')) {
+    return { data: masterCache.get('all_vehicles'), error: null };
+  }
+
+  const { data, error } = await supabase
+    .from('vehicle_master')
+    .select('vehicle_code, description, plant, cost_center, wilayah')
+    .order('plant', { ascending: true })
+    .order('vehicle_code', { ascending: true });
+
+  if (!error && data) {
+    masterCache.set('all_vehicles', data);
+  }
+  return { data, error };
+}`}
+            />
+          </div>
+        );
+
+      case 'jobcodes':
+        return (
+          <div className="space-y-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-700 mb-1">Kendaraan &amp; Alat Berat</p>
+            <h1 className="text-3xl font-black text-slate-900">Job Codes &amp; Satuan Operasional</h1>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Setiap transaksi logbook kendaraan wajib menyertakan kode pekerjaan (Job Code) standar SAP untuk penelusuran biaya dan alokasi cost center secara otomatis.
+            </p>
+
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase">
+                  <tr>
+                    <th className="px-4 py-3">Kode Pekerjaan</th>
+                    <th className="px-4 py-3">Deskripsi Pekerjaan</th>
+                    <th className="px-4 py-3">Satuan Ukur (UoM)</th>
+                    <th className="px-4 py-3">Pola Pembebanan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  <tr>
+                    <td className="px-4 py-2.5 font-mono font-bold text-emerald-800">JC-01</td>
+                    <td className="px-4 py-2.5">Langsir Buah / TBS dari TPH ke Pabrik</td>
+                    <td className="px-4 py-2.5 font-mono">TON / TRIP</td>
+                    <td className="px-4 py-2.5">Biaya Panen &amp; Angkut TBS</td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-2.5 font-mono font-bold text-emerald-800">JC-02</td>
+                    <td className="px-4 py-2.5">Pemadatan &amp; Perbaikan Jalan Kebun</td>
+                    <td className="px-4 py-2.5 font-mono">HM (Hour Meter)</td>
+                    <td className="px-4 py-2.5">Pemeliharaan Infrastruktur</td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-2.5 font-mono font-bold text-emerald-800">JC-03</td>
+                    <td className="px-4 py-2.5">Angkut Pupuk &amp; Bibitan Kelapa Sawit</td>
+                    <td className="px-4 py-2.5 font-mono">ZAK / TON</td>
+                    <td className="px-4 py-2.5">Pemupukan Tanaman Menghasilkan</td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-2.5 font-mono font-bold text-emerald-800">JC-04</td>
+                    <td className="px-4 py-2.5">Angkut Solid, Tankos &amp; Abu Janjang</td>
+                    <td className="px-4 py-2.5 font-mono">TON / TRIP</td>
+                    <td className="px-4 py-2.5">Aplikasi Limbah Pabrik ke Kebun</td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-2.5 font-mono font-bold text-emerald-800">JC-05</td>
+                    <td className="px-4 py-2.5">Transportasi CPO / Kernel ke Bulking</td>
+                    <td className="px-4 py-2.5 font-mono">TON / KM</td>
+                    <td className="px-4 py-2.5">Pengiriman Produksi Utama</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <CodeSnippet
+              language="javascript"
+              title="Konstanta Mapping Job Codes di Frontend React"
+              code={`export const JOB_CODE_DESC = {
+  'JC-01': 'Langsir Buah TBS ke Pabrik',
+  'JC-02': 'Pemadatan & Rawat Jalan Kebun',
+  'JC-03': 'Langsir Pupuk & Bahan Kimia',
+  'JC-04': 'Aplikasi Tankos & Solid PKS',
+  'JC-05': 'Transport CPO / Palm Kernel',
+  'JC-06': 'Pembersihan Parit / Drainase',
+  'JC-07': 'Operasional Genset / Pembangkit',
+  'JC-08': 'Dinas Operasional Kebun'
+};
+
+export const UOM_LABEL = {
+  'HM': 'Hour Meter (Jam Kerja)',
+  'KM': 'Kilometer (Jarak Tempuh)',
+  'TON': 'Tonase Hasil Angkut',
+  'TRIP': 'Jumlah Ritase / Trip'
+};`}
+            />
           </div>
         );
 
@@ -468,12 +910,360 @@ export default function DocsKnowledgeBaseView({ currentUser, onBackToApp }) {
             <p className="text-xs font-bold uppercase tracking-wider text-purple-700 mb-1">Verifikasi Biaya</p>
             <h1 className="text-3xl font-black text-slate-900">Verifikasi Biaya Cost Center (ZCO_CCTR_01)</h1>
             <p className="text-sm text-slate-600 leading-relaxed">
-              Laporan <code>ZCO_CCTR_01</code> menyajikan realisasi pembebanan biaya pemeliharaan armada kendaraan kebun dan pabrik.
+              Laporan SAP <code>ZCO_CCTR_01</code> menyajikan realisasi pembebanan biaya operasional per Cost Center kendaraan dan perbandingan dengan tarif log internal.
             </p>
+
             <div className="p-4 bg-white rounded-xl border border-slate-200 text-xs text-slate-700 space-y-2 shadow-xs">
-              <p className="font-bold text-emerald-700">Pembersihan Baris Otomatis:</p>
-              <p>Sistem secara otomatis menyaring 25 baris subtotal SAP <code>PLANT xxx LOG RATE</code> dan header baris ganda sehingga total cost center yang ditampilkan adalah 235 kendaraan valid.</p>
+              <p className="font-bold text-emerald-700">Tujuan Rekonsiliasi:</p>
+              <p>Mencocokkan apakah biaya BBM, suku cadang, dan jasa pemeliharaan pada SAP CO sesuai dengan akumulasi HM/KM yang tercatat pada logbook harian kendaraan.</p>
             </div>
+
+            <CodeSnippet
+              language="sql"
+              title="Kueri SQL: Rekonsiliasi Biaya Kendaraan vs Jam Kerja (HM/KM)"
+              code={`-- Membandingkan total jam kerja logbook dengan alokasi cost center:
+SELECT 
+  vl.plant,
+  vl.vehicle_code,
+  vm.description AS nama_kendaraan,
+  vm.cost_center,
+  COUNT(vl.activity_number) AS total_transaksi,
+  SUM(CASE WHEN vl.uom = 'HM' THEN vl.hm_km ELSE 0 END) AS total_hm,
+  SUM(CASE WHEN vl.uom = 'KM' THEN vl.hm_km ELSE 0 END) AS total_km,
+  SUM(vl.unit_value) AS total_hasil_angkut
+FROM vehicle_logs vl
+LEFT JOIN vehicle_master vm ON vl.vehicle_code = vm.vehicle_code
+WHERE vl.date BETWEEN '2026-08-01' AND '2026-08-31'
+  AND vl.cancelled = false
+GROUP BY vl.plant, vl.vehicle_code, vm.description, vm.cost_center
+ORDER BY vl.plant, total_hm DESC;`}
+            />
+          </div>
+        );
+
+      case 'zco-filter':
+        return (
+          <div className="space-y-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-purple-700 mb-1">Verifikasi Biaya</p>
+            <h1 className="text-3xl font-black text-slate-900">Aturan Subtotal &amp; Pembersihan Data ZCO</h1>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Hasil ekspor mentah dari SAP GUI sering memuat baris subtotal regional seperti <code>PLANT 5F01 LOG RATE</code> yang jika tidak dibersihkan akan menyebabkan perhitungan ganda.
+            </p>
+
+            <CodeSnippet
+              language="javascript"
+              title="Fungsi Pembersihan Otomatis Baris Subtotal SAP"
+              code={`// Membersihkan baris subtotal & header duplikat dari file Excel ZCO SAP:
+export function cleanZcoExcelRows(rawRows) {
+  return rawRows.filter(row => {
+    // 1. Ambil kolom pengenal cost center / akun
+    const cctr = String(row['Cost Center'] || row['cctr'] || '').trim().toUpperCase();
+    const desc = String(row['Description'] || row['desc'] || '').trim().toUpperCase();
+
+    // 2. Buang baris subtotal agregat
+    if (cctr.includes('TOTAL') || cctr.includes('LOG RATE') || cctr.includes('SUBTOTAL')) {
+      return false;
+    }
+    if (desc.includes('PLANT') && desc.includes('RATE')) {
+      return false;
+    }
+
+    // 3. Pastikan baris memiliki kode kendaraan / cost center yang valid
+    return cctr.length > 3 && !isNaN(Number(row['Actual Cost'] || row['Biaya Realisasi'] || 0));
+  });
+}`}
+            />
+          </div>
+        );
+
+      case 'wo-lifecycle':
+        return (
+          <div className="space-y-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-blue-700 mb-1">Monitoring Work Order</p>
+            <h1 className="text-3xl font-black text-slate-900">Siklus Hidup Work Order (CRTD/REL/TECO)</h1>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Setiap perintah kerja pemeliharaan mesin (Maintenance Order) melewati empat status utama dari penerbitan hingga penyelesaian keuangan di SAP PM:
+            </p>
+
+            <div className="grid sm:grid-cols-4 gap-3">
+              <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs space-y-1">
+                <span className="text-xs font-black text-slate-400">STATUS 1</span>
+                <h4 className="text-sm font-bold text-slate-800">CRTD (Created)</h4>
+                <p className="text-xs text-slate-500">Order baru dibuat, belum disetujui untuk pengadaan suku cadang.</p>
+              </div>
+              <div className="p-4 bg-white rounded-xl border border-blue-200 bg-blue-50/40 shadow-xs space-y-1">
+                <span className="text-xs font-black text-blue-600">STATUS 2</span>
+                <h4 className="text-sm font-bold text-blue-900">REL (Released)</h4>
+                <p className="text-xs text-blue-700">Order disetujui, reservasi material gudang dapat dicairkan.</p>
+              </div>
+              <div className="p-4 bg-white rounded-xl border border-emerald-200 bg-emerald-50/40 shadow-xs space-y-1">
+                <span className="text-xs font-black text-emerald-600">STATUS 3</span>
+                <h4 className="text-sm font-bold text-emerald-900">TECO (Completed)</h4>
+                <p className="text-xs text-emerald-700">Pekerjaan fisik mesin selesai, tinggal settlement biaya.</p>
+              </div>
+              <div className="p-4 bg-white rounded-xl border border-purple-200 bg-purple-50/40 shadow-xs space-y-1">
+                <span className="text-xs font-black text-purple-600">STATUS 4</span>
+                <h4 className="text-sm font-bold text-purple-900">CLSD (Closed)</h4>
+                <p className="text-xs text-purple-700">Penyelesaian akuntansi penuh, order terkunci permanen.</p>
+              </div>
+            </div>
+
+            <CodeSnippet
+              language="sql"
+              title="Kueri Pelacakan Order Terbuka (CRTD & REL) yang Belum TECO"
+              code={`-- Mendeteksi Work Order yang belum diselesaikan (Outstanding WO):
+SELECT 
+  plant,
+  order_number,
+  order_type,
+  equipment_desc,
+  system_status,
+  created_on,
+  CURRENT_DATE - created_on AS umur_order_hari
+FROM work_orders
+WHERE system_status NOT LIKE '%TECO%' 
+  AND system_status NOT LIKE '%CLSD%'
+ORDER BY umur_order_hari DESC;`}
+            />
+          </div>
+        );
+
+      case 'pm01-pm02-pm04':
+        return (
+          <div className="space-y-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-blue-700 mb-1">Monitoring Work Order</p>
+            <h1 className="text-3xl font-black text-slate-900">Tipe Order (PM01, PM02, PM04)</h1>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Standarisasi klasifikasi jenis pemeliharaan pada SAP PM PTPN IV:
+            </p>
+
+            <div className="space-y-3">
+              <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-mono font-bold text-xs">PM01</span>
+                  <h4 className="font-bold text-sm text-slate-800">Planned Corrective Maintenance</h4>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed">Perbaikan terencana berdasarkan temuan inspeksi berkala sebelum terjadi kerusakan total.</p>
+              </div>
+              <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono font-bold text-xs">PM02</span>
+                  <h4 className="font-bold text-sm text-slate-800">Preventive Maintenance</h4>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed">Pemeliharaan pencegahan berbasis jadwal siklus waktu atau jam operasi (greasing, ganti oli rutin, servis kalibrasi).</p>
+              </div>
+              <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded bg-red-100 text-red-800 font-mono font-bold text-xs">PM04</span>
+                  <h4 className="font-bold text-sm text-slate-800">Breakdown / Emergency Maintenance</h4>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed">Perbaikan darurat akibat kerusakan mendadak yang menyebabkan mesin berhenti operasi (stagnasi pabrik).</p>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'wo-integration':
+        return (
+          <div className="space-y-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-blue-700 mb-1">Monitoring Work Order</p>
+            <h1 className="text-3xl font-black text-slate-900">Upload Berkas IW39, ZVTAB, 046EXP</h1>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Sistem menyatukan tiga sumber data SAP terpisah ke dalam satu tampilan terpadu melalui penggabungan berbasis nomor order (<code>AUFNR</code>).
+            </p>
+
+            <CodeSnippet
+              language="javascript"
+              title="Logika Penggabungan File IW39 + ZVTAB + 046EXP"
+              code={`// Menggabungkan 3 file Excel SAP berdasarkan nomor Work Order (Order Number):
+export function mergeWorkOrderFiles(iw39Rows, zvtabRows, expRows) {
+  const mergedMap = new Map();
+
+  // 1. Base header dari IW39
+  iw39Rows.forEach(row => {
+    const orderNo = String(row['Order'] || row['Order Number'] || '').trim();
+    if (orderNo) {
+      mergedMap.set(orderNo, { ...row, orderNo, activities: [], costs: [] });
+    }
+  });
+
+  // 2. Masukkan rincian aktivitas dari ZVTAB
+  zvtabRows.forEach(row => {
+    const orderNo = String(row['Order'] || '').trim();
+    if (mergedMap.has(orderNo)) {
+      mergedMap.get(orderNo).activities.push(row);
+    }
+  });
+
+  // 3. Masukkan realisasi biaya aktual dari 046EXP
+  expRows.forEach(row => {
+    const orderNo = String(row['Order'] || '').trim();
+    if (mergedMap.has(orderNo)) {
+      mergedMap.get(orderNo).costs.push(row);
+    }
+  });
+
+  return Array.from(mergedMap.values());
+}`}
+            />
+          </div>
+        );
+
+      case 'ik17-verification':
+        return (
+          <div className="space-y-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-teal-700 mb-1">Sinkronisasi &amp; Laporan</p>
+            <h1 className="text-3xl font-black text-slate-900">Verifikasi Pembacaan SAP (IK17)</h1>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              T-Code <code>IK17</code> digunakan untuk memverifikasi dokumen pengukuran (Measurement Document) yang telah berhasil di-posting ke sistem SAP.
+            </p>
+
+            <CodeSnippet
+              language="sql"
+              title="Kueri Pencocokan Dokumen SAP IK17 vs Input Logbook Web"
+              code={`-- Mendeteksi entri jam jalan web yang belum terbit nomor dokumen SAP:
+SELECT 
+  plant,
+  date,
+  equipment,
+  duration_minutes / 60.0 AS jam_input,
+  synced_to_sap,
+  sap_doc_num
+FROM daily_logs
+WHERE synced_to_sap = false 
+  AND date <= CURRENT_DATE - INTERVAL '1 day'
+ORDER BY date DESC, plant ASC;`}
+            />
+          </div>
+        );
+
+      case 'berita-acara-sop':
+        return (
+          <div className="space-y-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-teal-700 mb-1">Sinkronisasi &amp; Laporan</p>
+            <h1 className="text-3xl font-black text-slate-900">Penerbitan Berita Acara Online</h1>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Dokumen resmi Berita Acara Jam Operasi Bulanan diterbitkan secara otomatis dari data spreadsheet Google Sheets terintegrasi dengan penyesuaian tersimpan di Supabase Cloud.
+            </p>
+
+            <CodeSnippet
+              language="javascript"
+              title="Kode Integrasi: Google Sheets JSONP Loader (Berita Acara)"
+              code={`export const loadGoogleSheetJSONP = (jsonpUrl) => {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    const callbackName = 'gviz_jsonp_' + Date.now();
+
+    window[callbackName] = (data) => {
+      delete window[callbackName];
+      document.body.removeChild(script);
+      resolve(data);
+    };
+
+    script.src = \`\${jsonpUrl}&tqx=responseHandler:\${callbackName}\`;
+    script.onerror = (err) => {
+      delete window[callbackName];
+      document.body.removeChild(script);
+      reject(new Error('Gagal menghubungi Google Sheets API'));
+    };
+    document.body.appendChild(script);
+  });
+};`}
+            />
+          </div>
+        );
+
+      case 'troubleshooting-sap':
+        return (
+          <div className="space-y-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-rose-700 mb-1">Sinkronisasi &amp; Laporan</p>
+            <h1 className="text-3xl font-black text-slate-900">Penanganan Error &amp; Selisih Data SAP</h1>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Panduan pemecahan masalah teknis yang sering ditemui saat impor atau sinkronisasi data dengan SAP ERP:
+            </p>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs space-y-1">
+                <h4 className="font-bold text-red-600">Error 1: "Measurement Document Already Exists"</h4>
+                <p className="text-slate-600">Terjadi ketika dokumen pengukuran untuk tanggal dan equipment tersebut sudah di-post sebelumnya di SAP. Solusi: Gunakan nomor dokumen yang sudah ada atau batalkan dokumen lama di IK12.</p>
+              </div>
+              <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs space-y-1">
+                <h4 className="font-bold text-amber-600">Error 2: "Plant Code Kosong / Tidak Terdaftar"</h4>
+                <p className="text-slate-600">Data mentah tidak menyertakan kode plant. Sistem menyediakan tombol <strong>Perbaiki Plant</strong> untuk mengaitkan equipment ke plant induk secara otomatis.</p>
+              </div>
+            </div>
+
+            <CodeSnippet
+              language="sql"
+              title="Kueri Perbaikan Data Plant yang Kosong (Repair Script)"
+              code={`-- Memperbaiki logbook lama yang kode plant-nya kosong berdasarkan master kendaraan:
+UPDATE vehicle_logs vl
+SET plant = vm.plant
+FROM vehicle_master vm
+WHERE vl.vehicle_code = vm.vehicle_code
+  AND (vl.plant IS NULL OR vl.plant = '');`}
+            />
+          </div>
+        );
+
+      case 'master-templates':
+        return (
+          <div className="space-y-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-700 mb-1">Admin &amp; Developer</p>
+            <h1 className="text-3xl font-black text-slate-900">Manajemen Master EQ &amp; Template Regional</h1>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Pengaturan hierarki master data equipment pabrik dan sinkronisasi berkala dari Master Template Google Sheets Regional V.
+            </p>
+
+            <CodeSnippet
+              language="javascript"
+              title="Logika Parsing Kode Equipment Terstruktur"
+              code={`// Format kode equipment standar: [PLANT]-[STASIUN]-[NO_URUT]
+// Contoh: 5F01-ST07-EQ001 (PKS Meliau, Stasiun Boiler, Boiler 01)
+export function parseStructuredEqCode(eqCode) {
+  const parts = eqCode.split('-');
+  return {
+    plant: parts[0] || '5F01',
+    station: parts[1] || 'ST-01',
+    eqIndex: parts[2] || 'EQ001'
+  };
+}`}
+            />
+          </div>
+        );
+
+      case 'user-management':
+        return (
+          <div className="space-y-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-700 mb-1">Admin &amp; Developer</p>
+            <h1 className="text-3xl font-black text-slate-900">Manajemen Akun &amp; Keamanan Sandi</h1>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Autentikasi menggunakan standar hashing kriptografi <strong>SHA-256</strong> langsung pada browser klien menggunakan Web Crypto API sebelum disimpan ke database.
+            </p>
+
+            <CodeSnippet
+              language="javascript"
+              title="Fungsi Kriptografi SHA-256 Hash Password"
+              code={`// Hashing sandi menggunakan Web Crypto API standar W3C:
+export async function hashPassword(plainText) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plainText);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}`}
+            />
+
+            <CodeSnippet
+              language="sql"
+              title="Kueri Pembaruan Sandi & Otorisasi Pengguna"
+              code={`-- Mengubah sandi pengguna dengan hash SHA-256:
+UPDATE app_users 
+SET 
+  password_hash = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+  updated_at = NOW()
+WHERE nik = '13004627';`}
+            />
           </div>
         );
 
@@ -504,8 +1294,29 @@ export default function DocsKnowledgeBaseView({ currentUser, onBackToApp }) {
               Artikel dan Tanya-Jawab di bawah ini tersimpan di Supabase Cloud dan terhubung otomatis dengan widget <strong>Chatbot Asisten PM</strong>.
             </p>
 
-            <div className="space-y-3">
-              {customArticles.map((item, idx) => (
+            <CodeSnippet
+              language="javascript"
+              title="API Sinkronisasi Knowledge Base dengan Database Cloud"
+              code={`import { supabase } from '../lib/supabase';
+
+// Mengambil seluruh entri Knowledge Base dari Supabase Cloud
+export async function fetchKnowledgeBase() {
+  return await supabase
+    .from('knowledge_base')
+    .select('*')
+    .order('created_at', { ascending: false });
+}
+
+// Menyimpan pembaruan Q&A ke Supabase Cloud
+export async function saveKnowledgeBase(articles) {
+  return await supabase
+    .from('knowledge_base')
+    .upsert(articles, { onConflict: 'id' });
+}`}
+            />
+
+            <div className="space-y-3 pt-2">
+              {customArticles.map((item) => (
                 <div key={item.id} className="p-4 rounded-xl bg-white border border-slate-200 hover:border-slate-300 transition-colors shadow-xs">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1.5 flex-1">
