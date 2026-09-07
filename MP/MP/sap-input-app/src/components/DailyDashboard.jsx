@@ -60,11 +60,7 @@ export default function DailyDashboard({
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   // Sub-Tab State for Jam Jalan Mesin Pabrik: 'isi' (Isi Jam Jalan Web Matrix) vs 'riwayat' (Calendar & History)
-  // Role USER starts on 'riwayat' — they only have access to Export SAP there
-  const roleCheck = String(currentUser?.role || '').toUpperCase();
-  const [dashboardSubTab, setDashboardSubTab] = useState(
-    (roleCheck === 'USER' || roleCheck === 'UNIT') ? 'riwayat' : 'isi'
-  );
+  const [dashboardSubTab, setDashboardSubTab] = useState('isi');
   const [matrixMonth, setMatrixMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [simulatedToday, setSimulatedToday] = useState(new Date());
 
@@ -1779,20 +1775,17 @@ export default function DailyDashboard({
       <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between flex-wrap gap-3 flex-shrink-0 shadow-xs z-30">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl border border-slate-200/70">
-            {!isUserRole && (
-
-              <button
-                onClick={() => setDashboardSubTab('isi')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
-                  dashboardSubTab === 'isi'
-                    ? 'bg-[#064e3b] text-white shadow-md shadow-emerald-900/20'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-                }`}
-              >
-                <FileSpreadsheet size={16} />
-                Isi Jam Jalan Pabrik
-              </button>
-            )}
+            <button
+              onClick={() => setDashboardSubTab('isi')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                dashboardSubTab === 'isi'
+                  ? 'bg-[#064e3b] text-white shadow-md shadow-emerald-900/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+              }`}
+            >
+              <FileSpreadsheet size={16} />
+              Isi Jam Jalan Pabrik
+            </button>
             <button
               onClick={() => setDashboardSubTab('riwayat')}
               className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
@@ -1804,19 +1797,17 @@ export default function DailyDashboard({
               <CalendarIcon size={16} />
               Riwayat &amp; Kalender Jam Jalan
             </button>
-            {!isUserRole && (
-              <button
-                onClick={() => setDashboardSubTab('rekap')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
-                  dashboardSubTab === 'rekap'
-                    ? 'bg-[#7c3aed] text-white shadow-md shadow-violet-900/20'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-                }`}
-              >
-                <ClipboardList size={16} />
-                Rekap Monitoring Regional
-              </button>
-            )}
+            <button
+              onClick={() => setDashboardSubTab('rekap')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                dashboardSubTab === 'rekap'
+                  ? 'bg-[#7c3aed] text-white shadow-md shadow-violet-900/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+              }`}
+            >
+              <ClipboardList size={16} />
+              Rekap Monitoring Regional
+            </button>
             <a
               href="https://cmms.ptpn4.co.id/"
               target="_blank"
