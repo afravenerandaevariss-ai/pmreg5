@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toPng } from 'html-to-image';
-import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, fetchMasterEquipment, fetchZCOData, saveZCOData, getSystemConfig, fetchDailyLogs } from '../lib/supabaseService';
+import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, invalidateVehicleCache, fetchMasterEquipment, fetchZCOData, saveZCOData, getSystemConfig, fetchDailyLogs } from '../lib/supabaseService';
 import WhatsAppSenderModal from './WhatsAppSenderModal';
 
 // ─── Plant Master Data ────────────────────────────────────────────────────────
@@ -228,6 +228,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const LOG_PAGE_SIZE = 50;
 
   const [lastRefreshed, setLastRefreshed] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(''); // granular status during upload
 
   // ── Load Data ────────────────────────────────────────────────────────────────
   // isManualRefresh: true  → tombol Refresh diklik, force-fetch vehicle_logs & master_map dari server
@@ -248,7 +249,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       // masterEquipment → cukup cache (jarang berubah, data besar)
       const [vRes, lRes, eqRes, zRes, mapRes] = await Promise.all([
         withTimeout(fetchVehicleMaster(isManualRefresh),            { data: [], error: null }),
-        withTimeout(fetchVehicleLogs(true),                         { data: [], error: null }),
+        withTimeout(fetchVehicleLogs(isManualRefresh),              { data: [], error: null }),
         withTimeout(fetchMasterEquipment(),                         { data: [], error: null }),
         withTimeout(fetchZCOData(isManualRefresh),                  { data: [], error: null }),
         withTimeout(getSystemConfig('master_map', isManualRefresh), { data: null, error: null }),
@@ -314,10 +315,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     setLoading(true);
     setError(null);
     setUploadInfo(null);
+    setUploadProgress('Membaca file Excel...');
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
+      // Yield to browser so the loading spinner renders before the heavy parse
+      await new Promise(resolve => setTimeout(resolve, 50));
       try {
+        setUploadProgress('Memproses data baris...');
         const data = new Uint8Array(evt.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
 
@@ -493,14 +498,19 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         const finalVehicles = Array.from(newVehMap.values());
         const finalLogs     = Array.from(newLogsMap.values());
 
+        // Update UI immediately from parsed data (no DB re-fetch needed)
+        setVehicles(finalVehicles);
+        setLogs(finalLogs);
+
+        // Save to DB in background — UI already shows data
+        setUploadProgress(`Menyimpan ${finalLogs.length} transaksi ke server...`);
         const { error: saveErr } = await saveVehicleData(finalVehicles, finalLogs);
         if (saveErr) {
           const errMsg = saveErr.message || (typeof saveErr === 'string' ? saveErr : JSON.stringify(saveErr));
           throw new Error(errMsg);
         }
 
-        setVehicles(finalVehicles);
-        setLogs(finalLogs);
+        setUploadProgress('');
         setUploadInfo({
           processed,
           skipped,
@@ -512,6 +522,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
       } catch (err) {
         console.error(err);
+        setUploadProgress('');
         setError('Error memproses file: ' + (err.message || 'Gagal menyimpan ke server database'));
       } finally {
         setLoading(false);
@@ -1650,6 +1661,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-start gap-3">
             <AlertCircle size={18} className="shrink-0 mt-0.5" />
             <p className="text-sm font-medium">{error}</p>
+          </div>
+        )}
+        {uploadProgress && (
+          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl flex items-center gap-3">
+            <RefreshCw size={16} className="shrink-0 animate-spin text-blue-500" />
+            <p className="text-sm font-medium">{uploadProgress}</p>
           </div>
         )}
         {uploadInfo && (

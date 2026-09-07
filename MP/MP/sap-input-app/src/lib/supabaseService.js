@@ -591,34 +591,108 @@ export async function getGSheetHistory() {
 
 // ── Vehicle Master (dedicated table) ─────────────────────────────────────────
 
+const VEHICLE_CACHE_KEY_MASTER = 'veh_master_cache_v1';
+const VEHICLE_CACHE_KEY_LOGS   = 'veh_logs_cache_v1';
+
 export async function fetchVehicleMaster(forceRefresh = false) {
   if (!supabase) return { data: [], error: 'Supabase not configured' };
+
+  if (!forceRefresh && memoryCache.has(VEHICLE_CACHE_KEY_MASTER)) {
+    return { data: memoryCache.get(VEHICLE_CACHE_KEY_MASTER), error: null };
+  }
+  if (!forceRefresh) {
+    try {
+      const cached = sessionStorage.getItem(VEHICLE_CACHE_KEY_MASTER);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          memoryCache.set(VEHICLE_CACHE_KEY_MASTER, parsed);
+          return { data: parsed, error: null };
+        }
+      }
+    } catch (e) {}
+  }
+
   const { data, error } = await supabase
     .from('vehicle_master')
     .select('*')
     .order('plant')
     .order('vehicle_code');
   if (error) return { data: [], error: error.message };
-  return { data: data || [], error: null };
+
+  const result = data || [];
+  memoryCache.set(VEHICLE_CACHE_KEY_MASTER, result);
+  try { sessionStorage.setItem(VEHICLE_CACHE_KEY_MASTER, JSON.stringify(result)); } catch (e) {}
+
+  return { data: result, error: null };
 }
 
 // ── Vehicle Logs (dedicated table) ───────────────────────────────────────────
 
 export async function fetchVehicleLogs(forceRefresh = false) {
   if (!supabase) return { data: [], error: 'Supabase not configured' };
-  const { data, error } = await supabase
-    .from('vehicle_logs')
-    .select('*')
-    .order('date', { ascending: false })
-    .order('vehicle_code');
-  if (error) return { data: [], error: error.message };
-  return { data: data || [], error: null };
+
+  if (!forceRefresh && memoryCache.has(VEHICLE_CACHE_KEY_LOGS)) {
+    return { data: memoryCache.get(VEHICLE_CACHE_KEY_LOGS), error: null };
+  }
+  if (!forceRefresh) {
+    try {
+      const cached = sessionStorage.getItem(VEHICLE_CACHE_KEY_LOGS);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          memoryCache.set(VEHICLE_CACHE_KEY_LOGS, parsed);
+          return { data: parsed, error: null };
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Paginate through all rows (PostgREST default limit caps at 1000)
+  let allData = [];
+  let from = 0;
+  const PAGE_SIZE = 2000;
+  let fetchError = null;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('vehicle_logs')
+      .select('activity_number,vehicle_code,plant,date,vehicle_time,job_code,hm_km,unit_value,uom,location_code,operator,helper_1,helper_2,reference,remarks,measurement_doc,document_number,spbs_number,tgl_angkut,antar_kebun,destination_plant,target_alokasi,company_code,fiscal_year,cancelled,created_by,created_on,changed_by,changed_on')
+      .order('date', { ascending: false })
+      .order('vehicle_code')
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) { fetchError = error; break; }
+    if (!data || data.length === 0) break;
+
+    allData = allData.concat(data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  if (fetchError) return { data: [], error: fetchError.message };
+
+  memoryCache.set(VEHICLE_CACHE_KEY_LOGS, allData);
+  try { sessionStorage.setItem(VEHICLE_CACHE_KEY_LOGS, JSON.stringify(allData)); } catch (e) {}
+
+  return { data: allData, error: null };
+}
+
+// ── Invalidate vehicle caches (called after saveVehicleData) ─────────────────
+export function invalidateVehicleCache() {
+  memoryCache.delete(VEHICLE_CACHE_KEY_MASTER);
+  memoryCache.delete(VEHICLE_CACHE_KEY_LOGS);
+  try { sessionStorage.removeItem(VEHICLE_CACHE_KEY_MASTER); } catch (e) {}
+  try { sessionStorage.removeItem(VEHICLE_CACHE_KEY_LOGS); } catch (e) {}
 }
 
 // ── Save Vehicle Data (upsert to dedicated tables) ───────────────────────────
 
 export async function saveVehicleData(vehicles, logs) {
   if (!supabase) return { error: 'Supabase not configured' };
+
+  // Bust caches before writing so next read is always fresh from DB
+  invalidateVehicleCache();
 
   // Handle clear (empty arrays) — truncate both tables
   if (vehicles.length === 0 && logs.length === 0) {
@@ -635,14 +709,22 @@ export async function saveVehicleData(vehicles, logs) {
     if (vErr) return { error: vErr.message || vErr };
   }
 
-  // Upsert vehicle_logs in chunks of 500 to avoid payload limits
+  // Upsert vehicle_logs — 4 parallel chunks at a time for speed
   const CHUNK_SIZE = 500;
+  const CONCURRENCY = 4;
+  const chunks = [];
   for (let i = 0; i < logs.length; i += CHUNK_SIZE) {
-    const chunk = logs.slice(i, i + CHUNK_SIZE);
-    const { error: lErr } = await supabase
-      .from('vehicle_logs')
-      .upsert(chunk, { onConflict: 'activity_number' });
-    if (lErr) return { error: lErr.message || lErr };
+    chunks.push(logs.slice(i, i + CHUNK_SIZE));
+  }
+  for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+    const batch = chunks.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(
+      batch.map(chunk =>
+        supabase.from('vehicle_logs').upsert(chunk, { onConflict: 'activity_number' })
+      )
+    );
+    const firstErr = results.find(r => r.error);
+    if (firstErr) return { error: firstErr.error.message || firstErr.error };
   }
 
   return { error: null };
