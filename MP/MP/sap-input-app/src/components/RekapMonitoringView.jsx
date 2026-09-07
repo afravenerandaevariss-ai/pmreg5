@@ -138,21 +138,18 @@ export default function RekapMonitoringView({ currentUser, equipments }) {
   const isAdmin = roleUpper === 'ADMIN' || roleUpper === 'DEV' || roleUpper === 'REGIONAL';
   const userPlant = currentUser?.plant;
 
-  /* Plant list */
+  /* Plant list — Tampilkan SEMUA unit pabrik Regional 5 untuk semua role */
   const pabrikList = useMemo(() => {
-    let baseList = ALL_PABRIK_PLANTS;
+    const map = new Map(ALL_PABRIK_PLANTS.map(p => [p.code, p]));
     if (equipments && equipments.length > 0) {
-      const set = new Set(
-        equipments.filter(e => e.plant && String(e.plant).startsWith('5F')).map(e => String(e.plant))
-      );
-      const hit = ALL_PABRIK_PLANTS.filter(p => set.has(p.code));
-      if (hit.length > 0) baseList = hit;
+      equipments.forEach(e => {
+        if (e.plant && String(e.plant).startsWith('5F') && !map.has(e.plant)) {
+          map.set(e.plant, { code: e.plant, name: e.plantName || e.plant });
+        }
+      });
     }
-    if (!isAdmin && userPlant && userPlant !== 'ALL' && userPlant !== '5R00') {
-      return baseList.filter(p => p.code === userPlant);
-    }
-    return baseList;
-  }, [equipments, isAdmin, userPlant]);
+    return Array.from(map.values()).sort((a, b) => a.code.localeCompare(b.code));
+  }, [equipments]);
 
   const [year, month] = rekapMonth.split('-').map(Number);
   const daysInMonth   = getDaysInMonth(new Date(year, month - 1, 1));
@@ -534,7 +531,14 @@ export default function RekapMonitoringView({ currentUser, equipments }) {
                               role="img"
                             />
                             <div>
-                              <div className="font-black text-[11px] text-slate-800 font-mono">{plant.code}</div>
+                              <div className="font-black text-[11px] text-slate-800 font-mono flex items-center gap-1.5">
+                                {plant.code}
+                                {userPlant && plant.code === userPlant && (
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold tracking-tight border border-emerald-200">
+                                    Unit Anda
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-[11px] text-slate-400 font-medium truncate max-w-[90px]">{plant.name}</div>
                             </div>
                           </div>
