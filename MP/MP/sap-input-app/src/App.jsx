@@ -2837,7 +2837,7 @@ function MasterDataView({ masterMap, equipments = [], currentUser }) {
               <th className="px-3 sm:px-6 py-3 sm:py-4 min-w-[200px] sticky top-0 bg-slate-100 text-slate-800 z-30 border-b-2 border-slate-300">FLoc Description</th>
               <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap sticky top-0 bg-slate-100 text-slate-800 z-30 border-b-2 border-slate-300">Cost Center</th>
               <th className="px-3 sm:px-6 py-3 sm:py-4 min-w-[150px] sticky top-0 bg-slate-100 text-slate-800 z-30 border-b-2 border-slate-300">CC Description</th>
-              <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap sticky top-0 bg-slate-100 text-slate-800 z-30 border-b-2 border-slate-300">MP</th>
+              <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap sticky top-0 bg-slate-100 text-slate-800 z-30 border-b-2 border-slate-300">UNIT</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">

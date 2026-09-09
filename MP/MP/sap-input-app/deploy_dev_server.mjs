@@ -54,7 +54,7 @@ async function main() {
         
         console.log('📤 Uploading deploy_dev.tar.gz archive...');
         await new Promise((resolve, reject) => {
-          sftp.fastPut('deploy_dev.tar.gz', '/tmp/deploy_dev.tar.gz', (putErr) => {
+          sftp.fastPut('deploy_dev.tar.gz', '/tmp/deploy_dev.tar.gz', { concurrency: 2, chunkSize: 32768 }, (putErr) => {
             if (putErr) reject(putErr);
             else resolve();
           });
