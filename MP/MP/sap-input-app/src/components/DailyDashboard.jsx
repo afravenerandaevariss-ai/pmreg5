@@ -354,17 +354,18 @@ export default function DailyDashboard({
   // Matrix Save handler (Manual button trigger)
   const handleSaveMatrix = () => performSaveMatrix(matrixData, true);
 
-  // Unique 5F Pabrik plants for matrix dropdown
-  const matrix5FPlants = useMemo(() => {
-    const sourceList = (templateData && Array.isArray(templateData.equipments) && templateData.equipments.length > 0)
-      ? templateData.equipments
-      : equipments;
+  // All units (Pabrik 5F, Kebun 5E, Distrik 5D) for matrix dropdown
+  const matrixPlants = useMemo(() => {
+    const sourceList = (Array.isArray(equipments) && equipments.length > 0)
+      ? equipments
+      : ((templateData && Array.isArray(templateData.equipments) && templateData.equipments.length > 0) ? templateData.equipments : []);
     const set = new Set();
     sourceList.forEach(eq => {
       const p = String(eq.plant || '').trim().toUpperCase();
-      if (p.startsWith('5F')) set.add(p);
+      if (p) set.add(p);
     });
-    if (set.size === 0) ['5F01', '5F04', '5F07', '5F08', '5F09', '5F14', '5F15', '5F21', '5F22'].forEach(p => set.add(p));
+    // Ensure all 30 registered plants (Pabrik, Kebun, Distrik) from PLANT_INFO are present
+    Object.keys(PLANT_INFO).forEach(p => set.add(p));
     return Array.from(set).sort();
   }, [templateData, equipments]);
 
@@ -394,14 +395,12 @@ export default function DailyDashboard({
       .select('*')
       .eq('eq_type', 'Induk');
       
-    if (matrixPlantFilter && matrixPlantFilter.startsWith('5F')) {
+    if (matrixPlantFilter) {
       query = query.eq('plant', matrixPlantFilter);
-    } else if (!isAdminUser && currentUser?.plant && currentUser.plant.startsWith('5F')) {
+    } else if (!isAdminUser && currentUser?.plant && currentUser.plant !== 'ALL' && currentUser.plant !== '5R00') {
       query = query.eq('plant', currentUser.plant);
-    } else {
-      // Role DEV / ADMIN when matrixPlantFilter is empty (Semua Plant) -> query all 5F plants!
-      query = query.like('plant', '5F%');
     }
+    // When matrixPlantFilter is empty and user is Admin/DEV, query all plants (all units) without 5F restriction!
     
     query.order('plant', { ascending: true })
       .order('eq_num', { ascending: true })
@@ -457,10 +456,9 @@ export default function DailyDashboard({
       if (!isInduk) return false;
 
       const plant = String(eq.plant || '').trim().toUpperCase();
-      if (!plant.startsWith('5F')) return false;
 
       if (matrixPlantFilter && plant !== matrixPlantFilter.toUpperCase()) return false;
-      if (!isAdminUser && currentUser?.plant && plant !== currentUser.plant.toUpperCase()) return false;
+      if (!isAdminUser && currentUser?.plant && currentUser.plant !== 'ALL' && currentUser.plant !== '5R00' && plant !== currentUser.plant.toUpperCase()) return false;
 
       if (matrixSearch.trim()) {
         const query = matrixSearch.toLowerCase();
@@ -1866,14 +1864,14 @@ export default function DailyDashboard({
 
               {isAdminUser ? (
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter Plant / Pabrik</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter Plant / Unit</label>
                   <select
                     value={matrixPlantFilter}
                     onChange={e => setMatrixPlantFilter(e.target.value)}
                     className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-[#064e3b]/20 focus:border-[#064e3b] outline-none cursor-pointer"
                   >
-                    <option value="">Semua Plant (Pabrik 5F)</option>
-                    {matrix5FPlants.map(p => (
+                    <option value="">Semua Plant / Unit ({matrixPlants.length} Unit)</option>
+                    {matrixPlants.map(p => (
                       <option key={p} value={p}>{p} - {PLANT_INFO[p]?.desc || p}</option>
                     ))}
                   </select>
@@ -2158,9 +2156,9 @@ export default function DailyDashboard({
                     onChange={(e) => setLogPlantFilter(e.target.value)}
                     className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs text-slate-700 font-bold focus:ring-2 focus:ring-[#064e3b]/20 focus:border-[#064e3b] focus:outline-none bg-slate-50 hover:bg-slate-100 transition-colors"
                   >
-                    <option value="">Semua Plant (5F)</option>
-                    {pabrikPlants.map(p => (
-                      <option key={p} value={p}>{p}</option>
+                    <option value="">Semua Plant / Unit ({matrixPlants.length} Unit)</option>
+                    {matrixPlants.map(p => (
+                      <option key={p} value={p}>{p} - {PLANT_INFO[p]?.desc || p}</option>
                     ))}
                   </select>
                 ) : (

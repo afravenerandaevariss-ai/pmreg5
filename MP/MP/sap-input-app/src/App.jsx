@@ -473,10 +473,22 @@ const getUnitName = (plant, existingName) => {
 };
 
 function App() {
+  // One-time startup: clear stale localStorage keys for large configs (master_map, template_data).
+  // These were previously cached in localStorage causing Distrik/Kebun plants to not appear
+  // in Master Data Equipment filter. Run once per browser session.
+  if (!sessionStorage.getItem('_cache_busted_v2')) {
+    try {
+      localStorage.removeItem('sys_cfg_hierarchy_data_2');
+      localStorage.removeItem('sys_cfg_hierarchy_data_3');
+      sessionStorage.setItem('_cache_busted_v2', '1');
+    } catch(e) {}
+  }
+
   // masterMap and templateData are large blobs (3+ MB) — never initialize from localStorage
   // to avoid serving stale data (e.g., old masterMap without Distrik/Kebun plants).
   // They will always be fetched fresh from the DB during loadData().
   const [masterMap, setMasterMap] = useState(null);
+
   const [templateData, setTemplateData] = useState(() => {
     try {
       // Only try session storage (shorter lifetime, less risk of stale data)
@@ -789,11 +801,28 @@ function App() {
               if (!info) return;
               const plant = typeof info === 'string' ? info : (info.plant || '');
               const description = typeof info === 'string' ? eqNum : info.description || eqNum;
+              const functionalLoc = typeof info === 'object' ? (info.functionalLoc || '') : '';
+              const flDescription = typeof info === 'object' ? (info.flDescription || '') : '';
+              const costCenter = typeof info === 'object' ? (info.costCenter || '') : '';
               if (mergedMap.has(eqNum)) {
                 const existing = mergedMap.get(eqNum);
                 if (!existing.plant && plant) existing.plant = plant;
+                if (!existing.functionalLoc && functionalLoc) existing.functionalLoc = functionalLoc;
+                if (!existing.flDescription && flDescription) existing.flDescription = flDescription;
+                if (!existing.costCenter && costCenter) existing.costCenter = costCenter;
               } else {
-                mergedMap.set(eqNum, { eqNum, plant, description, type: 'Sub', reading: 0, induk: description });
+                mergedMap.set(eqNum, { 
+                  eqNum, 
+                  plant, 
+                  description, 
+                  type: 'Induk', 
+                  eq_type: 'Induk',
+                  reading: 0, 
+                  induk: eqNum,
+                  functionalLoc,
+                  flDescription,
+                  costCenter
+                });
               }
             });
           }
@@ -2644,7 +2673,11 @@ function MasterDataView({ masterMap, equipments = [], currentUser }) {
 
   const uniquePlants = useMemo(() => {
     const plants = new Set();
-    dataList.forEach(item => plants.add(item.plant));
+    dataList.forEach(item => {
+      if (item.plant) plants.add(item.plant);
+    });
+    // Ensure all 30 registered plants (Pabrik, Kebun, Distrik) are available in the dropdown
+    Object.keys(PLANT_INFO).forEach(p => plants.add(p));
     return Array.from(plants).sort();
   }, [dataList]);
 
