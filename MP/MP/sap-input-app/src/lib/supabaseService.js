@@ -223,6 +223,7 @@ export async function saveSystemConfig(id, dataObj) {
   if (!supabase) return { error: 'Supabase not configured' };
   const numericId = resolveConfigNumericId(id);
   
+  // Only cache small configs to storage (not large blobs like master_map(2), template_data(3))
   const SMALL_CONFIG_IDS = new Set([4, 5, 12, 13, 17, 18]);
   const cacheKey = `sys_cfg_${T.hierarchy_data}_${numericId}`;
   memoryCache.set(cacheKey, dataObj);
@@ -251,11 +252,16 @@ export async function deleteSystemConfig(id) {
   return { error };
 }
 
+
 export async function getSystemConfig(id, forceRefresh = false) {
   if (!supabase) return { data: null, error: 'Supabase not configured' };
   const numericId = resolveConfigNumericId(id);
 
+  // Large blob configs (master_map=2, template_data=3) are never cached in localStorage/sessionStorage
+  // to avoid stale data issues. They use only memoryCache (per-session).
+  const LARGE_CONFIG_IDS = new Set([2, 3]);
   const cacheKey = `sys_cfg_${T.hierarchy_data}_${numericId}`;
+
   if (!forceRefresh) {
     if (memoryCache.has(cacheKey)) {
       const memVal = memoryCache.get(cacheKey);
@@ -263,16 +269,18 @@ export async function getSystemConfig(id, forceRefresh = false) {
         return { data: memVal, error: null };
       }
     }
-    try {
-      const cachedItem = sessionStorage.getItem(cacheKey) || localStorage.getItem(cacheKey);
-      if (cachedItem) {
-        const parsed = JSON.parse(cachedItem);
-        if (parsed && (numericId !== 3 || (Array.isArray(parsed.equipments) && parsed.equipments.length > 0))) {
-          memoryCache.set(cacheKey, parsed);
-          return { data: parsed, error: null };
+    if (!LARGE_CONFIG_IDS.has(numericId)) {
+      try {
+        const cachedItem = sessionStorage.getItem(cacheKey) || localStorage.getItem(cacheKey);
+        if (cachedItem) {
+          const parsed = JSON.parse(cachedItem);
+          if (parsed && (numericId !== 3 || (Array.isArray(parsed.equipments) && parsed.equipments.length > 0))) {
+            memoryCache.set(cacheKey, parsed);
+            return { data: parsed, error: null };
+          }
         }
-      }
-    } catch (e) {}
+      } catch (e) {}
+    }
   }
 
   const { data, error } = await supabase
@@ -285,31 +293,36 @@ export async function getSystemConfig(id, forceRefresh = false) {
     if (error.code === 'PGRST116' || error.status === 406) {
       return { data: null, error: null };
     }
-    // Fallback to cache if available and valid
-    try {
-      const fallbackItem = localStorage.getItem(cacheKey) || sessionStorage.getItem(cacheKey);
-      if (fallbackItem) {
-        const parsed = JSON.parse(fallbackItem);
-        if (parsed && (numericId !== 3 || (Array.isArray(parsed.equipments) && parsed.equipments.length > 0))) {
-          return { data: parsed, error: null };
+    // Fallback to cache if available and valid (only for non-large configs)
+    if (!LARGE_CONFIG_IDS.has(numericId)) {
+      try {
+        const fallbackItem = localStorage.getItem(cacheKey) || sessionStorage.getItem(cacheKey);
+        if (fallbackItem) {
+          const parsed = JSON.parse(fallbackItem);
+          if (parsed && (numericId !== 3 || (Array.isArray(parsed.equipments) && parsed.equipments.length > 0))) {
+            return { data: parsed, error: null };
+          }
         }
-      }
-    } catch (e) {}
+      } catch (e) {}
+    }
     return { data: null, error };
   }
 
   if (data?.data) {
     memoryCache.set(cacheKey, data.data);
-    try {
-      sessionStorage.setItem(cacheKey, JSON.stringify(data.data));
-    } catch (e) {}
-    try {
-      localStorage.setItem(cacheKey, JSON.stringify(data.data));
-    } catch (e) {}
+    if (!LARGE_CONFIG_IDS.has(numericId)) {
+      try {
+        sessionStorage.setItem(cacheKey, JSON.stringify(data.data));
+      } catch (e) {}
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(data.data));
+      } catch (e) {}
+    }
   }
 
   return { data: data?.data || null, error: null };
 }
+
 
 // ============================================================
 // DAILY LOGS

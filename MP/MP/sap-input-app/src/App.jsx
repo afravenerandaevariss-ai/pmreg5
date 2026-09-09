@@ -473,27 +473,21 @@ const getUnitName = (plant, existingName) => {
 };
 
 function App() {
-  const [masterMap, setMasterMap] = useState(() => {
-    try {
-      const cached = localStorage.getItem('sys_cfg_hierarchy_data_2') || sessionStorage.getItem('sys_cfg_hierarchy_data_2');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) return new Map(parsed);
-        if (parsed?.map && Array.isArray(parsed.map)) return new Map(parsed.map);
-      }
-    } catch(e) {}
-    return null;
-  });
+  // masterMap and templateData are large blobs (3+ MB) — never initialize from localStorage
+  // to avoid serving stale data (e.g., old masterMap without Distrik/Kebun plants).
+  // They will always be fetched fresh from the DB during loadData().
+  const [masterMap, setMasterMap] = useState(null);
   const [templateData, setTemplateData] = useState(() => {
     try {
-      const cached = localStorage.getItem('sys_cfg_hierarchy_data_3') || sessionStorage.getItem('sys_cfg_hierarchy_data_3');
+      // Only try session storage (shorter lifetime, less risk of stale data)
+      const cached = sessionStorage.getItem('sys_cfg_hierarchy_data_3');
       if (cached) return JSON.parse(cached);
     } catch(e) {}
     return null;
   });
   const [equipments, setEquipments] = useState(() => {
     try {
-      const cachedTpl = localStorage.getItem('sys_cfg_hierarchy_data_3') || sessionStorage.getItem('sys_cfg_hierarchy_data_3');
+      const cachedTpl = sessionStorage.getItem('sys_cfg_hierarchy_data_3');
       if (cachedTpl) {
         const parsed = JSON.parse(cachedTpl);
         if (parsed?.equipments && Array.isArray(parsed.equipments)) return parsed.equipments;
@@ -503,6 +497,7 @@ function App() {
     } catch(e) {}
     return [];
   });
+
   const [sapSyncedDates, setSapSyncedDates] = useState([]);
   const [hierarchyData, setHierarchyData] = useState(null);
   const [loading, setLoading] = useState(false);
