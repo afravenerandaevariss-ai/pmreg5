@@ -2625,18 +2625,10 @@ function MasterDataView({ masterMap, equipments = [], currentUser }) {
   const itemsPerPage = 100;
 
   const effectiveMap = useMemo(() => {
-    if (masterMap instanceof Map && masterMap.size > 0) return masterMap;
-    if (masterMap && typeof masterMap === 'object' && !Array.isArray(masterMap)) {
-      const keys = Object.keys(masterMap);
-      if (keys.length > 0) {
-        return new Map(Object.entries(masterMap));
-      }
-    }
-    if (Array.isArray(masterMap) && masterMap.length > 0) {
-      return new Map(masterMap);
-    }
+    const m = new Map();
+
+    // 1. Populate from equipments (from master_equipment DB table)
     if (Array.isArray(equipments) && equipments.length > 0) {
-      const m = new Map();
       equipments.forEach(e => {
         const key = e.eqNum || e.eq_num;
         if (key) {
@@ -2649,9 +2641,43 @@ function MasterDataView({ masterMap, equipments = [], currentUser }) {
           });
         }
       });
-      return m;
     }
-    return null;
+
+    // 2. Augment / merge with masterMap so all equipment from both sources are present
+    if (masterMap instanceof Map && masterMap.size > 0) {
+      masterMap.forEach((info, key) => {
+        if (!info) return;
+        const plant = typeof info === 'string' ? info : (info.plant || '');
+        const desc = typeof info === 'string' ? key : (info.description || key);
+        const functionalLoc = typeof info === 'string' ? '' : (info.functionalLoc || '');
+        const flDescription = typeof info === 'string' ? '' : (info.flDescription || '');
+        const costCenter = typeof info === 'string' ? '' : (info.costCenter || '');
+        if (m.has(key)) {
+          const existing = m.get(key);
+          if (!existing.plant && plant) existing.plant = plant;
+          if ((!existing.description || existing.description === key) && desc) existing.description = desc;
+          if (!existing.functionalLoc && functionalLoc) existing.functionalLoc = functionalLoc;
+          if (!existing.flDescription && flDescription) existing.flDescription = flDescription;
+          if (!existing.costCenter && costCenter) existing.costCenter = costCenter;
+        } else {
+          m.set(key, { plant, description: desc, functionalLoc, flDescription, costCenter });
+        }
+      });
+    } else if (masterMap && typeof masterMap === 'object' && !Array.isArray(masterMap)) {
+      Object.entries(masterMap).forEach(([key, info]) => {
+        if (!m.has(key)) {
+          m.set(key, {
+            plant: info?.plant || '',
+            description: info?.description || key,
+            functionalLoc: info?.functionalLoc || '',
+            flDescription: info?.flDescription || '',
+            costCenter: info?.costCenter || ''
+          });
+        }
+      });
+    }
+
+    return m.size > 0 ? m : null;
   }, [masterMap, equipments]);
 
   const dataList = useMemo(() => {
