@@ -354,18 +354,20 @@ export default function DailyDashboard({
   // Matrix Save handler (Manual button trigger)
   const handleSaveMatrix = () => performSaveMatrix(matrixData, true);
 
-  // All units (Pabrik 5F, Kebun 5E, Distrik 5D) for matrix dropdown
+  // Pabrik 5F only for Jam Jalan Mesin Pabrik matrix dropdown
   const matrixPlants = useMemo(() => {
-    const sourceList = (Array.isArray(equipments) && equipments.length > 0)
-      ? equipments
-      : ((templateData && Array.isArray(templateData.equipments) && templateData.equipments.length > 0) ? templateData.equipments : []);
+    const sourceList = (templateData && Array.isArray(templateData.equipments) && templateData.equipments.length > 0)
+      ? templateData.equipments
+      : (Array.isArray(equipments) && equipments.length > 0 ? equipments : []);
     const set = new Set();
     sourceList.forEach(eq => {
       const p = String(eq.plant || '').trim().toUpperCase();
-      if (p) set.add(p);
+      if (p.startsWith('5F')) set.add(p);
     });
-    // Ensure all 30 registered plants (Pabrik, Kebun, Distrik) from PLANT_INFO are present
-    Object.keys(PLANT_INFO).forEach(p => set.add(p));
+    // Fallback: ensure all 5F Pabrik plants are present
+    if (set.size === 0) {
+      Object.keys(PLANT_INFO).filter(p => p.startsWith('5F')).forEach(p => set.add(p));
+    }
     return Array.from(set).sort();
   }, [templateData, equipments]);
 
@@ -395,12 +397,14 @@ export default function DailyDashboard({
       .select('*')
       .eq('eq_type', 'Induk');
       
-    if (matrixPlantFilter) {
+    if (matrixPlantFilter && matrixPlantFilter.startsWith('5F')) {
       query = query.eq('plant', matrixPlantFilter);
-    } else if (!isAdminUser && currentUser?.plant && currentUser.plant !== 'ALL' && currentUser.plant !== '5R00') {
+    } else if (!isAdminUser && currentUser?.plant && currentUser.plant.startsWith('5F')) {
       query = query.eq('plant', currentUser.plant);
+    } else {
+      // Default: only 5F Pabrik for Jam Jalan Mesin
+      query = query.like('plant', '5F%');
     }
-    // When matrixPlantFilter is empty and user is Admin/DEV, query all plants (all units) without 5F restriction!
     
     query.order('plant', { ascending: true })
       .order('eq_num', { ascending: true })
@@ -456,9 +460,11 @@ export default function DailyDashboard({
       if (!isInduk) return false;
 
       const plant = String(eq.plant || '').trim().toUpperCase();
+      // Jam Jalan Mesin Pabrik: only 5F plants
+      if (!plant.startsWith('5F')) return false;
 
       if (matrixPlantFilter && plant !== matrixPlantFilter.toUpperCase()) return false;
-      if (!isAdminUser && currentUser?.plant && currentUser.plant !== 'ALL' && currentUser.plant !== '5R00' && plant !== currentUser.plant.toUpperCase()) return false;
+      if (!isAdminUser && currentUser?.plant && plant !== currentUser.plant.toUpperCase()) return false;
 
       if (matrixSearch.trim()) {
         const query = matrixSearch.toLowerCase();
@@ -472,6 +478,7 @@ export default function DailyDashboard({
     if (filtered.length === 0 && directPlantInduk.length > 0) {
       return directPlantInduk.filter(eq => {
         const p = String(eq.plant || '').trim().toUpperCase();
+        if (!p.startsWith('5F')) return false;
         if (matrixPlantFilter && p !== matrixPlantFilter.toUpperCase()) return false;
         if (!isAdminUser && currentUser?.plant && p !== currentUser.plant.toUpperCase()) return false;
         if (matrixSearch.trim()) {
@@ -1864,13 +1871,13 @@ export default function DailyDashboard({
 
               {isAdminUser ? (
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter Plant / Unit</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter Plant Pabrik (5F)</label>
                   <select
                     value={matrixPlantFilter}
                     onChange={e => setMatrixPlantFilter(e.target.value)}
                     className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-[#064e3b]/20 focus:border-[#064e3b] outline-none cursor-pointer"
                   >
-                    <option value="">Semua Plant / Unit ({matrixPlants.length} Unit)</option>
+                    <option value="">Semua Plant Pabrik ({matrixPlants.length} Plant 5F)</option>
                     {matrixPlants.map(p => (
                       <option key={p} value={p}>{p} - {PLANT_INFO[p]?.desc || p}</option>
                     ))}
