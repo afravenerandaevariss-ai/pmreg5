@@ -31,7 +31,7 @@ async function main() {
   console.log('🚀 DEPLOYING DEVELOPMENT SERVER (devpmreg5.afratarigan.my.id)...');
   console.log('📦 Building Vite for Development (VITE_APP_ENV=dev)...');
 
-  execSync('npx vite build --mode development --outDir dist-dev', { 
+  execSync('npx vite build --mode dev --outDir dist-dev', { 
     stdio: 'inherit',
     env: { ...process.env, VITE_APP_ENV: 'dev' }
   });
@@ -64,7 +64,7 @@ async function main() {
         await runCmd(conn, 'tar -xzf /tmp/deploy_dev.tar.gz -C /var/www/devpmreg5/dist && rm -f /tmp/deploy_dev.tar.gz', 'Extracting build archive to /var/www/devpmreg5/dist');
         await runCmd(conn, 'sudo chmod -R 755 /var/www/devpmreg5/dist && sudo chown -R ubuntu:www-data /var/www/devpmreg5/dist', 'Ensure 755 permissions on dist');
 
-        await runCmd(conn, 'pm2 reload pmreg5-dev || pm2 restart pmreg5-dev', 'Reloading PM2 pmreg5-dev');
+        await runCmd(conn, 'pm2 restart pmreg5-dev pmreg5-dev-auth pmreg5-dev-postgrest', 'Restarting DEV PM2 services');
         await runCmd(conn, 'sudo nginx -t && sudo systemctl reload nginx', 'Reloading Nginx');
 
         console.log('\n🎉 DEV DEPLOYMENT COMPLETE! (devpmreg5.afratarigan.my.id)');

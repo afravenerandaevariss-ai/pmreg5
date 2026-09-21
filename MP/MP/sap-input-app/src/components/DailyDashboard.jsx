@@ -6,7 +6,7 @@ import * as XLSX from 'xlsx';
 import { exportDailyToSAP, exportCumulativeToSAP, exportAccumulatedToSAP, validateDailyHours, DEFAULT_SAP_HEADERS, getEquipmentPlant } from '../utils/excel';
 import { supabase, IS_DEV_ENV } from '../lib/supabase';
 
-const T_DAILY_LOGS = IS_DEV_ENV ? 'dev_daily_logs' : 'daily_logs';
+const T_DAILY_LOGS = 'daily_logs';
 
 import { insertDailyLog, insertDailyLogs, deleteDailyLog, fetchDailyLogs, saveGSheetHistory, getGSheetHistory, saveSystemConfig, getSystemConfig, saveImportLog } from '../lib/supabaseService';
 import RekapMonitoringView from './RekapMonitoringView';

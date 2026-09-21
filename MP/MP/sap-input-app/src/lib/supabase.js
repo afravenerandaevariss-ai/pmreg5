@@ -34,10 +34,12 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
-// True when the app was built with VITE_APP_ENV=dev (devpmreg5 server)
-// False (or undefined) for production builds (pmreg5 server)
+// True when running on devpmreg5 or built with VITE_APP_ENV=dev
 export const IS_DEV_ENV = (() => {
   try {
+    if (typeof window !== 'undefined' && window.location.hostname.includes('devpmreg5')) {
+      return true;
+    }
     return import.meta?.env?.VITE_APP_ENV === 'dev';
   } catch {
     return false;

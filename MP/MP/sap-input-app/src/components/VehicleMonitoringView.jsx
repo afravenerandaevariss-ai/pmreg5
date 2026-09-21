@@ -6,7 +6,7 @@ import {
   CheckCircle, AlertCircle, AlertTriangle, ChevronDown, ChevronUp,
   Filter, BarChart2, Layers, TrendingUp, Activity, Truck, Calendar,
   XCircle, Info, Eye, EyeOff, FileDown, Check, X, ArrowRight,
-  Copy, Printer, Coins, ShieldAlert, Send, Lock
+  Copy, Printer, Coins, ShieldAlert, Send, Lock, Clock, MessageSquare
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toPng } from 'html-to-image';
@@ -146,6 +146,86 @@ const StatusBadge = ({ status, text }) => {
   );
 };
 
+// ─── WA Schedule Badge ────────────────────────────────────────────────────────
+function WAScheduleBadge({ onOpen }) {
+  const [countdown, setCountdown] = React.useState('');
+  const [nextLabel, setNextLabel] = React.useState('');
+  const [isActive, setIsActive] = React.useState(false);
+
+  React.useEffect(() => {
+    const SCHEDULE_TIMES = [
+      { h: 8,  m: 0,  label: '08:00 WIB' },
+      { h: 14, m: 30, label: '14:30 WIB' },
+    ];
+
+    const tick = () => {
+      const now = new Date();
+      // Convert to WIB (UTC+7)
+      const wib = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+      const currentH = wib.getHours();
+      const currentM = wib.getMinutes();
+      const currentTotalMin = currentH * 60 + currentM;
+
+      let nextTime = null;
+      for (const t of SCHEDULE_TIMES) {
+        const tTotal = t.h * 60 + t.m;
+        if (tTotal > currentTotalMin) {
+          nextTime = t;
+          break;
+        }
+      }
+      // If past all times today, next is first schedule tomorrow
+      if (!nextTime) nextTime = SCHEDULE_TIMES[0];
+
+      const nextTotalMin = nextTime.h * 60 + nextTime.m;
+      let diffMin = nextTotalMin - currentTotalMin;
+      if (diffMin < 0) diffMin += 24 * 60; // wrap to next day
+
+      const diffSec = diffMin * 60 - wib.getSeconds();
+      const h = Math.floor(diffSec / 3600);
+      const m = Math.floor((diffSec % 3600) / 60);
+      const s = diffSec % 60;
+
+      // "Active" = within 5 min of scheduled time
+      setIsActive(diffMin <= 5 && diffMin >= 0);
+      setNextLabel(nextTime.label);
+      setCountdown(
+        h > 0
+          ? `${h}j ${String(m).padStart(2,'0')}m`
+          : `${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}d`
+      );
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <button
+      onClick={onOpen}
+      title="Klik untuk buka Pengaturan WA Otomatis"
+      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition shadow-sm ${
+        isActive
+          ? 'bg-emerald-50 border-emerald-400 text-emerald-800 animate-pulse'
+          : 'bg-slate-50 border-slate-300 text-slate-700 hover:bg-emerald-50 hover:border-emerald-400 hover:text-emerald-800'
+      }`}
+    >
+      <MessageSquare size={13} className={isActive ? 'text-emerald-600' : 'text-slate-500'} />
+      <span className="hidden sm:inline">WA Auto-Send:</span>
+      <span className={`font-extrabold ${isActive ? 'text-emerald-700' : 'text-slate-800'}`}>
+        {nextLabel}
+      </span>
+      <span className={`font-mono text-[11px] px-1.5 py-0.5 rounded-lg ${
+        isActive ? 'bg-emerald-200 text-emerald-900' : 'bg-slate-200 text-slate-600'
+      }`}>
+        {isActive ? '🟢 Segera!' : countdown}
+      </span>
+      <Clock size={11} className="text-slate-400" />
+    </button>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   // ─── Role Detection ────────────────────────────────────────────────────────
@@ -273,6 +353,21 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         setMasterMap(new Map());
       }
       setLastRefreshed(new Date());
+      // Restore persistent upload notification if present and data was loaded
+      if (!isManualRefresh) {
+        try {
+          const stored = sessionStorage.getItem('vehicle_upload_info');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            // Only restore if uploaded in the last 24 hours
+            if (parsed?.uploadedAt && (Date.now() - new Date(parsed.uploadedAt).getTime()) < 86400000) {
+              setUploadInfo(parsed);
+            } else {
+              sessionStorage.removeItem('vehicle_upload_info');
+            }
+          }
+        } catch (e) {}
+      }
     } catch (e) {
       console.warn('Vehicle load data warning:', e);
     } finally {
@@ -296,6 +391,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       setSelectedPlant(currentUser.plant);
     }
   }, [currentUser?.plant, isAdmin]);
+
+  // Auto-refresh every 5 minutes for USER role (no manual Refresh button shown to them)
+  useEffect(() => {
+    if (isUserRole) {
+      const interval = setInterval(() => loadData(true), 5 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isUserRole, loadData]);
 
   // Lock activeTab to allowed tabs based on role
   // USER: can see unit-checklist, summary-regional, log-raw, zco-reconciliation (filtered by their plant)
@@ -434,7 +537,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           const fiscalYear    = String(get(FISCAL_YEAR) || '').trim();
           const vehTime       = formatTimeStr(get(VEH_TIME));
           const rawActNum     = String(get(ACT_NUM) || '').trim();
-          const actNum        = rawActNum ? `${rawActNum}-${i}` : `VEH-${plant}-${i}-${dateStr}`;
+          // Use rawActNum as-is (no row-index suffix) so upsert by activity_number is idempotent.
+          // For rows without an SAP activity number, generate a deterministic key from
+          // plant + vehicleCode + date + jobCode + vehTime so re-uploading the same file
+          // produces the same key and updates instead of inserting duplicate rows.
+          const actNum        = rawActNum
+            ? rawActNum
+            : `VEH-${plant}-${vehCode}-${dateStr}-${jobCode || 'NOJOB'}-${vehTime || '00:00'}`;
           const createdBy     = String(get(CREATED_BY) || '').trim();
           const createdOn     = formatDateStr(get(CREATED_ON)) || '';
           const changedBy     = String(get(CHANGED_BY) || '').trim();
@@ -509,16 +618,21 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           const errMsg = saveErr.message || (typeof saveErr === 'string' ? saveErr : JSON.stringify(saveErr));
           throw new Error(errMsg);
         }
+        // Bust vehicle caches again after successful write so next loadData always hits DB
+        invalidateVehicleCache();
 
         setUploadProgress('');
-        setUploadInfo({
+        const newUploadInfo = {
           processed,
           skipped,
           cancelled,
           plants: uniquePlants.size,
           jobCodes: uniqueJobCodes.size,
           file: file.name,
-        });
+          uploadedAt: new Date().toISOString(),
+        };
+        setUploadInfo(newUploadInfo);
+        try { sessionStorage.setItem('vehicle_upload_info', JSON.stringify(newUploadInfo)); } catch (e) {}
 
       } catch (err) {
         console.error(err);
@@ -538,6 +652,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     try {
       await saveVehicleData([], []);
       setVehicles([]); setLogs([]); setUploadInfo(null);
+      try { sessionStorage.removeItem('vehicle_upload_info'); } catch (e) {}
     } catch (e) { alert('Gagal: ' + e.message); }
     finally { setLoading(false); }
   };
@@ -1642,17 +1757,20 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 </button>
               </>
             )}
-            <div className="flex items-center gap-2">
-              {lastRefreshed && !loading && (
-                <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
-                  Update: {format(lastRefreshed, 'HH:mm:ss')}
-                </span>
-              )}
-              <button onClick={() => loadData(true)} disabled={loading}
-                className="bg-[#064e3b] hover:bg-[#065f46] text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm disabled:opacity-50 transition">
-                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
-              </button>
-            </div>
+            {/* Show Refresh button only to admins; USER role gets silent auto-refresh */}
+            {isAdmin && (
+              <div className="flex items-center gap-2">
+                {lastRefreshed && !loading && (
+                  <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+                    Update: {format(lastRefreshed, 'HH:mm:ss')}
+                  </span>
+                )}
+                <button onClick={() => loadData(true)} disabled={loading}
+                  className="bg-[#064e3b] hover:bg-[#065f46] text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm disabled:opacity-50 transition">
+                  <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1678,7 +1796,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 {uploadInfo.processed} transaksi diproses · {uploadInfo.cancelled} dibatalkan · {uploadInfo.skipped} baris dilewati · {uploadInfo.plants} plant · {uploadInfo.jobCodes} job code
               </p>
             </div>
-            <button onClick={() => setUploadInfo(null)} className="ml-auto text-emerald-400 hover:text-emerald-600"><XCircle size={16} /></button>
+            <button onClick={() => { setUploadInfo(null); try { sessionStorage.removeItem('vehicle_upload_info'); } catch (e) {} }} className="ml-auto text-emerald-400 hover:text-emerald-600"><XCircle size={16} /></button>
           </div>
         )}
         {zcoUploadInfo && (
@@ -2085,6 +2203,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 <input type="text" placeholder="Cari plant / kebun..." value={searchPlant} onChange={e => setSearchPlant(e.target.value)}
                   className="pl-9 pr-3 py-2 border border-slate-200 rounded-2xl text-xs w-56 focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b]" />
               </div>
+
+              {/* WA Auto-Send Schedule Info */}
+              {isAdmin && (
+                <WAScheduleBadge onOpen={() => setShowWAModal(true)} />
+              )}
+
               <div className="flex gap-2 flex-wrap">
                 <button onClick={handlePrint} disabled={isSavingImage}
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition ${

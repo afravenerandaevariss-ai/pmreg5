@@ -4,7 +4,7 @@ import { id } from 'date-fns/locale';
 import { RefreshCw, Download, Calendar, List, X, Copy, Check, Upload } from 'lucide-react';
 import { supabase, IS_DEV_ENV } from '../lib/supabase';
 
-const T_DAILY_LOGS = IS_DEV_ENV ? 'dev_daily_logs' : 'daily_logs';
+const T_DAILY_LOGS = 'daily_logs';
 
 import { getSystemConfig, saveSystemConfig, fetchMasterEquipment } from '../lib/supabaseService';
 import * as XLSX from 'xlsx';

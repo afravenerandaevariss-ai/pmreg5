@@ -2,14 +2,14 @@ import { supabase, IS_DEV_ENV } from '../lib/supabase.js';
 
 // ============================================================
 // TABLE NAME RESOLVER
-// DEV server (devpmreg5) uses prefixed tables to isolate data.
-// PROD server (pmreg5) uses the original table names.
+// DEV and PROD now have completely separate PostgreSQL databases
+// (pmreg5_dev_db vs pmreg5_db), so standard table names are used.
 // ============================================================
 const T = {
-  master_equipment: IS_DEV_ENV ? 'dev_master_equipment' : 'master_equipment',
-  daily_logs:       IS_DEV_ENV ? 'dev_daily_logs'       : 'daily_logs',
-  hierarchy_data:   IS_DEV_ENV ? 'dev_hierarchy_data'   : 'hierarchy_data',
-  app_users:        'app_users', // Shared — same users for both envs
+  master_equipment: 'master_equipment',
+  daily_logs:       'daily_logs',
+  hierarchy_data:   'hierarchy_data',
+  app_users:        'app_users',
 };
 
 
@@ -705,6 +705,21 @@ export async function saveVehicleData(vehicles, logs) {
       .from('vehicle_master')
       .upsert(vehicles, { onConflict: 'vehicle_code' });
     if (vErr) return { error: vErr.message || vErr };
+  }
+
+  // Delete ALL existing vehicle_logs for the uploaded plant(s) before inserting.
+  // This prevents stale rows with old activity_number keys from surviving after a re-upload,
+  // which is what caused data to disappear on page refresh (old records remained, new ones were added,
+  // and the view showed a mix of old + new duplicates, or old data when cache was cleared).
+  const uploadedPlants = [...new Set(logs.map(l => l.plant).filter(Boolean))];
+  if (uploadedPlants.length > 0) {
+    for (const plant of uploadedPlants) {
+      const { error: delErr } = await supabase
+        .from('vehicle_logs')
+        .delete()
+        .eq('plant', plant);
+      if (delErr) console.warn(`[saveVehicleData] Non-fatal: failed to delete old logs for plant ${plant}:`, delErr.message);
+    }
   }
 
   // Upsert vehicle_logs — 4 parallel chunks at a time for speed

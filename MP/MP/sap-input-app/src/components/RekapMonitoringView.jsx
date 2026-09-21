@@ -27,7 +27,7 @@ import {
 import { supabase, IS_DEV_ENV } from '../lib/supabase';
 import * as XLSX from 'xlsx';
 
-const T_DAILY_LOGS = IS_DEV_ENV ? 'dev_daily_logs' : 'daily_logs';
+const T_DAILY_LOGS = 'daily_logs';
 
 const ALL_PABRIK_PLANTS = [
   { code: '5F01', name: 'GUNUNG MELIAU' },

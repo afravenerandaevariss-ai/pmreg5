@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase, IS_DEV_ENV } from '../lib/supabase';
 import * as XLSX from 'xlsx';
 
-const T_PARSED_EXCEL = IS_DEV_ENV ? 'dev_parsed_excel' : 'parsed_excel';
+const T_PARSED_EXCEL = 'parsed_excel';
 const BUCKET_EXCEL   = 'excel_uploads';
 
 // localStorage keys — data persists across refreshes in the same browser

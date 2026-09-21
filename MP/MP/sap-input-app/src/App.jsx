@@ -18,8 +18,8 @@ import KnowledgeBaseManager from './components/KnowledgeBaseManager';
 import DocsKnowledgeBaseView from './components/DocsKnowledgeBaseView';
 import { supabase, IS_DEV_ENV } from './lib/supabase';
 
-const T_MASTER_EQ   = IS_DEV_ENV ? 'dev_master_equipment' : 'master_equipment';
-const T_HIERARCHY   = IS_DEV_ENV ? 'dev_hierarchy_data'   : 'hierarchy_data';
+const T_MASTER_EQ   = 'master_equipment';
+const T_HIERARCHY   = 'hierarchy_data';
 
 import { 
   uploadMasterEquipment, 
@@ -186,10 +186,21 @@ function LoginView({ onLogin }) {
             </div>
           </div>
 
-          <h2 className="text-[28px] font-black text-slate-800 mb-2 tracking-tight leading-tight">
-            Modul PM SAP
-          </h2>
-          <p className="text-slate-500 text-sm mb-8 font-medium">Silakan otentikasi dengan NIK Anda.</p>
+          <div className="flex items-center gap-2 mb-2">
+            <h2 className="text-[28px] font-black text-slate-800 tracking-tight leading-tight">
+              Modul PM SAP
+            </h2>
+            {IS_DEV_ENV && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-700 border border-amber-500/30 animate-pulse">
+                DEV PLAYGROUND
+              </span>
+            )}
+          </div>
+          <p className="text-slate-500 text-sm mb-8 font-medium">
+            {IS_DEV_ENV 
+              ? 'Taman Bermain (Database Terisolasi - Aman untuk Testing)' 
+              : 'Silakan otentikasi dengan NIK Anda.'}
+          </p>
 
           {error && (
             <div className="bg-red-50 text-red-700 p-3.5 rounded-xl mb-6 text-sm font-medium border border-red-200 flex items-center gap-2.5">
@@ -1450,7 +1461,15 @@ function App() {
               <Menu size={20} />
             </button>
             <Database className="text-[#0f766e] hidden sm:block" size={20} />
-            <h1 className="text-base font-bold text-slate-800 tracking-tight">PM Regional 5</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-bold text-slate-800 tracking-tight">PM Regional 5</h1>
+              {IS_DEV_ENV && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-700 border border-amber-500/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                  DEV PLAYGROUND
+                </span>
+              )}
+            </div>
           </div>
           
           <div className="flex items-center gap-3 sm:gap-4">

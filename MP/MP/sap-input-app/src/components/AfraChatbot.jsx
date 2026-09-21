@@ -3,7 +3,7 @@ import { X, Send } from 'lucide-react';
 import { fetchLiveChats, saveLiveChats, fetchKnowledgeBase } from '../lib/supabaseService';
 import { supabase, IS_DEV_ENV } from '../lib/supabase';
 
-const T_HIERARCHY = IS_DEV_ENV ? 'dev_hierarchy_data' : 'hierarchy_data';
+const T_HIERARCHY = 'hierarchy_data';
 
 
 // ─── Knowledge Base (Fallback default) ───────────────────────────────────────
