@@ -62,6 +62,7 @@ async function main() {
         });
         console.log('✅ Archive uploaded successfully!');
 
+        await runCmd(conn, 'rm -rf /var/www/pmreg5/dist/assets && rm -f /var/www/pmreg5/dist/index.html', 'Clean stale PROD assets & index.html');
         await runCmd(conn, 'tar -xzf /tmp/deploy_prod.tar.gz -C /var/www/pmreg5/dist && rm -f /tmp/deploy_prod.tar.gz', 'Extracting build archive to /var/www/pmreg5/dist');
         await runCmd(conn, 'sudo chmod -R 755 /var/www/pmreg5/dist && sudo chown -R ubuntu:www-data /var/www/pmreg5/dist', 'Ensure 755 permissions on dist');
 

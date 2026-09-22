@@ -87,6 +87,7 @@ async function main() {
         console.log('\n🚀 ─── DEPLOYING PRODUCTION ───');
         await runCmd(conn, 'sudo chmod -R 755 /var/www/pmreg5 && sudo chown -R ubuntu:www-data /var/www/pmreg5', 'Fix PROD permissions');
         await runCmd(conn, 'mkdir -p /var/www/pmreg5/dist', 'Ensure PROD dist dir');
+        await runCmd(conn, 'rm -rf /var/www/pmreg5/dist/assets && rm -f /var/www/pmreg5/dist/index.html', 'Wipe stale PROD assets & index.html');
         await runCmd(conn, 'tar -xzf /tmp/deploy_prod.tar.gz -C /var/www/pmreg5/dist && rm -f /tmp/deploy_prod.tar.gz', 'Extract PROD archive');
         await runCmd(conn, 'sudo chmod -R 755 /var/www/pmreg5/dist && sudo chown -R ubuntu:www-data /var/www/pmreg5/dist', 'Ensure PROD dist permissions');
         await runCmd(conn, 'pm2 reload pmreg5 || pm2 restart pmreg5', 'Reload PM2 pmreg5');
@@ -96,6 +97,7 @@ async function main() {
         console.log('\n🚀 ─── DEPLOYING DEV PLAYGROUND ───');
         await runCmd(conn, 'sudo chmod -R 755 /var/www/devpmreg5 && sudo chown -R ubuntu:www-data /var/www/devpmreg5', 'Fix DEV permissions');
         await runCmd(conn, 'mkdir -p /var/www/devpmreg5/dist', 'Ensure DEV dist dir');
+        await runCmd(conn, 'rm -rf /var/www/devpmreg5/dist/assets && rm -f /var/www/devpmreg5/dist/index.html', 'Wipe stale DEV assets & index.html');
         await runCmd(conn, 'tar -xzf /tmp/deploy_dev.tar.gz -C /var/www/devpmreg5/dist && rm -f /tmp/deploy_dev.tar.gz', 'Extract DEV archive');
         await runCmd(conn, 'sudo chmod -R 755 /var/www/devpmreg5/dist && sudo chown -R ubuntu:www-data /var/www/devpmreg5/dist', 'Ensure DEV dist permissions');
         await runCmd(conn, 'pm2 restart pmreg5-dev pmreg5-dev-auth pmreg5-dev-postgrest', 'Restart DEV PM2 services');
