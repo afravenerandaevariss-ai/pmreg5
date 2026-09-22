@@ -34,29 +34,11 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
-// True ONLY when running on devpmreg5 or localhost with VITE_APP_ENV=dev
-// CRITICAL: Production domain (pmreg5.afratarigan.my.id) MUST NEVER be treated as dev
-export const IS_DEV_ENV = (() => {
-  try {
-    if (typeof window !== 'undefined') {
-      const hostname = window.location.hostname || '';
-      // Explicitly reject production domain
-      if (hostname.includes('pmreg5') && !hostname.includes('devpmreg5')) {
-        return false;
-      }
-      // Dev server domain
-      if (hostname.includes('devpmreg5')) {
-        return true;
-      }
-      // Local development
-      if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return Boolean(import.meta?.env?.VITE_APP_ENV === 'dev');
-      }
-    }
-    return false;
-  } catch {
-    return false;
-  }
-})();
+// True ONLY in dev build (VITE_APP_ENV === 'dev')
+// In production builds (VITE_APP_ENV === 'production'), this is statically false at compile time
+// and Rollup completely removes all DEV PLAYGROUND elements from the production bundle.
+export const IS_DEV_ENV = import.meta.env.VITE_APP_ENV === 'dev';
+
+
 
 
