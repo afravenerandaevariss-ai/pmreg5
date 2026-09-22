@@ -34,15 +34,29 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
-// True when running on devpmreg5 or built with VITE_APP_ENV=dev
+// True ONLY when running on devpmreg5 or localhost with VITE_APP_ENV=dev
+// CRITICAL: Production domain (pmreg5.afratarigan.my.id) MUST NEVER be treated as dev
 export const IS_DEV_ENV = (() => {
   try {
-    if (typeof window !== 'undefined' && window.location.hostname.includes('devpmreg5')) {
-      return true;
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname || '';
+      // Explicitly reject production domain
+      if (hostname.includes('pmreg5') && !hostname.includes('devpmreg5')) {
+        return false;
+      }
+      // Dev server domain
+      if (hostname.includes('devpmreg5')) {
+        return true;
+      }
+      // Local development
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return Boolean(import.meta?.env?.VITE_APP_ENV === 'dev');
+      }
     }
-    return import.meta?.env?.VITE_APP_ENV === 'dev';
+    return false;
   } catch {
     return false;
   }
 })();
+
 

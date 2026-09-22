@@ -31,7 +31,10 @@ async function main() {
   console.log('🚀 DEPLOYING PRODUCTION SERVER (pmreg5.afratarigan.my.id)...');
   console.log('📦 Building Vite for Production...');
 
-  execSync('npx vite build --mode production --outDir dist-prod', { stdio: 'inherit' });
+  execSync('npx vite build --mode production --outDir dist-prod', {
+    stdio: 'inherit',
+    env: { ...process.env, VITE_APP_ENV: 'production' }
+  });
 
   // Create tar.gz archive locally using tar (index.html + assets)
   console.log('📦 Compressing dist-prod (index.html + assets) into deploy_prod.tar.gz...');
