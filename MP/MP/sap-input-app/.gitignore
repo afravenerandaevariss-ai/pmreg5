@@ -30,6 +30,8 @@ dist-prod/
 
 # Debug / scratch scripts (mengandung credentials)
 scratch/
+scratch_*.mjs
+update_gowa_html.mjs
 
 # Scripts dengan credentials
 sync_users_from_excel.mjs
@@ -48,10 +50,16 @@ seed_users.js
 seed_users2.js
 setup-db.js
 
-# Env files (Vercel credentials tetap di-ignore)
-.env.vercel
-.env.vercel.prod
+# Env files — JANGAN PERNAH di-commit ke Git (mengandung secrets & credentials)
+# Untuk onboarding developer baru, salin .env.example dan isi nilainya sendiri.
+.env
+.env.*
+!.env.example
 
 # Design critique files (lokal saja)
 .impeccable/
 
+# Database Backups (jangan sampai ter-push ke git)
+backups/
+*.dump
+*.sql.gz

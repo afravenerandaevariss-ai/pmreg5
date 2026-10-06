@@ -1,0 +1,72 @@
+name: 🧪 [DEV TESTING] Uji Coba Pengiriman Rekap Logbook ke WhatsApp
+
+# ─────────────────────────────────────────────────────────────────────────────
+# WORKFLOW KHUSUS TESTING DI LINGKUNGAN DEV
+# ⚠️ HANYA DIJALANKAN SECARA MANUAL (TIDAK ADA JADWAL OTOMATIS)
+# Mencegah pengiriman ke grup WhatsApp produksi resmi.
+# ─────────────────────────────────────────────────────────────────────────────
+on:
+  workflow_dispatch:
+    inputs:
+      target_wa:
+        description: 'Nomor WhatsApp atau ID Grup Pengujian (Misal: 62812xxxx@s.whatsapp.net)'
+        required: false
+        default: ''
+
+jobs:
+  test-dev-wa-report:
+    name: 🧪 Generate & Test DEV Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: MP/MP/sap-input-app/package-lock.json
+
+      - name: 📦 Install dependencies
+        working-directory: MP/MP/sap-input-app
+        run: npm ci
+
+      - name: 🌐 Install Google Chrome Stable
+        run: |
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update -q
+          sudo apt-get install -y google-chrome-stable
+
+      - name: 📁 Ensure public/ directory exists
+        working-directory: MP/MP/sap-input-app
+        run: mkdir -p public
+
+      - name: 📸 Generate DEV HD Image Report
+        working-directory: MP/MP/sap-input-app
+        env:
+          TZ: 'Asia/Jakarta'
+          # DEV ENVIRONMENT LOCK
+          VITE_APP_ENV: 'dev'
+          NODE_ENV: 'development'
+          APP_URL: 'https://devpmreg5.afratarigan.my.id'
+          VITE_SUPABASE_URL: 'https://devpmreg5.afratarigan.my.id'
+          VITE_SUPABASE_ANON_KEY: '${{ secrets.VITE_SUPABASE_ANON_KEY_DEV }}'
+          DEV_TARGET_WA: '${{ github.event.inputs.target_wa }}'
+          GOWA_URL: '${{ secrets.GOWA_URL }}'
+          GOWA_USER: '${{ secrets.GOWA_USER }}'
+          GOWA_PASS: '${{ secrets.GOWA_PASS }}'
+          CHROME_PATH: '/usr/bin/google-chrome-stable'
+        run: node scripts/run_wa_report.js
+
+      - name: 📎 Upload Screenshot Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rekap-dev-testing-${{ github.run_id }}
+          path: MP/MP/sap-input-app/public/rekap.png
+          retention-days: 7
+          if-no-files-found: ignore

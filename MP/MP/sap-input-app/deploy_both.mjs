@@ -3,10 +3,16 @@ import { execSync } from 'child_process';
 import fs from 'fs';
 
 const SSH = {
-  host: '43.134.84.59',
-  port: 22,
-  username: 'ubuntu',
-  password: 'Akuhebat123#',
+  host: process.env.SSH_HOST || '43.134.84.59',
+  port: parseInt(process.env.SSH_PORT || '22'),
+  username: process.env.SSH_USER || 'ubuntu',
+  // Gunakan SSH key (direkomendasikan) atau password dari env var
+  // Jalankan: SSH_PASS=xxx node deploy_both.mjs
+  // Atau set SSH_KEY_PATH=/path/to/key untuk key-based auth
+  ...(process.env.SSH_KEY_PATH
+    ? { privateKey: (await import('fs')).default.readFileSync(process.env.SSH_KEY_PATH) }
+    : { password: process.env.SSH_PASS || (() => { throw new Error('SSH_PASS atau SSH_KEY_PATH harus diset!'); })() }
+  ),
   readyTimeout: 30000,
   keepaliveInterval: 10000,
 };
@@ -83,6 +89,13 @@ async function main() {
       console.log('✅ DEV archive uploaded');
 
       try {
+        // ╔══════════════════════════════════════════════════════════════════╗
+        // ║  SAFETY RULE: Deploy TIDAK PERNAH menyentuh .env di server.    ║
+        // ║  File .env di /var/www/pmreg5/.env dan /var/www/devpmreg5/.env ║
+        // ║  adalah sumber kebenaran tunggal untuk secrets tiap environment.║
+        // ║  Edit secrets → langsung di server via SSH, bukan via deploy.   ║
+        // ╚══════════════════════════════════════════════════════════════════╝
+
         // ── Deploy PROD ──────────────────────────────────────────────────────
         console.log('\n🚀 ─── DEPLOYING PRODUCTION ───');
         await runCmd(conn, 'sudo chmod -R 755 /var/www/pmreg5 && sudo chown -R ubuntu:www-data /var/www/pmreg5', 'Fix PROD permissions');
@@ -90,6 +103,7 @@ async function main() {
         await runCmd(conn, 'rm -rf /var/www/pmreg5/dist/assets && rm -f /var/www/pmreg5/dist/index.html', 'Wipe stale PROD assets & index.html');
         await runCmd(conn, 'tar -xzf /tmp/deploy_prod.tar.gz -C /var/www/pmreg5/dist && rm -f /tmp/deploy_prod.tar.gz', 'Extract PROD archive');
         await runCmd(conn, 'sudo chmod -R 755 /var/www/pmreg5/dist && sudo chown -R ubuntu:www-data /var/www/pmreg5/dist', 'Ensure PROD dist permissions');
+        // ✅ SAFETY: Reload (bukan restart) agar .env server tetap terbaca dari PM2 env cache
         await runCmd(conn, 'pm2 reload pmreg5 || pm2 restart pmreg5', 'Reload PM2 pmreg5');
         console.log('\n🎉 PRODUCTION deployed! (pmreg5.afratarigan.my.id)');
 
@@ -100,6 +114,7 @@ async function main() {
         await runCmd(conn, 'rm -rf /var/www/devpmreg5/dist/assets && rm -f /var/www/devpmreg5/dist/index.html', 'Wipe stale DEV assets & index.html');
         await runCmd(conn, 'tar -xzf /tmp/deploy_dev.tar.gz -C /var/www/devpmreg5/dist && rm -f /tmp/deploy_dev.tar.gz', 'Extract DEV archive');
         await runCmd(conn, 'sudo chmod -R 755 /var/www/devpmreg5/dist && sudo chown -R ubuntu:www-data /var/www/devpmreg5/dist', 'Ensure DEV dist permissions');
+        // ✅ SAFETY: .env TIDAK pernah di-copy/overwrite — tiap server punya .env sendiri
         await runCmd(conn, 'pm2 restart pmreg5-dev pmreg5-dev-auth pmreg5-dev-postgrest', 'Restart DEV PM2 services');
         console.log('\n🎉 DEV PLAYGROUND deployed! (devpmreg5.afratarigan.my.id)');
 
