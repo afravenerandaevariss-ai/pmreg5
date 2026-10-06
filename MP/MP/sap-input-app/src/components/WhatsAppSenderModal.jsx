@@ -3,15 +3,23 @@ import { Send, CheckCircle2, AlertCircle, Copy, ExternalLink, Settings, Clock, S
 import { fetchWAConfig, saveWAConfig, fetchWALogs, saveWALog } from '../lib/supabaseService';
 
 export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targetInputDate }) {
-  const [targetPhone, setTargetPhone] = useState('120363430505509462');
-  const [targetGroup, setTargetGroup] = useState('Group PM (120363430505509462)');
+  const isDev = import.meta.env.VITE_APP_ENV === 'dev' || 
+                (typeof window !== 'undefined' && (
+                  window.location.hostname.includes('dev') || 
+                  window.location.hostname === 'localhost' || 
+                  window.location.hostname === '127.0.0.1'
+                ));
+  const PROD_GROUP_IDS = ['120363430505509462', '120363041780234935', '120363427768510358'];
+
+  const [targetPhone, setTargetPhone] = useState(isDev ? '' : '120363430505509462');
+  const [targetGroup, setTargetGroup] = useState(isDev ? 'DEV Testing (Belum Diset)' : 'Group PM (120363430505509462)');
   const [provider, setProvider] = useState('gowa');
   const [apiToken, setApiToken] = useState('');
-  const [gowaUrl, setGowaUrl] = useState('https://gowa.waterflai.my.id');
+  const [gowaUrl, setGowaUrl] = useState('https://gowa.afratarigan.my.id');
   const [gowaUser, setGowaUser] = useState('admin');
   const [gowaPass, setGowaPass] = useState('Sedap321#');
   const [gowaDevice, setGowaDevice] = useState('aaaa');
-  const [autoSendEnabled, setAutoSendEnabled] = useState(true);
+  const [autoSendEnabled, setAutoSendEnabled] = useState(!isDev);
   const [sendTime, setSendTime] = useState('08:00 & 15:30');
   const [sending, setSending] = useState(false);
   const [statusMsg, setStatusMsg] = useState(null);
@@ -28,15 +36,20 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
   const loadConfig = async () => {
     const { data } = await fetchWAConfig();
     if (data) {
-      if (data.targetPhone) setTargetPhone(data.targetPhone);
-      if (data.targetGroup) setTargetGroup(data.targetGroup);
+      const isProdTarget = data.targetPhone && PROD_GROUP_IDS.some(id => String(data.targetPhone).includes(id));
+      if (data.targetPhone !== undefined && !(isDev && isProdTarget)) {
+        setTargetPhone(data.targetPhone);
+      }
+      if (data.targetGroup && !(isDev && isProdTarget)) {
+        setTargetGroup(data.targetGroup);
+      }
       if (data.provider) setProvider(data.provider);
       if (data.apiToken) setApiToken(data.apiToken);
       if (data.gowaUrl) setGowaUrl(data.gowaUrl);
       if (data.gowaUser) setGowaUser(data.gowaUser);
       if (data.gowaPass) setGowaPass(data.gowaPass);
       if (data.gowaDevice) setGowaDevice(data.gowaDevice);
-      if (data.autoSendEnabled !== undefined) setAutoSendEnabled(data.autoSendEnabled);
+      if (data.autoSendEnabled !== undefined) setAutoSendEnabled(isDev ? false : data.autoSendEnabled);
       if (data.sendTime) setSendTime(data.sendTime);
     }
   };
@@ -47,6 +60,10 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
   };
 
   const handleSaveConfig = async () => {
+    if (isDev && PROD_GROUP_IDS.some(id => String(targetPhone).includes(id))) {
+      setStatusMsg({ type: 'error', text: '🛡️ [DEV SAFETY GUARD] Tidak boleh menyimpan ID Grup PROD di lingkungan DEV!' });
+      return;
+    }
     const config = {
       targetPhone,
       targetGroup,
@@ -56,7 +73,7 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
       gowaUser,
       gowaPass,
       gowaDevice,
-      autoSendEnabled,
+      autoSendEnabled: isDev ? false : autoSendEnabled,
       sendTime,
       updatedAt: new Date().toISOString()
     };
@@ -84,8 +101,9 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
     const now = new Date();
     const timeFormatted = `${String(now.getHours()).padStart(2, '0')}.${String(now.getMinutes()).padStart(2, '0')}`;
 
-    let text = `*Monitoring Transaksi Logbook tanggal 1 s.d ${reportDateStr} ${timeFormatted}*\n`;
-    text += `*REGIONAL 5*\n`;
+    let text = isDev ? `🧪 *[DEV TESTING - BUKAN DATA RESMI]*\n` : ``;
+    text += `*Monitoring Transaksi Logbook tanggal 1 s.d ${reportDateStr} ${timeFormatted}*\n`;
+    text += `*REGIONAL 5 ${isDev ? '(DEV)' : ''}*\n`;
     text += `Target input logbook : *${reportDateStr}* (H-1)\n\n`;
 
     text += `\`\`\`\n`;
@@ -110,7 +128,9 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
 
     text += `+-------+-------------------------+------+----------+-----+-----+--------+------------+------+\n`;
     text += `\`\`\`\n`;
-    text += `\n_Laporan otomatis dikirim setiap jam 08:00 WIB dari https://pmreg5.afratarigan.my.id_`;
+    text += isDev 
+      ? `\n_🧪 Laporan pengujian simulasi DEV dari ${window.location.origin}_`
+      : `\n_Laporan otomatis dikirim setiap jam 08:00 WIB dari ${window.location.origin}_`;
 
     return text;
   };
@@ -123,8 +143,15 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
   };
 
   const handleOpenWAWeb = () => {
-    const text = generateWAText();
     const cleanPhone = targetPhone.replace(/[^0-9]/g, '');
+    if (isDev && PROD_GROUP_IDS.some(id => cleanPhone.includes(id))) {
+      setStatusMsg({
+        type: 'error',
+        text: '🛡️ [DEV SAFETY GUARD] Pengiriman ke grup PROD diblokir pada mode DEV! Ubah target ke nomor/grup testing Anda di tab Pengaturan.'
+      });
+      return;
+    }
+    const text = generateWAText();
     const formattedPhone = cleanPhone.startsWith('0') ? '62' + cleanPhone.substring(1) : cleanPhone;
     const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
@@ -139,20 +166,34 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
       <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Modal Header */}
-        <div className="bg-gradient-to-r from-emerald-800 to-teal-700 text-white p-5 flex justify-between items-center">
+        <div className={`p-5 flex justify-between items-center text-white ${
+          isDev 
+            ? 'bg-gradient-to-r from-amber-700 via-orange-700 to-amber-900' 
+            : 'bg-gradient-to-r from-emerald-800 to-teal-700'
+        }`}>
           <div className="flex items-center gap-3">
-            <div className="bg-emerald-600/50 p-2.5 rounded-2xl border border-emerald-400/30">
-              <MessageSquare size={22} className="text-emerald-200" />
+            <div className={`p-2.5 rounded-2xl border ${
+              isDev ? 'bg-amber-600/50 border-amber-400/30' : 'bg-emerald-600/50 border-emerald-400/30'
+            }`}>
+              <MessageSquare size={22} className={isDev ? 'text-amber-200' : 'text-emerald-200'} />
             </div>
             <div>
               <h2 className="font-extrabold text-base tracking-wide flex items-center gap-2">
                 Otomatisasi WhatsApp Logbook
-                <span className="bg-emerald-500/40 text-emerald-100 text-[10px] px-2 py-0.5 rounded-full border border-emerald-300/30">
-                  Daily 08:00 AM
-                </span>
+                {isDev ? (
+                  <span className="bg-amber-400 text-slate-900 font-extrabold text-[10px] px-2.5 py-0.5 rounded-full shadow-sm">
+                    🧪 DEV TESTING (SAFE MODE)
+                  </span>
+                ) : (
+                  <span className="bg-emerald-500/40 text-emerald-100 text-[10px] px-2 py-0.5 rounded-full border border-emerald-300/30">
+                    Daily 08:00 AM
+                  </span>
+                )}
               </h2>
-              <p className="text-xs text-emerald-100/90 mt-0.5">
-                Pengiriman Laporan Rekap Regional 5 ke {targetPhone} ({targetGroup})
+              <p className={`text-xs mt-0.5 ${isDev ? 'text-amber-100/90' : 'text-emerald-100/90'}`}>
+                {isDev 
+                  ? 'Lingkungan Pengembangan DEV terisolasi - Grup PROD dilindungi' 
+                  : `Pengiriman Laporan Rekap Regional 5 ke ${targetPhone} (${targetGroup})`}
               </p>
             </div>
           </div>
@@ -304,7 +345,7 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
                     onChange={e => setProvider(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   >
-                    <option value="gowa">GoWA Waterflai API Gateway (gowa.waterflai.my.id)</option>
+                    <option value="gowa">GoWA Self-Hosted API Gateway (gowa.afratarigan.my.id)</option>
                     <option value="fonnte">Fonnte API (fonnte.com)</option>
                     <option value="custom">Custom Webhook Endpoint</option>
                   </select>
@@ -319,7 +360,7 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
                       type="text"
                       value={gowaUrl}
                       onChange={e => setGowaUrl(e.target.value)}
-                      placeholder="https://gowa.waterflai.my.id"
+                      placeholder="https://gowa.afratarigan.my.id"
                       className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                     />
                   </div>

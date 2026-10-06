@@ -14,7 +14,51 @@ if (fs.existsSync('.env.local')) {
 const GOWA_URL = process.env.GOWA_URL || 'https://gowa.waterflai.my.id';
 const GOWA_USER = process.env.GOWA_USER || 'admin';
 const GOWA_PASS = process.env.GOWA_PASS || 'Sedap321#';
-const TARGET_GROUP_JIDS = process.env.TARGET_GROUP_JIDS ? process.env.TARGET_GROUP_JIDS.split(',') : ['120363041780234935@g.us', '120363427768510358@g.us'];
+
+// ─────────────────────────────────────────────────────────────
+// SAFETY GUARD: STRICT DEV / PROD ISOLATION
+// ─────────────────────────────────────────────────────────────
+const PROD_GROUP_JIDS = ['120363041780234935@g.us', '120363427768510358@g.us', '120363430505509462'];
+
+// Detect whether running in DEV or PROD
+const APP_URL = process.env.APP_URL || process.env.VITE_APP_BASE_URL || process.env.VITE_SUPABASE_URL || 'https://devpmreg5.afratarigan.my.id';
+const isDev = process.env.VITE_APP_ENV === 'dev' || 
+              process.env.NODE_ENV === 'development' || 
+              (APP_URL && APP_URL.includes('dev')) ||
+              (!process.env.CI && (!process.env.APP_URL || process.env.APP_URL.includes('dev')));
+
+let TARGET_GROUP_JIDS = [];
+if (isDev) {
+  console.log('='.repeat(65));
+  console.log('🛡️ [SAFETY GUARD] ENVIRONMENT: DEV / TESTING DETECTED');
+  console.log(`   APP_URL: ${APP_URL}`);
+  
+  // In DEV, read target only from DEV_TARGET_WA or TARGET_GROUP_JIDS
+  const devTarget = process.env.DEV_TARGET_WA || process.env.TARGET_GROUP_JIDS;
+  if (devTarget) {
+    const candidateList = devTarget.split(',').map(s => s.trim()).filter(Boolean);
+    // STRICTLY strip any production group IDs
+    TARGET_GROUP_JIDS = candidateList.filter(id => !PROD_GROUP_JIDS.some(prodId => id.includes(prodId)));
+    if (TARGET_GROUP_JIDS.length < candidateList.length) {
+      console.warn('⚠️ [SAFETY GUARD] Blocked attempt to send to PROD group in DEV mode!');
+    }
+  }
+
+  if (TARGET_GROUP_JIDS.length === 0) {
+    console.warn('ℹ️ [SAFETY GUARD] No DEV_TARGET_WA configured in .env.local.');
+    console.warn('   PROD groups are completely blocked in DEV mode.');
+    console.warn('   Screenshots will be generated locally in public/ without sending to PROD.');
+    console.warn('   To receive test messages on your own WhatsApp, set DEV_TARGET_WA=<phone> in .env.local.');
+  } else {
+    console.log(`🎯 [SAFETY GUARD] DEV messages will ONLY be sent to test target: ${TARGET_GROUP_JIDS.join(', ')}`);
+  }
+  console.log('='.repeat(65));
+} else {
+  // PROD mode: Send to official groups
+  TARGET_GROUP_JIDS = process.env.TARGET_GROUP_JIDS ? process.env.TARGET_GROUP_JIDS.split(',').map(s => s.trim()).filter(Boolean) : ['120363041780234935@g.us', '120363427768510358@g.us'];
+  console.log('🚀 [ENVIRONMENT]: PRODUCTION MODE ACTIVE');
+}
+
 const MAX_RETRIES = 3;
 
 // Auto-detect Chrome path
@@ -68,8 +112,15 @@ async function sendPmreg5Screenshot(pngBuffer, deviceId, authHeader) {
   const dateFormatted = `${dayStr}/${monthStr}/${yearStr}`;
   const timeFormatted = formatterTime.format(now).replace(':', '.');
 
-  let caption = `*Monitoring Transaksi Logbook tanggal 1 s.d ${dateFormatted} ${timeFormatted}*\n`;
-  caption += `*REGIONAL 5*\n\n`;
+  let caption = isDev ? `🧪 *[DEV TESTING - BUKAN DATA RESMI]*\n` : ``;
+  caption += `*Monitoring Transaksi Logbook tanggal 1 s.d ${dateFormatted} ${timeFormatted}*\n`;
+  caption += `*REGIONAL 5 ${isDev ? '(DEV SIMULATION)' : ''}*\n\n`;
+
+  if (isDev && TARGET_GROUP_JIDS.length === 0) {
+    console.log('[DEV SAFETY GUARD] ✅ PMReg5 Screenshot saved locally to public/rekap.png.');
+    console.log('[DEV SAFETY GUARD] 🛡️ No WhatsApp messages sent to PROD. Simulation successful.');
+    return { success: true, simulated: true };
+  }
 
   let overallSuccess = true;
   for (const groupId of TARGET_GROUP_JIDS) {
@@ -94,7 +145,7 @@ async function sendPmreg5Screenshot(pngBuffer, deviceId, authHeader) {
 }
 
 async function capturePmreg5Screenshot() {
-  const targetUrl = `https://pmreg5.afratarigan.my.id/?hideNav=true&tab=vehicle&screenshotMode=true&t=${Date.now()}`;
+  const targetUrl = `${APP_URL}/?hideNav=true&tab=vehicle&screenshotMode=true&t=${Date.now()}`;
   let attempt = 1;
   let browser = null;
 
@@ -107,9 +158,18 @@ async function capturePmreg5Screenshot() {
       });
 
       const page = await browser.newPage();
+      page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
+      page.on('pageerror', err => console.log('BROWSER ERROR:', err.message));
+      page.on('response', resp => { if (resp.status() === 401) console.log('401 URL:', resp.url()); });
       await page.setViewport({ width: 1400, height: 900, deviceScaleFactor: 2 });
       
-      await page.goto(targetUrl, { waitUntil: 'networkidle0', timeout: 45000 });
+      if (APP_URL.includes('devpmreg5') || process.env.HTTP_AUTH_USER) {
+        const u = process.env.HTTP_AUTH_USER || 'Admin';
+        const p = process.env.HTTP_AUTH_PASS || 'Akuhebat#1';
+        await page.authenticate({ username: u, password: p });
+      }
+
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForSelector('#excel-report-sheet', { visible: true, timeout: 30000 });
 
       const isReady = await page.waitForFunction(() => {
@@ -123,7 +183,6 @@ async function capturePmreg5Screenshot() {
           if (emptyState && emptyState.innerText.includes('Tidak ada data')) return true; 
           return false;
         }
-        if (document.fonts.status !== 'loaded') return false;
         return true;
       }, { timeout: 30000, polling: 'raf' });
 
@@ -180,7 +239,14 @@ async function sendCmmsScreenshot(pngBuffer, deviceId, authHeader) {
   const dateFormatted = `${dayStr}/${monthStr}/${yearStr}`;
   const timeFormatted = formatterTime.format(now).replace(':', '.');
 
-  const caption = `*Update Running Hour Submission Monitoring*\n🗓️ ${dateFormatted} ⏰ ${timeFormatted} WIB`;
+  let caption = isDev ? `🧪 *[DEV TESTING - BUKAN DATA RESMI]*\n` : ``;
+  caption += `*Update Running Hour Submission Monitoring ${isDev ? '(DEV SIMULATION)' : ''}*\n🗓️ ${dateFormatted} ⏰ ${timeFormatted} WIB`;
+
+  if (isDev && TARGET_GROUP_JIDS.length === 0) {
+    console.log('[DEV SAFETY GUARD] ✅ CMMS Screenshot saved locally to public/cmms_screenshot.png.');
+    console.log('[DEV SAFETY GUARD] 🛡️ No WhatsApp messages sent to PROD. Simulation successful.');
+    return { success: true, simulated: true };
+  }
 
   let overallSuccess = true;
   for (const groupId of TARGET_GROUP_JIDS) {
@@ -336,15 +402,22 @@ async function main() {
   const currentHourWIB = parseInt(new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', hour12: false }).format(now));
 
   if (currentHourWIB === 7 || currentHourWIB === 14) {
+    let message = isDev ? `🧪 *[DEV TESTING - BUKAN DATA RESMI]*\n` : ``;
+    if (currentHourWIB === 7) {
+      message += `💪 *PTPN Tumbuh Juara Bangun Negeri!*\n_Bapak/Ibu sekalian, mohon segera selesaikan inputan Plant Maintenance (PM) unit masing-masing, karena hasil monitoring harian akan segera di-update secara berkala di grup ini._\n\n`;
+    } else {
+      message += `_Mohon kerjasamanya kepada seluruh unit untuk selalu disiplin melakukan *input* Logbook dan *update* Jam Jalan Mesin Pabrik secara rutin dan tepat waktu. Terima kasih!_\n\n`;
+    }
+
+    if (isDev && TARGET_GROUP_JIDS.length === 0) {
+      console.log('[DEV SAFETY GUARD] ✅ DEV reminder message generated:');
+      console.log(message);
+      console.log('[DEV SAFETY GUARD] 🛡️ No WhatsApp messages dispatched to PROD. Simulation successful.');
+      return;
+    }
+
     const authHeader = 'Basic ' + Buffer.from(`${GOWA_USER}:${GOWA_PASS}`).toString('base64');
     const deviceId = await getActiveDeviceId(authHeader);
-    
-    let message = '';
-    if (currentHourWIB === 7) {
-      message = `💪 *PTPN Tumbuh Juara Bangun Negeri!*\n_Bapak/Ibu sekalian, mohon segera selesaikan inputan Plant Maintenance (PM) unit masing-masing, karena hasil monitoring harian akan segera di-update secara berkala di grup ini._\n\n`;
-    } else {
-      message = `_Mohon kerjasamanya kepada seluruh unit untuk selalu disiplin melakukan *input* Logbook dan *update* Jam Jalan Mesin Pabrik secara rutin dan tepat waktu. Terima kasih!_\n\n`;
-    }
     
     let overallSuccess = true;
     for (const groupId of TARGET_GROUP_JIDS) {

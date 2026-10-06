@@ -1,8 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://pmreg5.afratarigan.my.id';
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InBtcmVnNSIsImlhdCI6MTc4NzE5NDMxOCwiZXhwIjoyMTAyNTU0MzE4fQ.ll8EmgpSp8W7Vhict4l56Ov1jMk8Jo_9zMzhGs9qUqs';
+// SAFETY: No hardcoded fallback — if env vars are missing, fail loudly
+// rather than silently connecting to the PRODUCTION database.
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error(
+    '[send-wa] VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY is not set. ' +
+    'Set the correct env vars for this environment (dev or prod) before running.'
+  );
+}
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// App base URL for this environment (used in WA report footer etc.)
+const appBaseUrl = process.env.VITE_APP_BASE_URL || supabaseUrl.replace('https://', 'https://');
 
 const PLANT_INFO = {
   "5E01": { desc: "KEBUN GUNUNG MELIAU",   wilayah: "Kal-Bar" },
@@ -182,10 +193,15 @@ async function buildReportText() {
   });
   text += `+-------+-------------------------+------+----------+-----+-----+--------+------------+------+\n`;
   text += `\`\`\`\n`;
-  text += `\n_Laporan otomatis diproses dari https://pmreg5.afratarigan.my.id (Setiap Jam 08:00 WIB)_`;
+  text += `\n_Laporan otomatis diproses dari ${appBaseUrl} (Setiap Jam 08:00 WIB)_`;
 
   return { text, list };
 }
+
+const PROD_GROUP_JIDS = ['120363041780234935@g.us', '120363427768510358@g.us', '120363430505509462'];
+const isDev = process.env.VITE_APP_ENV === 'dev' || 
+              process.env.NODE_ENV === 'development' || 
+              (supabaseUrl && supabaseUrl.includes('dev'));
 
 export default async function handler(req, res) {
   // Allow GET and POST
@@ -195,19 +211,49 @@ export default async function handler(req, res) {
 
   try {
     const waConfig = (await getSystemConfig(12)) || {};
-    const targetPhone = req.query.target || req.body?.target || waConfig.targetPhone || '120363427768510358@g.us';
-    const apiToken = req.query.token || req.body?.token || waConfig.apiToken || process.env.FONNTE_TOKEN;
-    const provider = req.query.provider || req.body?.provider || waConfig.provider || 'fonnte';
+    let targetPhone = req.query.target || req.body?.target || waConfig.targetPhone;
 
-    const { text, list } = await buildReportText();
+    let { text, list } = await buildReportText();
+    if (isDev) {
+      text = `🧪 *[DEV TESTING - BUKAN DATA RESMI]*\n` + text;
+    }
 
     if (req.query.mock === 'true' || req.body?.mock === true) {
       return res.status(200).json({ success: true, text, list });
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // SAFETY GUARD: BLOCK SENDING TO PROD GROUPS IN DEV MODE
+    // ─────────────────────────────────────────────────────────────
+    if (isDev) {
+      const devTarget = process.env.DEV_TARGET_WA;
+      const isTargetingProd = !targetPhone || PROD_GROUP_JIDS.some(id => String(targetPhone).includes(id));
+      
+      if (isTargetingProd) {
+        if (devTarget && !PROD_GROUP_JIDS.some(id => devTarget.includes(id))) {
+          console.log(`[SAFETY GUARD] Redirecting DEV message to DEV_TARGET_WA: ${devTarget}`);
+          targetPhone = devTarget;
+        } else {
+          console.warn(`[SAFETY GUARD] 🛡️ Blocked attempt to send WA to PROD group (${targetPhone || 'default'}) from DEV!`);
+          return res.status(200).json({
+            success: true,
+            devSafetyGuard: true,
+            message: `[DEV SAFETY GUARD] Pengiriman ke grup PROD dibatalkan karena server berada di mode DEV. Pesan TIDAK dikirim ke WhatsApp resmi untuk melindungi PROD.`,
+            previewText: text
+          });
+        }
+      }
+    } else {
+      if (!targetPhone) targetPhone = '120363427768510358@g.us';
+    }
+
+    const apiToken = req.query.token || req.body?.token || waConfig.apiToken || process.env.FONNTE_TOKEN;
+    const provider = req.query.provider || req.body?.provider || waConfig.provider || 'fonnte';
+
+
     let dispatchResult = { success: false, detail: null };
 
-    const gowaUrl = req.query.gowaUrl || waConfig.gowaUrl || 'https://gowa.waterflai.my.id';
+    const gowaUrl = req.query.gowaUrl || waConfig.gowaUrl || 'https://gowa.afratarigan.my.id';
     const gowaUser = req.query.gowaUser || waConfig.gowaUser || 'admin';
     const gowaPass = req.query.gowaPass || waConfig.gowaPass || 'Sedap321#';
 

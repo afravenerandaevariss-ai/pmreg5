@@ -776,11 +776,12 @@ export async function saveLiveChats(chats) {
 
 export async function fetchWAConfig() {
   const { data, error } = await getSystemConfig('wa_config');
+  const PROD_GROUP_IDS = ['120363430505509462', '120363041780234935', '120363427768510358'];
   const defaultConfig = {
-    targetPhone: '120363430505509462',
-    targetGroup: 'Group PM (120363430505509462)',
+    targetPhone: IS_DEV_ENV ? '' : '120363430505509462',
+    targetGroup: IS_DEV_ENV ? 'DEV Testing (Belum Diset)' : 'Group PM (120363430505509462)',
     provider: 'gowa',
-    gowaUrl: 'https://gowa.waterflai.my.id',
+    gowaUrl: 'https://gowa.afratarigan.my.id',
     gowaUser: 'admin',
     gowaPass: 'Sedap321#',
     gowaDevice: '黄玲玲',
@@ -790,7 +791,12 @@ export async function fetchWAConfig() {
   if (error || !data || typeof data !== 'object') {
     return { data: defaultConfig, error: null };
   }
-  return { data: { ...defaultConfig, ...data }, error: null };
+  const merged = { ...defaultConfig, ...data };
+  if (IS_DEV_ENV && merged.targetPhone && PROD_GROUP_IDS.some(id => String(merged.targetPhone).includes(id))) {
+    merged.targetPhone = '';
+    merged.targetGroup = 'DEV Testing (Grup PROD Diblokir)';
+  }
+  return { data: merged, error: null };
 }
 
 export async function saveWAConfig(configObj) {

@@ -1,15 +1,30 @@
 import puppeteer from 'puppeteer';
 
 
-// Configuration from environment variables
-let TARGET_PHONE = process.env.TARGET_PHONE || '081251334618'; // Group PM target
-if (TARGET_PHONE.startsWith('0')) {
+const APP_URL = process.env.APP_URL || process.env.VITE_APP_BASE_URL || process.env.VITE_SUPABASE_URL || 'https://devpmreg5.afratarigan.my.id';
+const isDev = process.env.VITE_APP_ENV === 'dev' || 
+              process.env.NODE_ENV === 'development' || 
+              (APP_URL && APP_URL.includes('dev'));
+
+const PROD_TARGETS = ['081251334618', '6281251334618', '120363041780234935@g.us', '120363427768510358@g.us'];
+let TARGET_PHONE = process.env.DEV_TARGET_WA || process.env.TARGET_PHONE;
+
+if (isDev) {
+  if (!TARGET_PHONE || PROD_TARGETS.some(p => String(TARGET_PHONE).includes(p))) {
+    console.warn('[DEV SAFETY GUARD] 🛡️ DEV Mode Active! Intercepted attempt to send to PROD recipient.');
+    TARGET_PHONE = null;
+  }
+} else {
+  if (!TARGET_PHONE) TARGET_PHONE = '081251334618';
+}
+
+if (TARGET_PHONE && TARGET_PHONE.startsWith('0')) {
   TARGET_PHONE = '62' + TARGET_PHONE.substring(1);
 }
-const GOWA_URL = process.env.GOWA_URL || 'https://gowa.waterflai.my.id';
+const GOWA_URL = process.env.GOWA_URL || 'https://gowa.afratarigan.my.id';
 const GOWA_USER = process.env.GOWA_USER || 'admin';
 const GOWA_PASS = process.env.GOWA_PASS || 'Sedap321#';
-const APP_URL = process.env.APP_URL || 'https://pmreg5.afratarigan.my.id';
+
 const NIK = process.env.WEB_NIK || '19010048';
 const PASS = process.env.WEB_PASS || 'ikatanistripenerbanganindonesia';
 
@@ -124,11 +139,15 @@ async function run() {
     const now = new Date();
     const dateStr = `${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()} ${now.getHours()}:${now.getMinutes()}`;
     
-    // Attempt sending image as form-data
-    // Note: We might need to adjust this depending on exact GoWA specs
+    if (isDev && !TARGET_PHONE) {
+      console.log('🛡️ [DEV SAFETY GUARD] Simulation complete: Screenshot captured successfully.');
+      console.log('   No WhatsApp messages dispatched to PROD.');
+      return;
+    }
+
     const formData = new FormData();
     formData.append('phone', TARGET_PHONE);
-    formData.append('message', 'Laporan Monitoring Logbook Kendaraan (Otomatis)');
+    formData.append('message', (isDev ? '🧪 [DEV TESTING] ' : '') + 'Laporan Monitoring Logbook Kendaraan (Otomatis)');
     
     // In Node.js 18+, native FormData expects a Blob instead of a raw Buffer
     const imageBlob = new Blob([imageBuffer], { type: 'image/png' });

@@ -4,10 +4,13 @@ import path from 'path';
 import { execSync } from 'child_process';
 
 const SSH = {
-  host: '43.134.84.59',
-  port: 22,
-  username: 'ubuntu',
-  password: 'Akuhebat123#',
+  host: process.env.SSH_HOST || '43.134.84.59',
+  port: parseInt(process.env.SSH_PORT || '22'),
+  username: process.env.SSH_USER || 'ubuntu',
+  ...(process.env.SSH_KEY_PATH
+    ? { privateKey: fs.readFileSync(process.env.SSH_KEY_PATH) }
+    : { password: process.env.SSH_PASS || (() => { throw new Error('SSH_PASS atau SSH_KEY_PATH harus diset!'); })() }
+  ),
   readyTimeout: 30000,
   keepaliveInterval: 10000,
   keepaliveCountMax: 10

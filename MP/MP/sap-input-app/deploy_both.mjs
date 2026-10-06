@@ -96,6 +96,15 @@ async function main() {
         // ║  Edit secrets → langsung di server via SSH, bukan via deploy.   ║
         // ╚══════════════════════════════════════════════════════════════════╝
 
+        // ── Sync API handlers to both PROD and DEV ───────────────────────────
+        for (const apiFile of ['send-wa.js', 'process-excel.js', 'send-wa-image-disabled.js', 'vehicle-logs-slim.js']) {
+          if (fs.existsSync(`api/${apiFile}`)) {
+            await new Promise((res, rej) => sftp.fastPut(`api/${apiFile}`, `/var/www/pmreg5/api/${apiFile}`, e => e ? rej(e) : res()));
+            await new Promise((res, rej) => sftp.fastPut(`api/${apiFile}`, `/var/www/devpmreg5/api/${apiFile}`, e => e ? rej(e) : res()));
+          }
+        }
+        console.log('✅ Synced api/*.js handlers to both PROD & DEV');
+
         // ── Deploy PROD ──────────────────────────────────────────────────────
         console.log('\n🚀 ─── DEPLOYING PRODUCTION ───');
         await runCmd(conn, 'sudo chmod -R 755 /var/www/pmreg5 && sudo chown -R ubuntu:www-data /var/www/pmreg5', 'Fix PROD permissions');

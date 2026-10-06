@@ -1,9 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://pmreg5.afratarigan.my.id';
+// SAFETY: No hardcoded fallback — if env vars are missing, fail loudly
+// rather than silently connecting to the PRODUCTION database.
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
 // Use service role key on the backend to bypass RLS; fall back to anon key if not set
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InBtcmVnNSIsImlhdCI6MTc4NzE5NDMxOCwiZXhwIjoyMTAyNTU0MzE4fQ.ll8EmgpSp8W7Vhict4l56Ov1jMk8Jo_9zMzhGs9qUqs';
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error(
+    '[process-excel] VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY is not set. ' +
+    'Set the correct env vars for this environment (dev or prod) before running.'
+  );
+}
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default async function handler(req, res) {

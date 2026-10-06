@@ -1118,6 +1118,17 @@ function App() {
     );
   }
 
+  const isScreenshotMode = new URLSearchParams(window.location.search).get('screenshotMode') === 'true';
+
+  if (isScreenshotMode) {
+    const screenshotUser = currentUser || { nik: 'SYSTEM_BOT', name: 'Bot Monitoring', role: 'admin' };
+    return (
+      <div className="bg-white">
+        <VehicleMonitoringView currentUser={screenshotUser} screenshotMode={true} />
+      </div>
+    );
+  }
+
   if (!currentUser) {
     return (
       <LoginView 
@@ -1126,16 +1137,6 @@ function App() {
           localStorage.setItem('sapApp_session_nik', user.nik);
         }} 
       />
-    );
-  }
-
-  const isScreenshotMode = new URLSearchParams(window.location.search).get('screenshotMode') === 'true';
-
-  if (isScreenshotMode) {
-    return (
-      <div className="bg-white">
-        <VehicleMonitoringView currentUser={currentUser} screenshotMode={true} />
-      </div>
     );
   }
 

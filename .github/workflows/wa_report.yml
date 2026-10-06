@@ -59,16 +59,19 @@ jobs:
         env:
           # Set Timezone agar jam di laporan (image) menggunakan WIB
           TZ: 'Asia/Jakarta'
+          VITE_APP_ENV: 'production'
+          NODE_ENV: 'production'
+          APP_URL: 'https://pmreg5.afratarigan.my.id'
           
-          # Supabase (sumber data logbook)
+          # Supabase (sumber data logbook PROD)
           VITE_SUPABASE_URL: '${{ secrets.VITE_SUPABASE_URL }}'
           VITE_SUPABASE_ANON_KEY: '${{ secrets.VITE_SUPABASE_ANON_KEY }}'
           # GoWA API (pengiriman WhatsApp)
           GOWA_URL: '${{ secrets.GOWA_URL }}'
           GOWA_USER: '${{ secrets.GOWA_USER }}'
           GOWA_PASS: '${{ secrets.GOWA_PASS }}'
-          # Target: grup WhatsApp Regional 5
-          # (TARGET_GROUP_JID is now hardcoded in the script)
+          # Target: grup WhatsApp Regional 5 PROD
+          TARGET_GROUP_JIDS: '120363041780234935@g.us,120363427768510358@g.us'
           # Chrome path di Ubuntu runner
           CHROME_PATH: '/usr/bin/google-chrome-stable'
         run: node scripts/run_wa_report.js

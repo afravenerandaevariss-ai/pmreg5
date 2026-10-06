@@ -7,9 +7,34 @@ export default async function handler(req, res) {
 
   try {
     const waConfig = (await getSystemConfig(12)) || {};
-    const targetPhone = req.query.target || req.body?.target || waConfig.targetPhone || '120363041780234935@g.us';
+    let targetPhone = req.query.target || req.body?.target || waConfig.targetPhone;
     const provider = req.query.provider || req.body?.provider || waConfig.provider || 'gowa';
-    const baseUrl = 'https://pmreg5.afratarigan.my.id';
+    // SAFETY: Use env-based app URL, not hardcoded PROD URL.
+    const baseUrl = process.env.VITE_APP_BASE_URL
+      || process.env.VITE_SUPABASE_URL
+      || 'https://devpmreg5.afratarigan.my.id';
+    const PROD_GROUP_JIDS = ['120363041780234935@g.us', '120363427768510358@g.us', '120363430505509462'];
+    const isDev = process.env.VITE_APP_ENV === 'dev' ||
+                  process.env.NODE_ENV === 'development' ||
+                  (baseUrl && baseUrl.includes('dev'));
+
+    if (isDev) {
+      const devTarget = process.env.DEV_TARGET_WA;
+      const isTargetingProd = !targetPhone || PROD_GROUP_JIDS.some(id => String(targetPhone).includes(id));
+      if (isTargetingProd) {
+        if (devTarget && !PROD_GROUP_JIDS.some(id => devTarget.includes(id))) {
+          targetPhone = devTarget;
+        } else {
+          return res.status(200).json({
+            success: true,
+            devSafetyGuard: true,
+            message: '[DEV SAFETY GUARD] Pengiriman screenshot ke grup PROD diblokir pada mode DEV.'
+          });
+        }
+      }
+    } else if (!targetPhone) {
+      targetPhone = '120363041780234935@g.us';
+    }
 
     // 1. Use Microlink API to take HD screenshot
     // Add timestamp to bust Microlink cache and ensure fresh data is captured
