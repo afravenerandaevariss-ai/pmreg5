@@ -187,6 +187,31 @@ export async function fetchHierarchyData() {
 
 const memoryCache = new Map();
 
+// ============================================================
+// DAILY LOGS IN-MEMORY CACHE
+// Hanya di memori (tidak localStorage/sessionStorage), sehingga:
+// - Refresh halaman → cache kosong → data selalu fresh dari Supabase ✅
+// - Ganti filter plant/bulan dalam sesi yg sama → pakai cache (cepat) ✅
+// - Setelah save/upload data baru → cache di-invalidate → fetch ulang ✅
+// ============================================================
+const dailyLogsCache = new Map(); // key: "plant__yearMonth"
+
+function dailyLogsCacheKey(plant, yearMonth) {
+  return `${plant || 'ALL'}__${yearMonth || ''}`;
+}
+
+/** Invalidate cache untuk kombinasi plant+month tertentu, atau semua jika tanpa argumen */
+export function invalidateDailyLogsCache(plant, yearMonth) {
+  if (!plant && !yearMonth) {
+    dailyLogsCache.clear();
+    return;
+  }
+  const key = dailyLogsCacheKey(plant, yearMonth);
+  dailyLogsCache.delete(key);
+  // Juga invalidate cache "ALL" yang mungkin mencakup plant ini
+  dailyLogsCache.delete(dailyLogsCacheKey('ALL', yearMonth));
+}
+
 export function resolveConfigNumericId(id) {
   if (typeof id === 'number') return id;
   const strId = String(id || '').trim();
@@ -330,9 +355,18 @@ export async function getSystemConfig(id, forceRefresh = false) {
 
 /**
  * Fetch daily logs for a specific plant and date range (month).
+ * Menggunakan in-memory cache agar ganti filter tidak perlu fetch ulang.
+ * Cache otomatis kosong saat refresh halaman (memory tidak persist).
+ * Gunakan invalidateDailyLogsCache() setelah menyimpan data baru.
  */
-export async function fetchDailyLogs(plant, yearMonth) {
+export async function fetchDailyLogs(plant, yearMonth, forceRefresh = false) {
   if (!supabase) return { data: null, error: 'Supabase not configured' };
+
+  // --- Cek cache dulu ---
+  const cKey = dailyLogsCacheKey(plant, yearMonth);
+  if (!forceRefresh && dailyLogsCache.has(cKey)) {
+    return { data: dailyLogsCache.get(cKey), error: null };
+  }
 
   let allData = [];
   let from = 0;
@@ -384,6 +418,10 @@ export async function fetchDailyLogs(plant, yearMonth) {
       plant: row.plant,
     });
   }
+
+  // --- Simpan ke cache (memory-only, hilang saat refresh) ---
+  dailyLogsCache.set(cKey, logsMap);
+
   return { data: logsMap, error: null };
 }
 
@@ -776,25 +814,25 @@ export async function saveLiveChats(chats) {
 
 export async function fetchWAConfig() {
   const { data, error } = await getSystemConfig('wa_config');
-  const PROD_GROUP_IDS = ['120363430505509462', '120363041780234935', '120363427768510358'];
+  const STRICT_PROD_GROUPS = ['120363041780234935', '120363427768510358'];
   const defaultConfig = {
-    targetPhone: IS_DEV_ENV ? '' : '120363430505509462',
-    targetGroup: IS_DEV_ENV ? 'DEV Testing (Belum Diset)' : 'Group PM (120363430505509462)',
+    targetPhone: '120363430505509462@g.us',
+    targetGroup: 'Grup ID 120363430505509462@g.us',
     provider: 'gowa',
     gowaUrl: 'https://gowa.afratarigan.my.id',
     gowaUser: 'admin',
     gowaPass: 'Sedap321#',
-    gowaDevice: '黄玲玲',
+    gowaDevice: '6285135734210@s.whatsapp.net', // Device: 6285135734210@s.whatsapp.net (Plant Maintenance PM)
     autoSendEnabled: false,
-    sendTime: '08:00 & 15:30',
+    sendTime: '07:00, 08:00, 14:00 & 16:00 WIB',
   };
   if (error || !data || typeof data !== 'object') {
     return { data: defaultConfig, error: null };
   }
   const merged = { ...defaultConfig, ...data };
-  if (IS_DEV_ENV && merged.targetPhone && PROD_GROUP_IDS.some(id => String(merged.targetPhone).includes(id))) {
-    merged.targetPhone = '';
-    merged.targetGroup = 'DEV Testing (Grup PROD Diblokir)';
+  if (IS_DEV_ENV && merged.targetPhone && STRICT_PROD_GROUPS.some(id => String(merged.targetPhone).includes(id))) {
+    merged.targetPhone = '120363430505509462@g.us';
+    merged.targetGroup = 'Grup ID 120363430505509462@g.us';
   }
   return { data: merged, error: null };
 }

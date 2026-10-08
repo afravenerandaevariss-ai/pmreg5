@@ -8,7 +8,7 @@ import { supabase, IS_DEV_ENV } from '../lib/supabase';
 
 const T_DAILY_LOGS = 'daily_logs';
 
-import { insertDailyLog, insertDailyLogs, deleteDailyLog, fetchDailyLogs, saveGSheetHistory, getGSheetHistory, saveSystemConfig, getSystemConfig, saveImportLog } from '../lib/supabaseService';
+import { insertDailyLog, insertDailyLogs, deleteDailyLog, fetchDailyLogs, invalidateDailyLogsCache, saveGSheetHistory, getGSheetHistory, saveSystemConfig, getSystemConfig, saveImportLog } from '../lib/supabaseService';
 import RekapMonitoringView from './RekapMonitoringView';
 
 const PLANT_INFO = {
@@ -284,6 +284,9 @@ export default function DailyDashboard({
       }
 
       if (payloadList.length > 0) {
+        // Invalidate cache agar fetch berikutnya selalu ambil data terbaru dari Supabase
+        invalidateDailyLogsCache(matrixPlantFilter, matrixMonth);
+
         const { error } = await supabase
           .from(T_DAILY_LOGS)
           .upsert(payloadList, { onConflict: 'id' });
@@ -292,6 +295,8 @@ export default function DailyDashboard({
       }
 
       for (const idToDelete of keysToDelete) {
+        // Invalidate cache juga untuk operasi delete
+        invalidateDailyLogsCache(matrixPlantFilter, matrixMonth);
         await supabase
           .from(T_DAILY_LOGS)
           .delete()
@@ -303,8 +308,8 @@ export default function DailyDashboard({
       setAutoSaveStatus('saved');
       setTimeout(() => setAutoSaveStatus(''), 3000);
 
-      // Refresh calendar daily logs map
-      const { data: updatedLogsMap } = await fetchDailyLogs(logPlantFilter || 'ALL', format(selectedDate, 'yyyy-MM'));
+      // Refresh calendar daily logs map (forceRefresh=true → bypass cache, ambil data terbaru)
+      const { data: updatedLogsMap } = await fetchDailyLogs(logPlantFilter || 'ALL', format(selectedDate, 'yyyy-MM'), true);
       if (updatedLogsMap) setDailyLogs(updatedLogsMap);
 
       if (isManual) {
@@ -924,6 +929,8 @@ export default function DailyDashboard({
     // Save to Supabase
     if (supabase) {
       const plant = selectedInduk.plant || currentUser?.plant;
+      // Invalidate cache agar tab/filter lain dapat data terbaru
+      invalidateDailyLogsCache(plant, format(selectedDate, 'yyyy-MM'));
       await insertDailyLog(plant, selectedDateStr, newLog);
     }
 
@@ -967,6 +974,8 @@ export default function DailyDashboard({
 
     // Remove from Supabase
     if (supabase) {
+      // Invalidate cache agar data yang dihapus tidak muncul lagi di filter lain
+      invalidateDailyLogsCache(log.plant, format(selectedDate, 'yyyy-MM'));
       await deleteDailyLog(log.id);
     }
 
@@ -1608,12 +1617,14 @@ export default function DailyDashboard({
           return;
         }
 
-        // ── Re-fetch fresh data from Supabase to guarantee full sync ──
+        // ── Re-fetch fresh data dari Supabase ──
         setImportProgress('Menyinkronkan data terbaru...');
         try {
           const yearMonth = format(currentMonth, 'yyyy-MM');
           const plant = currentUser?.role === 'Unit' ? currentUser.plant : null;
-          const { data: freshData, error: fetchErr } = await fetchDailyLogs(plant, yearMonth);
+          // Invalidate cache agar re-fetch benar-benar ke Supabase (bukan cache lama)
+          invalidateDailyLogsCache(plant, yearMonth);
+          const { data: freshData, error: fetchErr } = await fetchDailyLogs(plant, yearMonth, true);
           if (!fetchErr && freshData) {
             saveDailyLogs(freshData); // update state + localStorage with authoritative DB data
           }
