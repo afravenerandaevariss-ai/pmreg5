@@ -44,21 +44,32 @@ echo "🟢 Node.js binary: $NODE_BIN"
 # 4. Konfigurasi Crontab
 echo "⏱️ Mengatur jadwal di Linux Crontab..."
 
+# ── PENTING: cron 3.0pl1 (Ubuntu) TIDAK mendukung variabel CRON_TZ ────────────
+# Server ini memakai localtime Asia/Shanghai (CST, UTC+8), sedangkan WIB = UTC+7.
+# Selisihnya 1 jam. Maka jam cron harus memakai CST = WIB + 1.
+#   07:00 WIB = 08:00 CST  ->  0 8  * * *
+#   08:00 WIB = 09:00 CST  ->  0 9  * * *
+#   14:00 WIB = 15:00 CST  ->  0 15 * * *
+#   16:00 WIB = 17:00 CST  ->  0 17 * * *
+# Script run_wa_report.js tetap me-routing sendiri berdasarkan jam WIB,
+# jadi kombinasi ini konsisten.
+echo "🕐 Timezone server: $(date '+%Z %z') (WIB = server -1 jam)"
+
 # Siapkan file sementara crontab
 CRON_TMP=$(mktemp)
 
 # Ambil crontab user saat ini (jika ada), abaikan entry lama pmreg5 jika ada
 crontab -l 2>/dev/null | grep -v "scripts/run_wa_report.js" | grep -v "# === PMREG5 WA AUTO-SEND ===" > "$CRON_TMP" || true
 
-# Tambahkan entry jadwal baru dengan Timezone Asia/Jakarta
+# Tambahkan entry jadwal baru (jam dalam CST / server localtime)
 cat << 'EOF' >> "$CRON_TMP"
 
 # === PMREG5 WA AUTO-SEND ===
-CRON_TZ=Asia/Jakarta
-# 1. Jam 07:00 & 14:00 WIB - Reminder Teks Disiplin Input Logbook
-0 7,14 * * * cd /var/www/pmreg5 && /usr/bin/node scripts/run_wa_report.js >> /var/log/pmreg5/wa_report.log 2>&1
-# 2. Jam 08:00 & 16:00 WIB - Laporan HD Rekap Logbook PMReg5 & Jam Jalan CMMS
-0 8,16 * * * cd /var/www/pmreg5 && /usr/bin/node scripts/run_wa_report.js >> /var/log/pmreg5/wa_report.log 2>&1
+# Server localtime = CST (UTC+8); WIB = UTC+7 (1 jam lebih awal)
+# 1. 07:00 WIB & 14:00 WIB -> Reminder Teks (08:00 & 15:00 CST)
+0 8,15 * * * cd /var/www/pmreg5 && /usr/bin/node scripts/run_wa_report.js >> /var/log/pmreg5/wa_report.log 2>&1
+# 2. 08:00 WIB & 16:00 WIB -> Laporan HD PMReg5 + CMMS (09:00 & 17:00 CST)
+0 9,17 * * * cd /var/www/pmreg5 && /usr/bin/node scripts/run_wa_report.js >> /var/log/pmreg5/wa_report.log 2>&1
 # ===========================
 EOF
 
