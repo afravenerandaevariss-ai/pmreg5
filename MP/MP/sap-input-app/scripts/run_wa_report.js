@@ -6,19 +6,29 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-if (fs.existsSync('.env.local')) {
-  const envConfig = dotenv.parse(fs.readFileSync('.env.local'));
-  for (const k in envConfig) process.env[k] = envConfig[k];
+const envPaths = [
+  path.join(process.cwd(), '.env.local'),
+  path.join(process.cwd(), '.env'),
+  path.join(__dirname, '..', '.env.local'),
+  path.join(__dirname, '..', '.env')
+];
+for (const envFile of envPaths) {
+  if (fs.existsSync(envFile)) {
+    const envConfig = dotenv.parse(fs.readFileSync(envFile));
+    for (const k in envConfig) {
+      if (!process.env[k]) process.env[k] = envConfig[k];
+    }
+  }
 }
 
-const GOWA_URL = process.env.GOWA_URL || 'https://gowa.waterflai.my.id';
+const GOWA_URL = process.env.GOWA_URL || 'https://gowa.afratarigan.my.id';
 const GOWA_USER = process.env.GOWA_USER || 'admin';
 const GOWA_PASS = process.env.GOWA_PASS || 'Sedap321#';
 
 // ─────────────────────────────────────────────────────────────
 // SAFETY GUARD: STRICT DEV / PROD ISOLATION
 // ─────────────────────────────────────────────────────────────
-const PROD_GROUP_JIDS = ['120363041780234935@g.us', '120363427768510358@g.us', '120363430505509462'];
+const PROD_GROUP_JIDS = ['120363430505509462@g.us'];
 
 // Detect whether running in DEV or PROD
 const APP_URL = process.env.APP_URL || process.env.VITE_APP_BASE_URL || process.env.VITE_SUPABASE_URL || 'https://devpmreg5.afratarigan.my.id';
@@ -55,7 +65,7 @@ if (isDev) {
   console.log('='.repeat(65));
 } else {
   // PROD mode: Send to official groups
-  TARGET_GROUP_JIDS = process.env.TARGET_GROUP_JIDS ? process.env.TARGET_GROUP_JIDS.split(',').map(s => s.trim()).filter(Boolean) : ['120363041780234935@g.us', '120363427768510358@g.us'];
+  TARGET_GROUP_JIDS = process.env.TARGET_GROUP_JIDS ? process.env.TARGET_GROUP_JIDS.split(',').map(s => s.trim()).filter(Boolean) : ['120363430505509462@g.us'];
   console.log('🚀 [ENVIRONMENT]: PRODUCTION MODE ACTIVE');
 }
 
@@ -83,16 +93,24 @@ async function logStep(msg) {
 }
 
 async function getActiveDeviceId(authHeader) {
-  const devRes = await fetch(`${GOWA_URL}/devices`, { headers: { 'Authorization': authHeader } });
-  if (devRes.ok) {
-    const devData = await devRes.json();
-    const activeDevs = (devData.results || []).filter(d => d.state === 'logged_in');
-    if (activeDevs.length > 0) {
-      activeDevs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      return activeDevs[0].id;
+  const targetDevice = process.env.GOWA_DEVICE || '6285135734210@s.whatsapp.net';
+  try {
+    const devRes = await fetch(`${GOWA_URL}/devices`, { headers: { 'Authorization': authHeader } });
+    if (devRes.ok) {
+      const devData = await devRes.json();
+      const matched = (devData.results || []).find(d =>
+        (d.jid && (d.jid === targetDevice || d.jid.includes('6285135734210'))) ||
+        d.id === targetDevice ||
+        (d.display_name && d.display_name.toLowerCase().includes('plant maintenance'))
+      );
+      if (matched) return matched.id;
+      const activeDevs = (devData.results || []).filter(d => d.state === 'logged_in');
+      if (activeDevs.length > 0) return activeDevs[0].id;
     }
+  } catch (e) {
+    console.warn('Could not fetch GoWA devices:', e.message);
   }
-  return 'aaaa'; // fallback
+  return '4a7d45f1-9304-471b-9f78-451fdd651517';
 }
 
 // ---------------------------------------------------------
@@ -154,7 +172,21 @@ async function capturePmreg5Screenshot() {
       logStep(`[PMReg5] Attempt ${attempt}/${MAX_RETRIES}...`);
       browser = await puppeteer.launch({
         executablePath: getChromePath(),
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
+        headless: 'new',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--use-gl=swiftshader',                    // fix: rendering software agar tidak hitam
+          '--use-angle=swiftshader-webgl',            // fix: WebGL via swiftshader
+          '--force-color-profile=srgb',               // fix: warna CSS tampil benar
+          '--run-all-compositor-stages-before-draw',  // fix: tunggu render selesai
+          '--disable-features=VizDisplayCompositor',
+          '--font-render-hinting=none',
+          '--disable-background-timer-throttling',
+          '--disable-renderer-backgrounding',
+          '--disable-backgrounding-occluded-windows',
+        ]
       });
 
       const page = await browser.newPage();
@@ -169,25 +201,34 @@ async function capturePmreg5Screenshot() {
         await page.authenticate({ username: u, password: p });
       }
 
-      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForSelector('#excel-report-sheet', { visible: true, timeout: 30000 });
+      logStep('[PMReg5] Membuka halaman dan menunggu load awal...');
+      await page.goto(targetUrl, { waitUntil: 'networkidle0', timeout: 90000 });
+      await page.waitForSelector('#excel-report-sheet', { visible: true, timeout: 60000 });
 
+      logStep('[PMReg5] Tahan lebih lama untuk memastikan data fresh selesai di-fetch dari server...');
       const isReady = await page.waitForFunction(() => {
         const table = document.querySelector('#excel-report-sheet table');
         if (!table) return false;
-        const rect = table.getBoundingClientRect();
-        if (rect.width === 0 || rect.height === 0) return false;
-        const rows = table.querySelectorAll('tr');
-        if (rows.length < 5) {
-          const emptyState = document.querySelector('.text-slate-500');
-          if (emptyState && emptyState.innerText.includes('Tidak ada data')) return true; 
-          return false;
-        }
-        return true;
-      }, { timeout: 30000, polling: 'raf' });
+        const rows = Array.from(table.querySelectorAll('tbody tr'));
+        if (rows.length < 5) return false;
 
-      if (!isReady) throw new Error('Robust rendering checks timed out or failed.');
-      await new Promise(resolve => setTimeout(resolve, 1000));
+        // Periksa apakah transaksi aktif (> 0) sudah termuat di tabel
+        const hasPopulatedTx = rows.some(r => {
+          const tds = r.querySelectorAll('td');
+          if (tds.length <= 8) return false;
+          const tx = parseInt(tds[8].innerText.trim(), 10);
+          return !isNaN(tx) && tx > 0;
+        });
+
+        const hasDataReady = !!document.querySelector('#data-ready');
+        return hasPopulatedTx || hasDataReady;
+      }, { timeout: 60000, polling: 500 });
+
+      if (!isReady) throw new Error('Data rendering checks timed out or failed.');
+
+      // Tahan lebih lama: Beri waktu ekstra 10 detik agar seluruh badge status & warna selesai dirender
+      logStep('[PMReg5] Data terdeteksi masuk! Menahan 10 detik ekstra agar visual stabil...');
+      await new Promise(resolve => setTimeout(resolve, 10000));
 
       const element = await page.$('#excel-report-sheet');
       const boundingBox = await element.boundingBox();
@@ -280,7 +321,7 @@ async function captureCmmsScreenshot() {
       browser = await puppeteer.launch({
         executablePath: getChromePath(),
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--window-size=1920,1080']
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--window-size=1920,1080']
       });
 
       const page = await browser.newPage();
@@ -334,7 +375,7 @@ async function captureCmmsScreenshot() {
       if (!absoluteY) throw new Error('Heading "Monitoring Penginputan Jam Jalan" NOT FOUND');
 
       await page.evaluate((y) => {
-        window.scrollTo({ top: Math.max(0, y - 120), behavior: 'instant' });
+        window.scrollTo({ top: Math.max(0, y - 80), behavior: 'instant' });
       }, absoluteY);
       await new Promise(r => setTimeout(r, 2000));
 
@@ -359,12 +400,30 @@ async function captureCmmsScreenshot() {
         await new Promise(r => setTimeout(r, 6000));
       }
 
+      // Delete the legend row inside the red box ("delete in the red box" requested by user)
+      await page.evaluate(() => {
+        const allElements = Array.from(document.querySelectorAll('*'));
+        for (const el of allElements) {
+          const text = (el.textContent || '').trim();
+          if (
+            text.includes('ada data jam jalan yang diinput') ||
+            text.includes('Jumlah Equipment dengan data jam jalan') ||
+            text.includes('Pabrik Tidak Beroperasi')
+          ) {
+            if (el.children.length > 0 && el.offsetHeight < 120 && el.tagName !== 'BODY' && el.tagName !== 'HTML') {
+              el.remove();
+            }
+          }
+        }
+      });
+      await new Promise(r => setTimeout(r, 1000));
+
       const viewportBuffer = await page.screenshot({ type: 'png' });
       const scale = 1.5;
-      const cropTop = Math.floor(100 * scale);
-      const cropLeft = Math.floor(90 * scale);
-      const cropWidth = Math.floor(1740 * scale);
-      const cropHeight = Math.floor(600 * scale);
+      const cropTop = Math.floor(65 * scale);
+      const cropLeft = Math.floor(15 * scale);
+      const cropWidth = Math.floor(1885 * scale);
+      const cropHeight = Math.floor(615 * scale);
       
       let pngBuffer;
       const sharp = (await import('sharp')).default;
