@@ -156,8 +156,21 @@ async function sendPmreg5Screenshot(pngBuffer, deviceId, authHeader) {
       headers: { 'Authorization': authHeader },
       body: formData
     });
-    const data = await resp.json();
-    if (data.code !== 'SUCCESS') overallSuccess = false;
+    const rawText = await resp.text();
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (e) {
+      console.error(`[PMReg5] ❌ Non-JSON response (HTTP ${resp.status}): ${rawText.slice(0, 200)}`);
+      overallSuccess = false;
+      continue;
+    }
+    if (data.code === 'SUCCESS') {
+      console.log(`[PMReg5] ✅ SUCCESS | Message ID: ${data.results?.message_id || 'n/a'} | ${groupId.trim()}`);
+    } else {
+      console.error(`[PMReg5] ❌ FAILED (HTTP ${resp.status}): ${JSON.stringify(data).slice(0, 300)}`);
+      overallSuccess = false;
+    }
   }
   return { success: overallSuccess };
 }
@@ -248,19 +261,19 @@ async function capturePmreg5Screenshot() {
 
       const authHeader = 'Basic ' + Buffer.from(`${GOWA_USER}:${GOWA_PASS}`).toString('base64');
       const deviceId = await getActiveDeviceId(authHeader);
-      await sendPmreg5Screenshot(pngBuffer, deviceId, authHeader);
-      return; 
+      return await sendPmreg5Screenshot(pngBuffer, deviceId, authHeader);
     } catch (error) {
       console.error(`[PMReg5] ❌ Attempt ${attempt} failed:`, error.message);
       if (browser) await browser.close().catch(()=> {});
       if (attempt >= MAX_RETRIES) {
         console.error('[PMReg5] 🚨 Max retries reached.');
-        break; // Continue to next script instead of exiting
+        return { success: false }; // Continue to next script instead of exiting
       }
       attempt++;
       await new Promise(res => setTimeout(res, 5000));
     }
   }
+  return { success: false };
 }
 
 
@@ -306,8 +319,21 @@ async function sendCmmsScreenshot(pngBuffer, deviceId, authHeader) {
       headers: { 'Authorization': authHeader },
       body: formData
     });
-    const data = await resp.json();
-    if (data.code !== 'SUCCESS') overallSuccess = false;
+    const rawText = await resp.text();
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (e) {
+      console.error(`[CMMS] ❌ Non-JSON response (HTTP ${resp.status}): ${rawText.slice(0, 200)}`);
+      overallSuccess = false;
+      continue;
+    }
+    if (data.code === 'SUCCESS') {
+      console.log(`[CMMS] ✅ SUCCESS | Message ID: ${data.results?.message_id || 'n/a'} | ${groupId.trim()}`);
+    } else {
+      console.error(`[CMMS] ❌ FAILED (HTTP ${resp.status}): ${JSON.stringify(data).slice(0, 300)}`);
+      overallSuccess = false;
+    }
   }
   return { success: overallSuccess };
 }
@@ -439,19 +465,19 @@ async function captureCmmsScreenshot() {
 
       const authHeader = 'Basic ' + Buffer.from(`${GOWA_USER}:${GOWA_PASS}`).toString('base64');
       const deviceId = await getActiveDeviceId(authHeader);
-      await sendCmmsScreenshot(pngBuffer, deviceId, authHeader);
-      return; 
+      return await sendCmmsScreenshot(pngBuffer, deviceId, authHeader);
     } catch (error) {
       console.error(`[CMMS] ❌ Attempt ${attempt} failed:`, error.message);
       if (browser) await browser.close().catch(()=> {});
       if (attempt >= MAX_RETRIES) {
         console.error('[CMMS] 🚨 Max retries reached.');
-        break;
+        return { success: false };
       }
       attempt++;
       await new Promise(res => setTimeout(res, 5000));
     }
   }
+  return { success: false };
 }
 
 // ---------------------------------------------------------
@@ -460,6 +486,7 @@ async function captureCmmsScreenshot() {
 async function main() {
   const now = new Date();
   const currentHourWIB = parseInt(new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', hour12: false }).format(now));
+  let failure = false;
 
   if (currentHourWIB === 7 || currentHourWIB === 14) {
     let message = isDev ? `🧪 *[DEV TESTING - BUKAN DATA RESMI]*\n` : ``;
@@ -491,18 +518,42 @@ async function main() {
         headers: { 'Authorization': authHeader, 'Content-Type': 'application/x-www-form-urlencoded' },
         body: formData
       });
-      const data = await resp.json();
-      console.log(`GoWA Response for ${groupId.trim()}:`, JSON.stringify(data, null, 2));
-      if (data.code !== 'SUCCESS') overallSuccess = false;
+      const rawText = await resp.text();
+      let data;
+      try {
+        data = JSON.parse(rawText);
+      } catch (e) {
+        console.error(`[Reminder] ❌ Non-JSON response (HTTP ${resp.status}): ${rawText.slice(0, 200)}`);
+        overallSuccess = false;
+        continue;
+      }
+      if (data.code === 'SUCCESS') {
+        console.log(`[Reminder] ✅ SUCCESS | Message ID: ${data.results?.message_id || 'n/a'} | ${groupId.trim()}`);
+      } else {
+        console.error(`[Reminder] ❌ FAILED (HTTP ${resp.status}): ${JSON.stringify(data).slice(0, 300)}`);
+        overallSuccess = false;
+      }
     }
+    failure = !overallSuccess;
   } else {
     // 08:00 or 15:00 - RUN BOTH REPORTS SEQUENTIALLY
     console.log('\n--- STARTING PMREG5 REPORT ---');
-    await capturePmreg5Screenshot();
+    const pm = await capturePmreg5Screenshot();
     
     console.log('\n--- STARTING CMMS REPORT ---');
-    await captureCmmsScreenshot();
+    const cm = await captureCmmsScreenshot();
+
+    failure = !(pm?.success && cm?.success);
   }
+
+  if (failure) {
+    console.error('\n[RESULT] ❌ Sebagian atau seluruh pengiriman GAGAL. Periksa log di atas.');
+    process.exit(1);
+  }
+  console.log('\n[RESULT] ✅ Semua pengiriman berhasil.');
 }
 
-main();
+main().catch(err => {
+  console.error('[FATAL]', err);
+  process.exit(1);
+});
