@@ -71,7 +71,7 @@ jobs:
           GOWA_USER: '${{ secrets.GOWA_USER }}'
           GOWA_PASS: '${{ secrets.GOWA_PASS }}'
           # Target: grup WhatsApp Regional 5 PROD
-          TARGET_GROUP_JIDS: '120363041780234935@g.us,120363427768510358@g.us'
+          TARGET_GROUP_JIDS: '120363430505509462@g.us'
           # Chrome path di Ubuntu runner
           CHROME_PATH: '/usr/bin/google-chrome-stable'
         run: node scripts/run_wa_report.js
