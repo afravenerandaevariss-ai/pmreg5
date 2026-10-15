@@ -47,10 +47,22 @@ if (isDev) {
   const devTarget = process.env.DEV_TARGET_WA || process.env.TARGET_GROUP_JIDS;
   if (devTarget) {
     const candidateList = devTarget.split(',').map(s => s.trim()).filter(Boolean);
-    // STRICTLY strip any production group IDs
-    TARGET_GROUP_JIDS = candidateList.filter(id => !PROD_GROUP_JIDS.some(prodId => id.includes(prodId)));
-    if (TARGET_GROUP_JIDS.length < candidateList.length) {
-      console.warn('⚠️ [SAFETY GUARD] Blocked attempt to send to PROD group in DEV mode!');
+    // STRICTLY strip any production group IDs — KECUALI jika admin sudah
+    // mendeklarasikannya secara eksplisit di DEV_TARGET_WA (opt-in sadar).
+    // Tanpa pengecualian ini, DEV tidak akan pernah bisa mengirim apa pun
+    // ketika DEV_TARGET_WA diset ke grup yang sama dengan grup PROD.
+    const explicitlyOptedIn = (process.env.DEV_TARGET_WA || '')
+      .split(',').map(s => s.trim()).filter(Boolean);
+
+    TARGET_GROUP_JIDS = candidateList.filter(id =>
+      explicitlyOptedIn.includes(id) || !PROD_GROUP_JIDS.some(prodId => id.includes(prodId))
+    );
+    const blocked = candidateList.length - TARGET_GROUP_JIDS.length;
+    if (blocked > 0) {
+      console.warn(`⚠️ [SAFETY GUARD] Blocked ${blocked} PROD group(s) in DEV mode!`);
+    }
+    if (explicitlyOptedIn.length > 0) {
+      console.log(`✅ [SAFETY GUARD] DEV_TARGET_WA opt-in eksplisit: ${explicitlyOptedIn.join(', ')}`);
     }
   }
 
@@ -70,6 +82,31 @@ if (isDev) {
 }
 
 const MAX_RETRIES = 3;
+
+// ─────────────────────────────────────────────────────────────
+// AUTO-DETECT PERIODE BERDATA
+// App default ke bulan berjalan. Jika bulan itu belum ada transaksi
+// (mis. DEV hanya punya data s/d Sep 2026), tabel akan tampil kosong dan
+// gate screenshot tidak akan pernah lolos. Jadi cari bulan terakhir yang
+// benar-benar punya transaksi di PostgREST, lalu pakai sebagai ?month=.
+// ─────────────────────────────────────────────────────────────
+async function detectLatestDataMonth() {
+  if (process.env.REPORT_MONTH) return process.env.REPORT_MONTH; // override manual
+  try {
+    const res = await fetch(
+      `${APP_URL}/rest/v1/vehicle_logs?select=date&order=date.desc&limit=1`,
+      { headers: { 'Accept': 'application/json' } }
+    );
+    if (!res.ok) return null;
+    const rows = await res.json();
+    const maxDate = rows?.[0]?.date;
+    if (!maxDate) return null;
+    return { month: maxDate.slice(0, 7), date: maxDate };
+  } catch (e) {
+    console.warn('[PERIODE] Gagal deteksi bulan berdata:', e.message);
+    return null;
+  }
+}
 
 // Auto-detect Chrome path
 function getChromePath() {
@@ -176,7 +213,15 @@ async function sendPmreg5Screenshot(pngBuffer, deviceId, authHeader) {
 }
 
 async function capturePmreg5Screenshot() {
-  const targetUrl = `${APP_URL}/?hideNav=true&tab=vehicle&screenshotMode=true&t=${Date.now()}`;
+  const period = await detectLatestDataMonth();
+  let url = `${APP_URL}/?hideNav=true&tab=vehicle&screenshotMode=true&t=${Date.now()}`;
+  if (period?.month) {
+    url += `&month=${encodeURIComponent(period.month)}&targetDate=${encodeURIComponent(period.date)}`;
+    logStep(`[PMReg5] Periode berdata terdeteksi: ${period.month} (transaksi terakhir ${period.date})`);
+  } else {
+    logStep('[PMReg5] Tidak dapat mendeteksi periode berdata; memakai default bulan berjalan.');
+  }
+  const targetUrl = url;
   let attempt = 1;
   let browser = null;
 
@@ -483,70 +528,98 @@ async function captureCmmsScreenshot() {
 // ---------------------------------------------------------
 // MAIN
 // ---------------------------------------------------------
-async function main() {
-  const now = new Date();
-  const currentHourWIB = parseInt(new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', hour12: false }).format(now));
-  let failure = false;
-
-  if (currentHourWIB === 7 || currentHourWIB === 14) {
-    let message = isDev ? `🧪 *[DEV TESTING - BUKAN DATA RESMI]*\n` : ``;
-    if (currentHourWIB === 7) {
-      message += `💪 *PTPN Tumbuh Juara Bangun Negeri!*\n_Bapak/Ibu sekalian, mohon segera selesaikan inputan Plant Maintenance (PM) unit masing-masing, karena hasil monitoring harian akan segera di-update secara berkala di grup ini._\n\n`;
-    } else {
-      message += `_Mohon kerjasamanya kepada seluruh unit untuk selalu disiplin melakukan *input* Logbook dan *update* Jam Jalan Mesin Pabrik secara rutin dan tepat waktu. Terima kasih!_\n\n`;
-    }
-
-    if (isDev && TARGET_GROUP_JIDS.length === 0) {
-      console.log('[DEV SAFETY GUARD] ✅ DEV reminder message generated:');
-      console.log(message);
-      console.log('[DEV SAFETY GUARD] 🛡️ No WhatsApp messages dispatched to PROD. Simulation successful.');
-      return;
-    }
-
-    const authHeader = 'Basic ' + Buffer.from(`${GOWA_USER}:${GOWA_PASS}`).toString('base64');
-    const deviceId = await getActiveDeviceId(authHeader);
-    
-    let overallSuccess = true;
-    for (const groupId of TARGET_GROUP_JIDS) {
-      console.log(`\n[+] Sending text reminder to ${groupId.trim()}...`);
-      const formData = new URLSearchParams();
-      formData.append('phone', groupId.trim());
-      formData.append('message', message);
-      
-      const resp = await fetch(`${GOWA_URL}/send/message?device_id=${encodeURIComponent(deviceId)}`, {
-        method: 'POST',
-        headers: { 'Authorization': authHeader, 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: formData
-      });
-      const rawText = await resp.text();
-      let data;
-      try {
-        data = JSON.parse(rawText);
-      } catch (e) {
-        console.error(`[Reminder] ❌ Non-JSON response (HTTP ${resp.status}): ${rawText.slice(0, 200)}`);
-        overallSuccess = false;
-        continue;
-      }
-      if (data.code === 'SUCCESS') {
-        console.log(`[Reminder] ✅ SUCCESS | Message ID: ${data.results?.message_id || 'n/a'} | ${groupId.trim()}`);
-      } else {
-        console.error(`[Reminder] ❌ FAILED (HTTP ${resp.status}): ${JSON.stringify(data).slice(0, 300)}`);
-        overallSuccess = false;
-      }
-    }
-    failure = !overallSuccess;
+async function sendReminder(hourWIB) {
+  let message = isDev ? `🧪 *[DEV TESTING - BUKAN DATA RESMI]*\n` : ``;
+  if (hourWIB === 7) {
+    message += `💪 *PTPN Tumbuh Juara Bangun Negeri!*\n_Bapak/Ibu sekalian, mohon segera selesaikan inputan Plant Maintenance (PM) unit masing-masing, karena hasil monitoring harian akan segera di-update secara berkala di grup ini._\n\n`;
   } else {
-    // 08:00 or 15:00 - RUN BOTH REPORTS SEQUENTIALLY
-    console.log('\n--- STARTING PMREG5 REPORT ---');
-    const pm = await capturePmreg5Screenshot();
-    
-    console.log('\n--- STARTING CMMS REPORT ---');
-    const cm = await captureCmmsScreenshot();
-
-    failure = !(pm?.success && cm?.success);
+    message += `_Mohon kerjasamanya kepada seluruh unit untuk selalu disiplin melakukan *input* Logbook dan *update* Jam Jalan Mesin Pabrik secara rutin dan tepat waktu. Terima kasih!_\n\n`;
   }
 
-  if (failure) {
+  if (isDev && TARGET_GROUP_JIDS.length === 0) {
+    console.log('[DEV SAFETY GUARD] ✅ DEV reminder message generated:');
+    console.log(message);
+    console.log('[DEV SAFETY GUARD] 🛡️ No WhatsApp messages dispatched to PROD. Simulation successful.');
+    return { success: true, simulated: true };
+  }
+
+  const authHeader = 'Basic ' + Buffer.from(`${GOWA_USER}:${GOWA_PASS}`).toString('base64');
+  const deviceId = await getActiveDeviceId(authHeader);
+
+  let overallSuccess = true;
+  for (const groupId of TARGET_GROUP_JIDS) {
+    console.log(`\n[+] Sending text reminder to ${groupId.trim()}...`);
+    const formData = new URLSearchParams();
+    formData.append('phone', groupId.trim());
+    formData.append('message', message);
+
+    const resp = await fetch(`${GOWA_URL}/send/message?device_id=${encodeURIComponent(deviceId)}`, {
+      method: 'POST',
+      headers: { 'Authorization': authHeader, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData
+    });
+    const rawText = await resp.text();
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (e) {
+      console.error(`[Reminder] ❌ Non-JSON response (HTTP ${resp.status}): ${rawText.slice(0, 200)}`);
+      overallSuccess = false;
+      continue;
+    }
+    if (data.code === 'SUCCESS') {
+      console.log(`[Reminder] ✅ SUCCESS | Message ID: ${data.results?.message_id || 'n/a'} | ${groupId.trim()}`);
+    } else {
+      console.error(`[Reminder] ❌ FAILED (HTTP ${resp.status}): ${JSON.stringify(data).slice(0, 300)}`);
+      overallSuccess = false;
+    }
+  }
+  return { success: overallSuccess };
+}
+
+async function sendBothReports() {
+  console.log('\n--- STARTING PMREG5 REPORT ---');
+  const pm = await capturePmreg5Screenshot();
+
+  console.log('\n--- STARTING CMMS REPORT ---');
+  const cm = await captureCmmsScreenshot();
+
+  return { success: !!(pm?.success && cm?.success) };
+}
+
+async function main() {
+  // --action=07:00 | 08:00 | 14:00 | 16:00 | all  (untuk cron yang presisi)
+  const actionArg = process.argv.slice(2)
+    .find(a => a.startsWith('--action='))
+    ?.replace('--action=', '').trim();
+
+  const now = new Date();
+  const currentHourWIB = parseInt(new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', hour12: false }).format(now));
+
+  let result;
+  if (actionArg) {
+    console.log(`🎯 [MODE] Action eksplisit: ${actionArg}`);
+    if (actionArg === 'all') {
+      result = await sendBothReports();
+      await new Promise(r => setTimeout(r, 2500));
+      await sendReminder(7);
+      await new Promise(r => setTimeout(r, 2500));
+      await sendReminder(14);
+    } else if (actionArg === '07:00' || actionArg === '14:00') {
+      result = await sendReminder(actionArg === '07:00' ? 7 : 14);
+    } else if (actionArg === '08:00' || actionArg === '16:00') {
+      result = await sendBothReports();
+    } else {
+      console.error(`❌ Action tidak dikenal: ${actionArg}`);
+      process.exit(1);
+    }
+  } else if (currentHourWIB === 7 || currentHourWIB === 14) {
+    result = await sendReminder(currentHourWIB);
+  } else {
+    result = await sendBothReports();
+  }
+
+  if (!result?.success) {
     console.error('\n[RESULT] ❌ Sebagian atau seluruh pengiriman GAGAL. Periksa log di atas.');
     process.exit(1);
   }
