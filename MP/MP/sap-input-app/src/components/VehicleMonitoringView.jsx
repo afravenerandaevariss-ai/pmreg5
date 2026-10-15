@@ -326,7 +326,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     setLoading(true);
     setError(null);
     try {
-      const TIMEOUT_MS = 15000; // 15s — lebih responsif dari 60s
+      // vehicle_logs (2.2k+ rows, 2 halaman PostgREST) butuh ~19s di PROD.
+      // Timeout 15s membuat fallback {data:[]} menang balapan → seluruh transaksi tampil 0.
+      const TIMEOUT_MS = 90000;
       const withTimeout = (promise, fallback = { data: [], error: null }) =>
         Promise.race([
           promise,

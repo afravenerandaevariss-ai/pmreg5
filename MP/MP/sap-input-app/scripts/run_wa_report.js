@@ -202,7 +202,9 @@ async function capturePmreg5Screenshot() {
       }
 
       logStep('[PMReg5] Membuka halaman dan menunggu load awal...');
-      await page.goto(targetUrl, { waitUntil: 'networkidle0', timeout: 90000 });
+      // networkidle0 TIDAK dipakai: app melakukan polling/upsert berkala sehingga
+      // network tidak pernah idle → goto selalu timeout 90s.
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
       await page.waitForSelector('#excel-report-sheet', { visible: true, timeout: 60000 });
 
       logStep('[PMReg5] Tahan lebih lama untuk memastikan data fresh selesai di-fetch dari server...');
@@ -212,17 +214,16 @@ async function capturePmreg5Screenshot() {
         const rows = Array.from(table.querySelectorAll('tbody tr'));
         if (rows.length < 5) return false;
 
-        // Periksa apakah transaksi aktif (> 0) sudah termuat di tabel
-        const hasPopulatedTx = rows.some(r => {
+        // WAJIB: minimal satu baris punya Total Transaksi > 0.
+        // '#data-ready' TIDAK dipakai karena muncul prematur (~15s) sebelum
+        // vehicle_logs selesai di-fetch (~19-25s) → screenshot jadi kosong/hitam.
+        return rows.some(r => {
           const tds = r.querySelectorAll('td');
           if (tds.length <= 8) return false;
           const tx = parseInt(tds[8].innerText.trim(), 10);
           return !isNaN(tx) && tx > 0;
         });
-
-        const hasDataReady = !!document.querySelector('#data-ready');
-        return hasPopulatedTx || hasDataReady;
-      }, { timeout: 60000, polling: 500 });
+      }, { timeout: 120000, polling: 500 });
 
       if (!isReady) throw new Error('Data rendering checks timed out or failed.');
 
