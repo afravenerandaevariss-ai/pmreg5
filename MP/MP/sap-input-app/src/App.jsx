@@ -2807,7 +2807,7 @@ function MasterDataView({ masterMap, equipments = [], currentUser }) {
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             <button 
               onClick={() => {
-                const url = 'https://pmreg5.vercel.app/?tab=master';
+                const url = `${window.location.origin}/?tab=master`;
                 navigator.clipboard.writeText(url);
                 alert('Link khusus Master Data berhasil disalin!\nAnda bisa membagikan link ini: ' + url);
               }}
