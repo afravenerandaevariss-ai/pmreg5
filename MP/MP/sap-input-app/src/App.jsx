@@ -1466,7 +1466,7 @@ function App() {
               <h1 className="text-base font-bold text-slate-800 tracking-tight">PM Regional 5</h1>
               {IS_DEV_ENV && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-700 border border-amber-500/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                   DEV PLAYGROUND
                 </span>
               )}

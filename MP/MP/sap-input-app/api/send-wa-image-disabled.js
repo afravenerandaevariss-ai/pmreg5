@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     const baseUrl = process.env.VITE_APP_BASE_URL
       || process.env.VITE_SUPABASE_URL
       || 'https://devpmreg5.afratarigan.my.id';
-    const PROD_GROUP_JIDS = ['120363041780234935@g.us', '120363427768510358@g.us', '120363430505509462'];
+    const PROD_GROUP_JIDS = ['120363430505509462@g.us'];
     const isDev = process.env.VITE_APP_ENV === 'dev' ||
                   process.env.NODE_ENV === 'development' ||
                   (baseUrl && baseUrl.includes('dev'));
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
         }
       }
     } else if (!targetPhone) {
-      targetPhone = '120363041780234935@g.us';
+      targetPhone = '120363430505509462@g.us';
     }
 
     // 1. Use Microlink API to take HD screenshot
@@ -72,20 +72,32 @@ export default async function handler(req, res) {
 
     let dispatchResult = { success: false, detail: null };
     const apiToken = req.query.token || req.body?.token || waConfig.apiToken || process.env.FONNTE_TOKEN;
-    const gowaUrl = req.query.gowaUrl || waConfig.gowaUrl || 'https://gowa.waterflai.my.id';
+    const gowaUrl = req.query.gowaUrl || waConfig.gowaUrl || 'https://gowa.afratarigan.my.id';
     const gowaUser = req.query.gowaUser || waConfig.gowaUser || 'admin';
     const gowaPass = req.query.gowaPass || waConfig.gowaPass || 'Sedap321#';
 
     if (provider === 'gowa') {
       const authHeader = 'Basic ' + Buffer.from(`${gowaUser}:${gowaPass}`).toString('base64');
-      let deviceId = waConfig.gowaDevice || ',ZZ';
+      // Target device: 6285135734210@s.whatsapp.net (Plant Maintenance)
+      let targetDevice = req.query.device || waConfig.gowaDevice || process.env.GOWA_DEVICE || '6285135734210@s.whatsapp.net';
+      let deviceId = targetDevice;
 
       try {
         const devRes = await fetch(`${gowaUrl}/devices`, { headers: { 'Authorization': authHeader } });
         if (devRes.ok) {
           const devData = await devRes.json();
-          const activeDev = (devData.results || []).find(d => d.state === 'logged_in');
-          if (activeDev) deviceId = activeDev.id;
+          const targetStr = String(targetDevice).toLowerCase();
+          const matchedDev = (devData.results || []).find(d =>
+            (d.jid && (d.jid.toLowerCase() === targetStr || d.jid.includes('6285135734210'))) ||
+            (d.id && d.id.toLowerCase() === targetStr) ||
+            (d.display_name && targetStr && d.display_name.toLowerCase().includes('plant maintenance'))
+          );
+          if (matchedDev) {
+            deviceId = matchedDev.jid || matchedDev.id;
+          } else {
+            const activeDev = (devData.results || []).find(d => d.state === 'logged_in');
+            if (activeDev) deviceId = activeDev.jid || activeDev.id;
+          }
         }
       } catch (e) {
         console.warn('Could not fetch active GoWA device list:', e.message);

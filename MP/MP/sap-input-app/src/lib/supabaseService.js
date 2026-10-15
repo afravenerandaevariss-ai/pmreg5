@@ -814,7 +814,7 @@ export async function saveLiveChats(chats) {
 
 export async function fetchWAConfig() {
   const { data, error } = await getSystemConfig('wa_config');
-  const STRICT_PROD_GROUPS = ['120363041780234935', '120363427768510358'];
+  const STRICT_PROD_GROUPS = ['120363430505509462'];
   const defaultConfig = {
     targetPhone: '120363430505509462@g.us',
     targetGroup: 'Grup ID 120363430505509462@g.us',

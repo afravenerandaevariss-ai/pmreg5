@@ -154,8 +154,10 @@ function WAScheduleBadge({ onOpen }) {
 
   React.useEffect(() => {
     const SCHEDULE_TIMES = [
+      { h: 7,  m: 0,  label: '07:00 WIB' },
       { h: 8,  m: 0,  label: '08:00 WIB' },
-      { h: 14, m: 30, label: '14:30 WIB' },
+      { h: 14, m: 0,  label: '14:00 WIB' },
+      { h: 16, m: 0,  label: '16:00 WIB' },
     ];
 
     const tick = () => {
@@ -228,6 +230,12 @@ function WAScheduleBadge({ onOpen }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
+  // Dev-only check: strictly true in local dev / localhost only
+  const isLocalDev = Boolean(
+    import.meta.env.DEV || 
+    (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname))
+  );
+
   // ─── Role Detection ────────────────────────────────────────────────────────
   // Normalize role string — handles all DB variants: 'USER','Unit','unit','UNIT'
   const roleUpper = currentUser?.role?.toUpperCase() || '';
@@ -249,8 +257,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
 
   const today = new Date();
-  const [targetMonth, setTargetMonth]           = useState(format(today, 'yyyy-MM'));
-  const [targetInputDate, setTargetInputDate]   = useState(format(today, 'yyyy-MM-dd'));
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const [targetMonth, setTargetMonth]           = useState(() => searchParams?.get('month') || format(today, 'yyyy-MM'));
+  const [targetInputDate, setTargetInputDate]   = useState(() => searchParams?.get('targetDate') || format(today, 'yyyy-MM-dd'));
   const [targetWorkingDays, setTargetWorkingDays] = useState(20);
 
   const [vehicles, setVehicles] = useState([]);
@@ -339,6 +348,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       setLogs(lRes.data || []);
       setMasterEquipments(eqRes.data || []);
       setZcoData(zRes.data || []);
+
       if (mapRes) {
         if (Array.isArray(mapRes)) {
           setMasterMap(new Map(mapRes));
@@ -375,7 +385,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         setTimeout(() => {
           setLoading(false);
           setDataReady(true);
-        }, 10000);
+        }, 500);
       } else {
         setLoading(false);
       }
@@ -1831,19 +1841,38 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         )}
 
         {/* ── Controls (Adapts based on active tab) ────────────────── */}
-        {!screenshotMode && (<div className="bg-[#fafafa]  p-5 rounded-2xl border border-emerald-100 shadow-lg shadow-emerald-900/5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 items-end sticky top-0 z-40">
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1">Pilih Bulan</label>
-            <input type="month" value={targetMonth} onChange={e => setTargetMonth(e.target.value)}
-              className="px-3 py-2 border border-slate-300 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b]" />
-          </div>
-          
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1">Tanggal Cek Status</label>
-            <input type="date" value={targetInputDate} onChange={e => setTargetInputDate(e.target.value)}
-              className="px-3 py-2 border border-slate-300 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b]" />
-          </div>
+        {!screenshotMode && (
+          <div className={`${
+            isLocalDev 
+              ? 'bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs' 
+              : 'bg-[#fafafa] p-5 rounded-2xl border border-emerald-100 shadow-lg shadow-emerald-900/5'
+          } grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 items-end sticky top-0 z-40 transition-all`}>
+            {/* Dev Mode Banner Badge */}
+            {isLocalDev && (
+              <div className="col-span-2 sm:col-span-3 lg:col-span-5 flex items-center justify-between pb-2 border-b border-slate-100 text-[10px]">
+                <span className="font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
+                  MDS DATA-DENSE MODE (MORNINGSTAR X PTPN IV HYBRID)
+                </span>
+                <span className="font-mono text-slate-400 font-semibold">LOCAL DEV ONLY • COMPACT NUMERALS</span>
+              </div>
+            )}
 
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Pilih Bulan</label>
+              <input type="month" value={targetMonth} onChange={e => setTargetMonth(e.target.value)}
+                className={`px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 font-medium ${
+                  isLocalDev ? 'bg-slate-50/70' : 'rounded-2xl'
+                }`} />
+            </div>
+            
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal Cek Status</label>
+              <input type="date" value={targetInputDate} onChange={e => setTargetInputDate(e.target.value)}
+                className={`px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 font-medium ${
+                  isLocalDev ? 'bg-slate-50/70' : 'rounded-2xl'
+                }`} />
+            </div>
           {activeTab === 'unit-checklist' ? (
             // Unit view controls: plant selection
             // ADMIN/DEV → full dropdown; USER → locked read-only badge
@@ -1918,54 +1947,71 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         {activeTab === 'unit-checklist' && (
           <div className="space-y-4">
             
-            {/* Kebun Info Panel & KPIs */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-lg shadow-emerald-900/5 p-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-center mt-2 hover:shadow-xl transition-shadow duration-300">
-              <div className="border-r border-slate-100 pr-2">
-                <span className="text-[9px] font-bold text-[#064e3b] uppercase tracking-widest">Kebun Terpilih</span>
-                <h3 className="text-base font-bold text-slate-800 mt-0.5">{PLANT_INFO[selectedPlant]?.desc || `Kebun ${selectedPlant}`}</h3>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded font-mono">{selectedPlant}</span>
-                  <span className="text-slate-400 text-xs font-semibold">{PLANT_INFO[selectedPlant]?.wilayah}</span>
+            {/* Kebun Info Panel & KPIs (Enhanced with Morningstar Analytical Density on Dev) */}
+            <div className={`${
+              isLocalDev 
+                ? 'bg-white rounded-xl border border-slate-200 shadow-2xs divide-y md:divide-y-0 md:divide-x divide-slate-100 grid grid-cols-1 md:grid-cols-4 items-stretch mt-2 overflow-hidden'
+                : 'bg-white rounded-2xl border border-slate-100 shadow-lg shadow-emerald-900/5 p-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-center mt-2 hover:shadow-xl transition-shadow duration-300'
+            }`}>
+              <div className={isLocalDev ? "p-4 flex flex-col justify-between" : "border-r border-slate-100 pr-2"}>
+                <div>
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Kebun Terpilih</span>
+                  <h3 className="text-sm font-extrabold text-slate-900 mt-0.5 leading-snug">{PLANT_INFO[selectedPlant]?.desc || `Kebun ${selectedPlant}`}</h3>
+                </div>
+                <div className="flex items-center gap-1.5 mt-2">
+                  <span className="bg-slate-100 text-slate-800 border border-slate-200 text-[10px] font-bold px-2 py-0.5 rounded font-mono">{selectedPlant}</span>
+                  <span className="text-slate-500 text-xs font-semibold">{PLANT_INFO[selectedPlant]?.wilayah}</span>
                 </div>
               </div>
 
-              <div className="flex flex-col items-center justify-center p-3 bg-slate-50 rounded-xl">
-                <span className="text-slate-400 text-[10px] font-bold uppercase">Total Kendaraan</span>
-                <span className="text-2xl font-bold text-slate-800 mt-1">{unitFocusedData.kpis.total} <span className="text-xs text-slate-400 font-semibold">Unit</span></span>
-                <span className="text-[9px] text-slate-400 mt-0.5">{unitFocusedData.kpis.active} Aktif Bulan Ini</span>
-              </div>
-
-              <div className="flex flex-col items-center justify-center p-3 bg-slate-50 rounded-xl">
-                <span className="text-slate-400 text-[10px] font-bold uppercase">Status Hari Ini ({format(new Date(targetInputDate + 'T00:00:00'), 'dd/MM/yyyy')})</span>
-                <div className="flex gap-3 mt-1 items-center">
-                  <span className="text-emerald-600 font-extrabold text-base flex items-center gap-0.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block mr-1"></span>
-                    {unitFocusedData.kpis.todayFilled} <span className="text-[10px] text-slate-400 font-semibold">Selesai</span>
-                  </span>
-                  <span className="text-red-500 font-extrabold text-base flex items-center gap-0.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block mr-1"></span>
-                    {unitFocusedData.kpis.todayPending} <span className="text-[10px] text-slate-400 font-semibold">Belum</span>
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-center justify-center p-3 bg-slate-50 rounded-xl">
-                <span className="text-slate-400 text-[10px] font-bold uppercase">Status Pengisian Kebun</span>
-                <span className="text-sm font-bold text-slate-800 mt-2">
-                  <StatusBadge status={unitFocusedData.kpis.statusColor} text={unitFocusedData.kpis.statusText} />
+              <div className={isLocalDev ? "p-4 flex flex-col items-center justify-center bg-slate-50/40 text-center" : "flex flex-col items-center justify-center p-3 bg-slate-50 rounded-xl"}>
+                <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Total Kendaraan</span>
+                <span className="text-2xl md:text-3xl font-black font-mono tracking-tight text-slate-900 mt-1">
+                  {unitFocusedData.kpis.total} <span className="text-xs text-slate-500 font-normal">Unit</span>
                 </span>
-                <span className="text-[9px] text-slate-400 mt-1">Terakhir Update: {unitFocusedData.kpis.lastUpdate !== '-' ? format(new Date(unitFocusedData.kpis.lastUpdate + 'T00:00:00'), 'dd/MM/yyyy') : '-'}</span>
+                <span className="text-[10px] text-slate-500 font-medium mt-0.5">{unitFocusedData.kpis.active} Aktif Bulan Ini</span>
+              </div>
+
+              <div className={isLocalDev ? "p-4 flex flex-col items-center justify-center bg-slate-50/40 text-center" : "flex flex-col items-center justify-center p-3 bg-slate-50 rounded-xl"}>
+                <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Status ({format(new Date(targetInputDate + 'T00:00:00'), 'dd/MM/yyyy')})</span>
+                <div className="flex gap-3 mt-1.5 items-center">
+                  <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono font-bold text-sm px-2.5 py-1 rounded-md flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block"></span>
+                    {unitFocusedData.kpis.todayFilled} <span className="text-[10px] text-emerald-700 font-sans font-medium">Selesai</span>
+                  </span>
+                  <span className="bg-red-50 text-red-800 border border-red-200 font-mono font-bold text-sm px-2.5 py-1 rounded-md flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-red-600 inline-block"></span>
+                    {unitFocusedData.kpis.todayPending} <span className="text-[10px] text-red-700 font-sans font-medium">Belum</span>
+                  </span>
+                </div>
+              </div>
+
+              <div className={isLocalDev ? "p-4 flex flex-col items-center justify-center bg-slate-50/40 text-center" : "flex flex-col items-center justify-center p-3 bg-slate-50 rounded-xl"}>
+                <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Status Pengisian Kebun</span>
+                <div className="mt-1.5">
+                  <StatusBadge status={unitFocusedData.kpis.statusColor} text={unitFocusedData.kpis.statusText} />
+                </div>
+                <span className="text-[10px] text-slate-400 font-medium mt-1 font-mono">
+                  Update: {unitFocusedData.kpis.lastUpdate !== '-' ? format(new Date(unitFocusedData.kpis.lastUpdate + 'T00:00:00'), 'dd/MM/yyyy') : '-'}
+                </span>
               </div>
             </div>
 
             {/* Checklist Table */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-lg shadow-emerald-900/5 overflow-hidden mt-4">
-              <div className="p-5 border-b border-emerald-100/50 flex flex-col sm:flex-row justify-between items-center gap-3 bg-slate-50/50">
+            {/* Checklist Table (High Density on Dev) */}
+            <div className={`${
+              isLocalDev 
+                ? 'bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden mt-3' 
+                : 'bg-white rounded-2xl border border-slate-100 shadow-lg shadow-emerald-900/5 overflow-hidden mt-4'
+            }`}>
+              <div className={`${
+                isLocalDev ? 'px-4 py-2.5 border-b border-slate-200 bg-slate-50/90' : 'p-5 border-b border-emerald-100/50 bg-slate-50/50'
+              } flex flex-col sm:flex-row justify-between items-center gap-2`}>
                 <div>
-                  <h4 className="font-bold text-slate-700 text-xs">Checklist Absensi Pengisian Logbook Harian</h4>
-                  <p className="text-[10px] text-slate-400">Centang hijau menunjukkan logbook sudah terisi pada tanggal terpilih.</p>
+                  <h4 className="font-extrabold text-slate-900 text-xs tracking-tight">Checklist Absensi Pengisian Logbook Harian</h4>
+                  <p className="text-[10px] text-slate-500">Centang hijau menunjukkan logbook sudah terisi pada tanggal terpilih.</p>
                 </div>
-                <div className="flex items-center gap-4 text-xs font-semibold text-slate-500">
+                <div className="flex items-center gap-4 text-[11px] font-semibold text-slate-600">
                   <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-emerald-500 rounded-full" /> <span>Terisi</span></div>
                   <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-red-400 rounded-full" /> <span>Belum Terisi</span></div>
                 </div>
@@ -1974,15 +2020,15 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left border-collapse">
                   <thead>
-                    <tr className="bg-slate-100/60 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                      <th className="text-center px-4 py-3 w-[120px]">No. Equipment</th>
-                      <th className="text-center px-4 py-3 min-w-[150px]">Deskripsi Kendaraan</th>
-                      <th className="text-center px-4 py-3 w-[100px]">Cost Center</th>
-                      <th className="text-center px-4 py-3 min-w-[180px]">Pekerjaan Utama (Transaksi)</th>
-                      <th className="px-4 py-3 text-center w-[160px]">Status Hari Ini</th>
-                      <th className="px-4 py-3 text-center w-[120px]">Bulan Ini (Terisi)</th>
-                      <th className="text-center px-4 py-3">Absensi Harian (Tanggal 1 s.d. 31)</th>
-                      <th className="px-4 py-3 text-center w-[60px]">Aksi</th>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-[10px] font-black uppercase tracking-wider">
+                      <th className={`text-center ${isLocalDev ? 'px-3 py-2 w-[110px]' : 'px-4 py-3 w-[120px]'}`}>No. Equipment</th>
+                      <th className={`text-center ${isLocalDev ? 'px-3 py-2 min-w-[140px]' : 'px-4 py-3 min-w-[150px]'}`}>Deskripsi Kendaraan</th>
+                      <th className={`text-center ${isLocalDev ? 'px-3 py-2 w-[90px]' : 'px-4 py-3 w-[100px]'}`}>Cost Center</th>
+                      <th className={`text-center ${isLocalDev ? 'px-3 py-2 min-w-[160px]' : 'px-4 py-3 min-w-[180px]'}`}>Pekerjaan Utama</th>
+                      <th className={`text-center ${isLocalDev ? 'px-3 py-2 w-[140px]' : 'px-4 py-3 w-[160px]'}`}>Status Hari Ini</th>
+                      <th className={`text-center ${isLocalDev ? 'px-3 py-2 w-[110px]' : 'px-4 py-3 w-[120px]'}`}>Bulan Ini (Terisi)</th>
+                      <th className={`text-center ${isLocalDev ? 'px-3 py-2' : 'px-4 py-3'}`}>Absensi Harian (Tanggal 1 s.d. 31)</th>
+                      <th className={`text-center ${isLocalDev ? 'px-3 py-2 w-[60px]' : 'px-4 py-3 w-[60px]'}`}>Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -2028,31 +2074,31 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
                     ) : unitFocusedData.vehiclesList.slice((unitPage - 1) * LOG_PAGE_SIZE, unitPage * LOG_PAGE_SIZE).map(v => (
                       <React.Fragment key={v.vehicle_code}>
-                        <tr className={`hover:bg-emerald-50/40  hover:shadow-sm transition-colors duration-200 border-b border-slate-50 group ${expandedVehicleId === v.vehicle_code ? 'bg-emerald-50/10' : ''}`}>
-                          <td className="px-4 py-3 font-bold text-slate-800 font-mono text-[13px]">{v.vehicle_code}</td>
-                          <td className="px-4 py-3 text-[10px] text-slate-500 font-medium">{v.eqDesc}</td>
-                          <td className="px-4 py-3 font-mono text-[11px] font-semibold text-slate-700">{v.costCenter}</td>
-                          <td className="px-4 py-3 text-slate-600">
-                            <span className="font-semibold text-slate-700 block text-xs">{v.description}</span>
-                            <span className="text-[10px] text-slate-400 font-medium mt-0.5 block">Tipe Pekerjaan Utama: {v.description.split(' Ke ')[0]}</span>
+                        <tr className={`hover:bg-slate-50/80 transition-colors duration-150 border-b border-slate-100 group ${expandedVehicleId === v.vehicle_code ? 'bg-emerald-50/20' : ''}`}>
+                          <td className={`${isLocalDev ? 'px-3 py-1.5' : 'px-4 py-3'} font-bold text-slate-900 font-mono text-[12px]`}>{v.vehicle_code}</td>
+                          <td className={`${isLocalDev ? 'px-3 py-1.5' : 'px-4 py-3'} text-[11px] text-slate-600 font-medium`}>{v.eqDesc}</td>
+                          <td className={`${isLocalDev ? 'px-3 py-1.5' : 'px-4 py-3'} font-mono text-[11px] font-semibold text-slate-700`}>{v.costCenter}</td>
+                          <td className={`${isLocalDev ? 'px-3 py-1.5' : 'px-4 py-3'} text-slate-700`}>
+                            <span className="font-semibold text-slate-800 block text-xs">{v.description}</span>
+                            <span className="text-[10px] text-slate-400 font-medium block">Tipe: {v.description.split(' Ke ')[0]}</span>
                           </td>
-                          <td className="px-4 py-3 text-center">
+                          <td className={`${isLocalDev ? 'px-3 py-1.5' : 'px-4 py-3'} text-center`}>
                             {v.isInputtedToday ? (
-                              <div className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-800 px-2.5 py-1 rounded-2xl font-bold text-[10px]">
-                                <Check size={12} className="text-emerald-600 stroke-[3px]" /> Sudah Diisi
+                              <div className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold">
+                                <Check size={11} className="text-emerald-700 stroke-[3px]" /> Sudah Diisi
                               </div>
                             ) : (
-                              <div className="inline-flex items-center gap-1 bg-red-50 border border-red-200 text-red-700 px-2.5 py-1 rounded-2xl font-bold text-[10px]">
-                                <X size={12} className="text-red-500 stroke-[3px]" /> Belum Diisi
+                              <div className="inline-flex items-center gap-1 bg-red-50 border border-red-200 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                                <X size={11} className="text-red-600 stroke-[3px]" /> Belum Diisi
                               </div>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-center font-bold text-slate-700">
-                            {v.daysFilled} Hari
+                          <td className={`${isLocalDev ? 'px-3 py-1.5' : 'px-4 py-3'} text-center font-bold text-slate-800 font-mono text-xs`}>
+                            {v.daysFilled} <span className="font-sans text-[10px] text-slate-500 font-normal">Hari</span>
                           </td>
-                          <td className="px-4 py-3">
-                            {/* Calendar Checklist Row */}
-                            <div className="flex flex-wrap gap-1 items-center justify-start">
+                          <td className={`${isLocalDev ? 'px-3 py-1.5' : 'px-4 py-3'}`}>
+                            {/* Calendar Checklist Row (Compact density on Dev) */}
+                            <div className="flex flex-wrap gap-0.5 items-center justify-start">
                               {calendarDays.map(day => {
                                 const dateStr = format(day, 'yyyy-MM-dd');
                                 const dayNum  = format(day, 'd');
@@ -2064,11 +2110,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                                   <div
                                     key={dateStr}
                                     title={`Tanggal ${dayNum} (${dayName}): ${state ? state.desc : 'Belum Ada Input'}`}
-                                    className={`w-6 h-6 rounded flex items-center justify-center font-mono text-[9px] font-bold transition cursor-help border ${
+                                    className={`${isLocalDev ? 'w-5 h-5 text-[8.5px]' : 'w-6 h-6 text-[9px]'} rounded flex items-center justify-center font-mono font-bold transition cursor-help border ${
                                       state 
-                                        ? 'bg-emerald-500 text-white border-emerald-600' 
-                                        : 'bg-red-100 text-red-500 hover:bg-red-200 border-red-200'
-                                    } ${isCurrentDate ? 'ring-2 ring-[#064e3b] ring-offset-1 scale-110 shadow-sm' : ''}`}
+                                        ? 'bg-emerald-600 text-white border-emerald-700' 
+                                        : 'bg-red-50 text-red-500 hover:bg-red-100 border-red-200'
+                                    } ${isCurrentDate ? 'ring-2 ring-emerald-700 ring-offset-1 scale-105 z-10 shadow-xs' : ''}`}
                                   >
                                     {dayNum}
                                   </div>
@@ -2076,7 +2122,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                               })}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-center">
+                          <td className={`${isLocalDev ? 'px-3 py-1.5' : 'px-4 py-3'} text-center`}>
                             <button
                               onClick={() => {
                                 setSearchVehicle(v.vehicle_code);
@@ -2084,10 +2130,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                                 setActiveTab('log-raw');
                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                               }}
-                              className="font-bold text-xs px-3 py-1.5 rounded-lg transition shadow-xs flex items-center justify-center gap-1.5 mx-auto border text-[#064e3b] hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200 cursor-pointer"
+                              className="font-bold text-[11px] px-2.5 py-1 rounded-md transition flex items-center justify-center gap-1 mx-auto border text-[#064e3b] hover:text-emerald-800 bg-slate-50 hover:bg-slate-100 border-slate-300 cursor-pointer"
                               title={`Buka Log Transaksi Asli untuk kendaraan ${v.vehicle_code}`}
                             >
-                              <Eye size={12} /> Detail
+                              <Eye size={11} /> Detail
                             </button>
                           </td>
                         </tr>

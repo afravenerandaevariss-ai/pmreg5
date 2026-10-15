@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
 
 // SAFETY: No hardcoded fallback — if env vars are missing, fail loudly
 // rather than silently connecting to the PRODUCTION database.
@@ -198,7 +199,7 @@ async function buildReportText() {
   return { text, list };
 }
 
-const PROD_GROUP_JIDS = ['120363041780234935@g.us', '120363427768510358@g.us', '120363430505509462'];
+const PROD_GROUP_JIDS = ['120363430505509462@g.us'];
 const isDev = process.env.VITE_APP_ENV === 'dev' || 
               process.env.NODE_ENV === 'development' || 
               (supabaseUrl && supabaseUrl.includes('dev'));
@@ -224,27 +225,29 @@ export default async function handler(req, res) {
 
     // ─────────────────────────────────────────────────────────────
     // SAFETY GUARD: BLOCK SENDING TO PROD GROUPS IN DEV MODE
+    // Use ?force=true to override for manual testing sends.
     // ─────────────────────────────────────────────────────────────
     if (isDev) {
-      const devTarget = process.env.DEV_TARGET_WA;
-      const isTargetingProd = !targetPhone || PROD_GROUP_JIDS.some(id => String(targetPhone).includes(id));
+      const forceOverride = req.query.force === 'true' || req.body?.force === true;
+      const devTarget = process.env.DEV_TARGET_WA || waConfig.targetPhone || '120363430505509462@g.us';
+      if (!targetPhone) targetPhone = devTarget;
+
+      // Hanya grup PROD resmi utama yang dilindungi secara ketat
+      const STRICT_PROD_GROUPS = ['120363430505509462'];
+      const isTargetingStrictProd = STRICT_PROD_GROUPS.some(id => String(targetPhone).includes(id));
       
-      if (isTargetingProd) {
-        if (devTarget && !PROD_GROUP_JIDS.some(id => devTarget.includes(id))) {
-          console.log(`[SAFETY GUARD] Redirecting DEV message to DEV_TARGET_WA: ${devTarget}`);
-          targetPhone = devTarget;
-        } else {
-          console.warn(`[SAFETY GUARD] 🛡️ Blocked attempt to send WA to PROD group (${targetPhone || 'default'}) from DEV!`);
-          return res.status(200).json({
-            success: true,
-            devSafetyGuard: true,
-            message: `[DEV SAFETY GUARD] Pengiriman ke grup PROD dibatalkan karena server berada di mode DEV. Pesan TIDAK dikirim ke WhatsApp resmi untuk melindungi PROD.`,
-            previewText: text
-          });
-        }
+      if (isTargetingStrictProd && !forceOverride) {
+        console.warn(`[SAFETY GUARD] 🛡️ Blocked attempt to send WA to strict PROD group (${targetPhone}) from DEV!`);
+        return res.status(200).json({
+          success: true,
+          devSafetyGuard: true,
+          message: `[DEV SAFETY GUARD] Pengiriman ke grup PROD resmi dibatalkan karena server berada di mode DEV. Pesan TIDAK dikirim untuk melindungi PROD.`,
+          previewText: text
+        });
       }
+      console.log(`[DEV SEND] 🚀 Mengirim ke target: ${targetPhone} dari DEV server.`);
     } else {
-      if (!targetPhone) targetPhone = '120363427768510358@g.us';
+      if (!targetPhone) targetPhone = '120363430505509462@g.us';
     }
 
     const apiToken = req.query.token || req.body?.token || waConfig.apiToken || process.env.FONNTE_TOKEN;
@@ -259,15 +262,27 @@ export default async function handler(req, res) {
 
     if (provider === 'gowa' || (!apiToken && provider !== 'custom')) {
       const authHeader = 'Basic ' + Buffer.from(`${gowaUser}:${gowaPass}`).toString('base64');
-      let deviceId = waConfig.gowaDevice || '黄玲玲';
+      // Target device: 6285135734210@s.whatsapp.net (Plant Maintenance)
+      let targetDevice = req.query.device || waConfig.gowaDevice || process.env.GOWA_DEVICE || '6285135734210@s.whatsapp.net';
+      let deviceId = targetDevice;
 
       try {
         const devRes = await fetch(`${gowaUrl}/devices`, { headers: { 'Authorization': authHeader } });
         if (devRes.ok) {
           const devData = await devRes.json();
-          const activeDev = (devData.results || []).find(d => d.state === 'logged_in');
-          if (activeDev) {
-            deviceId = activeDev.id;
+          const targetStr = String(targetDevice).toLowerCase();
+          const matchedDev = (devData.results || []).find(d =>
+            (d.jid && (d.jid.toLowerCase() === targetStr || d.jid.includes('6285135734210'))) ||
+            (d.id && d.id.toLowerCase() === targetStr) ||
+            (d.display_name && targetStr && d.display_name.toLowerCase().includes('plant maintenance'))
+          );
+          if (matchedDev) {
+            deviceId = matchedDev.jid || matchedDev.id;
+          } else {
+            const activeDev = (devData.results || []).find(d => d.state === 'logged_in');
+            if (activeDev) {
+              deviceId = activeDev.jid || activeDev.id;
+            }
           }
         }
       } catch (e) {
@@ -282,23 +297,85 @@ export default async function handler(req, res) {
         formattedPhone = cleanPhone.startsWith('0') ? '62' + cleanPhone.substring(1) : cleanPhone;
       }
 
-      const gowaRes = await fetch(`${gowaUrl}/send/message?device_id=${encodeURIComponent(deviceId)}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': authHeader,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          phone: formattedPhone,
-          message: text
-        })
-      });
+      const hasImage = req.body?.image || req.body?.imageBase64;
+      const sendImageFlag = req.body?.sendImage === true || req.query?.sendImage === 'true' || Boolean(hasImage);
 
-      const gowaData = await gowaRes.json();
-      dispatchResult = {
-        success: gowaData.code === 'SUCCESS',
-        detail: gowaData
-      };
+      if (sendImageFlag) {
+        let imageBlob = null;
+        if (hasImage) {
+          const rawB64 = (req.body.image || req.body.imageBase64).replace(/^data:image\/\w+;base64,/, '');
+          const buf = Buffer.from(rawB64, 'base64');
+          imageBlob = new Blob([buf], { type: 'image/png' });
+        } else {
+          // Check server-side generated rekap.png
+          const possiblePaths = [
+            'public/rekap.png',
+            'dist/rekap.png',
+            '/var/www/devpmreg5/dist/rekap.png',
+            '/var/www/devpmreg5/public/rekap.png'
+          ];
+          for (const p of possiblePaths) {
+            if (fs.existsSync(p)) {
+              const buf = fs.readFileSync(p);
+              imageBlob = new Blob([buf], { type: 'image/png' });
+              break;
+            }
+          }
+        }
+
+        if (imageBlob) {
+          const formData = new FormData();
+          formData.append('phone', formattedPhone);
+          formData.append('caption', text || '');
+          formData.append('image', imageBlob, 'Rekap_Logbook_Regional5_HD.png');
+          formData.append('is_hd', 'true');
+          formData.append('compress', 'false');
+
+          const gowaRes = await fetch(`${gowaUrl}/send/image?device_id=${encodeURIComponent(deviceId)}`, {
+            method: 'POST',
+            headers: { 'Authorization': authHeader },
+            body: formData
+          });
+          const gowaData = await gowaRes.json();
+          dispatchResult = {
+            success: gowaData.code === 'SUCCESS',
+            detail: gowaData,
+            type: 'image'
+          };
+        } else {
+          // Fallback to text message
+          const gowaRes = await fetch(`${gowaUrl}/send/message?device_id=${encodeURIComponent(deviceId)}`, {
+            method: 'POST',
+            headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: formattedPhone, message: text })
+          });
+          const gowaData = await gowaRes.json();
+          dispatchResult = {
+            success: gowaData.code === 'SUCCESS',
+            detail: gowaData,
+            type: 'text'
+          };
+        }
+      } else {
+        const gowaRes = await fetch(`${gowaUrl}/send/message?device_id=${encodeURIComponent(deviceId)}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            phone: formattedPhone,
+            message: text
+          })
+        });
+
+        const gowaData = await gowaRes.json();
+        dispatchResult = {
+          success: gowaData.code === 'SUCCESS',
+          detail: gowaData,
+          type: 'text'
+        };
+      }
     } else if (apiToken && provider === 'fonnte') {
       const formData = new URLSearchParams();
       formData.append('target', targetPhone);

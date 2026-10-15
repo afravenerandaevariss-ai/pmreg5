@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Send, CheckCircle2, AlertCircle, Copy, ExternalLink, Settings, Clock, Smartphone, MessageSquare, ShieldCheck } from 'lucide-react';
+import { Send, CheckCircle2, AlertCircle, Copy, ExternalLink, Settings, Clock, Smartphone, MessageSquare, ShieldCheck, Image as ImageIcon } from 'lucide-react';
+import { toPng } from 'html-to-image';
 import { fetchWAConfig, saveWAConfig, fetchWALogs, saveWALog } from '../lib/supabaseService';
 
 export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targetInputDate }) {
@@ -9,18 +10,18 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
                   window.location.hostname === 'localhost' || 
                   window.location.hostname === '127.0.0.1'
                 ));
-  const PROD_GROUP_IDS = ['120363430505509462', '120363041780234935', '120363427768510358'];
+  const STRICT_PROD_GROUPS = ['120363430505509462'];
 
-  const [targetPhone, setTargetPhone] = useState(isDev ? '' : '120363430505509462');
-  const [targetGroup, setTargetGroup] = useState(isDev ? 'DEV Testing (Belum Diset)' : 'Group PM (120363430505509462)');
+  const [targetPhone, setTargetPhone] = useState('120363430505509462@g.us');
+  const [targetGroup, setTargetGroup] = useState('Grup ID 120363430505509462@g.us');
   const [provider, setProvider] = useState('gowa');
   const [apiToken, setApiToken] = useState('');
   const [gowaUrl, setGowaUrl] = useState('https://gowa.afratarigan.my.id');
   const [gowaUser, setGowaUser] = useState('admin');
   const [gowaPass, setGowaPass] = useState('Sedap321#');
-  const [gowaDevice, setGowaDevice] = useState('aaaa');
+  const [gowaDevice, setGowaDevice] = useState('6285135734210@s.whatsapp.net');
   const [autoSendEnabled, setAutoSendEnabled] = useState(!isDev);
-  const [sendTime, setSendTime] = useState('08:00 & 15:30');
+  const [sendTime, setSendTime] = useState('07:00, 08:00, 14:00 & 16:00 WIB');
   const [sending, setSending] = useState(false);
   const [statusMsg, setStatusMsg] = useState(null);
   const [activeTab, setActiveTab] = useState('send'); // 'send', 'settings', 'logs'
@@ -36,11 +37,11 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
   const loadConfig = async () => {
     const { data } = await fetchWAConfig();
     if (data) {
-      const isProdTarget = data.targetPhone && PROD_GROUP_IDS.some(id => String(data.targetPhone).includes(id));
-      if (data.targetPhone !== undefined && !(isDev && isProdTarget)) {
+      const isStrictProd = data.targetPhone && STRICT_PROD_GROUPS.some(id => String(data.targetPhone).includes(id));
+      if (data.targetPhone !== undefined && !(isDev && isStrictProd)) {
         setTargetPhone(data.targetPhone);
       }
-      if (data.targetGroup && !(isDev && isProdTarget)) {
+      if (data.targetGroup && !(isDev && isStrictProd)) {
         setTargetGroup(data.targetGroup);
       }
       if (data.provider) setProvider(data.provider);
@@ -60,8 +61,8 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
   };
 
   const handleSaveConfig = async () => {
-    if (isDev && PROD_GROUP_IDS.some(id => String(targetPhone).includes(id))) {
-      setStatusMsg({ type: 'error', text: '🛡️ [DEV SAFETY GUARD] Tidak boleh menyimpan ID Grup PROD di lingkungan DEV!' });
+    if (isDev && STRICT_PROD_GROUPS.some(id => String(targetPhone).includes(id))) {
+      setStatusMsg({ type: 'error', text: '🛡️ [DEV SAFETY GUARD] Tidak boleh menyimpan ID Grup PROD resmi di lingkungan DEV!' });
       return;
     }
     const config = {
@@ -144,10 +145,10 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
 
   const handleOpenWAWeb = () => {
     const cleanPhone = targetPhone.replace(/[^0-9]/g, '');
-    if (isDev && PROD_GROUP_IDS.some(id => cleanPhone.includes(id))) {
+    if (isDev && STRICT_PROD_GROUPS.some(id => cleanPhone.includes(id))) {
       setStatusMsg({
         type: 'error',
-        text: '🛡️ [DEV SAFETY GUARD] Pengiriman ke grup PROD diblokir pada mode DEV! Ubah target ke nomor/grup testing Anda di tab Pengaturan.'
+        text: '🛡️ [DEV SAFETY GUARD] Pengiriman ke grup PROD resmi utama diblokir pada mode DEV! Ubah target ke nomor/grup testing Anda di tab Pengaturan.'
       });
       return;
     }
@@ -155,6 +156,125 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
     const formattedPhone = cleanPhone.startsWith('0') ? '62' + cleanPhone.substring(1) : cleanPhone;
     const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
+  };
+
+  const handleSendNow = async () => {
+    if (!targetPhone) {
+      setStatusMsg({ type: 'error', text: 'Target WhatsApp belum diisi!' });
+      return;
+    }
+    const cleanPhone = targetPhone.replace(/[^0-9]/g, '');
+    if (isDev && STRICT_PROD_GROUPS.some(id => cleanPhone.includes(id))) {
+      setStatusMsg({
+        type: 'error',
+        text: '🛡️ [DEV SAFETY GUARD] Pengiriman ke grup PROD resmi utama diblokir pada mode DEV!'
+      });
+      return;
+    }
+    setSending(true);
+    setStatusMsg(null);
+    try {
+      const res = await fetch('/api/send-wa?force=true', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetPhone,
+          message: generateWAText(),
+          force: true
+        })
+      });
+      const data = await res.json();
+      if (data.success && !data.devSafetyGuard) {
+        const msgId = data.dispatchResult?.detail?.results?.message_id || data.dispatchResult?.detail?.message_id || '';
+        setStatusMsg({
+          type: 'success',
+          text: `🎉 Berhasil! Pesan WhatsApp terkirim ke ${data.target || targetPhone} via Gateway! ${msgId ? '(ID: ' + msgId + ')' : ''}`
+        });
+        loadLogs();
+      } else if (data.devSafetyGuard) {
+        setStatusMsg({
+          type: 'error',
+          text: data.message
+        });
+      } else {
+        setStatusMsg({
+          type: 'error',
+          text: `Gagal mengirim: ${data.message || data.error || 'Response tidak sukses'}`
+        });
+      }
+    } catch (e) {
+      setStatusMsg({
+        type: 'error',
+        text: `Error pengiriman: ${e.message}`
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleSendImageNow = async () => {
+    if (!targetPhone) {
+      setStatusMsg({ type: 'error', text: 'Target WhatsApp belum diisi!' });
+      return;
+    }
+    const cleanPhone = targetPhone.replace(/[^0-9]/g, '');
+    if (isDev && STRICT_PROD_GROUPS.some(id => cleanPhone.includes(id))) {
+      setStatusMsg({
+        type: 'error',
+        text: '🛡️ [DEV SAFETY GUARD] Pengiriman ke grup PROD resmi utama diblokir pada mode DEV!'
+      });
+      return;
+    }
+    setSending(true);
+    setStatusMsg({ type: 'info', text: '📸 Mengambil screenshot HD tabel rekap...' });
+
+    let imageBase64 = null;
+    try {
+      const sheetEl = document.getElementById('excel-report-sheet');
+      if (sheetEl) {
+        imageBase64 = await toPng(sheetEl, { quality: 0.95, pixelRatio: 2 });
+      }
+    } catch (err) {
+      console.warn('DOM screenshot capture warning, fallback to server image:', err.message);
+    }
+
+    try {
+      setStatusMsg({ type: 'info', text: '📤 Mengirim Gambar Rekap HD ke WhatsApp Gateway...' });
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}.${String(now.getMinutes()).padStart(2, '0')}`;
+      const caption = isDev
+        ? `🧪 *[DEV TESTING - devpmreg5.afratarigan.my.id]*\n*Monitoring Transaksi Logbook REGIONAL 5*\n*Update ${timeStr} WIB*\n\n_Laporan rekap kendaraan format HD Gambar via GoWA Gateway._`
+        : `*Monitoring Transaksi Logbook REGIONAL 5*\n*Update ${timeStr} WIB*\n\n_Laporan otomatis format HD Gambar via GoWA Gateway._`;
+
+      const res = await fetch('/api/send-wa?force=true', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetPhone,
+          message: caption,
+          imageBase64: imageBase64 || undefined,
+          sendImage: true,
+          force: true
+        })
+      });
+      const data = await res.json();
+      if (data.success && !data.devSafetyGuard) {
+        const msgId = data.dispatchResult?.detail?.results?.message_id || data.dispatchResult?.detail?.message_id || '';
+        setStatusMsg({
+          type: 'success',
+          text: `🎉 Berhasil! Gambar Rekap HD terkirim ke ${data.target || targetPhone}! ${msgId ? '(ID: ' + msgId + ')' : ''}`
+        });
+        loadLogs();
+      } else if (data.devSafetyGuard) {
+        setStatusMsg({ type: 'error', text: data.message });
+      } else {
+        setStatusMsg({ type: 'error', text: `Gagal mengirim gambar: ${data.message || data.error || 'Response error'}` });
+      }
+    } catch (e) {
+      setStatusMsg({ type: 'error', text: `Error pengiriman: ${e.message}` });
+    } finally {
+      setSending(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -270,7 +390,23 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
                   </div>
                 </div>
 
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-2 flex-wrap items-center">
+                  <button
+                    onClick={handleSendImageNow}
+                    disabled={sending}
+                    className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:from-emerald-400 disabled:to-teal-400 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-md"
+                  >
+                    <ImageIcon size={14} className={sending ? 'animate-spin' : ''} />
+                    {sending ? 'Memproses...' : '📸 Kirim Gambar Rekap HD'}
+                  </button>
+                  <button
+                    onClick={handleSendNow}
+                    disabled={sending}
+                    className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-800 disabled:bg-slate-400 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm"
+                  >
+                    <Send size={12} className={sending ? 'animate-spin' : ''} />
+                    💬 Kirim Teks
+                  </button>
                   <button
                     onClick={handleCopyText}
                     className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition border border-slate-300"
@@ -408,7 +544,7 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
                       type="text"
                       value={gowaDevice}
                       onChange={e => setGowaDevice(e.target.value)}
-                      placeholder="黄玲玲"
+                      placeholder="6285135734210@s.whatsapp.net"
                       className="w-full px-2.5 py-1.5 border border-slate-300 rounded-xl text-xs font-semibold"
                     />
                   </div>
@@ -421,7 +557,7 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
                   <div className="flex items-center gap-2">
                     <Clock size={16} className="text-emerald-700" />
                     <span className="text-xs font-bold text-emerald-900">
-                      Jadwal Otomatis: 08:00 AM &amp; 02:30 PM (14:30 WIB)
+                      Jadwal Otomatis: 07:00, 08:00, 14:00 &amp; 16:00 WIB (4x sehari)
                     </span>
                   </div>
                   <button
@@ -430,12 +566,12 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
                       autoSendEnabled ? 'bg-emerald-600 text-white' : 'bg-slate-300 text-slate-700'
                     }`}
                   >
-                    {autoSendEnabled ? 'Status: AKTIF (Vercel Cron & Task Scheduler)' : 'Status: NON-AKTIF'}
+                    {autoSendEnabled ? 'Status: AKTIF' : 'Status: NON-AKTIF'}
                   </button>
                 </div>
 
                 <p className="text-[11px] text-emerald-800 leading-relaxed">
-                  Laporan rekap kendaraan Regional 5 secara otomatis dikirim 2x sehari (08:00 WIB &amp; 14:30 WIB) dalam format Gambar/Screenshot via GoWA Gateway (<code className="bg-emerald-100 px-1 py-0.5 rounded">https://gowa.waterflai.my.id</code>) melalui *Cloud Server* Vercel Cron (<code className="bg-emerald-100 px-1 py-0.5 rounded">/api/send-wa-image</code>). Laporan akan tetap terkirim walaupun komputer Anda dalam keadaan mati.
+                  Laporan rekap kendaraan Regional 5 dikirim 4x sehari (07:00, 08:00, 14:00 &amp; 16:00 WIB) dalam format Gambar/Screenshot via GoWA Gateway (<code className="bg-emerald-100 px-1 py-0.5 rounded">https://gowa.afratarigan.my.id</code>).
                 </p>
               </div>
 

@@ -51,13 +51,21 @@ function forceColumnsAsText(ws, colIndices) {
 
 /**
  * Accurately resolve plant code (e.g. 5F01, 5F08, etc.) from equipment object, functional location, or masterMap
+ * FIX: Jangan hardcode fallback ke '5F01' — gunakan defaultPlant yang dikirim caller.
  */
 export function getEquipmentPlant(eq, masterMap, defaultPlant) {
-  if (!eq) return defaultPlant || '5F01';
+  // Normalise defaultPlant sekali di awal
+  const safeDefault = (defaultPlant && String(defaultPlant).trim().toUpperCase().startsWith('5'))
+    ? String(defaultPlant).trim().toUpperCase()
+    : null;
+
+  if (!eq) return safeDefault || '5F01';
+
   let p = String(eq.plant || '').trim().toUpperCase();
   if (p && p !== 'UNCATEGORIZED' && p !== '-' && p !== 'UNKNOWN' && p.startsWith('5F')) {
     return p;
   }
+
   const text = `${eq.functionalLoc || ''} ${eq.functional_loc || ''} ${eq.flDescription || ''} ${eq.fl_description || ''} ${eq.costCenter || ''} ${eq.description || ''} ${eq.induk || ''}`;
   const m = text.match(/\b(5F\d{2})\b/i);
   if (m) return m[1].toUpperCase();
@@ -73,7 +81,9 @@ export function getEquipmentPlant(eq, masterMap, defaultPlant) {
       }
     }
   }
-  return (defaultPlant && defaultPlant !== 'ALL' && defaultPlant.startsWith('5F')) ? defaultPlant.toUpperCase() : '5F01';
+
+  // Gunakan defaultPlant yang dikirim (misal '5F04'), bukan hardcode '5F01'
+  return safeDefault || '5F01';
 }
 
 /**

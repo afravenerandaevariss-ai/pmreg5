@@ -6,7 +6,7 @@ const isDev = process.env.VITE_APP_ENV === 'dev' ||
               process.env.NODE_ENV === 'development' || 
               (APP_URL && APP_URL.includes('dev'));
 
-const PROD_TARGETS = ['081251334618', '6281251334618', '120363041780234935@g.us', '120363427768510358@g.us'];
+const PROD_TARGETS = ['081251334618', '6281251334618', '120363430505509462@g.us'];
 let TARGET_PHONE = process.env.DEV_TARGET_WA || process.env.TARGET_PHONE;
 
 if (isDev) {
@@ -123,14 +123,24 @@ async function run() {
     console.log('Sending to GoWA API...');
     const authHeader = 'Basic ' + Buffer.from(`${GOWA_USER}:${GOWA_PASS}`).toString('base64');
     
-    // First, find device
-    let deviceId = '黄玲玲';
+    // First, find device (default: 6285135734210@s.whatsapp.net)
+    let targetDevice = process.env.GOWA_DEVICE || '6285135734210@s.whatsapp.net';
+    let deviceId = targetDevice;
     try {
       const devRes = await fetch(`${GOWA_URL}/devices`, { headers: { 'Authorization': authHeader } });
       if (devRes.ok) {
         const devData = await devRes.json();
-        const activeDev = (devData.results || []).find(d => d.state === 'logged_in');
-        if (activeDev) deviceId = activeDev.id;
+        const matchedDev = (devData.results || []).find(d =>
+          (d.jid && (d.jid === targetDevice || d.jid.includes('6285135734210'))) ||
+          d.id === targetDevice ||
+          (d.display_name && d.display_name.toLowerCase().includes('plant maintenance'))
+        );
+        if (matchedDev) {
+          deviceId = matchedDev.jid || matchedDev.id;
+        } else {
+          const activeDev = (devData.results || []).find(d => d.state === 'logged_in');
+          if (activeDev) deviceId = activeDev.jid || activeDev.id;
+        }
       }
     } catch (e) {
       console.warn('Could not fetch GoWA device list:', e.message);

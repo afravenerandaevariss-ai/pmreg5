@@ -9,7 +9,7 @@ const TEMP_PATH = path.join(__dirname, '..', 'public', 'cmms_screenshot.png');
 const GOWA_URL = 'https://gowa.waterflai.my.id';
 const GOWA_USER = 'admin';
 const GOWA_PASS = 'Sedap321#';
-const TARGET_JID = '120363427768510358@g.us';
+const TARGET_JID = '120363430505509462@g.us';
 const CAPTION = 'Update Running Hour Submission Monitoring';
 
 function getChromePath() {
@@ -111,8 +111,7 @@ async function main() {
   console.log('[8.1] Scrolling exactly to the target area...');
   await page.evaluate((y) => {
     // Scroll so the heading is 120px from the top of the viewport
-    // This perfectly clears the fixed navigation header (~100px tall)
-    window.scrollTo({ top: Math.max(0, y - 120), behavior: 'instant' });
+    window.scrollTo({ top: Math.max(0, y - 80), behavior: 'instant' });
   }, absoluteY);
   
   // Wait for any fixed headers or scroll-linked animations to settle
@@ -142,17 +141,32 @@ async function main() {
     console.log('[8.16] WARNING: "Reg 5" not found! Taking screenshot of original view.');
   }
 
+  // Delete the legend row inside the red box ("delete in the red box" requested by user)
+  await page.evaluate(() => {
+    const allElements = Array.from(document.querySelectorAll('*'));
+    for (const el of allElements) {
+      const text = (el.textContent || '').trim();
+      if (
+        text.includes('ada data jam jalan yang diinput') ||
+        text.includes('Jumlah Equipment dengan data jam jalan') ||
+        text.includes('Pabrik Tidak Beroperasi')
+      ) {
+        if (el.children.length > 0 && el.offsetHeight < 120 && el.tagName !== 'BODY' && el.tagName !== 'HTML') {
+          el.remove();
+        }
+      }
+    }
+  });
+  await new Promise(r => setTimeout(r, 1000));
+
   console.log('[8.2] Taking normal viewport screenshot...');
-  // Normal screenshot captures only the viewport. Since we just scrolled exactly there,
-  // the target is now clearly visible below the header!
   const viewportBuffer = await page.screenshot({ type: 'png' });
   
   const scale = 1.5;
-  const cropTop = Math.floor(100 * scale);
-  const cropLeft = Math.floor(90 * scale);
-  const cropWidth = Math.floor(1740 * scale);
-  // Mengurangi cropHeight (logical px) agar tulisan "Traceability" tidak ikut terpotret
-  const cropHeight = Math.floor(600 * scale);
+  const cropTop = Math.floor(65 * scale);
+  const cropLeft = Math.floor(15 * scale);
+  const cropWidth = Math.floor(1885 * scale);
+  const cropHeight = Math.floor(615 * scale);
   
   let pngBuffer;
   try {
@@ -165,7 +179,6 @@ async function main() {
     console.error('Error during Sharp crop:', err);
     throw err;
   }
-
 
   console.log(`[9] Screenshot taken! Size: ${(pngBuffer.length / 1024).toFixed(2)} KB`);
   if (!fs.existsSync(path.join(__dirname, '..', 'public'))) fs.mkdirSync(path.join(__dirname, '..', 'public'), { recursive: true });

@@ -11,6 +11,22 @@ const T_DAILY_LOGS = 'daily_logs';
 import { insertDailyLog, insertDailyLogs, deleteDailyLog, fetchDailyLogs, invalidateDailyLogsCache, saveGSheetHistory, getGSheetHistory, saveSystemConfig, getSystemConfig, saveImportLog } from '../lib/supabaseService';
 import RekapMonitoringView from './RekapMonitoringView';
 
+/**
+ * Batas waktu untuk panggilan jaringan saat export.
+ * Supabase (via proxy Nginx) kadang menggantung 60-90s+ tanpa balasan;
+ * tanpa batas ini, tombol DOWNLOAD EXCEL SAP tampak "tidak berfungsi"
+ * karena tidak ada file yang pernah dibuat dan tidak ada pesan apa pun.
+ */
+const EXPORT_FETCH_TIMEOUT_MS = 30000;
+/** Batas total seluruh rangkaian fetch saat export, supaya timeout tidak menumpuk. */
+const EXPORT_TOTAL_TIMEOUT_MS = 35000;
+function withTimeout(promise, ms = EXPORT_FETCH_TIMEOUT_MS, fallback = { data: null, error: 'timeout' }) {
+  return Promise.race([
+    promise,
+    new Promise(resolve => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
 const PLANT_INFO = {
   // Kal-Bar
   "5E01": { desc: "KEBUN GUNUNG MELIAU",    wilayah: "Kal-Bar" },
@@ -132,12 +148,12 @@ export default function DailyDashboard({
 
   const [importSummary, setImportSummary] = useState(null);
   const [showImportSummary, setShowImportSummary] = useState(false);
-  const [isRefreshingForExport, setIsRefreshingForExport] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [massData, setMassData] = useState({});
   const getH1ExportDateStr = () => format(subDays(new Date(), 1), 'yyyy-MM-dd');
   const [exportSettings, setExportSettings] = useState({ 
     time: '08:00', 
-    readBy: currentUser?.role === 'Unit' ? currentUser.name : 'ADMIN',
+    readBy: isUserRole ? (currentUser?.name || 'ADMIN') : 'ADMIN',
     startDate: '',
     endDate: '',
     isAccumulated: false
@@ -735,7 +751,7 @@ export default function DailyDashboard({
       try {
         if (supabase) {
           const yearMonth = format(currentMonth, 'yyyy-MM');
-          const plant = currentUser?.role === 'Unit' ? currentUser.plant : null;
+          const plant = isUserRole ? currentUser?.plant : null;
           const { data, error } = await fetchDailyLogs(plant, yearMonth);
           if (!error && data) {
             setDailyLogs(data);
@@ -756,7 +772,7 @@ export default function DailyDashboard({
       }
     };
     loadLogs();
-  }, [currentMonth, currentUser]);
+  }, [currentMonth, currentUser, isUserRole]);
 
   const saveDailyLogs = (newLogs) => {
     setDailyLogs(newLogs);
@@ -868,10 +884,10 @@ export default function DailyDashboard({
 
   // Equipment filtered by plant selection in mass input modal
   const massIndukEquipments = useMemo(() => {
-    if (currentUser?.role === 'Unit') return indukEquipments;
+    if (isUserRole) return indukEquipments;
     if (!massPlantFilter) return indukEquipments;
     return indukEquipments.filter(eq => eq.plant === massPlantFilter);
-  }, [indukEquipments, massPlantFilter, currentUser]);
+  }, [indukEquipments, massPlantFilter, isUserRole]);
 
   const [formData, setFormData] = useState({
     indukId: '',
@@ -1621,7 +1637,7 @@ export default function DailyDashboard({
         setImportProgress('Menyinkronkan data terbaru...');
         try {
           const yearMonth = format(currentMonth, 'yyyy-MM');
-          const plant = currentUser?.role === 'Unit' ? currentUser.plant : null;
+          const plant = isUserRole ? currentUser?.plant : null;
           // Invalidate cache agar re-fetch benar-benar ke Supabase (bukan cache lama)
           invalidateDailyLogsCache(plant, yearMonth);
           const { data: freshData, error: fetchErr } = await fetchDailyLogs(plant, yearMonth, true);
@@ -2568,7 +2584,7 @@ export default function DailyDashboard({
                 <h3 className="font-bold text-lg mb-1">INPUT MASAL JAM JALAN</h3>
                 <p className="text-xs text-slate-300 mb-3">{format(selectedDate, 'dd/MM/yyyy')} • Paste satu kolom penuh dari Excel ke kotak Durasi di bawah</p>
                 <div className="flex items-center gap-3 flex-wrap">
-                  {currentUser?.role !== 'Unit' && (
+                  {!isUserRole && (
                     <select
                       value={massPlantFilter}
                       onChange={e => { setMassPlantFilter(e.target.value); setMassData({}); }}
@@ -2595,7 +2611,7 @@ export default function DailyDashboard({
                 <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 shadow-sm z-10">
                   <tr>
                     <th className="text-center px-6 py-3 font-semibold text-slate-700 w-16">No</th>
-                    {currentUser?.role !== 'Unit' && (
+                    {!isUserRole && (
                       <th className="text-center px-4 py-3 font-semibold text-slate-700 w-24">Plant</th>
                     )}
                     <th className="text-center px-6 py-3 font-semibold text-slate-700">Equipment Induk</th>
@@ -2615,7 +2631,7 @@ export default function DailyDashboard({
                     return (
                       <tr key={eq.eqNum} className="hover:bg-emerald-50/30">
                         <td className="px-6 py-3 text-slate-400">{idx + 1}</td>
-                        {currentUser?.role !== 'Unit' && (
+                        {!isUserRole && (
                           <td className="px-4 py-3">
                             <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-xs font-semibold border border-emerald-100">{eq.plant}</span>
                           </td>
@@ -2902,6 +2918,7 @@ export default function DailyDashboard({
             <div className="p-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex flex-col gap-3">
               <button 
                 onClick={async () => {
+                  if (isExporting) return;
                   const effStartDate = exportSettings.startDate;
                   const effEndDate = isUserRole ? exportSettings.startDate : exportSettings.endDate;
 
@@ -2915,61 +2932,93 @@ export default function DailyDashboard({
                     return;
                   }
 
-                  // ── Re-fetch latest data from Supabase before export ──
-                  let freshLogs = dailyLogs;
-                  if (supabase) {
-                    setIsRefreshingForExport(true);
-                    try {
-                      const yearMonth = effStartDate.substring(0, 7) || format(currentMonth, 'yyyy-MM');
-                      const plant = isUserRole ? currentUser?.plant : null;
-                      const { data, error } = await fetchDailyLogs(plant, yearMonth);
-                      if (!error && data) {
-                        freshLogs = data;
-                        setDailyLogs(data); // update state too
-                      }
-                    } catch(e) {
-                      console.warn('Re-fetch before export failed, using cached data:', e);
+                  setIsExporting(true);
+                  try {
+                  // ── Re-fetch latest data dari Supabase sebelum export (semua bulan dalam rentang) ──
+                  // Semua fetch dijalankan PARALEL dengan SATU batas waktu total, supaya timeout
+                  // tidak menumpuk (4 bulan × 30s = 2 menit diam tanpa output sama sekali).
+                  let freshLogs = { ...(dailyLogs || {}) };
+                  const monthsToFetch = new Set();
+                  {
+                    let cur = new Date(effStartDate + 'T00:00:00');
+                    const endD = new Date(effEndDate + 'T00:00:00');
+                    while (cur <= endD) {
+                      monthsToFetch.add(format(cur, 'yyyy-MM'));
+                      cur = addMonths(cur, 1);
                     }
-                    setIsRefreshingForExport(false);
                   }
+                  const monthList = [...monthsToFetch];
+
+                  const scopePlant = isUserRole ? (currentUser?.plant || null) : null;
+                  const needsTemplate = !templateData?.headers || !templateData?.originalData || templateData.headers.length === 0;
+                  const needsEqFromDb = !templateData?.equipments?.length
+                    && !(Array.isArray(equipments) && equipments.length > 0)
+                    && !(Array.isArray(directPlantInduk) && directPlantInduk.length > 0);
+
+                  const [monthResults, tplResult, eqResult] = await withTimeout(
+                    Promise.all([
+                      Promise.all(monthList.map(ym =>
+                        fetchDailyLogs(scopePlant, ym, true).catch(() => ({ data: null, error: 'fetch-error' }))
+                      )),
+                      needsTemplate
+                        ? getSystemConfig('template_data').catch(() => ({ data: null }))
+                        : Promise.resolve({ data: null }),
+                      (supabase && needsEqFromDb)
+                        ? (() => {
+                            let q = supabase.from('master_equipment').select('*');
+                            if (scopePlant) q = q.eq('plant', scopePlant);
+                            return q.then(r => r).catch(() => ({ data: null }));
+                          })()
+                        : Promise.resolve({ data: null }),
+                    ]),
+                    EXPORT_TOTAL_TIMEOUT_MS,
+                    [null, null, null]
+                  );
+
+                  if (Array.isArray(monthResults)) {
+                    monthResults.forEach((res, i) => {
+                      if (res && !res.error && res.data) {
+                        freshLogs = { ...freshLogs, ...res.data };
+                      } else {
+                        console.warn(`[export] daily_logs ${monthList[i]} gagal/timeout — memakai data cache.`);
+                      }
+                    });
+                    setDailyLogs(freshLogs);
+                  } else {
+                    console.warn('[export] batas waktu total tercapai saat mengambil daily_logs — memakai data cache.');
+                  }
+
 
                   // Ensure templateData is complete, or auto-fetch from DB
                   let exportTpl = templateData;
-                  if (!exportTpl?.headers || !exportTpl?.originalData || exportTpl.headers.length === 0) {
-                    try {
-                      const cfgRes = await getSystemConfig('template_data');
-                      if (cfgRes?.data?.headers && cfgRes.data?.originalData) {
-                        exportTpl = cfgRes.data;
-                        setTemplateData(cfgRes.data);
-                      }
-                    } catch(e) {}
+                  if (tplResult?.data?.headers && tplResult.data.originalData) {
+                    exportTpl = tplResult.data;
+                    setInternalTemplateData(tplResult.data);
                   }
 
                   const exportHeaders = (exportTpl?.headers && Array.isArray(exportTpl.headers) && exportTpl.headers.length > 0) ? exportTpl.headers : DEFAULT_SAP_HEADERS;
                   const exportOriginalData = exportTpl?.originalData || [];
-                  let exportEquipments = (exportTpl?.equipments && Array.isArray(exportTpl.equipments) && exportTpl.equipments.length > 0) 
-                    ? exportTpl.equipments 
-                    : (Array.isArray(equipments) && equipments.length > 0 ? equipments : (Array.isArray(directPlantInduk) ? directPlantInduk : []));
-
-                  if (!exportEquipments || exportEquipments.length === 0) {
-                    try {
-                      const { data: dbEqs } = await supabase.from('master_equipment').select('*');
-                      if (dbEqs && dbEqs.length > 0) {
-                        exportEquipments = dbEqs.map(r => ({
-                          eqNum: r.eq_num,
-                          plant: r.plant,
-                          description: r.description,
-                          type: r.eq_type || 'Induk',
-                          eq_type: r.eq_type || 'Induk',
-                          induk: r.induk || r.description,
-                          reading: r.reading || 0,
-                          functionalLoc: r.functional_loc,
-                          flDescription: r.fl_description,
-                          costCenter: r.cost_center
-                        }));
-                      }
-                    } catch(e) {}
-                  }
+                  const tplEquipments = (exportTpl?.equipments && Array.isArray(exportTpl.equipments) && exportTpl.equipments.length > 0)
+                    ? exportTpl.equipments
+                    : null;
+                  const eqFromDb = (eqResult?.data && eqResult.data.length > 0)
+                    ? eqResult.data.map(r => ({
+                        eqNum: r.eq_num,
+                        plant: r.plant,
+                        description: r.description,
+                        type: r.eq_type || 'Induk',
+                        eq_type: r.eq_type || 'Induk',
+                        induk: r.induk || r.description,
+                        reading: r.reading || 0,
+                        functionalLoc: r.functional_loc,
+                        flDescription: r.fl_description,
+                        costCenter: r.cost_center
+                      }))
+                    : null;
+                  const exportEquipments = tplEquipments
+                    || eqFromDb
+                    || (Array.isArray(equipments) && equipments.length > 0 ? equipments : null)
+                    || (Array.isArray(directPlantInduk) ? directPlantInduk : []);
 
                   // ── Validasi: total jam jalan per induk per hari tidak boleh > 24 jam ──
                   const validation = validateDailyHours(
@@ -3042,26 +3091,25 @@ export default function DailyDashboard({
                   try {
                     let targetEquipments = filterTargetEquipments(exportEquipments, selectedExportPlants, selectedExportEqs, currentUser?.role, userPlant);
                     if (!targetEquipments || targetEquipments.length === 0) {
-                      try {
-                        const { data: dbEqs } = await supabase.from('master_equipment').select('*').eq('plant', userPlant);
-                        if (dbEqs && dbEqs.length > 0) {
-                          targetEquipments = dbEqs.map(r => ({
-                            eqNum: r.eq_num,
-                            plant: r.plant,
-                            description: r.description,
-                            type: r.eq_type || 'Induk',
-                            eq_type: r.eq_type || 'Induk',
-                            induk: r.induk || r.description,
-                            reading: r.reading || 0,
-                            functionalLoc: r.functional_loc,
-                            flDescription: r.fl_description,
-                            costCenter: r.cost_center
-                          }));
-                        }
-                      } catch (e) {}
-                    }
-                    if (!targetEquipments || targetEquipments.length === 0) {
+                      // Data sudah diambil di blok paralel di atas (plant-scoped, berbatas waktu).
+                      // Jangan query ulang di sini — query tambahan hanya menambah waktu tunggu.
                       targetEquipments = exportEquipments;
+                    }
+
+                    // ── Validasi akhir: pastikan ada equipment sebelum export ──
+                    if (!targetEquipments || targetEquipments.length === 0) {
+                      const plantInfo = userPlant || currentUser?.plant || '—';
+                      const totalEq = (exportEquipments || []).length;
+                      alert(
+                        `⚠️ Tidak ada equipment ditemukan untuk Plant ${plantInfo}.\n\n` +
+                        `Total equipment dimuat: ${totalEq}\n\n` +
+                        `Kemungkinan penyebab:\n` +
+                        `• Template/Master EQ belum diupload ke sistem\n` +
+                        `• Data Master belum selesai dimuat (tunggu sebentar lalu coba lagi)\n` +
+                        `• Plant yang dipilih tidak cocok dengan data template\n\n` +
+                        `Solusi: Refresh halaman, tunggu hingga data dimuat, lalu coba export kembali.`
+                      );
+                      return;
                     }
 
                     const exportPayloadWithMaster = { ...exportPayload, masterMap };
@@ -3077,10 +3125,24 @@ export default function DailyDashboard({
                     console.error("Export Error:", err);
                     alert("Terjadi kendala saat mengekspor Excel: " + (err.message || err));
                   }
+                  } finally {
+                    setIsExporting(false);
+                  }
                 }}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2"
+                disabled={isExporting}
+                className={`w-full text-white font-bold py-3 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 ${
+                  isExporting ? 'bg-emerald-800 cursor-wait' : 'bg-emerald-600 hover:bg-emerald-700'
+                }`}
               >
-                <FileDown size={20} /> DOWNLOAD EXCEL SAP
+                {isExporting ? (
+                  <>
+                    <RefreshCw size={20} className="animate-spin" /> MENYIAPKAN EXCEL...
+                  </>
+                ) : (
+                  <>
+                    <FileDown size={20} /> DOWNLOAD EXCEL SAP
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -3174,6 +3236,8 @@ export default function DailyDashboard({
               {pendingExportPayload && (
                 <button
                   onClick={() => {
+                    if (isExporting) return;
+                    setIsExporting(true);
                     try {
                       const { freshLogs: pLogs, exportSettings: pSettings, selectedExportPlants: pPlants, selectedExportEqs: pEqs } = pendingExportPayload;
                       const pPayload = {
@@ -3259,11 +3323,13 @@ export default function DailyDashboard({
                       console.error("Error during Export Tetap:", err);
                       alert("Gagal melakukan export: " + err.message);
                     } finally {
+                      setIsExporting(false);
                       setShowExportHourError(false);
                       setShowExportModal(false);
                       setPendingExportPayload(null);
                     }
                   }}
+                  disabled={isExporting}
                   className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
                 >
                   <FileDown size={16} /> Export Tetap

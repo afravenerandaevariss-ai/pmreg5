@@ -155,14 +155,14 @@ export default function AfraChatbot({ currentUser }) {
       {!isOpen && (
         <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
           <div onClick={() => setIsOpen(true)}
-            className="bg-white text-slate-700 px-3 py-1.5 rounded-2xl rounded-br-sm shadow-lg text-[10px] font-bold border border-slate-100 cursor-pointer hover:-translate-y-1 transition-transform animate-bounce hover:animate-none"
-            style={{ animationDuration: '2s' }}>
+            className="bg-white text-slate-800 px-3.5 py-1.5 rounded-xl rounded-br-sm shadow-md text-xs font-semibold border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors"
+          >
             Hi, butuh bantuan? 👋
           </div>
           <button onClick={() => setIsOpen(true)}
-            className="relative bg-[#064e3b] hover:bg-[#065f46] text-white p-1 rounded-full shadow-2xl transition-all duration-300 flex items-center justify-center w-14 h-14 shrink-0 hover:scale-110"
+            className="relative bg-[#064e3b] hover:bg-[#065f46] text-white p-1 rounded-full shadow-xl transition-all duration-200 flex items-center justify-center w-14 h-14 shrink-0 hover:shadow-2xl"
             title="Tanya Key User PM">
-            <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-white animate-pulse z-10" />
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white z-10" />
             <div className="w-full h-full rounded-full overflow-hidden border-2 border-white/30">
               <img src="/afra.png" alt="Key User PM" className="w-full h-full object-cover"
                 style={{ transform: 'scale(2.8)', transformOrigin: '50% 18%' }}
@@ -200,9 +200,8 @@ export default function AfraChatbot({ currentUser }) {
 
           {/* Single scroll area */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto"
-            style={{ backgroundColor: '#e8efe5', backgroundImage: WA_PATTERN }}>
+            style={{ backgroundColor: '#f8fafc', backgroundImage: WA_PATTERN }}>
             <div className="flex flex-col p-4 gap-3">
-
               {/* ── Welcome card (always shown at top) ─────────────────── */}
               <div className="flex items-end gap-2">
                 <div className="w-7 h-7 rounded-full bg-emerald-100 border border-emerald-200 flex-shrink-0 overflow-hidden mb-1">

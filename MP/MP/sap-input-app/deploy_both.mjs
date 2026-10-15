@@ -105,6 +105,17 @@ async function main() {
         }
         console.log('✅ Synced api/*.js handlers to both PROD & DEV');
 
+        // ── Sync scripts to PROD ──────────────────────────────────────────────
+        await runCmd(conn, 'mkdir -p /var/www/pmreg5/scripts', 'Ensure PROD scripts directory');
+        if (fs.existsSync('scripts/run_wa_report.js')) {
+          await new Promise((res, rej) => sftp.fastPut('scripts/run_wa_report.js', '/var/www/pmreg5/scripts/run_wa_report.js', e => e ? rej(e) : res()));
+        }
+        if (fs.existsSync('scripts/setup_cron_ubuntu.sh')) {
+          await new Promise((res, rej) => sftp.fastPut('scripts/setup_cron_ubuntu.sh', '/var/www/pmreg5/scripts/setup_cron_ubuntu.sh', e => e ? rej(e) : res()));
+          await runCmd(conn, 'chmod +x /var/www/pmreg5/scripts/setup_cron_ubuntu.sh', 'Make setup script executable');
+        }
+        console.log('✅ Synced scripts to PROD');
+
         // ── Deploy PROD ──────────────────────────────────────────────────────
         console.log('\n🚀 ─── DEPLOYING PRODUCTION ───');
         await runCmd(conn, 'sudo chmod -R 755 /var/www/pmreg5 && sudo chown -R ubuntu:www-data /var/www/pmreg5', 'Fix PROD permissions');
