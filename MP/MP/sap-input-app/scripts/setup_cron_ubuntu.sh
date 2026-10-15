@@ -53,6 +53,11 @@ echo "⏱️ Mengatur jadwal di Linux Crontab..."
 #   16:00 WIB = 17:00 CST  ->  0 17 * * *
 # Script run_wa_report.js tetap me-routing sendiri berdasarkan jam WIB,
 # jadi kombinasi ini konsisten.
+#
+# ── PENTING: DEV harus digeser +20 menit dari PROD ────────────────────────────
+# Capture memuat ~19 MB / 21 request REST dan butuh ~90s. Jika PROD dan DEV
+# berjalan pada menit yang sama (:00), dua Chromium berebut CPU/RAM sehingga
+# pemuatan melampaui timeout dan memicu retry. DEV dipindah ke menit :20.
 echo "🕐 Timezone server: $(date '+%Z %z') (WIB = server -1 jam)"
 
 # Siapkan file sementara crontab

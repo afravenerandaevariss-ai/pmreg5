@@ -231,6 +231,9 @@ async function capturePmreg5Screenshot() {
       browser = await puppeteer.launch({
         executablePath: getChromePath(),
         headless: 'new',
+        // Default protocolTimeout = 180s. waitForFunction di bawah memakai 240s,
+        // sehingga CDP call mati lebih dulu ("Runtime.callFunctionOn timed out").
+        protocolTimeout: 300000,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -266,6 +269,8 @@ async function capturePmreg5Screenshot() {
       await page.waitForSelector('#excel-report-sheet', { visible: true, timeout: 60000 });
 
       logStep('[PMReg5] Tahan lebih lama untuk memastikan data fresh selesai di-fetch dari server...');
+      // Terukur di server: 21 request REST (~19.4 MB) baru selesai pada t≈106s.
+      // Timeout 120s terlalu mepet sehingga attempt 1 sering gagal dan harus retry.
       const isReady = await page.waitForFunction(() => {
         const table = document.querySelector('#excel-report-sheet table');
         if (!table) return false;
@@ -274,14 +279,14 @@ async function capturePmreg5Screenshot() {
 
         // WAJIB: minimal satu baris punya Total Transaksi > 0.
         // '#data-ready' TIDAK dipakai karena muncul prematur (~15s) sebelum
-        // vehicle_logs selesai di-fetch (~19-25s) → screenshot jadi kosong/hitam.
+        // vehicle_logs selesai di-fetch (~106s) → screenshot jadi kosong/hitam.
         return rows.some(r => {
           const tds = r.querySelectorAll('td');
           if (tds.length <= 8) return false;
           const tx = parseInt(tds[8].innerText.trim(), 10);
           return !isNaN(tx) && tx > 0;
         });
-      }, { timeout: 120000, polling: 500 });
+      }, { timeout: 240000, polling: 500 });
 
       if (!isReady) throw new Error('Data rendering checks timed out or failed.');
 
@@ -393,6 +398,7 @@ async function captureCmmsScreenshot() {
       browser = await puppeteer.launch({
         executablePath: getChromePath(),
         headless: true,
+        protocolTimeout: 300000,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--window-size=1920,1080']
       });
 
