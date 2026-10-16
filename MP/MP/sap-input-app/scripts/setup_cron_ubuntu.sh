@@ -27,12 +27,11 @@ echo "🌐 Memeriksa Google Chrome Stable..."
 if ! command -v google-chrome &> /dev/null && ! command -v google-chrome-stable &> /dev/null; then
   echo "⚠️ Google Chrome belum terpasang. Mengunduh dan memasang Google Chrome..."
   sudo apt-get update -q
-  sudo apt-get install -y wget gnupg ca-certificates
-  wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
-  echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-  sudo apt-get update -q
-  sudo apt-get install -y google-chrome-stable
-  echo "✅ Google Chrome berhasil dipasang: $(google-chrome --version)"
+  sudo apt-get install -y wget ca-certificates
+  wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/chrome.deb
+  sudo dpkg -i /tmp/chrome.deb || sudo apt-get install -f -y
+  rm -f /tmp/chrome.deb
+  echo "✅ Google Chrome berhasil dipasang: $(google-chrome --version 2>/dev/null || google-chrome-stable --version)"
 else
   echo "✅ Google Chrome sudah terpasang: $(google-chrome --version 2>/dev/null || google-chrome-stable --version)"
 fi
