@@ -1372,9 +1372,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     const rows = filteredZCOData.map(r => ({
       'Cost Center': r.rawCostCenter,
       'Cost (Biaya SAP)': r.zcoCost,
-      'Acty (SAP)': r.zcoActy,
+      'Activity': r.logActivity || 0,
       'Rate (Tarif)': r.zcoRate,
-      'Logbook (Acty)': r.logActivity || 0,
       'Kebun / Unit': `${r.plantCode} - ${r.plantDesc}`,
       'Cek Status': r.cekStatus,
       'Indikator & Tindak Lanjut': r.statusText,
@@ -1482,8 +1481,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       }
 
       const zcoCost = parseFloat(row.totalCost) || 0;
-      const zcoActy = parseFloat(row.activityQty) || 0;
-      const zcoRate = zcoActy > 0 ? zcoCost / zcoActy : 0;
+      const activity = parseFloat(logActivity) || 0;
+      const zcoRate = activity > 0 ? zcoCost / activity : 0;
 
       // Status logic
       let cekStatus = 'Oke';
@@ -1503,21 +1502,21 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         cekStatus = 'Oke';
         statusColor = 'grey';
         statusText = '';
-      } else if (zcoCost + zcoActy + zcoRate === 0) {
+      } else if (zcoCost + activity + zcoRate === 0) {
         cekStatus = 'Oke';
         statusColor = 'grey';
         statusText = '';
       } else {
-        if (zcoCost > 0 && zcoActy > 0) {
+        if (zcoCost > 0 && activity > 0) {
           cekStatus = 'Oke';
           statusColor = 'green';
           statusText = 'Oke';
         } else {
           cekStatus = 'Cek';
-          if (zcoCost > 0 && zcoActy === 0) {
+          if (zcoCost > 0 && activity === 0) {
             statusColor = 'red';
             statusText = 'Logbook Belum Dibuat';
-          } else if (zcoCost === 0 && zcoActy > 0) {
+          } else if (zcoCost === 0 && activity > 0) {
             statusColor = 'orange';
             statusText = 'Belum Ada Pembebanan Biaya';
           } else {
@@ -1534,9 +1533,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         plantCode,
         plantDesc,
         wilayah,
-        logActivity,
+        logActivity: activity,
+        activity,
         zcoCost,
-        zcoActy,
+        zcoActy: activity,
         zcoRate,
         isPlantLogRate,
         cekStatus,
@@ -2786,9 +2786,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 text-[10px] font-extrabold uppercase tracking-wider text-center">
                 <th className="px-3 py-2 text-center w-[220px]">Cost Center</th>
                 <th className="px-3 py-2 text-center">Cost (Biaya SAP)</th>
-                <th className="px-3 py-2 text-center">Acty (SAP)</th>
+                <th className="px-3 py-2 text-center text-[#064e3b] font-bold bg-emerald-50/50">Activity</th>
                 <th className="px-3 py-2 text-center">Rate (Tarif)</th>
-                <th className="px-3 py-2 text-center text-[#064e3b] font-bold bg-emerald-50/50">Logbook (Acty)</th>
                 <th className="px-3 py-2 text-center w-[150px]">Kebun / Unit</th>
                 <th className="px-3 py-2 text-center w-[90px]">Cek Status</th>
                 <th className="px-3 py-2 text-center w-[280px]">Indikator & Tindak Lanjut</th>
@@ -2797,7 +2796,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             <tbody className="divide-y divide-slate-200">
               {filteredZCOData.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400 font-semibold text-xs">
+                  <td colSpan={7} className="py-12 text-center text-slate-400 font-semibold text-xs">
                     {zcoData.length === 0 
                       ? 'Belum ada data ZCO. Silakan upload file ZCO_CCTR_01.xlsx di atas.' 
                       : 'Tidak ada data biaya yang cocok dengan filter pencarian.'}
@@ -2808,16 +2807,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   const formattedCost = row.zcoCost > 0 
                     ? row.zcoCost.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) 
                     : '0';
-                  const formattedActy = row.zcoActy > 0 
-                    ? row.zcoActy.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) 
-                    : '0,00';
+                  const formattedActy = (row.activity || row.logActivity) > 0 
+                    ? (row.activity || row.logActivity).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) 
+                    : '-';
                   const formattedRate = row.zcoRate > 0 
                     ? row.zcoRate.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) 
                     : '0,00';
-                  const formattedLogAct = row.logActivity > 0 
-                    ? row.logActivity.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) 
-                    : '-';
-
                   // Dynamic row bg classes based on compliance status
                   let rowBgClass = 'bg-white hover:bg-slate-50';
                   if (row.statusColor === 'red') {
@@ -2841,14 +2836,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                       <td className="px-3 py-2 text-right font-bold text-slate-800 font-mono">
                         {formattedCost}
                       </td>
-                      <td className="px-3 py-2 text-right font-medium text-slate-600 font-mono">
+                      <td className="px-3 py-2 text-right font-extrabold text-[#064e3b] bg-emerald-50/30 font-mono">
                         {formattedActy}
                       </td>
                       <td className="px-3 py-2 text-right text-slate-500 font-mono">
                         {formattedRate}
-                      </td>
-                      <td className="px-3 py-2 text-right font-extrabold text-[#064e3b] bg-emerald-50/30 font-mono">
-                        {formattedLogAct}
                       </td>
                       <td className="px-3 py-2 text-left">
                         <span className="font-bold text-slate-700 block">{row.plantCode}</span>
