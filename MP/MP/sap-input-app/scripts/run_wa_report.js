@@ -140,15 +140,18 @@ function probeChrome(binPath) {
 }
 
 function getChromePath() {
+  const linuxDefaults = [
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+  ];
+  // CHROME_PATH diutamakan, TAPI tidak mengunci: kalau nilainya basi/tidak bisa
+  // dijalankan, auto-detect tetap dijalankan agar laporan tidak gagal total.
   const candidates = process.env.CHROME_PATH
-    ? [process.env.CHROME_PATH]
+    ? [process.env.CHROME_PATH, ...linuxDefaults.filter((p) => p !== process.env.CHROME_PATH)]
     : process.platform === 'linux'
-      ? [
-          '/usr/bin/google-chrome-stable',
-          '/usr/bin/google-chrome',
-          '/usr/bin/chromium-browser',
-          '/usr/bin/chromium',
-        ]
+      ? linuxDefaults
       : ['C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'];
 
   for (const p of candidates) {

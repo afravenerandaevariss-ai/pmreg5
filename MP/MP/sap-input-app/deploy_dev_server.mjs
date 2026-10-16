@@ -54,6 +54,20 @@ async function main() {
       try {
         await runCmd(conn, 'sudo chmod -R 755 /var/www/devpmreg5 && sudo chown -R ubuntu:www-data /var/www/devpmreg5', 'Fix permissions on DEV root');
         await runCmd(conn, 'mkdir -p /var/www/devpmreg5/dist', 'Ensure DEV directory exists');
+        await runCmd(conn, 'mkdir -p /var/www/devpmreg5/scripts', 'Ensure DEV scripts directory exists');
+
+        // Script WA harus ikut terkirim. Sebelumnya hanya PROD (deploy_server.mjs) yang
+        // meng-upload scripts/, sehingga run_wa_report.js di DEV tertinggal versi lama dan
+        // berbeda dari PROD — perbaikan apa pun di script tidak pernah sampai ke DEV.
+        if (fs.existsSync('scripts/run_wa_report.js')) {
+          await new Promise((res, rej) => sftp.fastPut('scripts/run_wa_report.js', '/var/www/devpmreg5/scripts/run_wa_report.js', e => e ? rej(e) : res()));
+          await runCmd(conn, 'chmod +x /var/www/devpmreg5/scripts/run_wa_report.js', 'Make DEV run_wa_report.js executable');
+        }
+        if (fs.existsSync('scripts/setup_cron_ubuntu.sh')) {
+          await new Promise((res, rej) => sftp.fastPut('scripts/setup_cron_ubuntu.sh', '/var/www/devpmreg5/scripts/setup_cron_ubuntu.sh', e => e ? rej(e) : res()));
+          await runCmd(conn, 'chmod +x /var/www/devpmreg5/scripts/setup_cron_ubuntu.sh', 'Make DEV setup script executable');
+        }
+        console.log('✅ Synced scripts to DEV');
         
         console.log('📤 Uploading deploy_dev.tar.gz archive...');
         await new Promise((resolve, reject) => {

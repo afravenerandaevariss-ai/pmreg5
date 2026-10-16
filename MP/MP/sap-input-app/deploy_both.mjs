@@ -131,6 +131,17 @@ async function main() {
         console.log('\n🚀 ─── DEPLOYING DEV PLAYGROUND ───');
         await runCmd(conn, 'sudo chmod -R 755 /var/www/devpmreg5 && sudo chown -R ubuntu:www-data /var/www/devpmreg5', 'Fix DEV permissions');
         await runCmd(conn, 'mkdir -p /var/www/devpmreg5/dist', 'Ensure DEV dist dir');
+        await runCmd(conn, 'mkdir -p /var/www/devpmreg5/scripts', 'Ensure DEV scripts dir');
+        // Script WA harus ikut tersinkron ke DEV; sebelumnya hanya PROD yang dapat,
+        // sehingga run_wa_report.js DEV tertinggal versi lama.
+        if (fs.existsSync('scripts/run_wa_report.js')) {
+          await new Promise((res, rej) => sftp.fastPut('scripts/run_wa_report.js', '/var/www/devpmreg5/scripts/run_wa_report.js', e => e ? rej(e) : res()));
+          await runCmd(conn, 'chmod +x /var/www/devpmreg5/scripts/run_wa_report.js', 'Make DEV run_wa_report.js executable');
+        }
+        if (fs.existsSync('scripts/setup_cron_ubuntu.sh')) {
+          await new Promise((res, rej) => sftp.fastPut('scripts/setup_cron_ubuntu.sh', '/var/www/devpmreg5/scripts/setup_cron_ubuntu.sh', e => e ? rej(e) : res()));
+          await runCmd(conn, 'chmod +x /var/www/devpmreg5/scripts/setup_cron_ubuntu.sh', 'Make DEV setup script executable');
+        }
         await runCmd(conn, 'rm -rf /var/www/devpmreg5/dist/assets && rm -f /var/www/devpmreg5/dist/index.html', 'Wipe stale DEV assets & index.html');
         await runCmd(conn, 'tar -xzf /tmp/deploy_dev.tar.gz -C /var/www/devpmreg5/dist && rm -f /tmp/deploy_dev.tar.gz', 'Extract DEV archive');
         await runCmd(conn, 'sudo chmod -R 755 /var/www/devpmreg5/dist && sudo chown -R ubuntu:www-data /var/www/devpmreg5/dist', 'Ensure DEV dist permissions');

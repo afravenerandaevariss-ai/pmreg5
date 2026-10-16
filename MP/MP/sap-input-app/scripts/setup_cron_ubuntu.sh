@@ -7,6 +7,23 @@
 
 set -e
 
+# JANGAN dijalankan sebagai root. `crontab` menulis ke crontab user yang memanggilnya,
+# jadi menjalankan script ini dengan sudo akan membuat jadwal PMREG5 masuk ke crontab
+# ROOT — sementara cron yang ada sekarang berjalan sebagai ubuntu. Akibatnya jadwal
+# ganda (double send) atau jadwal tidak terpasang di user yang benar.
+if [ "$(id -u)" -eq 0 ]; then
+  echo "❌ Jangan jalankan script ini sebagai root/sudo."
+  echo "   Jalankan sebagai user yang memiliki crontab (ubuntu):"
+  echo "     bash $0"
+  echo "   Script ini memakai 'sudo' internal hanya untuk operasi yang butuh root."
+  exit 1
+fi
+
+if [ "$(id -un)" != "ubuntu" ]; then
+  echo "⚠️  Dijalankan sebagai '$(id -un)', bukan 'ubuntu'."
+  echo "   Crontab akan dipasang untuk user ini. Pastikan ini memang yang diinginkan."
+fi
+
 echo "=========================================================="
 echo "🚀 MENYIAPKAN PENGIRIMAN WHATSAPP OTOMATIS DI SERVER UBUNTU"
 echo "=========================================================="
@@ -89,23 +106,37 @@ echo "🕐 Timezone server: $(date '+%Z %z') (WIB = server -1 jam)"
 # Siapkan file sementara crontab
 CRON_TMP=$(mktemp)
 
-# Ambil crontab user saat ini (jika ada), abaikan entry lama pmreg5 jika ada
-crontab -l 2>/dev/null | grep -v "scripts/run_wa_report.js" | grep -v "# === PMREG5 WA AUTO-SEND ===" > "$CRON_TMP" || true
+# Ambil crontab user saat ini (jika ada), lalu buang SELURUH blok PMREG5 lama.
+# Sentinel BEGIN/END dipakai (bukan grep pola komentar) karena filter berbasis pola
+# menyisakan baris komentar header versi lama yang menumpuk setiap kali script dijalankan.
+# Format blok lama "# === PMREG5 WA AUTO-SEND (PROD) ===" tetap dikenali agar upgrade bersih.
+crontab -l 2>/dev/null | awk '
+  /^#[[:space:]]*<<<[[:space:]]*PMREG5 WA AUTO-SEND/ { skip = 0; next }
+  /PMREG5 WA AUTO-SEND/ { skip = 1; next }
+  skip && /^#[[:space:]]*=+[[:space:]]*$/ { skip = 0; next }
+  skip { next }
+  /run_wa_report\.js/ { next }
+  { print }
+' > "$CRON_TMP" || true
 
 # Tambahkan entry jadwal baru (jam dalam CST / server localtime)
 # CHROME_PATH dipatok eksplisit: mencegah script jatuh ke /usr/bin/chromium-browser
 # (wrapper snap) yang gagal di server headless.
 cat << EOF >> "$CRON_TMP"
 
-# === PMREG5 WA AUTO-SEND ===
+# >>> PMREG5 WA AUTO-SEND >>>
 # Server localtime = CST (UTC+8); WIB = UTC+7 (1 jam lebih awal)
 # Browser dipatok ke Chrome asli (bukan wrapper snap chromium-browser)
 CHROME_PATH=$CHROME_BIN
 # 1. 07:00 WIB & 14:00 WIB -> Reminder Teks (08:00 & 15:00 CST)
-0 8,15 * * * cd /var/www/pmreg5 && /usr/bin/node scripts/run_wa_report.js >> /var/log/pmreg5/wa_report.log 2>&1
+#    --action dipatok eksplisit: tanpa ini routing bergantung pada jam WIB saat proses
+#    start, sehingga clock skew / cron yang tertunda bisa memilih aksi yang salah.
+0 8 * * * cd /var/www/pmreg5 && /usr/bin/node scripts/run_wa_report.js --action=07:00 >> /var/log/pmreg5/wa_report.log 2>&1
+0 15 * * * cd /var/www/pmreg5 && /usr/bin/node scripts/run_wa_report.js --action=14:00 >> /var/log/pmreg5/wa_report.log 2>&1
 # 2. 08:00 WIB & 16:00 WIB -> Laporan HD PMReg5 + CMMS (09:00 & 17:00 CST)
-0 9,17 * * * cd /var/www/pmreg5 && /usr/bin/node scripts/run_wa_report.js >> /var/log/pmreg5/wa_report.log 2>&1
-# ===========================
+0 9 * * * cd /var/www/pmreg5 && /usr/bin/node scripts/run_wa_report.js --action=08:00 >> /var/log/pmreg5/wa_report.log 2>&1
+0 17 * * * cd /var/www/pmreg5 && /usr/bin/node scripts/run_wa_report.js --action=16:00 >> /var/log/pmreg5/wa_report.log 2>&1
+# <<< PMREG5 WA AUTO-SEND <<<
 EOF
 
 # Pasang crontab baru
@@ -117,8 +148,12 @@ rm -f "$CRON_TMP"
 # dibuka ulang — tanpa copytruncate, rotasi akan membuat proses terus menulis ke
 # inode lama yang sudah dipindah.
 echo "🧾 Memasang logrotate untuk /var/log/pmreg5/*.log..."
+# `su ubuntu www-data` WAJIB: direktori /var/log/pmreg5 dimiliki ubuntu:www-data dengan
+# mode 775, sehingga tanpa direktif ini logrotate menolak semua file
+# ("parent directory has insecure permissions") dan rotasi tidak pernah berjalan.
 sudo tee /etc/logrotate.d/pmreg5 > /dev/null << 'EOF'
 /var/log/pmreg5/*.log {
+  su ubuntu www-data
   weekly
   rotate 8
   maxsize 20M
@@ -130,7 +165,11 @@ sudo tee /etc/logrotate.d/pmreg5 > /dev/null << 'EOF'
   create 0664 ubuntu www-data
 }
 EOF
-sudo logrotate --debug /etc/logrotate.d/pmreg5 > /dev/null 2>&1 || echo "⚠️ Konfigurasi logrotate perlu dicek manual"
+if sudo logrotate --debug /etc/logrotate.d/pmreg5 > /dev/null 2>&1; then
+  echo "✅ Logrotate terpasang dan tervalidasi."
+else
+  echo "❌ Logrotate GAGAL divalidasi — periksa /etc/logrotate.d/pmreg5"
+fi
 
 echo "=========================================================="
 echo "✅ PENJADWALAN BERHASIL DIAKTIFKAN DI CRONTAB UBUNTU!"
