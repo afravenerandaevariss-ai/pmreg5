@@ -24,17 +24,44 @@ sudo chmod -R 775 "$LOG_DIR"
 
 # 2. Periksa Google Chrome Stable (diperlukan untuk Puppeteer screenshot)
 echo "🌐 Memeriksa Google Chrome Stable..."
-if ! command -v google-chrome &> /dev/null && ! command -v google-chrome-stable &> /dev/null; then
-  echo "⚠️ Google Chrome belum terpasang. Mengunduh dan memasang Google Chrome..."
+
+# CATATAN PENTING (insiden 16 Okt 2026):
+# `command -v google-chrome` TIDAK cukup. Ubuntu menyediakan /usr/bin/chromium-browser
+# sebagai wrapper snap yang ADA di disk tapi GAGAL dijalankan di server headless
+# ("xdg-settings: not found", dan content snap gpu-2404/gnome-46-2404 sering dilepas
+# demi disk). Kalau Chrome asli tidak ada, run_wa_report.js jatuh ke wrapper rusak itu
+# dan seluruh laporan 08:00/16:00 WIB gagal. Jadi verifikasi dengan MENJALANKAN binary.
+chrome_ok() {
+  local bin="$1"
+  [ -x "$bin" ] || return 1
+  "$bin" --version >/dev/null 2>&1
+}
+
+CHROME_BIN=""
+for cand in /usr/bin/google-chrome-stable /usr/bin/google-chrome; do
+  if chrome_ok "$cand"; then CHROME_BIN="$cand"; break; fi
+done
+
+if [ -z "$CHROME_BIN" ]; then
+  echo "⚠️ Google Chrome belum terpasang (atau tidak bisa dijalankan). Memasang..."
   sudo apt-get update -q
   sudo apt-get install -y wget ca-certificates
+  # Unduh .deb langsung: cara apt-key/`gpg --dearmor` GAGAL di sesi non-interaktif
+  # ("gpg: cannot open '/dev/tty'"), dan `set -e` membuat seluruh script berhenti
+  # sebelum crontab sempat dipasang.
   wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/chrome.deb
   sudo dpkg -i /tmp/chrome.deb || sudo apt-get install -f -y
   rm -f /tmp/chrome.deb
-  echo "✅ Google Chrome berhasil dipasang: $(google-chrome --version 2>/dev/null || google-chrome-stable --version)"
-else
-  echo "✅ Google Chrome sudah terpasang: $(google-chrome --version 2>/dev/null || google-chrome-stable --version)"
+
+  for cand in /usr/bin/google-chrome-stable /usr/bin/google-chrome; do
+    if chrome_ok "$cand"; then CHROME_BIN="$cand"; break; fi
+  done
+  if [ -z "$CHROME_BIN" ]; then
+    echo "❌ GAGAL memasang Google Chrome. Pengiriman WA tidak akan bisa screenshot."
+    exit 1
+  fi
 fi
+echo "✅ Google Chrome siap: $CHROME_BIN ($("$CHROME_BIN" --version))"
 
 # 3. Cari path node binary
 NODE_BIN=$(which node || echo "/usr/bin/node")
@@ -66,10 +93,14 @@ CRON_TMP=$(mktemp)
 crontab -l 2>/dev/null | grep -v "scripts/run_wa_report.js" | grep -v "# === PMREG5 WA AUTO-SEND ===" > "$CRON_TMP" || true
 
 # Tambahkan entry jadwal baru (jam dalam CST / server localtime)
-cat << 'EOF' >> "$CRON_TMP"
+# CHROME_PATH dipatok eksplisit: mencegah script jatuh ke /usr/bin/chromium-browser
+# (wrapper snap) yang gagal di server headless.
+cat << EOF >> "$CRON_TMP"
 
 # === PMREG5 WA AUTO-SEND ===
 # Server localtime = CST (UTC+8); WIB = UTC+7 (1 jam lebih awal)
+# Browser dipatok ke Chrome asli (bukan wrapper snap chromium-browser)
+CHROME_PATH=$CHROME_BIN
 # 1. 07:00 WIB & 14:00 WIB -> Reminder Teks (08:00 & 15:00 CST)
 0 8,15 * * * cd /var/www/pmreg5 && /usr/bin/node scripts/run_wa_report.js >> /var/log/pmreg5/wa_report.log 2>&1
 # 2. 08:00 WIB & 16:00 WIB -> Laporan HD PMReg5 + CMMS (09:00 & 17:00 CST)
@@ -80,6 +111,26 @@ EOF
 # Pasang crontab baru
 crontab "$CRON_TMP"
 rm -f "$CRON_TMP"
+
+# 5. Logrotate: tanpa ini wa_report.log tumbuh tanpa batas (disk / sudah 93%).
+# `copytruncate` dipakai karena script menulis dengan append (>>) dan file tidak
+# dibuka ulang — tanpa copytruncate, rotasi akan membuat proses terus menulis ke
+# inode lama yang sudah dipindah.
+echo "🧾 Memasang logrotate untuk /var/log/pmreg5/*.log..."
+sudo tee /etc/logrotate.d/pmreg5 > /dev/null << 'EOF'
+/var/log/pmreg5/*.log {
+  weekly
+  rotate 8
+  maxsize 20M
+  missingok
+  notifempty
+  compress
+  delaycompress
+  copytruncate
+  create 0664 ubuntu www-data
+}
+EOF
+sudo logrotate --debug /etc/logrotate.d/pmreg5 > /dev/null 2>&1 || echo "⚠️ Konfigurasi logrotate perlu dicek manual"
 
 echo "=========================================================="
 echo "✅ PENJADWALAN BERHASIL DIAKTIFKAN DI CRONTAB UBUNTU!"

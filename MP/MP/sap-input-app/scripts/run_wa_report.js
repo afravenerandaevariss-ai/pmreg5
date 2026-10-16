@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { execFileSync } from 'child_process';
 import puppeteer from 'puppeteer-core';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
@@ -108,21 +109,61 @@ async function detectLatestDataMonth() {
   }
 }
 
-// Auto-detect Chrome path
+// Auto-detect Chrome path.
+// PENTING: kandidat TIDAK cukup dicek dengan fs.accessSync(). Ubuntu menyediakan
+// /usr/bin/chromium-browser sebagai wrapper snap yang ADA tapi GAGAL dieksekusi di
+// server headless (butuh `xdg-settings`, dan content snap gpu-2404/gnome-46-2404
+// sering dilepas demi disk). Akibatnya Puppeteer "Failed to launch the browser
+// process!" dan laporan 08:00/16:00 WIB gagal total. Jadi setiap kandidat
+// dijalankan `--version` dulu; yang pertama benar-benar jalan itulah yang dipakai.
+function probeChrome(binPath) {
+  try {
+    fs.accessSync(binPath);
+  } catch {
+    return null;
+  }
+  // Hanya Linux yang punya jebakan wrapper (chromium-browser → snap). Di Windows
+  // cukup cek keberadaan file agar `--version` tidak memicu/menempel ke sesi Chrome
+  // yang sedang berjalan.
+  if (process.platform !== 'linux') return binPath;
+  try {
+    const out = execFileSync(binPath, ['--version'], {
+      timeout: 20000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).toString().trim();
+    return out || null;
+  } catch (e) {
+    const detail = (e.stderr || '').toString().trim().split('\n')[0] || e.message;
+    console.warn(`⚠️ [BROWSER] Kandidat tidak bisa dijalankan: ${binPath} → ${detail}`);
+    return null;
+  }
+}
+
 function getChromePath() {
-  if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
-  if (process.platform === 'linux') {
-    const linuxPaths = [
-      '/usr/bin/google-chrome-stable',
-      '/usr/bin/google-chrome',
-      '/usr/bin/chromium-browser',
-      '/usr/bin/chromium'
-    ];
-    for (const p of linuxPaths) {
-      try { fs.accessSync(p); return p; } catch {}
+  const candidates = process.env.CHROME_PATH
+    ? [process.env.CHROME_PATH]
+    : process.platform === 'linux'
+      ? [
+          '/usr/bin/google-chrome-stable',
+          '/usr/bin/google-chrome',
+          '/usr/bin/chromium-browser',
+          '/usr/bin/chromium',
+        ]
+      : ['C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'];
+
+  for (const p of candidates) {
+    const version = probeChrome(p);
+    if (version) {
+      console.log(`🌐 [BROWSER] Memakai ${p} (${version})`);
+      return p;
     }
   }
-  return 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+
+  throw new Error(
+    'Tidak ada browser yang bisa dijalankan. Pasang Google Chrome: ' +
+      'wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/chrome.deb && ' +
+      'sudo dpkg -i /tmp/chrome.deb || sudo apt-get install -f -y'
+  );
 }
 
 async function logStep(msg) {
