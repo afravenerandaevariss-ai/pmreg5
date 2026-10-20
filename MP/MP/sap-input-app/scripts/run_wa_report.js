@@ -23,8 +23,8 @@ for (const envFile of envPaths) {
 }
 
 const GOWA_URL = process.env.GOWA_URL || 'https://gowa.afratarigan.my.id';
-const GOWA_USER = process.env.GOWA_USER || 'admin';
-const GOWA_PASS = process.env.GOWA_PASS || 'Sedap321#';
+const GOWA_USER = process.env.GOWA_USER || 'Admin';
+const GOWA_PASS = process.env.GOWA_PASS || 'Akuhebat#1';
 
 // ─────────────────────────────────────────────────────────────
 // SAFETY GUARD: STRICT DEV / PROD ISOLATION

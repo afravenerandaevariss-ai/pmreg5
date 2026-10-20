@@ -257,14 +257,15 @@ export default async function handler(req, res) {
     let dispatchResult = { success: false, detail: null };
 
     const gowaUrl = req.query.gowaUrl || waConfig.gowaUrl || 'https://gowa.afratarigan.my.id';
-    const gowaUser = req.query.gowaUser || waConfig.gowaUser || 'admin';
-    const gowaPass = req.query.gowaPass || waConfig.gowaPass || 'Sedap321#';
+    const gowaUser = req.query.gowaUser || waConfig.gowaUser || process.env.GOWA_USER || 'Admin';
+    const gowaPass = req.query.gowaPass || waConfig.gowaPass || process.env.GOWA_PASS || 'Akuhebat#1';
 
     if (provider === 'gowa' || (!apiToken && provider !== 'custom')) {
       const authHeader = 'Basic ' + Buffer.from(`${gowaUser}:${gowaPass}`).toString('base64');
       // Target device: 6285135734210@s.whatsapp.net (Plant Maintenance)
-      let targetDevice = req.query.device || waConfig.gowaDevice || process.env.GOWA_DEVICE || '6285135734210@s.whatsapp.net';
-      let deviceId = targetDevice;
+      let targetDevice = req.query.device || waConfig.gowaDevice || process.env.GOWA_DEVICE || '6285135734210';
+      let targetCode = req.query.device_code || waConfig.gowaDeviceCode || process.env.GOWA_DEVICE_CODE || '000';
+      let deviceId = targetCode || targetDevice || '000';
 
       try {
         const devRes = await fetch(`${gowaUrl}/devices`, { headers: { 'Authorization': authHeader } });

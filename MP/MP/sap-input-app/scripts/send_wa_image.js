@@ -22,8 +22,8 @@ if (TARGET_PHONE && TARGET_PHONE.startsWith('0')) {
   TARGET_PHONE = '62' + TARGET_PHONE.substring(1);
 }
 const GOWA_URL = process.env.GOWA_URL || 'https://gowa.afratarigan.my.id';
-const GOWA_USER = process.env.GOWA_USER || 'admin';
-const GOWA_PASS = process.env.GOWA_PASS || 'Sedap321#';
+const GOWA_USER = process.env.GOWA_USER || 'Admin';
+const GOWA_PASS = process.env.GOWA_PASS || 'Akuhebat#1';
 
 const NIK = process.env.WEB_NIK || '19010048';
 const PASS = process.env.WEB_PASS || 'ikatanistripenerbanganindonesia';
