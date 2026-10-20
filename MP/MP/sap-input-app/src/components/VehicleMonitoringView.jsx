@@ -93,9 +93,11 @@ function excelSerialToDate(serial) {
 }
 
 function formatDateStr(rawDate) {
-  if (!rawDate) return null;
-  if (typeof rawDate === 'number') {
-    const d = excelSerialToDate(rawDate);
+  if (rawDate === undefined || rawDate === null || rawDate === '') return null;
+  // If numeric or numeric string representing Excel serial days (e.g. 46296)
+  if (typeof rawDate === 'number' || (!isNaN(rawDate) && !isNaN(parseFloat(rawDate)) && isFinite(rawDate) && Number(rawDate) > 20000 && Number(rawDate) < 70000)) {
+    const num = Number(rawDate);
+    const d = excelSerialToDate(num);
     return format(d, 'yyyy-MM-dd');
   }
   let s = String(rawDate).trim();
@@ -120,9 +122,10 @@ function formatDateStr(rawDate) {
 }
 
 function formatTimeStr(rawTime) {
-  if (!rawTime) return '-';
-  if (typeof rawTime === 'number') {
-    const totalSec = Math.round(rawTime * 86400);
+  if (rawTime === undefined || rawTime === null || rawTime === '') return '-';
+  const num = typeof rawTime === 'number' ? rawTime : (typeof rawTime === 'string' && !isNaN(rawTime) && isFinite(rawTime) && rawTime.includes('.') ? parseFloat(rawTime) : null);
+  if (num !== null && num >= 0 && num <= 1) {
+    const totalSec = Math.round(num * 86400);
     const h = Math.floor(totalSec / 3600).toString().padStart(2, '0');
     const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0');
     return `${h}:${m}`;
@@ -467,32 +470,37 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         }
 
         const { rows, headerIdx, headers } = sheetData;
-        const col = (patterns) => headers.find(h => patterns.some(p => h.toLowerCase().includes(p.toLowerCase())));
+        // Priority 1: exact match (case-insensitive), Priority 2: partial substring
+        const col = (patterns) => {
+          const exact = headers.find(h => patterns.some(p => h.trim().toLowerCase() === p.trim().toLowerCase()));
+          if (exact) return exact;
+          return headers.find(h => patterns.some(p => h.toLowerCase().includes(p.toLowerCase())));
+        };
         
-        const ACT_NUM   = col(['Actvity Number', 'Activity Number', 'Vehicle Actvity']);
-        const VEH_CODE  = col(['Vehicle Code', 'Vehicle code']);
-        const VEH_DATE  = col(['Vehicle Date', 'Vehicle date']);
-        const VEH_TIME  = col(['Vehicle Time', 'Vehicle time']);
+        const ACT_NUM   = col(['Vehicle Actvity Number', 'Vehicle Activity Number', 'Actvity Number', 'Activity Number', 'Vehicle Actvity']);
+        const VEH_CODE  = col(['Vehicle Code', 'Vehicle code', 'Vehicle']);
+        const VEH_DATE  = col(['Vehicle Date', 'Vehicle date', 'Posting Date', 'Date']);
+        const VEH_TIME  = col(['Vehicle Time', 'Vehicle time', 'Time']);
         const PLANT_COL = col(['Plant']);
-        const JOB_CODE  = col(['Job Code', 'Job code']);
-        const HM_KM     = col(['HM/KM', 'HM_KM', 'HM', 'KM']);
-        const UNIT_VAL  = col(['Unit']);
-        const UOM       = col(['UoM', 'UOM', 'Satuan']);
-        const OPERATOR  = col(['Operator']);
+        const JOB_CODE  = col(['Job Code', 'Job code', 'Job']);
+        const HM_KM     = col(['HM/KM', 'HM_KM', 'HM / KM', 'Total HM/KM', 'HM', 'KM']);
+        const UNIT_VAL  = col(['Unit', 'Hasil Kerja']);
+        const UOM       = col(['UoM', 'UOM', 'Satuan', 'Unit of Measure']);
+        const OPERATOR  = col(['Operator', 'Driver']);
         const HELPER1   = col(['Helper 1', 'Helper1']);
         const HELPER2   = col(['Helper 2', 'Helper2']);
-        const REFERENCE = col(['Reference', 'Referensi']);
+        const REFERENCE = col(['Reference', 'Referensi', 'Ref']);
         const REMARKS   = col(['Remarks', 'Keterangan', 'Catatan']);
-        const CANCELLED = col(['Cancelled', 'Reversed', 'Cancel']);
-        const LOC_CODE  = col(['Location Code', 'Location code', 'Lokasi']);
-        const MEAS_DOC  = col(['Measurement document', 'Measurement Document', 'Meas']);
+        const CANCELLED = col(['Cancelled/Reversed', 'Cancelled', 'Reversed', 'Cancel', 'Batal']);
+        const LOC_CODE  = col(['Location Code', 'Location code', 'Location', 'Lokasi']);
+        const MEAS_DOC  = col(['Measurement document', 'Measurement Document', 'Meas Doc', 'Meas']);
         const DOC_NUM   = col(['Document Number', 'Doc Number', 'Nomor Dokumen']);
         const SPBS_NUM  = col(['Nomor SPBS', 'SPBS']);
         const TGL_ANGKUT = col(['Tgl Angkut', 'Tgl. Angkut', 'Tanggal Angkut']);
-        const ANTAR_KEBUN = col(['Antar Kebun']);
+        const ANTAR_KEBUN = col(['Antar Kebun', 'Antar kebun']);
         const DEST_PLANT = col(['Destination Plant', 'Dest Plant']);
-        const ALOKASI    = col(['Target Alokasi', 'Alokasi Biaya', 'Alokasi']);
-        const COMPANY    = col(['Company Code', 'Company code']);
+        const ALOKASI    = col(['Target Alokasi Biaya', 'Target Alokasi', 'Alokasi Biaya', 'Alokasi']);
+        const COMPANY    = col(['Company Code', 'Company code', 'Company']);
         const FISCAL_YEAR = col(['Fiscal Year', 'Fiscal year']);
         const CREATED_BY  = col(['Created by']);
         const CREATED_ON  = col(['Created on']);
@@ -653,7 +661,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       } catch (err) {
         console.error(err);
         setUploadProgress('');
-        setError('Error memproses file: ' + (err.message || 'Gagal menyimpan ke server database'));
+        let msg = err.message || 'Gagal menyimpan ke server database';
+        if (msg.includes('schema cache') || msg.includes('vehicle_master')) {
+          msg += ' (Versi cache browser terdeteksi lama. Silakan tekan Ctrl+F5 untuk hard refresh).';
+        }
+        setError('Error memproses file: ' + msg);
       } finally {
         setLoading(false);
         e.target.value = '';
