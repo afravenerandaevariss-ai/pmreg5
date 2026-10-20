@@ -1121,6 +1121,42 @@ export default function DailyDashboard({
     XLSX.writeFile(wb, `Template_Input_Masal_${currentUser?.plant || 'ALL'}.xlsx`);
   };
 
+  // Export current monthly matrix grid directly to Excel (.xlsx)
+  const handleExportMatrixExcel = () => {
+    try {
+      const plantLabel = matrixPlantFilter || currentUser?.plant || 'ALL';
+      const rows = [];
+      parentEquipments.forEach((eq, idx) => {
+        let totalHM = 0;
+        const dailyValues = {};
+        matrixDaysInMonth.forEach(day => {
+          const key = `${eq.eqNum}_${day.dateStr}`;
+          const val = parseFloat(matrixData[key]) || 0;
+          totalHM += val;
+          dailyValues[`Tgl_${day.dayStr}`] = val;
+        });
+        rows.push({
+          'No': idx + 1,
+          'EQ Code': eq.eqNum,
+          'Deskripsi Mesin': eq.description,
+          'Plant': eq.plant || plantLabel,
+          'Total HM': Math.round(totalHM * 10) / 10,
+          ...dailyValues
+        });
+      });
+      if (rows.length === 0) {
+        alert('Tidak ada data mesin untuk diekspor.');
+        return;
+      }
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, `Matriks_${matrixMonth}`);
+      XLSX.writeFile(wb, `Logbook_Jam_Jalan_${plantLabel}_${matrixMonth}.xlsx`);
+    } catch (err) {
+      alert('Gagal mengekspor Excel: ' + err.message);
+    }
+  };
+
   // ---- Excel Bulk Upload ----
   const downloadUploadTemplate = () => {
     const sampleData = [
@@ -1971,8 +2007,18 @@ export default function DailyDashboard({
               )}
 
               <button
+                onClick={handleExportMatrixExcel}
+                className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
+                title="Download seluruh data tabel matriks jam jalan bulan ini ke file Excel (.xlsx)"
+              >
+                <FileSpreadsheet size={14} />
+                Export Matriks Excel
+              </button>
+
+              <button
                 onClick={openExportModal}
                 className="px-3.5 py-2 bg-[#0f172a] hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
+                title="Buka opsi download Excel untuk format upload SAP"
               >
                 <FileDown size={14} />
                 Export SAP

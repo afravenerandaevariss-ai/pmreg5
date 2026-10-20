@@ -1362,23 +1362,6 @@ function App() {
               </span>
             </button>
 
-            {isDev && (
-              <button 
-                onClick={() => {
-                  setActiveTab('knowledge-base');
-                  window.history.pushState({}, '', '?tab=knowledge-base');
-                  setIsMobileMenuOpen(false);
-                }} 
-                className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'knowledge-base' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
-                title="Knowledge Base & CMMS Docs"
-              >
-                <BookOpen size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4 text-amber-400" : "mx-auto text-amber-400 group-hover:mr-4 group-hover:mx-0"} />
-                <span className={`text-xs font-semibold ${isSidebarOpen || isMobileMenuOpen ? 'block' : 'hidden group-hover:block'}`}>
-                  Knowledge Base
-                </span>
-                {activeTab === 'knowledge-base' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-[#10b981] rounded-r-full" />}
-              </button>
-            )}
 
             <a 
               href="https://cmms.ptpn4.co.id/"
@@ -1531,20 +1514,6 @@ function App() {
                         <span>Settings</span>
                       </button>
 
-                      {isDev && (
-                        <button 
-                          onClick={() => {
-                            setActiveTab('knowledge-base');
-                            window.history.pushState({}, '', '?tab=knowledge-base');
-                            setIsProfileDropdownOpen(false);
-                            setIsMobileMenuOpen(false);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-amber-800 bg-amber-50/60 hover:bg-amber-100/70 border border-amber-200/50 rounded-xl transition-colors text-left cursor-pointer"
-                        >
-                          <BookOpen size={14} className="text-amber-600" />
-                          <span>Knowledge Base</span>
-                        </button>
-                      )}
                     </div>
                     <div className="p-1.5 border-t border-slate-100 bg-slate-50/40">
                       <button 
@@ -1904,32 +1873,6 @@ function App() {
               {currentUser?.role?.toUpperCase() === 'DEV' && (
                 <div className="space-y-8 pt-2">
                   
-                  {/* Knowledge Base Quick Banner (DEV ONLY - Modern Light Card) */}
-                  <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100/70 rounded-3xl p-6 border border-emerald-200/90 text-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
-                    <div className="flex items-center gap-4">
-                      <div className="w-14 h-14 rounded-2xl bg-[#064e3b] text-white flex items-center justify-center shadow-lg shadow-emerald-950/20 shrink-0">
-                        <BookOpen size={26} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-black text-slate-900">CMMS Documentation & Knowledge Base</h3>
-                          <span className="bg-emerald-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">DEV ONLY</span>
-                        </div>
-                        <p className="text-xs text-slate-600 mt-1">Pusat dokumentasi standar CMMS PTPN IV, referensi T-Code SAP PM, dan live chatbot knowledge base.</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setActiveTab('knowledge-base');
-                        window.history.pushState({}, '', '?tab=knowledge-base');
-                      }}
-                      className="px-5 py-2.5 bg-[#064e3b] hover:bg-[#047857] text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
-                    >
-                      <BookOpen size={15} />
-                      <span>Buka Knowledge Base</span>
-                      <ArrowRight size={14} />
-                    </button>
-                  </div>
 
                   {/* Manajemen File Dasar Section */}
                   <div className="bg-white rounded-3xl p-7 border border-slate-200 shadow-sm space-y-6">
