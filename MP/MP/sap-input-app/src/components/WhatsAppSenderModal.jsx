@@ -27,13 +27,6 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
   const [activeTab, setActiveTab] = useState('send'); // 'send', 'settings', 'logs'
   const [logs, setLogs] = useState([]);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadConfig();
-      loadLogs();
-    }
-  }, [isOpen]);
-
   const loadConfig = async () => {
     const { data } = await fetchWAConfig();
     if (data) {
@@ -59,6 +52,13 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
     const { data } = await fetchWALogs();
     if (data) setLogs(data);
   };
+
+  useEffect(() => {
+    if (isOpen) {
+      loadConfig();
+      loadLogs();
+    }
+  }, [isOpen]);
 
   const handleSaveConfig = async () => {
     if (isDev && STRICT_PROD_GROUPS.some(id => String(targetPhone).includes(id))) {
@@ -89,14 +89,14 @@ export default function WhatsAppSenderModal({ isOpen, onClose, summaryData, targ
 
   // Generate WA text
   const generateWAText = () => {
-    let reportDateStr = '-';
+    let reportDateStr;
     try {
       const parts = (targetInputDate || '').split('-');
       const d = new Date(parts[0], parts[1] - 1, parts[2]);
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
       reportDateStr = `${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
-    } catch (e) {
-      reportDateStr = targetInputDate;
+    } catch (_e) {
+      reportDateStr = targetInputDate || '-';
     }
 
     const now = new Date();

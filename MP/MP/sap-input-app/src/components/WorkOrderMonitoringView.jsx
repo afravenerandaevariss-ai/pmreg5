@@ -336,103 +336,99 @@ export default function WorkOrderMonitoringView({ currentUser }) {
   };
 
   const processFileOnBackend = async (fileBlob, type, customSessionId = null) => {
-    return new Promise(async (resolve, reject) => {
+    try {
+      const sessionId = customSessionId || `global_${type}`;
+      const fileName = `${sessionId}.xlsx`;
+
+      // Map type → localStorage key
+      const lsKey = type === 'iw39' ? LS_IW39 : type === 'zvtab' ? LS_ZVTAB : LS_046EXP;
+
+      setUploadProgress(20);
+
+      // ── Step 1: Parse file in browser ─────────────────────────────────
+      let clientParsed = null;
       try {
-        const sessionId = customSessionId || `global_${type}`;
-        const fileName = `${sessionId}.xlsx`;
-
-        // Map type → localStorage key
-        const lsKey = type === 'iw39' ? LS_IW39 : type === 'zvtab' ? LS_ZVTAB : LS_046EXP;
-
-        setUploadProgress(20);
-
-        // ── Step 1: Parse file in browser ─────────────────────────────────
-        let clientParsed = null;
-        try {
-          clientParsed = await parseFileInBrowser(fileBlob, type);
-        } catch (_clientErr) {
-          console.warn('Client-side parsing failed:', _clientErr);
-        }
-
-        if (clientParsed) {
-          // ── Step 2: Save to localStorage IMMEDIATELY (guaranteed persistence) ──
-          try { localStorage.setItem(lsKey, JSON.stringify(clientParsed)); } catch (_) {}
-          setUploadProgress(50);
-
-          // ── Step 3: Try Supabase upsert (cross-device sync) ───────────────
-          const { error: upsertError } = await supabase
-            .from(T_PARSED_EXCEL)
-            .upsert({ session_id: sessionId, type, data: clientParsed }, { onConflict: 'session_id' });
-
-          if (!upsertError) {
-            // Verify the Supabase save actually stuck
-            const { data: verify } = await supabase
-              .from(T_PARSED_EXCEL)
-              .select('session_id')
-              .eq('session_id', sessionId)
-              .single();
-
-            if (verify) {
-              setUploadProgress(100);
-              return resolve(clientParsed);
-            }
-            console.warn('Supabase upsert reported success but read-back failed. Data is in localStorage.');
-          } else {
-            console.warn('Supabase upsert failed. Data saved to localStorage only.', upsertError.message);
-          }
-
-          // localStorage already saved — resolve with parsed data
-          setUploadProgress(100);
-          return resolve(clientParsed);
-        }
-
-        // ── Step 4: No client parse result — try backend API path ─────────
-        setUploadProgress(60);
-        const { error: uploadError } = await supabase.storage
-          .from(BUCKET_EXCEL)
-          .upload(fileName, fileBlob, { cacheControl: '3600', upsert: true });
-
-        if (uploadError) {
-          throw new Error(`Gagal mengunggah file ke Storage: ${uploadError.message}`);
-        }
-
-        setUploadProgress(75);
-
-        const processRes = await fetch('/api/process-excel', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId, type })
-        });
-
-        if (!processRes.ok) {
-          const errBody = await processRes.text();
-          throw new Error(`Gagal memproses data di server: ${errBody}`);
-        }
-
-        setUploadProgress(90);
-
-        // Read back from DB
-        const { data: savedRow, error: readError } = await supabase
-          .from(T_PARSED_EXCEL)
-          .select('data')
-          .eq('session_id', sessionId)
-          .single();
-
-        if (readError || !savedRow) {
-          throw new Error('Gagal menyimpan data ke database. Cek izin RLS tabel parsed_excel.');
-        }
-
-        // Save backend result to localStorage too
-        try { localStorage.setItem(lsKey, JSON.stringify(savedRow.data)); } catch (_) {}
-
-        setUploadProgress(100);
-        resolve(savedRow.data);
-      } catch (err) {
-        reject(err);
-      } finally {
-        setTimeout(() => setUploadProgress(0), 1000);
+        clientParsed = await parseFileInBrowser(fileBlob, type);
+      } catch (_clientErr) {
+        console.warn('Client-side parsing failed:', _clientErr);
       }
-    });
+
+      if (clientParsed) {
+        // ── Step 2: Save to localStorage IMMEDIATELY (guaranteed persistence) ──
+        try { localStorage.setItem(lsKey, JSON.stringify(clientParsed)); } catch (_) {}
+        setUploadProgress(50);
+
+        // ── Step 3: Try Supabase upsert (cross-device sync) ───────────────
+        const { error: upsertError } = await supabase
+          .from(T_PARSED_EXCEL)
+          .upsert({ session_id: sessionId, type, data: clientParsed }, { onConflict: 'session_id' });
+
+        if (!upsertError) {
+          // Verify the Supabase save actually stuck
+          const { data: verify } = await supabase
+            .from(T_PARSED_EXCEL)
+            .select('session_id')
+            .eq('session_id', sessionId)
+            .single();
+
+          if (verify) {
+            setUploadProgress(100);
+            return clientParsed;
+          }
+          console.warn('Supabase upsert reported success but read-back failed. Data is in localStorage.');
+        } else {
+          console.warn('Supabase upsert failed. Data saved to localStorage only.', upsertError.message);
+        }
+
+        // localStorage already saved — resolve with parsed data
+        setUploadProgress(100);
+        return clientParsed;
+      }
+
+      // ── Step 4: No client parse result — try backend API path ─────────
+      setUploadProgress(60);
+      const { error: uploadError } = await supabase.storage
+        .from(BUCKET_EXCEL)
+        .upload(fileName, fileBlob, { cacheControl: '3600', upsert: true });
+
+      if (uploadError) {
+        throw new Error(`Gagal mengunggah file ke Storage: ${uploadError.message}`);
+      }
+
+      setUploadProgress(75);
+
+      const processRes = await fetch('/api/process-excel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, type })
+      });
+
+      if (!processRes.ok) {
+        const errBody = await processRes.text();
+        throw new Error(`Gagal memproses data di server: ${errBody}`);
+      }
+
+      setUploadProgress(90);
+
+      // Read back from DB
+      const { data: savedRow, error: readError } = await supabase
+        .from(T_PARSED_EXCEL)
+        .select('data')
+        .eq('session_id', sessionId)
+        .single();
+
+      if (readError || !savedRow) {
+        throw new Error('Gagal menyimpan data ke database. Cek izin RLS tabel parsed_excel.');
+      }
+
+      // Save backend result to localStorage too
+      try { localStorage.setItem(lsKey, JSON.stringify(savedRow.data)); } catch (_) {}
+
+      setUploadProgress(100);
+      return savedRow.data;
+    } finally {
+      setTimeout(() => setUploadProgress(0), 1000);
+    }
   };
 
 

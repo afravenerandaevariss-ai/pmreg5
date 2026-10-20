@@ -63,3 +63,9 @@ setup-db.js
 backups/
 *.dump
 *.sql.gz
+
+# Large binary files (terlalu besar untuk git push biasa)
+*.tar.gz
+*.pdf
+*.xlsx
+*.xls

@@ -19,26 +19,32 @@ if (typeof process !== 'undefined' && process.env) {
 
 
 // For Vite Client (Browser)
-// Dynamically resolve URL and Anon Key based on current domain to guarantee 100% environment isolation
+// Check explicit environment variables first, then fallback to domain-based resolution
 try {
-  if (typeof window !== 'undefined' && window.location) {
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    if (import.meta.env.VITE_SUPABASE_URL) {
+      envSupabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    }
+    if (import.meta.env.VITE_SUPABASE_ANON_KEY) {
+      envSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    }
+  }
+
+  if (!envSupabaseUrl && typeof window !== 'undefined' && window.location) {
     const host = window.location.hostname;
     if (host.includes('devpmreg5') || host === 'localhost' || host === '127.0.0.1') {
       envSupabaseUrl = DEV_URL;
       envSupabaseAnonKey = DEV_ANON_KEY;
-    } else if (host.includes('pmreg5')) {
+    } else if (host.includes('pmreg5.afratarigan.my.id') || (!host.includes('vercel.app') && host.includes('pmreg5'))) {
+      envSupabaseUrl = PROD_URL;
+      envSupabaseAnonKey = PROD_ANON_KEY;
+    } else {
+      // Default fallback
       envSupabaseUrl = PROD_URL;
       envSupabaseAnonKey = PROD_ANON_KEY;
     }
   }
-
-  if (!envSupabaseUrl && typeof import.meta !== 'undefined' && import.meta.env) {
-    envSupabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  }
-  if (!envSupabaseAnonKey && typeof import.meta !== 'undefined' && import.meta.env) {
-    envSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  }
-} catch (e) {
+} catch (_e) {
   // Ignore
 }
 
