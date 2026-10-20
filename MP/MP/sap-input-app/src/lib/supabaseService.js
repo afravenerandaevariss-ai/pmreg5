@@ -752,13 +752,7 @@ export async function saveVehicleData(vehicles, logs) {
   // Merge logs:
   // Identify plants in incoming logs
   const incomingPlants = new Set((logs || []).map(l => l.plant).filter(Boolean));
-  let mergedLogs = [];
-  if (incomingPlants.size > 0) {
-    const otherPlantLogs = (currentLogs || []).filter(l => !incomingPlants.has(l.plant));
-    mergedLogs = [...otherPlantLogs, ...(logs || [])];
-  } else {
-    mergedLogs = logs || [];
-  }
+  const mergedLogs = incomingPlants.size > 0 ? [...((currentLogs || []).filter(l => !incomingPlants.has(l.plant))), ...(logs || [])] : (logs || []);
 
   const vErr = await saveSystemConfig('vehicle_master', mergedVehicles);
   if (vErr?.error) return { error: vErr.error };

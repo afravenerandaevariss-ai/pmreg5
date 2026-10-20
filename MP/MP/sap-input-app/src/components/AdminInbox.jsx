@@ -30,13 +30,6 @@ export default function AdminInbox({ currentUser }) {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    if (selectedUserNik) {
-      markAsRead(selectedUserNik);
-    }
-  }, [chats, selectedUserNik]);
-
   const markAsRead = async (nik) => {
     const hasUnread = chats.some(c => c.user_nik === nik && c.sender_type === 'user' && !c.is_read);
     if (!hasUnread) return;
@@ -48,6 +41,15 @@ export default function AdminInbox({ currentUser }) {
     setChats(updated);
     await saveLiveChats(updated);
   };
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (selectedUserNik) {
+      markAsRead(selectedUserNik);
+    }
+  }, [chats, selectedUserNik]);
+
+  
 
   const handleSend = async () => {
     if (!replyText.trim() || !selectedUserNik) return;

@@ -36,9 +36,7 @@ const WA_PATTERN = `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBo
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function AfraChatbot({ currentUser }) {
-  if (currentUser?.role?.toUpperCase() !== 'DEV') {
-    return null;
-  }
+  
 
   const [isOpen, setIsOpen] = useState(false);
   const [showFaq, setShowFaq] = useState(true);
@@ -147,6 +145,8 @@ export default function AfraChatbot({ currentUser }) {
       Chat Langsung via WhatsApp
     </a>
   );
+
+  if (currentUser?.role?.toUpperCase() !== 'DEV') return null;
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -283,12 +283,12 @@ export default function AfraChatbot({ currentUser }) {
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest px-1 mb-2">
                     {conversation.length === 0 ? 'Contoh pertanyaan' : 'Pertanyaan lainnya'}
                   </p>
-                  {FAQ.map((faq, idx) => (
+                  {faqList.map((faq, idx) => (
                     <button key={idx}
                       onClick={() => handleSend(faq.q)}
                       className="text-left bg-white/90 hover:bg-white border border-slate-200 hover:border-emerald-400 text-slate-700 hover:text-emerald-700 px-4 py-3 text-xs font-semibold transition-all shadow-sm hover:shadow-md hover:-translate-y-px"
                       style={{
-                        borderRadius: idx === 0 ? '12px 12px 0 0' : idx === FAQ.length - 1 ? '0 0 12px 12px' : '0',
+                        borderRadius: idx === 0 ? '12px 12px 0 0' : idx === faqList.length - 1 ? '0 0 12px 12px' : '0',
                         borderTopWidth: idx === 0 ? '1px' : '0',
                       }}
                     >
