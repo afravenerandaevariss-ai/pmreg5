@@ -282,9 +282,8 @@ export async function getSystemConfig(id, forceRefresh = false) {
   if (!supabase) return { data: null, error: 'Supabase not configured' };
   const numericId = resolveConfigNumericId(id);
 
-  // Large blob configs (master_map=2, template_data=3) are never cached in localStorage/sessionStorage
-  // to avoid stale data issues. They use only memoryCache (per-session).
-  const LARGE_CONFIG_IDS = new Set([2, 3]);
+  // Large blob configs are never cached in localStorage to avoid quota issues
+  const LARGE_CONFIG_IDS = new Set([2, 3, 7, 8, 9, 10, 14, 15, 16]);
   const cacheKey = `sys_cfg_${T.hierarchy_data}_${numericId}`;
 
   if (!forceRefresh) {
@@ -318,34 +317,37 @@ export async function getSystemConfig(id, forceRefresh = false) {
     if (error.code === 'PGRST116' || error.status === 406) {
       return { data: null, error: null };
     }
-    // Fallback to cache if available and valid (only for non-large configs)
-    if (!LARGE_CONFIG_IDS.has(numericId)) {
-      try {
-        const fallbackItem = localStorage.getItem(cacheKey) || sessionStorage.getItem(cacheKey);
-        if (fallbackItem) {
-          const parsed = JSON.parse(fallbackItem);
-          if (parsed && (numericId !== 3 || (Array.isArray(parsed.equipments) && parsed.equipments.length > 0))) {
-            return { data: parsed, error: null };
-          }
+    // Fallback to cache if available and valid
+    try {
+      const fallbackItem = sessionStorage.getItem(cacheKey) || localStorage.getItem(cacheKey);
+      if (fallbackItem) {
+        const parsed = JSON.parse(fallbackItem);
+        if (parsed && (numericId !== 3 || (Array.isArray(parsed.equipments) && parsed.equipments.length > 0))) {
+          return { data: parsed, error: null };
         }
-      } catch (e) {}
-    }
+      }
+    } catch (e) {}
     return { data: null, error };
   }
 
-  if (data?.data) {
-    memoryCache.set(cacheKey, data.data);
+  if (data?.data !== undefined && data?.data !== null) {
+    let resultData = data.data;
+    if (resultData && typeof resultData === 'object' && !Array.isArray(resultData) && Array.isArray(resultData.data)) {
+      resultData = resultData.data;
+    }
+    memoryCache.set(cacheKey, resultData);
     if (!LARGE_CONFIG_IDS.has(numericId)) {
       try {
-        sessionStorage.setItem(cacheKey, JSON.stringify(data.data));
+        sessionStorage.setItem(cacheKey, JSON.stringify(resultData));
       } catch (e) {}
       try {
-        localStorage.setItem(cacheKey, JSON.stringify(data.data));
+        localStorage.setItem(cacheKey, JSON.stringify(resultData));
       } catch (e) {}
     }
+    return { data: resultData, error: null };
   }
 
-  return { data: data?.data || null, error: null };
+  return { data: null, error: null };
 }
 
 
@@ -625,7 +627,7 @@ export async function getGSheetHistory() {
 // VEHICLES (ZESTHLP16PA)
 // ============================================================
 
-// ── Vehicle Master (dedicated table) ─────────────────────────────────────────
+// ── Vehicle Master & Logs (stored in hierarchy_data id=8 & id=9) ─────────────
 
 const VEHICLE_CACHE_KEY_MASTER = 'veh_master_cache_v1';
 const VEHICLE_CACHE_KEY_LOGS   = 'veh_logs_cache_v1';
@@ -649,21 +651,23 @@ export async function fetchVehicleMaster(forceRefresh = false) {
     } catch (e) {}
   }
 
-  const { data, error } = await supabase
-    .from('vehicle_master')
-    .select('*')
-    .order('plant')
-    .order('vehicle_code');
-  if (error) return { data: [], error: error.message };
+  const { data, error } = await getSystemConfig('vehicle_master', forceRefresh);
+  let result = [];
+  if (Array.isArray(data)) {
+    result = data;
+  } else if (data && Array.isArray(data.data)) {
+    result = data.data;
+  }
 
-  const result = data || [];
+  if (error) return { data: result, error: error.message || String(error) };
+
   memoryCache.set(VEHICLE_CACHE_KEY_MASTER, result);
   try { sessionStorage.setItem(VEHICLE_CACHE_KEY_MASTER, JSON.stringify(result)); } catch (e) {}
 
   return { data: result, error: null };
 }
 
-// ── Vehicle Logs (dedicated table) ───────────────────────────────────────────
+// ── Vehicle Logs ─────────────────────────────────────────────────────────────
 
 export async function fetchVehicleLogs(forceRefresh = false) {
   if (!supabase) return { data: [], error: 'Supabase not configured' };
@@ -684,101 +688,86 @@ export async function fetchVehicleLogs(forceRefresh = false) {
     } catch (e) {}
   }
 
-  // Paginate through all rows (PostgREST default limit caps at 1000)
-  let allData = [];
-  let from = 0;
-  const PAGE_SIZE = 2000;
-  let fetchError = null;
-
-  while (true) {
-    const { data, error } = await supabase
-      .from('vehicle_logs')
-      .select('activity_number,vehicle_code,plant,date,vehicle_time,job_code,hm_km,unit_value,uom,location_code,operator,helper_1,helper_2,reference,remarks,measurement_doc,document_number,spbs_number,tgl_angkut,antar_kebun,destination_plant,target_alokasi,company_code,fiscal_year,cancelled,created_by,created_on,changed_by,changed_on')
-      .order('date', { ascending: false })
-      .order('vehicle_code')
-      .range(from, from + PAGE_SIZE - 1);
-
-    if (error) { fetchError = error; break; }
-    if (!data || data.length === 0) break;
-
-    allData = allData.concat(data);
-    if (data.length < PAGE_SIZE) break;
-    from += PAGE_SIZE;
+  const { data, error } = await getSystemConfig('vehicle_logs', forceRefresh);
+  let result = [];
+  if (Array.isArray(data)) {
+    result = data;
+  } else if (data && Array.isArray(data.data)) {
+    result = data.data;
   }
 
-  if (fetchError) return { data: [], error: fetchError.message };
+  if (error) return { data: result, error: error.message || String(error) };
 
-  memoryCache.set(VEHICLE_CACHE_KEY_LOGS, allData);
-  try { sessionStorage.setItem(VEHICLE_CACHE_KEY_LOGS, JSON.stringify(allData)); } catch (e) {}
+  memoryCache.set(VEHICLE_CACHE_KEY_LOGS, result);
+  try { sessionStorage.setItem(VEHICLE_CACHE_KEY_LOGS, JSON.stringify(result)); } catch (e) {}
 
-  return { data: allData, error: null };
+  return { data: result, error: null };
 }
 
-// ── Invalidate vehicle caches (called after saveVehicleData) ─────────────────
+// ── Invalidate vehicle caches ────────────────────────────────────────────────
 export function invalidateVehicleCache() {
   memoryCache.delete(VEHICLE_CACHE_KEY_MASTER);
   memoryCache.delete(VEHICLE_CACHE_KEY_LOGS);
+  const cacheKeyMaster = `sys_cfg_${T.hierarchy_data}_8`;
+  const cacheKeyLogs   = `sys_cfg_${T.hierarchy_data}_9`;
+  memoryCache.delete(cacheKeyMaster);
+  memoryCache.delete(cacheKeyLogs);
   try { sessionStorage.removeItem(VEHICLE_CACHE_KEY_MASTER); } catch (e) {}
   try { sessionStorage.removeItem(VEHICLE_CACHE_KEY_LOGS); } catch (e) {}
+  try { sessionStorage.removeItem(cacheKeyMaster); } catch (e) {}
+  try { sessionStorage.removeItem(cacheKeyLogs); } catch (e) {}
+  try { localStorage.removeItem(cacheKeyMaster); } catch (e) {}
+  try { localStorage.removeItem(cacheKeyLogs); } catch (e) {}
 }
 
-// ── Save Vehicle Data (upsert to dedicated tables) ───────────────────────────
+// ── Save Vehicle Data (stored in hierarchy_data id=8 & id=9) ─────────────────
 
 export async function saveVehicleData(vehicles, logs) {
   if (!supabase) return { error: 'Supabase not configured' };
 
-  // Bust caches before writing so next read is always fresh from DB
   invalidateVehicleCache();
 
-  // Handle clear (empty arrays) — truncate both tables
-  if (vehicles.length === 0 && logs.length === 0) {
-    const { error: e1 } = await supabase.from('vehicle_master').delete().neq('vehicle_code', '___NEVER___');
-    const { error: e2 } = await supabase.from('vehicle_logs').delete().neq('activity_number', '___NEVER___');
-    return { error: e1 || e2 || null };
+  // Clear data
+  if ((!vehicles || vehicles.length === 0) && (!logs || logs.length === 0)) {
+    const vErr = await saveSystemConfig('vehicle_master', []);
+    const lErr = await saveSystemConfig('vehicle_logs', []);
+    invalidateVehicleCache();
+    return { data: { vehicles: [], logs: [] }, error: vErr?.error || lErr?.error || null };
   }
 
-  // Upsert vehicle_master
-  if (vehicles.length > 0) {
-    const { error: vErr } = await supabase
-      .from('vehicle_master')
-      .upsert(vehicles, { onConflict: 'vehicle_code' });
-    if (vErr) return { error: vErr.message || vErr };
+  // Fetch current data to merge so different plants do not overwrite each other
+  const { data: currentVehicles } = await fetchVehicleMaster(true);
+  const { data: currentLogs } = await fetchVehicleLogs(true);
+
+  // Merge vehicles by vehicle_code
+  const vehicleMap = new Map();
+  (currentVehicles || []).forEach(v => {
+    if (v && v.vehicle_code) vehicleMap.set(v.vehicle_code, v);
+  });
+  (vehicles || []).forEach(v => {
+    if (v && v.vehicle_code) vehicleMap.set(v.vehicle_code, v);
+  });
+  const mergedVehicles = Array.from(vehicleMap.values());
+
+  // Merge logs:
+  // Identify plants in incoming logs
+  const incomingPlants = new Set((logs || []).map(l => l.plant).filter(Boolean));
+  let mergedLogs = [];
+  if (incomingPlants.size > 0) {
+    const otherPlantLogs = (currentLogs || []).filter(l => !incomingPlants.has(l.plant));
+    mergedLogs = [...otherPlantLogs, ...(logs || [])];
+  } else {
+    mergedLogs = logs || [];
   }
 
-  // Delete ALL existing vehicle_logs for the uploaded plant(s) before inserting.
-  // This prevents stale rows with old activity_number keys from surviving after a re-upload,
-  // which is what caused data to disappear on page refresh (old records remained, new ones were added,
-  // and the view showed a mix of old + new duplicates, or old data when cache was cleared).
-  const uploadedPlants = [...new Set(logs.map(l => l.plant).filter(Boolean))];
-  if (uploadedPlants.length > 0) {
-    for (const plant of uploadedPlants) {
-      const { error: delErr } = await supabase
-        .from('vehicle_logs')
-        .delete()
-        .eq('plant', plant);
-      if (delErr) console.warn(`[saveVehicleData] Non-fatal: failed to delete old logs for plant ${plant}:`, delErr.message);
-    }
-  }
+  const vErr = await saveSystemConfig('vehicle_master', mergedVehicles);
+  if (vErr?.error) return { error: vErr.error };
 
-  // Upsert vehicle_logs — 4 parallel chunks at a time for speed
-  const CHUNK_SIZE = 500;
-  const CONCURRENCY = 4;
-  const chunks = [];
-  for (let i = 0; i < logs.length; i += CHUNK_SIZE) {
-    chunks.push(logs.slice(i, i + CHUNK_SIZE));
-  }
-  for (let i = 0; i < chunks.length; i += CONCURRENCY) {
-    const batch = chunks.slice(i, i + CONCURRENCY);
-    const results = await Promise.all(
-      batch.map(chunk =>
-        supabase.from('vehicle_logs').upsert(chunk, { onConflict: 'activity_number' })
-      )
-    );
-    const firstErr = results.find(r => r.error);
-    if (firstErr) return { error: firstErr.error.message || firstErr.error };
-  }
+  const lErr = await saveSystemConfig('vehicle_logs', mergedLogs);
+  if (lErr?.error) return { error: lErr.error };
 
-  return { error: null };
+  invalidateVehicleCache();
+  return { data: { vehicles: mergedVehicles, logs: mergedLogs }, error: null };
 }
 
 

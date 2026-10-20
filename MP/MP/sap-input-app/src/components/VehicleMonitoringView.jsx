@@ -625,10 +625,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
         // Save to DB in background — UI already shows data
         setUploadProgress(`Menyimpan ${finalLogs.length} transaksi ke server...`);
-        const { error: saveErr } = await saveVehicleData(finalVehicles, finalLogs);
+        const { data: saveRes, error: saveErr } = await saveVehicleData(finalVehicles, finalLogs);
         if (saveErr) {
           const errMsg = saveErr.message || (typeof saveErr === 'string' ? saveErr : JSON.stringify(saveErr));
           throw new Error(errMsg);
+        }
+        if (saveRes?.vehicles && saveRes?.logs) {
+          setVehicles(saveRes.vehicles);
+          setLogs(saveRes.logs);
         }
         // Bust vehicle caches again after successful write so next loadData always hits DB
         invalidateVehicleCache();
