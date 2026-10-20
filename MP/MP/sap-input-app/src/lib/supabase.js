@@ -3,18 +3,20 @@ import { createClient } from '@supabase/supabase-js';
 let envSupabaseUrl;
 let envSupabaseAnonKey;
 
-// Static environment configurations for runtime domain matching
-const DEV_URL = 'https://devpmreg5.afratarigan.my.id';
-const DEV_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InBtcmVnNS1kZXYiLCJpYXQiOjE3OTEyNzUxMTIsImV4cCI6MjEwNjYzNTExMn0.8BgDRC_KV3xWPpfSjl6gi-7ZPhU3J-PH4Yh-VIA3j44';
+// Production Cloud Database with full data (7,503 daily logs & 17,277 equipment records)
+const SUPABASE_CLOUD_URL = 'https://pabnvxlvrussdfhisxzn.supabase.co';
+const SUPABASE_CLOUD_ANON_KEY = 'sb_publishable_btvgcbyES8_4w5x3dE-atg_kYfUAii4';
 
-const PROD_URL = 'https://pmreg5.afratarigan.my.id';
-const PROD_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InBtcmVnNSIsImlhdCI6MTc4NzE5NDMxOCwiZXhwIjoyMTAyNTU0MzE4fQ.ll8EmgpSp8W7Vhict4l56Ov1jMk8Jo_9zMzhGs9qUqs';
+const DEV_URL = SUPABASE_CLOUD_URL;
+const DEV_ANON_KEY = SUPABASE_CLOUD_ANON_KEY;
+
+const PROD_URL = SUPABASE_CLOUD_URL;
+const PROD_ANON_KEY = SUPABASE_CLOUD_ANON_KEY;
 
 // For Node.js / scripts
 if (typeof process !== 'undefined' && process.env) {
-  const isProd = process.env.VITE_APP_ENV === 'production' || process.env.NODE_ENV === 'production';
-  envSupabaseUrl = process.env.VITE_SUPABASE_URL || (isProd ? PROD_URL : DEV_URL);
-  envSupabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || (isProd ? PROD_ANON_KEY : DEV_ANON_KEY);
+  envSupabaseUrl = process.env.VITE_SUPABASE_URL || SUPABASE_CLOUD_URL;
+  envSupabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || SUPABASE_CLOUD_ANON_KEY;
 }
 
 
