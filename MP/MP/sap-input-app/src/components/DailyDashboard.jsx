@@ -1205,7 +1205,7 @@ export default function DailyDashboard({
           }
 
           // Parse date (accepts dd-MM-yyyy, dd/MM/yyyy, yyyy-MM-dd)
-          let dateStr = '';
+          let dateStr;
           const dStr = tanggalRaw.toString().trim();
           const dmyMatch = dStr.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
           const isoMatch = dStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);

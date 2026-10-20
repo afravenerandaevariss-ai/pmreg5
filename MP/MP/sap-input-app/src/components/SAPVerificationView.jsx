@@ -85,12 +85,12 @@ export default function SAPVerificationView({ equipments, currentUser }) {
 
         if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
 
-        if (/^\d{4}[\/\.]\d{1,2}[\/\.]\d{1,2}$/.test(str)) {
-          const p = str.split(/[\/\.]/);
+        if (/^\d{4}[/.]\d{1,2}[/.]\d{1,2}$/.test(str)) {
+          const p = str.split(/[/.]/);
           return `${p[0]}-${p[1].padStart(2, '0')}-${p[2].padStart(2, '0')}`;
         }
 
-        const parts = str.split(/[\/\.\-]/);
+        const parts = str.split(/[-/.]/);
         if (parts.length === 3) {
           let [p1, p2, p3] = parts;
           if (p3.length === 2) p3 = `20${p3}`;
@@ -318,7 +318,7 @@ export default function SAPVerificationView({ equipments, currentUser }) {
           let str = String(raw).trim();
           if (str.includes(' ')) str = str.split(' ')[0];
           if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-          const parts = str.split(/[\/\.\-]/);
+          const parts = str.split(/[-/.]/);
           if (parts.length === 3) {
             let [p1, p2, p3] = parts;
             if (p3.length === 2) p3 = `20${p3}`;

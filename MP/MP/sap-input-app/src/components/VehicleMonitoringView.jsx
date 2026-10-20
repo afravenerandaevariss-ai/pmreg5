@@ -1489,9 +1489,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       const zcoRate = activity > 0 ? zcoCost / activity : 0;
 
       // Status logic
-      let cekStatus = 'Oke';
-      let statusColor = 'green';
-      let statusText = 'Oke';
+      let cekStatus;
+      let statusColor;
+      let statusText;
       
       const rawCC = String(row.rawCostCenter || '').trim();
       const isPlantLogRate = rawCC.toLowerCase().startsWith('plant') || rawCC.toLowerCase().includes('log rate');
