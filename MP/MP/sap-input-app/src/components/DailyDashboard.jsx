@@ -258,9 +258,17 @@ export default function DailyDashboard({
     matrixDataRef.current = matrixData;
   }, [matrixData]);
 
-  // Clean up timer on unmount
+  // Auto-Save flush on beforeunload and cleanup on unmount
   useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        performSaveMatrix(matrixDataRef.current, false);
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
   }, []);
@@ -1976,24 +1984,6 @@ export default function DailyDashboard({
             </div>
 
             <div className="flex items-center gap-2.5">
-              {/* Auto-Save live status indicator */}
-              {autoSaveStatus === 'saving' ? (
-                <span className="text-xs font-bold text-amber-700 flex items-center gap-1.5 animate-pulse bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 shadow-xs">
-                  <RefreshCw size={13} className="animate-spin text-amber-600" />
-                  Menyimpan Otomatis...
-                </span>
-              ) : autoSaveStatus === 'saved' ? (
-                <span className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 shadow-xs">
-                  <CheckCircle size={14} className="text-emerald-600" />
-                  Tersimpan Otomatis ✓
-                </span>
-              ) : (
-                <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200" title="Setiap pengisian jam jalan otomatis tersimpan ke server">
-                  <CheckCircle size={13} className="text-emerald-600" />
-                  Auto-Save Aktif
-                </span>
-              )}
-
               <button
                 onClick={openExportModal}
                 className="px-3.5 py-2 bg-[#0f172a] hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
@@ -2001,30 +1991,6 @@ export default function DailyDashboard({
               >
                 <FileDown size={14} />
                 Export SAP
-              </button>
-
-              {/* Reload & Save - accessible to all roles */}
-              <button
-                onClick={loadMatrixFromDB}
-                disabled={isMatrixLoading}
-                className="px-3.5 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
-              >
-                <RefreshCw size={14} className={isMatrixLoading ? "animate-spin" : ""} />
-                Muat Ulang
-              </button>
-
-              <button
-                onClick={handleSaveMatrix}
-                disabled={isSavingMatrix || unsavedMatrixCount === 0}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 ${
-                  unsavedMatrixCount > 0
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse cursor-pointer'
-                    : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
-                }`}
-                title="Semua isian tersimpan otomatis saat Anda mengetik atau berpindah kolom."
-              >
-                <Save size={14} />
-                {isSavingMatrix ? 'Menyimpan...' : 'Simpan Jam Jalan'}
               </button>
             </div>
           </div>
