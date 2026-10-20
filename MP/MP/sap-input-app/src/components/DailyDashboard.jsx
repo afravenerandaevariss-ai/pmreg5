@@ -1886,17 +1886,6 @@ export default function DailyDashboard({
 
         {/* Global Action Buttons */}
         <div className="flex items-center gap-2">
-          {isAfraUser && (
-            <button
-              onClick={handleFetchGoogleSheet}
-              disabled={isFetchingSheet || !googleSheetUrl.trim()}
-              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-3.5 py-2 rounded-xl shadow-xs transition-colors flex items-center gap-1.5 font-bold text-xs"
-              title="Sinkronisasi dari Google Sheet"
-            >
-              <RefreshCw size={14} className={isFetchingSheet ? "animate-spin" : ""} />
-              ✓ GSheet
-            </button>
-          )}
           {!isUserRole && (
             <button
               onClick={openExportModal}
