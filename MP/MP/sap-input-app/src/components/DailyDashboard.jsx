@@ -248,17 +248,38 @@ export default function DailyDashboard({
   }, [dashboardSubTab, matrixMonth, matrixPlantFilter]);
 
   const autoSaveTimerRef = useRef(null);
+  const matrixDataRef = useRef(matrixData);
+  const isSavingRef = useRef(false);
+  const pendingSaveRef = useRef(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState(''); // 'saving', 'saved', ''
 
+  // Sync ref with state
+  useEffect(() => {
+    matrixDataRef.current = matrixData;
+  }, [matrixData]);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, []);
+
   // Core save routine for both Auto-Save and Manual Save
-  const performSaveMatrix = async (dataToSave = matrixData, isManual = false) => {
+  const performSaveMatrix = async (dataToSave = matrixDataRef.current, isManual = false) => {
+    if (isSavingRef.current) {
+      pendingSaveRef.current = true;
+      return;
+    }
+    isSavingRef.current = true;
     setIsSavingMatrix(true);
     setAutoSaveStatus('saving');
     try {
+      const currentData = dataToSave || matrixDataRef.current;
       const modifiedKeys = new Set();
-      const allKeys = new Set([...Object.keys(dataToSave), ...Object.keys(initialMatrixData)]);
+      const allKeys = new Set([...Object.keys(currentData), ...Object.keys(initialMatrixData)]);
       allKeys.forEach(k => {
-        if (dataToSave[k] !== initialMatrixData[k]) {
+        if (currentData[k] !== initialMatrixData[k]) {
           modifiedKeys.add(k);
         }
       });
@@ -266,6 +287,7 @@ export default function DailyDashboard({
       if (modifiedKeys.size === 0) {
         if (isManual) alert('Tidak ada perubahan jam jalan yang perlu disimpan.');
         setIsSavingMatrix(false);
+        isSavingRef.current = false;
         setAutoSaveStatus('');
         return;
       }
@@ -279,7 +301,7 @@ export default function DailyDashboard({
         const [eqNum, dateStr] = key.split('_');
         const eq = eqMap.get(eqNum);
         const plant = eq?.plant || matrixPlantFilter || currentUser?.plant || '5F01';
-        const hours = dataToSave[key];
+        const hours = currentData[key];
 
         if (hours !== undefined && hours !== null && hours !== '') {
           payloadList.push({
@@ -319,10 +341,10 @@ export default function DailyDashboard({
           .eq('id', idToDelete);
       }
 
-      setInitialMatrixData({ ...dataToSave });
+      setInitialMatrixData({ ...currentData });
       setUnsavedMatrixCount(0);
       setAutoSaveStatus('saved');
-      setTimeout(() => setAutoSaveStatus(''), 3000);
+      setTimeout(() => setAutoSaveStatus(''), 4000);
 
       // Refresh calendar daily logs map (forceRefresh=true → bypass cache, ambil data terbaru)
       const { data: updatedLogsMap } = await fetchDailyLogs(logPlantFilter || 'ALL', format(selectedDate, 'yyyy-MM'), true);
@@ -337,13 +359,18 @@ export default function DailyDashboard({
       if (isManual) alert('❌ Gagal menyimpan jam jalan: ' + err.message);
     } finally {
       setIsSavingMatrix(false);
+      isSavingRef.current = false;
+      if (pendingSaveRef.current) {
+        pendingSaveRef.current = false;
+        performSaveMatrix(matrixDataRef.current, false);
+      }
     }
   };
 
   // Matrix cell change handler with Auto-Save trigger
   const handleMatrixCellChange = (eqNum, dateStr, valueStr) => {
     const key = `${eqNum}_${dateStr}`;
-    const updated = { ...matrixData };
+    const updated = { ...matrixDataRef.current };
 
     if (valueStr.trim() === '') {
       delete updated[key];
@@ -363,13 +390,14 @@ export default function DailyDashboard({
       setUnsavedMatrixCount(prev => Math.max(0, prev - 1));
     }
 
+    matrixDataRef.current = updated;
     setMatrixData(updated);
 
-    // Trigger Auto-Save after 800ms debounce
+    // Trigger Auto-Save after 400ms debounce
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
-      performSaveMatrix(updated, false);
-    }, 800);
+      performSaveMatrix(matrixDataRef.current, false);
+    }, 400);
   };
 
   // Matrix Save handler (Manual button trigger)
@@ -1121,41 +1149,7 @@ export default function DailyDashboard({
     XLSX.writeFile(wb, `Template_Input_Masal_${currentUser?.plant || 'ALL'}.xlsx`);
   };
 
-  // Export current monthly matrix grid directly to Excel (.xlsx)
-  const handleExportMatrixExcel = () => {
-    try {
-      const plantLabel = matrixPlantFilter || currentUser?.plant || 'ALL';
-      const rows = [];
-      parentEquipments.forEach((eq, idx) => {
-        let totalHM = 0;
-        const dailyValues = {};
-        matrixDaysInMonth.forEach(day => {
-          const key = `${eq.eqNum}_${day.dateStr}`;
-          const val = parseFloat(matrixData[key]) || 0;
-          totalHM += val;
-          dailyValues[`Tgl_${day.dayStr}`] = val;
-        });
-        rows.push({
-          'No': idx + 1,
-          'EQ Code': eq.eqNum,
-          'Deskripsi Mesin': eq.description,
-          'Plant': eq.plant || plantLabel,
-          'Total HM': Math.round(totalHM * 10) / 10,
-          ...dailyValues
-        });
-      });
-      if (rows.length === 0) {
-        alert('Tidak ada data mesin untuk diekspor.');
-        return;
-      }
-      const ws = XLSX.utils.json_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, `Matriks_${matrixMonth}`);
-      XLSX.writeFile(wb, `Logbook_Jam_Jalan_${plantLabel}_${matrixMonth}.xlsx`);
-    } catch (err) {
-      alert('Gagal mengekspor Excel: ' + err.message);
-    }
-  };
+
 
   // ---- Excel Bulk Upload ----
   const downloadUploadTemplate = () => {
@@ -1992,32 +1986,28 @@ export default function DailyDashboard({
               )}
             </div>
 
-            <div className="flex items-center gap-3">
-              {autoSaveStatus === 'saving' && (
+            <div className="flex items-center gap-2.5">
+              {/* Auto-Save live status indicator */}
+              {autoSaveStatus === 'saving' ? (
                 <span className="text-xs font-bold text-amber-700 flex items-center gap-1.5 animate-pulse bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 shadow-xs">
                   <RefreshCw size={13} className="animate-spin text-amber-600" />
-                  Auto-Save...
+                  Menyimpan Otomatis...
                 </span>
-              )}
-              {autoSaveStatus === 'saved' && (
+              ) : autoSaveStatus === 'saved' ? (
                 <span className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 shadow-xs">
                   <CheckCircle size={14} className="text-emerald-600" />
                   Tersimpan Otomatis ✓
                 </span>
+              ) : (
+                <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200" title="Setiap pengisian jam jalan otomatis tersimpan ke server">
+                  <CheckCircle size={13} className="text-emerald-600" />
+                  Auto-Save Aktif
+                </span>
               )}
 
               <button
-                onClick={handleExportMatrixExcel}
-                className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
-                title="Download seluruh data tabel matriks jam jalan bulan ini ke file Excel (.xlsx)"
-              >
-                <FileSpreadsheet size={14} />
-                Export Matriks Excel
-              </button>
-
-              <button
                 onClick={openExportModal}
-                className="px-3.5 py-2 bg-[#0f172a] hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
+                className="px-3.5 py-2 bg-[#0f172a] hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
                 title="Buka opsi download Excel untuk format upload SAP"
               >
                 <FileDown size={14} />
@@ -2028,7 +2018,7 @@ export default function DailyDashboard({
               <button
                 onClick={loadMatrixFromDB}
                 disabled={isMatrixLoading}
-                className="px-3.5 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+                className="px-3.5 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <RefreshCw size={14} className={isMatrixLoading ? "animate-spin" : ""} />
                 Muat Ulang
@@ -2037,14 +2027,15 @@ export default function DailyDashboard({
               <button
                 onClick={handleSaveMatrix}
                 disabled={isSavingMatrix || unsavedMatrixCount === 0}
-                className={`px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 ${
                   unsavedMatrixCount > 0
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse cursor-pointer'
+                    : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
                 }`}
+                title="Semua isian tersimpan otomatis saat Anda mengetik atau berpindah kolom."
               >
-                <Save size={16} />
-                {isSavingMatrix ? 'Menyimpan...' : `Simpan Jam Jalan ${unsavedMatrixCount > 0 ? `(${unsavedMatrixCount})` : ''}`}
+                <Save size={14} />
+                {isSavingMatrix ? 'Menyimpan...' : 'Simpan Jam Jalan'}
               </button>
             </div>
           </div>
@@ -2147,6 +2138,13 @@ export default function DailyDashboard({
                                   disabled={!editable}
                                   placeholder="-"
                                   onChange={e => handleMatrixCellChange(eqNum, dateStr, e.target.value)}
+                                  onBlur={() => {
+                                    if (autoSaveTimerRef.current) {
+                                      clearTimeout(autoSaveTimerRef.current);
+                                      autoSaveTimerRef.current = null;
+                                    }
+                                    performSaveMatrix(matrixDataRef.current, false);
+                                  }}
                                   title={!editable ? `Tanggal ${dateStr} terkunci. Hanya tanggal kemarin (H-1) yang dapat diisi.` : isAfraUser ? `Isi jam jalan ${dateStr} (DEV: bebas)` : `Isi jam jalan ${dateStr} (maks 24)`}
                                   className={`w-11 text-center py-1 text-xs font-mono rounded outline-none transition-all ${
                                     !editable
