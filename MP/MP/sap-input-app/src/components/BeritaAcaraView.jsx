@@ -1560,10 +1560,21 @@ export default function BeritaAcaraView({ currentUser }) {
               )}
 
               {/* Add Row button - hidden when printing */}
-              <div className="no-print mt-2 mb-4">
+              <div 
+                className="no-print"
+                style={{
+                  borderLeft: '2.2px solid #000000',
+                  borderRight: '2.2px solid #000000',
+                  borderBottom: '1.5px solid #000000',
+                  padding: '6px 12px',
+                  backgroundColor: '#f8fafc',
+                  margin: '0',
+                  boxSizing: 'border-box'
+                }}
+              >
                 <button
                   onClick={handleAddRow}
-                  className="flex items-center gap-1.5 text-xs text-teal-600 hover:text-teal-800 font-semibold hover:bg-teal-50 px-3 py-1.5 rounded-lg transition-colors border border-dashed border-teal-300 hover:border-teal-500 w-full justify-center"
+                  className="flex items-center gap-1.5 text-xs text-teal-600 hover:text-teal-800 font-semibold hover:bg-teal-50 px-3 py-1.5 rounded-lg transition-colors border border-dashed border-teal-300 hover:border-teal-500 w-full justify-center bg-white shadow-sm"
                 >
                   <span className="text-base leading-none">+</span> Tambah Baris
                 </button>
@@ -1588,9 +1599,10 @@ export default function BeritaAcaraView({ currentUser }) {
                 }}
               />
 
-              {/* Spacer before signatures */}
+              {/* Spacer before signatures - expands to fill the entire remaining height so left & right borders are 100% continuous */}
               <div style={{ 
-                height: '25px', 
+                flex: 1,
+                minHeight: '25px', 
                 borderLeft: '2.2px solid #000000', 
                 borderRight: '2.2px solid #000000',
                 margin: '0',
@@ -1603,7 +1615,7 @@ export default function BeritaAcaraView({ currentUser }) {
                 borderRight: '2.2px solid #000000', 
                 borderBottom: '2.2px solid #000000', 
                 padding: '0 30px 30px 30px', 
-                marginTop: 'auto', 
+                marginTop: '0', 
                 marginBottom: '0', 
                 boxSizing: 'border-box' 
               }}>
