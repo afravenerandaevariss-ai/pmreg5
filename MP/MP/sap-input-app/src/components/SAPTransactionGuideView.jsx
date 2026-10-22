@@ -134,7 +134,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Menengah',
       purpose: 'Membuat lokasi fungsional (Functional Location) baru untuk memetakan struktur hierarki area pemeliharaan, pabrik, kebun, stasiun, hingga blok/ruang penempatan equipment.',
       ptpnStandard: 'Edit Mask PTPN: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX (Contoh: N011-KP05-GD01-ST01 = Stasiun Gilingan Pabrik Kanigoro).',
-      pdfFile: '01. PM-UM-02_Master Data-Functional Location v02.pdf',
       fields: [
         { name: 'Functional Loc.', type: 'Required', example: 'N011-KP05-GD01-ST01', desc: 'Kode hierarki lokasi sesuai edit mask standar PTPN.' },
         { name: 'Description', type: 'Required', example: 'STASIUN GILINGAN', desc: 'Deskripsi nama lokasi fungsional (maks. 40 karakter).' },
@@ -176,7 +175,7 @@ export default function SAPTransactionGuideView() {
         {
           num: 5,
           title: 'Lampirkan Dokumen / Gambar Teknik via GOS Attachment',
-          desc: 'Untuk melampirkan foto denah atau gambar teknik, klik tombol Services for Object (di sebelah kiri judul layar) ➔ Create ➔ Create Attachment, lalu pilih file PDF/foto.',
+          desc: 'Untuk melampirkan foto denah atau gambar teknik, klik tombol Services for Object (di sebelah kiri judul layar) ➔ Create ➔ Create Attachment, lalu pilih file lampiran/foto.',
           image: '/images/il01/step_5.png',
           imgCaption: 'Fitur GOS (Generic Object Services) untuk Melampirkan Dokumen Fisik'
         }
@@ -195,7 +194,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Menengah',
       purpose: 'Membuat nomor aset fisik alat/mesin individual (Mesin Pabrik, Kendaraan Angkutan, Alat Berat, Genset) agar riwayat kerusakan dan jam jalannya dapat dimonitor.',
       ptpnStandard: 'Equipment Type: 2 (Kendaraan/Traksi) atau M (Mesin Pabrik). Menggunakan referensi Copy Equipment untuk mempercepat input.',
-      pdfFile: '02. PM-UM-02_Master Data-Equipment v02.pdf',
       fields: [
         { name: 'Valid From', type: 'Required', example: '01.01.2026', desc: 'Tanggal mulai berlaku operasional equipment.' },
         { name: 'Equipment Type', type: 'Required', example: '2 (Kendaraan) / M (Mesin)', desc: 'Kategori jenis equipment.' },
@@ -248,7 +246,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Tinggi',
       purpose: 'Menghubungkan daftar suku cadang (spare part) resmi dari master material gudang ke spesifik mesin/alat, sehingga saat teknisi membuat WO, spare part langsung muncul dalam katalog pilih.',
       ptpnStandard: 'Material spare part harus sudah terdaftar di master MM PTPN dan berstatus aktif di plant terkait.',
-      pdfFile: '03. PM-UM-02_Master Data-Bill of Material v02.pdf',
       fields: [
         { name: 'Equipment', type: 'Required', example: '2000001205', desc: 'Nomor equipment mesin yang akan dibuatkan daftar part-nya.' },
         { name: 'Plant', type: 'Required', example: '5F01', desc: 'Kode Plant gudang penyimpan material.' },
@@ -300,7 +297,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Menengah',
       purpose: 'Mendefinisikan unit pelaksana kerja pemeliharaan (Bengkel Traksi, Teknisi Listrik, Mekanik Pabrik, Welder) beserta kapasitas jam kerja, kalender kerja, dan tarif alokasi biaya per jam.',
       ptpnStandard: 'Work Center Category: 0005 (Plant Maintenance). Standar Work Center PTPN: TEK-WSH (Workshop), TEK-ELC (Elektrik), TEK-TRA (Traksi).',
-      pdfFile: '04. PM-UM-02_Master Data-Work Center v02.pdf',
       fields: [
         { name: 'Plant', type: 'Required', example: '5F01 / 5E01', desc: 'Kode Plant bengkel berada.' },
         { name: 'Work Center', type: 'Required', example: 'TEK-WSH', desc: 'Kode singkat identitas bengkel/regu teknisi (maks. 8 karakter).' },
@@ -351,7 +347,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Menengah',
       purpose: 'Membuat titik ukur fisik pada alat/mesin: Hour Meter (HM Jam Jalan) untuk mesin pabrik/genset, dan Odometer (KM) untuk kendaraan operasional, sebagai acuan perawatan preventif.',
       ptpnStandard: 'Measuring Point Category: M. Centang "Measuring point is a counter" agar nilai pembacaan bertambah terus secara akumulatif.',
-      pdfFile: '05. PM-UM-02_Master Data-Measuring Point v02.pdf',
       fields: [
         { name: 'Equipment', type: 'Required', example: '2000001205', desc: 'Nomor equipment mesin yang dipasang titik ukur.' },
         { name: 'MeasPoint Category', type: 'Required', example: 'M', desc: 'Kategori titik ukur pemeliharaan.' },
@@ -403,7 +398,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Dasar',
       purpose: 'Standarisasi kamus kode kerusakan mesin: Jenis Kerusakan (Damage Code), Bagian Objek yang Rusak (Object Part), Penyebab Kerusakan (Cause Code), dan Tindakan Penanggulangan (Activity Code).',
       ptpnStandard: 'Catalog Type: B (Object Parts), C (Damage/Gejala), 5 (Causes/Penyebab), A (Activities/Tindakan).',
-      pdfFile: '07. PM-UM-02_Master Data-Catalog v02.pdf',
       fields: [
         { name: 'Catalog Type', type: 'Required', example: 'C (Damages) / 5 (Causes)', desc: 'Tipe katalog master kode.' },
         { name: 'Catalog Group', type: 'Required', example: 'ENG (Engine) / HYD (Hydraulic)', desc: 'Grup komponen sistem mesin.' },
@@ -450,7 +444,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Menengah',
       purpose: 'Membuat SOP instruksi kerja pemeliharaan standar yang merinci langkah perbaikan per mesin, durasi jam mekanik, alat kerja (PRT), dan daftar suku cadang yang wajib diganti.',
       ptpnStandard: 'Tipe Task List: IA01 (Equipment Task List), IA05 (General Maintenance Task List untuk servis umum seperti Ganti Oli 250 Jam).',
-      pdfFile: '08. PM-UM-02_Master Data-Task List v02.pdf',
       fields: [
         { name: 'Equipment / Group', type: 'Required', example: '2000001205 / GEN-250H', desc: 'Objek mesin atau identitas grup servis.' },
         { name: 'Planning Plant', type: 'Required', example: '5F01 / 5E01', desc: 'Plant tempat SOP ini berlaku.' },
@@ -501,7 +494,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Menengah',
       purpose: 'Menggabungkan Objek Mesin (Equipment/FL), Strategi Perawatan (Siklus Jam/Hari), dan SOP Pekerjaan (Task List IA01) menjadi satu rencana jadwal pemeliharaan rutin otomatis.',
       ptpnStandard: 'Tipe: Single Cycle Plan (siklus tunggal sederhana misal per 250 Jam) atau Strategy Plan (siklus berjenjang 250H, 500H, 1000H).',
-      pdfFile: '10. PM-UM-02_Master Data-Maintenance Plan v02.pdf',
       fields: [
         { name: 'Maintenance Plan', type: 'Required', example: 'Otomatis di-generate SAP', desc: 'Nomor dokumen rencana pemeliharaan.' },
         { name: 'Plan Category', type: 'Required', example: 'PM (Maintenance Order)', desc: 'Jenis dokumen output yang diterbitkan otomatis.' },
@@ -553,7 +545,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Menengah',
       purpose: 'Menjalankan kalkulasi massal (Deadline Monitoring) untuk memeriksa seluruh rencana perawatan (Maintenance Plan) dan menerbitkan Work Order preventif (PM02) secara otomatis saat tiba waktu servis.',
       ptpnStandard: 'Dijalankan secara batch berkala oleh planner atau otomatis via scheduled background job server.',
-      pdfFile: '11. PM-UM-02_Maintenance Schedule v02.pdf',
       fields: [
         { name: 'Maintenance Plan', type: 'Optional', example: 'Kosongkan untuk semua plan plant', desc: 'Filter nomor plan tertentu.' },
         { name: 'Interval', type: 'Required', example: '30 Days', desc: 'Rentang waktu ke depan yang ingin dipindai jadwalnya.' },
@@ -603,7 +594,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Dasar',
       purpose: 'Mencatat nilai aktual angka pembacaan Hour Meter (HM Jam Jalan) mesin pabrik dan Odometer (KM) kendaraan operasional harian ke sistem SAP untuk memicu jadwal servis preventif.',
       ptpnStandard: 'Wajib diinput setiap hari atau setiap selesai shift operasi. Nilai counter tidak boleh lebih kecil dari pembacaan sebelumnya.',
-      pdfFile: '17. PM-UM-02_Measurement Document v02.pdf',
       fields: [
         { name: 'Measuring Point', type: 'Required', example: '0000000124', desc: 'Nomor titik ukur target dari IK01.' },
         { name: 'Reading Date/Time', type: 'Required', example: 'Tanggal & Jam Pencatatan', desc: 'Waktu aktual pembacaan di lapangan.' },
@@ -657,7 +647,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Dasar',
       purpose: 'Membuat dokumen pemberitahuan kerusakan resmi (Notification) saat terjadi gangguan teknis atau mesin breakdown untuk meminta tindakan perbaikan kepada bagian bengkel/planner.',
       ptpnStandard: 'Tipe Notifikasi: M1 (Maintenance Request), M2 (Malfunction Report - Breakdown Darurat), M3 (Activity Report).',
-      pdfFile: '12. PM-UM-02_Bisnis Proses-Maintenance Notification v02.pdf',
       fields: [
         { name: 'Notification Type', type: 'Required', example: 'M1 (Permintaan) / M2 (Breakdown)', desc: 'Kategori laporan gangguan mesin.' },
         { name: 'Equipment / FL', type: 'Required', example: '1000171426', desc: 'Nomor mesin yang mengalami masalah.' },
@@ -708,7 +697,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Tinggi',
       purpose: 'Membuat dokumen Work Order resmi untuk merencanakan tenaga mekanik, durasi jam kerja, suku cadang gudang (PR/Reservasi otomatis), dan alokasi pembebanan biaya.',
       ptpnStandard: 'Order Type: PM01 (Corrective/Breakdown), PM02 (Preventive Servis Rutin), PM03 (Kalibrasi/Prediktif), PM04 (Overhaul Besar/Investasi Capex).',
-      pdfFile: '13. PM-UM-02_Bisnis Proses-Maintenance Order v02.pdf',
       fields: [
         { name: 'Order Type', type: 'Required', example: 'PM01 (Corrective) / PM02 (Preventive)', desc: 'Jenis Work Order pemeliharaan.' },
         { name: 'Planning Plant', type: 'Required', example: '5F01 / 5E01', desc: 'Plant tempat pekerjaan direncanakan.' },
@@ -774,7 +762,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Menengah',
       purpose: 'Melakukan perubahan data order, merilis otorisasi pekerjaan (Status REL) agar gudang bisa mengeluarkan suku cadang, serta melakukan penutupan teknis (TECO) setelah pekerjaan selesai.',
       ptpnStandard: 'Status Order: CRTE (Created) ➔ REL (Released) ➔ TECO (Technically Completed) ➔ CLSD (Closed).',
-      pdfFile: '15. PM-UM-02_Bisnis Proses-Release Maintenance Order v02.pdf',
       fields: [
         { name: 'Order', type: 'Required', example: '200000000039', desc: 'Nomor Work Order yang akan diedit, dirilis, atau di-TECO.' },
         { name: 'Status Flag', type: 'Required', example: 'REL (Ikon Bendera Hijau)', desc: 'Otorisasi resmi untuk memulai pekerjaan fisik & pengambilan part.' },
@@ -831,7 +818,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Menengah',
       purpose: 'Mengeluarkan suku cadang fisik dari gudang sentral/unit berdasarkan nomor reservasi resmi yang diterbitkan oleh Work Order (IW31/IW32).',
       ptpnStandard: 'Movement Type: 261 (Goods Issue for Order). Wajib menyertakan nomor reservasi Work Order.',
-      pdfFile: '13. PM-UM-02_Bisnis Proses-Maintenance Order v02.pdf',
       fields: [
         { name: 'Transaction', type: 'Required', example: 'A07 Goods Issue', desc: 'Aktivitas pengeluaran barang.' },
         { name: 'Reference Document', type: 'Required', example: 'R09 Reservation / Order', desc: 'Dokumen acuan pengeluaran.' },
@@ -875,7 +861,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Dasar',
       purpose: 'Memantau seluruh daftar Work Order aktif di unit kerja, melihat progres perbaikan, merilis order secara massal, atau mengubah status TECO dalam satu layar kerja.',
       ptpnStandard: 'Filter Maintenance Plant 5* untuk seluruh unit Regional 5. Layout resmi: /EUT IW38.',
-      pdfFile: '13. PM-UM-02_Bisnis Proses-Maintenance Order v02.pdf',
       fields: [
         { name: 'Order Status', type: 'Required', example: 'Outstanding, In process, Completed', desc: 'Status siklus hidup order yang ingin ditampilkan.' },
         { name: 'Maintenance Plant', type: 'Required', example: '5* (Semua) / 5F01 / 5E02', desc: 'Filter plant unit kerja pemeliharaan.' },
@@ -933,7 +918,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Dasar',
       purpose: 'Menampilkan laporan historis seluruh pekerjaan pemeliharaan dalam mode baca (Display Only) untuk keperluan audit biaya, analisa downtime mesin, dan evaluasi bulanan.',
       ptpnStandard: 'Fungsi sama seperti IW38 namun dalam mode proteksi baca sehingga aman dari perubahan tidak sengaja.',
-      pdfFile: '13. PM-UM-02_Bisnis Proses-Maintenance Order v02.pdf',
       fields: [
         { name: 'Order Status', type: 'Required', example: 'Completed & Historical', desc: 'Status pekerjaan yang sudah tuntas.' },
         { name: 'Plant', type: 'Required', example: '5F01 / 5E01 / 5*', desc: 'Unit usaha sasaran pelaporan.' },
@@ -990,7 +974,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Menengah',
       purpose: 'Mengunggah ratusan transaksi logbook kendaraan (HM, Odometer, BBM, dan utilitas) secara sekaligus via template Excel ke dalam sistem SAP tanpa input manual satu per satu.',
       ptpnStandard: 'Menggunakan template excel resmi VRA PTPN. Status baris wajib berwarna hijau sebelum dapat diposting via ZESTHLP16PA.',
-      pdfFile: '18. PM-UM-02_Vehicle Activity_Logbook v02.pdf',
       fields: [
         { name: 'Upload File', type: 'Required', example: 'REGIONAL_5_MP.xlsx', desc: 'Berkas template excel logbook unit yang sudah tervalidasi.' },
         { name: 'Start Row', type: 'Required', example: '2', desc: 'Baris awal pembacaan data di excel.' },
@@ -1041,7 +1024,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Dasar',
       purpose: 'Memposting transaksi logbook yang telah disubmit via ZESTHLC003PA serta menarik laporan monitoring seluruh armada kendaraan untuk diekspor ke Excel.',
       ptpnStandard: 'Digunakan Regional 5 untuk monitoring harian (rekap WA jam 08:00 WIB). Filter Plant dapat menggunakan 5* untuk seluruh unit.',
-      pdfFile: '18. PM-UM-02_Vehicle Activity_Logbook v02.pdf',
       fields: [
         { name: 'Company Code', type: 'Required', example: 'Palm', desc: 'Kode entitas holding kelapa sawit.' },
         { name: 'Plant', type: 'Required', example: '5* (Semua unit) / 5E01', desc: 'Kode unit kerja pemeliharaan.' },
@@ -1085,7 +1067,6 @@ export default function SAPTransactionGuideView() {
       difficulty: 'Dasar',
       purpose: 'Memantau realisasi biaya operasional armada kendaraan (Total Cost) dan utilisasi jam kerja (Activity Quantity) per unit Cost Center kebun dan pabrik.',
       ptpnStandard: 'Controlling Area: PTPN. Cost Center Group: REG5-LOG / REGION 5 LOG RATE.',
-      pdfFile: '18. PM-UM-02_Vehicle Activity_Logbook v02.pdf',
       fields: [
         { name: 'Controlling Area', type: 'Required', example: 'PTPN', desc: 'Area pengendalian holding.' },
         { name: 'Fiscal Year', type: 'Required', example: '2026', desc: 'Tahun buku anggaran.' },
@@ -2198,7 +2179,7 @@ export default function SAPTransactionGuideView() {
                     3
                   </span>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">Cara Melampirkan Foto & Dokumen PDF ke Objek SAP (GOS Attachment)</h3>
+                    <h3 className="text-sm font-bold text-slate-900">Cara Melampirkan Foto & Dokumen Lampiran ke Objek SAP (GOS Attachment)</h3>
                     <p className="text-xs text-slate-500">Untuk melampirkan foto fisik kerusakan atau manual book mesin langsung ke master equipment / work order.</p>
                   </div>
                 </div>
@@ -2215,7 +2196,7 @@ export default function SAPTransactionGuideView() {
                   <ol className="list-decimal list-inside text-xs text-slate-700 space-y-1.5 font-medium">
                     <li>Klik ikon kotak kecil bertingkat di pojok kiri atas <strong>[Services for Object]</strong></li>
                     <li>Pilih menu <strong>Create ➔ Create Attachment</strong></li>
-                    <li>Pilih file foto (.JPG, .PNG) atau dokumen (.PDF) dari komputer Anda</li>
+                    <li>Pilih file foto (.JPG, .PNG) atau dokumen lampiran dari komputer Anda</li>
                     <li>File otomatis tersimpan di server SAP dan dapat dibuka siapa pun yang melihat transaksi ini</li>
                   </ol>
                 </div>
@@ -2239,7 +2220,7 @@ export default function SAPTransactionGuideView() {
                   </span>
                   <div>
                     <h3 className="text-sm font-bold text-slate-900">Otomasi Script VBScript SAP GUI (Input Massal Cepat)</h3>
-                    <p className="text-xs text-slate-500">Dokumen asli menyertakan script VBS untuk input massal equipment tanpa ketik manual (C:\Logbook\ie01.vbs).</p>
+                    <p className="text-xs text-slate-500">Script VBS untuk input massal equipment tanpa ketik manual (C:\Logbook\ie01.vbs).</p>
                   </div>
                 </div>
                 <button
@@ -2345,9 +2326,6 @@ session.findById("wnd[0]").sendVKey 0`}
                   <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-900 md:text-[28px]">
                     Ensiklopedi &amp; Matriks 18 Modul Standar SAP Plant Maintenance
                   </h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600">
-                    Seluruh materi panduan, aturan input data, alur bisnis proses, dan standar PTPN IV dari 18 modul PDF telah dipindahkan secara lengkap ke dalam sistem web ini tanpa perlu mengunduh file dokumen manual.
-                  </p>
 
                   <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
                     {[

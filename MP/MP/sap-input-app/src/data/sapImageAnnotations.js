@@ -6,7 +6,7 @@
  *
  * Koordinat ditentukan dengan mengukur gambar, bukan diperkirakan:
  *   1. Kotak merah yang sudah tercetak pada tangkapan layar asli (hasil render
- *      PDF SOP PTPN) dideteksi per piksel dan dipakai sebagai acuan utama.
+ *      SOP PTPN) dideteksi per piksel dan dipakai sebagai acuan utama.
  *   2. Elemen tanpa kotak tercetak dilokalisasi dengan membaca gambar + grid
  *      persen, lalu diverifikasi berulang pada gambar yang digambar ulang.
  *   3. Kotak yang elemennya tidak ada di gambar dihapus, bukan ditebak.
