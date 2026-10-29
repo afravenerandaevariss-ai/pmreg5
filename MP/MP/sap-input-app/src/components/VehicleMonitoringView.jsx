@@ -1497,7 +1497,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       }
 
       const zcoCost = parseFloat(row.totalCost) || 0;
-      const activity = parseFloat(logActivity) || 0;
+      // Use SAP ZCO activityQty as the primary activity (from uploaded ZCO file)
+      const zcoActivityQty = parseFloat(row.activityQty) || 0;
+      // logActivityVal = actual logbook HM/KM (for reconciliation comparison)
+      const logActivityVal = parseFloat(logActivity) || 0;
+      // ACTIVITY column displays SAP ZCO activity qty; rate = cost / SAP activity
+      const activity = zcoActivityQty;
       const zcoRate = activity > 0 ? zcoCost / activity : 0;
 
       // Status logic
@@ -1529,7 +1534,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           statusText = 'Oke';
         } else {
           cekStatus = 'Cek';
-          if (zcoCost > 0 && activity === 0) {
+          // "Logbook Belum Dibuat" = SAP has cost but logbook HM/KM not yet entered
+          if (zcoCost > 0 && logActivityVal === 0) {
             statusColor = 'red';
             statusText = 'Logbook Belum Dibuat';
           } else if (zcoCost === 0 && activity > 0) {
@@ -1549,10 +1555,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         plantCode,
         plantDesc,
         wilayah,
-        logActivity: activity,
-        activity,
+        logActivity: logActivityVal,  // actual logbook HM/KM
+        activity,                     // SAP ZCO activityQty (shown in ACTIVITY column)
         zcoCost,
-        zcoActy: activity,
+        zcoActy: activity,            // SAP activity qty
         zcoRate,
         isPlantLogRate,
         cekStatus,
