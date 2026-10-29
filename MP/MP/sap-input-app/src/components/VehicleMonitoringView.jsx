@@ -1523,7 +1523,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         cekStatus = 'Oke';
         statusColor = 'grey';
         statusText = '';
-      } else if (zcoCost + activity + zcoRate === 0) {
+      } else if (Math.abs(zcoCost) + activity + Math.abs(zcoRate) === 0) {
         cekStatus = 'Oke';
         statusColor = 'grey';
         statusText = '';
@@ -1534,13 +1534,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           statusText = 'Oke';
         } else {
           cekStatus = 'Cek';
-          // "Logbook Belum Dibuat" = SAP has cost but logbook HM/KM not yet entered
-          if (zcoCost > 0 && logActivityVal === 0) {
-            statusColor = 'red';
-            statusText = 'Logbook Belum Dibuat';
-          } else if (zcoCost === 0 && activity > 0) {
+          // Apabila ada activity tapi tidak ada cost (cost <= 0)
+          if (activity > 0 && zcoCost <= 0) {
             statusColor = 'orange';
             statusText = 'Belum Ada Pembebanan Biaya';
+          } else if (zcoCost > 0 && (activity === 0 || logActivityVal === 0)) {
+            statusColor = 'red';
+            statusText = 'Logbook Belum Dibuat';
           } else {
             statusColor = 'red';
             statusText = 'Perbaiki';
