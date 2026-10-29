@@ -1388,7 +1388,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     const rows = filteredZCOData.map(r => ({
       'Cost Center': r.rawCostCenter,
       'Cost (Biaya SAP)': r.zcoCost,
-      'Activity': r.logActivity || 0,
+      'Activity': r.activity || 0,
       'Rate (Tarif)': r.zcoRate,
       'Kebun / Unit': `${r.plantCode} - ${r.plantDesc}`,
       'Cek Status': r.cekStatus,
@@ -1606,6 +1606,17 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
     return list.filter(r => r.cekStatus === 'Cek').length;
   }, [zcoReconciliationData, zcoWilayah]);
+
+  const zcoSummary = useMemo(() => {
+    let totalCost = 0;
+    let totalActivity = 0;
+    filteredZCOData.forEach(r => {
+      totalCost += (r.zcoCost || 0);
+      totalActivity += (r.activity || 0);
+    });
+    const avgRate = totalActivity > 0 ? totalCost / totalActivity : 0;
+    return { totalCost, totalActivity, avgRate };
+  }, [filteredZCOData]);
 
   const uomOptions    = useMemo(() => ['ALL', ...new Set(monthLogs.map(l => l.uom).filter(Boolean))], [monthLogs]);
   const jobCodeOptions = useMemo(() => ['ALL', ...new Set(monthLogs.map(l => l.job_code).filter(Boolean))], [monthLogs]);
@@ -2790,6 +2801,31 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         </div>
 
+        {/* ── Summary Metric Cards ─────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 pb-0 bg-white no-print">
+          <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex flex-col justify-between shadow-xs">
+            <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Total Biaya SAP (Cost)</span>
+            <span className="text-lg font-extrabold text-slate-900 font-mono mt-1">
+              Rp {zcoSummary.totalCost.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </span>
+            <span className="text-[10px] text-slate-400 mt-0.5">{filteredZCOData.length} Cost Center terpilih</span>
+          </div>
+          <div className="bg-emerald-50/50 border border-emerald-200/60 rounded-xl p-3 flex flex-col justify-between shadow-xs">
+            <span className="text-[10.5px] font-bold text-emerald-800 uppercase tracking-wider">Total Activity SAP</span>
+            <span className="text-lg font-extrabold text-[#064e3b] font-mono mt-1">
+              {zcoSummary.totalActivity.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+            <span className="text-[10px] text-emerald-600 mt-0.5">Total jam / km seluruh kendaraan</span>
+          </div>
+          <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex flex-col justify-between shadow-xs">
+            <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Rata-rata Tarif (Rate)</span>
+            <span className="text-lg font-extrabold text-slate-800 font-mono mt-1">
+              Rp {zcoSummary.avgRate.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+            <span className="text-[10px] text-slate-400 mt-0.5">Total Biaya / Total Activity</span>
+          </div>
+        </div>
+
         <div id="zco-report-sheet" className="p-4 bg-white">
           {/* Print Header (Only visible when printing) */}
           <div className="hidden print:block mb-4 border-b border-slate-300 pb-2">
@@ -2911,6 +2947,25 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 })
               )}
             </tbody>
+            {filteredZCOData.length > 0 && (
+              <tfoot className="bg-slate-100 font-bold border-t-2 border-slate-300">
+                <tr>
+                  <td className="px-3 py-2 text-left font-mono text-[11px] font-extrabold text-slate-800">
+                    TOTAL ({filteredZCOData.length} Cost Center)
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-[11px] font-extrabold text-slate-900">
+                    {zcoSummary.totalCost.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-[11px] font-extrabold text-[#064e3b] bg-emerald-100/50">
+                    {zcoSummary.totalActivity.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-[11px] text-slate-700">
+                    {zcoSummary.avgRate.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td colSpan={3}></td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
         </div>
