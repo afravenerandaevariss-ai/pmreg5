@@ -1828,63 +1828,115 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return map;
   }, [masterMap, masterEquipments, vehicles, fuelData?.summaries]);
 
-  // Index ZESTHLP16PA logs by vehicle and date/month for fast reference lookup
-  const zestLogsByVehMonth = useMemo(() => {
+  // ── Pre-Index ZESTHLP16PA Logs by No. Equipment & Date ─────────────────────
+  const zestLogsByEquipment = useMemo(() => {
     const map = new Map();
     (logs || []).forEach(l => {
-      if (!l.date) return;
-      const ym = l.date.substring(0, 7);
-      const code = String(l.vehicle_code || '').trim();
-      if (!code) return;
-      const key = `${code}_${ym}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(l);
+      const eq = String(l.vehicle_code || '').trim();
+      if (!eq) return;
+      if (!map.has(eq)) map.set(eq, []);
+      map.get(eq).push(l);
+    });
+    // Sort descending by date
+    map.forEach(list => {
+      list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     });
     return map;
   }, [logs]);
 
-  const zestLogsByVehDate = useMemo(() => {
+  // Pre-Index SLARC Credit daily records by Cost Center & Date
+  const slarcDailyByCostCenter = useMemo(() => {
     const map = new Map();
-    (logs || []).forEach(l => {
-      if (!l.date) return;
-      const code = String(l.vehicle_code || '').trim();
-      if (!code) return;
-      const key = `${code}_${l.date}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(l);
+    (fuelData?.daily || []).filter(d => d.t === 'C').forEach(d => {
+      const cc = String(d.c || '').trim().toUpperCase();
+      if (!cc) return;
+      if (!map.has(cc)) map.set(cc, []);
+      map.get(cc).push(d);
+    });
+    map.forEach(list => {
+      list.sort((a, b) => (b.d || '').localeCompare(a.d || ''));
     });
     return map;
-  }, [logs]);
+  }, [fuelData?.daily]);
 
+  // Main Fuel Table Data with Deep Reference & Reconciliation Mapping
   const fuelTableData = useMemo(() => {
     const targetPeriod = fuelMonth === 'ALL' ? fuelYear : `${fuelYear}-${fuelMonth}`;
     const activePlant = (!isAdmin && currentUser?.plant && currentUser.plant !== 'ALL')
       ? currentUser.plant
       : fuelPlant;
 
-    const getRefInfo = (equipment, costCenter, ymOrDate, isDate = false) => {
-      let matched = [];
+    // Helper to extract rich reference from ZEST logs and SLARC
+    const getRefAndReconcile = (equipment, costCenter, ymOrDate, isDate = false) => {
+      const eqLogs = (equipment && equipment !== '-') ? (zestLogsByEquipment.get(equipment) || []) : [];
+      const ccLogs = (costCenter && costCenter !== '-') ? (slarcDailyByCostCenter.get(costCenter.toUpperCase()) || []) : [];
+
+      let matchedZest = [];
+      let matchedSlarc = [];
+
       if (isDate) {
-        if (equipment) matched = matched.concat(zestLogsByVehDate.get(`${equipment}_${ymOrDate}`) || []);
-        if (costCenter) matched = matched.concat(zestLogsByVehDate.get(`${costCenter}_${ymOrDate}`) || []);
+        matchedZest = eqLogs.filter(l => l.date === ymOrDate);
+        matchedSlarc = ccLogs.filter(d => d.d === ymOrDate);
       } else {
-        if (equipment) matched = matched.concat(zestLogsByVehMonth.get(`${equipment}_${ymOrDate}`) || []);
-        if (costCenter) matched = matched.concat(zestLogsByVehMonth.get(`${costCenter}_${ymOrDate}`) || []);
+        if (fuelMonth !== 'ALL') {
+          matchedZest = eqLogs.filter(l => l.date && l.date.startsWith(ymOrDate));
+          matchedSlarc = ccLogs.filter(d => d.m === ymOrDate);
+        } else {
+          matchedZest = eqLogs.filter(l => l.date && l.date.startsWith(fuelYear));
+          matchedSlarc = ccLogs.filter(d => d.m && d.m.startsWith(fuelYear));
+        }
       }
+
+      // Fallback: If no ZEST logs in this specific month, check ALL available logs for this equipment
+      let refLogsPool = matchedZest;
+      if (refLogsPool.length === 0 && eqLogs.length > 0) {
+        refLogsPool = eqLogs;
+      }
+
       const refList = [];
-      const seen = new Set();
-      matched.forEach(l => {
-        const text = (l.reference && l.reference.trim()) || (l.remarks && l.remarks.trim());
-        if (text && !seen.has(text.toLowerCase())) {
-          seen.add(text.toLowerCase());
+      refLogsPool.forEach(l => {
+        const ref = (l.reference || '').trim();
+        const rem = (l.remarks || '').trim();
+        const job = JOB_CODE_DESC[l.job_code] || '';
+        let text = '';
+        if (ref && ref !== '1') {
+          text = rem && rem !== ref ? `${ref} (${rem})` : ref;
+        } else if (rem) {
+          text = rem;
+        } else if (job) {
+          text = job;
+        }
+        if (text && !refList.includes(text)) {
           refList.push(text);
         }
       });
+
+      // Secondary fallback: Extract route/narration from SLARC
+      if (refList.length === 0) {
+        const pool = matchedSlarc.length > 0 ? matchedSlarc : ccLogs;
+        pool.forEach(d => {
+          const parts = String(d.n || '').split('|');
+          const text = parts[0].trim();
+          if (text && !refList.includes(text)) {
+            refList.push(text);
+          }
+        });
+      }
+
+      // Sum ZEST KM/HM for reconciliation comparison
+      let zestKmHmTotal = 0;
+      matchedZest.forEach(l => {
+        zestKmHmTotal += parseFloat(l.hm_km) || 0;
+      });
+
       return {
         primary: refList[0] || '-',
         all: refList.join('; ') || '-',
         count: refList.length,
-        logs: matched
+        zestLogs: eqLogs,
+        matchedZest,
+        matchedSlarc,
+        zestKmHmTotal: Math.round(zestKmHmTotal * 100) / 100
       };
     };
 
@@ -1909,17 +1961,36 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         const resolvedEquipment = (s.equipment && s.equipment !== '-') ? s.equipment : (eqLookup?.equipment || '-');
         const resolvedDescription = s.description || eqLookup?.description || `Kendaraan ${s.costCenter}`;
         const resolvedPlant = s.plant || eqLookup?.plant || s.costCenter.substring(0, 4);
-        const refInfo = getRefInfo(resolvedEquipment, s.costCenter, s.month, false);
+        const refData = getRefAndReconcile(resolvedEquipment, s.costCenter, s.month, false);
+
+        // Verification between SLARC (Credit) and ZESTHLP16PA
+        const slarcTotal = s.creditKm || s.creditHm || 0;
+        const zestTotal = refData.zestKmHmTotal;
+        const diff = Math.round((slarcTotal - zestTotal) * 100) / 100;
+        let reconcileStatus = 'NONE';
+        if (slarcTotal > 0 && zestTotal > 0) {
+          reconcileStatus = Math.abs(diff) < 0.01 ? 'MATCH' : 'DIFF';
+        } else if (slarcTotal > 0) {
+          reconcileStatus = 'SLARC_ONLY';
+        } else if (zestTotal > 0) {
+          reconcileStatus = 'ZEST_ONLY';
+        }
+
         return {
           ...s,
           equipment: resolvedEquipment,
           description: resolvedDescription,
           plant: resolvedPlant,
           plantDesc: s.plantDesc || PLANT_INFO[resolvedPlant]?.desc || resolvedPlant,
-          referencePrimary: refInfo.primary,
-          referenceAll: refInfo.all,
-          referenceCount: refInfo.count,
-          matchingLogs: refInfo.logs
+          referencePrimary: refData.primary,
+          referenceAll: refData.all,
+          referenceCount: refData.count,
+          allZestLogs: refData.zestLogs,
+          matchedZestLogs: refData.matchedZest,
+          matchedSlarcDaily: refData.matchedSlarc,
+          zestTotalKmHm: zestTotal,
+          varianceKmHm: diff,
+          reconcileStatus
         };
       });
     } else {
@@ -2011,7 +2082,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         const resolvedEquipment = (v.equipment && v.equipment !== '-') ? v.equipment : (eqLookup?.equipment || '-');
         const resolvedDescription = v.description || eqLookup?.description || `Kendaraan ${v.costCenter}`;
         const resolvedPlant = v.plant || eqLookup?.plant || v.costCenter.substring(0, 4);
-        const refInfo = getRefInfo(resolvedEquipment, v.costCenter, fuelDate, true);
+        const refData = getRefAndReconcile(resolvedEquipment, v.costCenter, fuelDate, true);
+
         const kmPerL = v.debitLiters > 0 && v.creditKm > 0 ? Number((v.creditKm / v.debitLiters).toFixed(2)) : 0;
         const literPerH = v.debitLiters > 0 && v.creditHm > 0 ? Number((v.debitLiters / v.creditHm).toFixed(2)) : 0;
         const isHeavy = ['TRACTOR', 'EXCAVATOR', 'GRADER', 'WLOADER'].some(h => (v.objectType || '').toUpperCase().includes(h)) || v.creditHm > 0;
@@ -2025,6 +2097,18 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           else if (kmPerL > 0 && kmPerL < 2.0) status = 'BOROS';
         }
 
+        const slarcTotal = v.creditKm || v.creditHm || 0;
+        const zestTotal = refData.zestKmHmTotal;
+        const diff = Math.round((slarcTotal - zestTotal) * 100) / 100;
+        let reconcileStatus = 'NONE';
+        if (slarcTotal > 0 && zestTotal > 0) {
+          reconcileStatus = Math.abs(diff) < 0.01 ? 'MATCH' : 'DIFF';
+        } else if (slarcTotal > 0) {
+          reconcileStatus = 'SLARC_ONLY';
+        } else if (zestTotal > 0) {
+          reconcileStatus = 'ZEST_ONLY';
+        }
+
         return {
           ...v,
           equipment: resolvedEquipment,
@@ -2035,10 +2119,15 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           literPerHm: literPerH,
           costPerUnit: v.creditKm > 0 ? Math.round(v.debitRp / v.creditKm) : (v.creditHm > 0 ? Math.round(v.debitRp / v.creditHm) : 0),
           status,
-          referencePrimary: refInfo.primary,
-          referenceAll: refInfo.all,
-          referenceCount: refInfo.count,
-          matchingLogs: refInfo.logs
+          referencePrimary: refData.primary,
+          referenceAll: refData.all,
+          referenceCount: refData.count,
+          allZestLogs: refData.zestLogs,
+          matchedZestLogs: refData.matchedZest,
+          matchedSlarcDaily: refData.matchedSlarc,
+          zestTotalKmHm: zestTotal,
+          varianceKmHm: diff,
+          reconcileStatus
         };
       });
     }
@@ -2046,8 +2135,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     if (searchFuel.trim()) {
       const q = searchFuel.toLowerCase();
       result = result.filter(r =>
-        (r.costCenter || '').toLowerCase().includes(q) ||
         (r.equipment || '').toLowerCase().includes(q) ||
+        (r.costCenter || '').toLowerCase().includes(q) ||
         (r.description || '').toLowerCase().includes(q) ||
         (r.plant || '').toLowerCase().includes(q) ||
         (r.plantDesc || '').toLowerCase().includes(q) ||
@@ -2057,7 +2146,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
 
     return result;
-  }, [fuelData, fuelYear, fuelMonth, fuelDate, fuelPlant, searchFuel, zestLogsByVehMonth, zestLogsByVehDate, logs, costCenterToEquipmentMap, isAdmin, currentUser]);
+  }, [fuelData, fuelYear, fuelMonth, fuelDate, fuelPlant, searchFuel, zestLogsByEquipment, slarcDailyByCostCenter, logs, costCenterToEquipmentMap, isAdmin, currentUser]);
 
   const fuelKPIs = useMemo(() => {
     let totalLiters = 0;
@@ -2104,13 +2193,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     const rows = fuelTableData.map((s, idx) => ({
       'No.': idx + 1,
       'Kebun / Unit': `${s.plant} - ${s.plantDesc}`,
-      'Cost Center': s.costCenter,
       'No. Equipment': s.equipment || '-',
+      'Cost Center': s.costCenter,
       'Deskripsi Kendaraan': s.description || '-',
-      'Tipe Objek': s.objectType || 'VEH',
-      'Keterangan / Reference (ZESTHLP16PA)': s.referenceAll || s.referencePrimary || '-',
+      'Reference': s.referenceAll || s.referencePrimary || '-',
       'Solar (Liter)': s.debitLiters || 0,
-      'KM / HM': s.creditKm > 0 ? `${s.creditKm} KM` : (s.creditHm > 0 ? `${s.creditHm} HM` : '-'),
+      'KM / HM (SLARC)': s.creditKm > 0 ? `${s.creditKm} KM` : (s.creditHm > 0 ? `${s.creditHm} HM` : '-'),
+      'KM / HM (ZESTHLP16PA)': s.zestTotalKmHm > 0 ? s.zestTotalKmHm : '-',
+      'Selisih (Variance)': s.varianceKmHm !== 0 ? s.varianceKmHm : 0,
       'Rasio / Efisiensi': s.kmPerLiter > 0 ? `${s.kmPerLiter} KM/L` : (s.literPerHm > 0 ? `${s.literPerHm} L/HM` : '-'),
       'Biaya Solar (Rp)': s.debitRp || 0,
       'Status': s.status
@@ -4018,30 +4108,30 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         </div>
 
-        {/* ── Clean Table (Strict Column Order: Solar First, then KM/HM) ── */}
+        {/* ── Clean Table (Centered, Symmetrical, No. Equipment First, Then Cost Center) ── */}
         <div className="p-4 bg-white">
           <div className="overflow-x-auto excel-cell-border">
             <table className="w-full text-[11px] border-collapse">
               <thead>
                 <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 text-[10px] font-extrabold uppercase tracking-wider text-center">
                   <th className="px-2.5 py-2.5 text-center w-10">No</th>
-                  <th className="px-3 py-2.5 text-left w-36">Kebun / Unit</th>
-                  <th className="px-3 py-2.5 text-left w-28">Cost Center</th>
+                  <th className="px-3 py-2.5 text-center w-36">Kebun / Unit</th>
                   <th className="px-3 py-2.5 text-center w-32 bg-emerald-50/70 text-emerald-950 font-black border-x border-emerald-200">
                     No. Equipment
                   </th>
-                  <th className="px-3 py-2.5 text-left w-44">Deskripsi Kendaraan</th>
-                  <th className="px-3 py-2.5 text-left w-48 bg-slate-50/70">Keterangan / Reference (ZESTHLP16PA)</th>
-                  <th className="px-3 py-2.5 text-right w-28 bg-amber-50/70 text-amber-950 font-black border-x border-amber-200">
+                  <th className="px-3 py-2.5 text-center w-28 font-mono">Cost Center</th>
+                  <th className="px-3 py-2.5 text-center w-44">Deskripsi Kendaraan</th>
+                  <th className="px-3 py-2.5 text-center w-52 bg-slate-50/70 text-slate-800">Reference</th>
+                  <th className="px-3 py-2.5 text-center w-28 bg-amber-50/70 text-amber-950 font-black border-x border-amber-200">
                     Solar (Liter)
                   </th>
-                  <th className="px-3 py-2.5 text-right w-28 bg-blue-50/70 text-blue-950 font-black border-r border-blue-200">
+                  <th className="px-3 py-2.5 text-center w-28 bg-blue-50/70 text-blue-950 font-black border-r border-blue-200">
                     KM / HM
                   </th>
                   <th className="px-3 py-2.5 text-center w-32 bg-emerald-50/70 text-emerald-950 font-black border-r border-emerald-200">
                     Rasio / Efisiensi
                   </th>
-                  <th className="px-3 py-2.5 text-right w-32 text-slate-700">Biaya Solar (Rp)</th>
+                  <th className="px-3 py-2.5 text-center w-32 text-slate-700">Biaya Solar (Rp)</th>
                   <th className="px-2.5 py-2.5 text-center w-20 no-print">Aksi</th>
                 </tr>
               </thead>
@@ -4065,22 +4155,17 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                       const isBoros = row.status === 'BOROS';
 
                       return (
-                        <tr key={`${row.month || fuelDate}_${row.costCenter}_${idx}`} className="hover:bg-slate-50 transition-colors">
+                        <tr key={`${row.month || fuelDate}_${row.costCenter}_${idx}`} className="hover:bg-slate-50 transition-colors text-center">
                           {/* 1. No */}
                           <td className="px-2.5 py-2 text-center text-slate-500 font-mono">{rowNum}</td>
 
                           {/* 2. Kebun / Unit */}
-                          <td className="px-3 py-2">
+                          <td className="px-3 py-2 text-center">
                             <div className="font-bold text-slate-900 text-[11px]">{row.plant}</div>
-                            <div className="text-[10px] text-slate-500 truncate max-w-[125px]">{row.plantDesc || row.plant}</div>
+                            <div className="text-[10px] text-slate-500 truncate max-w-[130px] mx-auto">{row.plantDesc || row.plant}</div>
                           </td>
 
-                          {/* 3. Cost Center */}
-                          <td className="px-3 py-2 font-mono font-bold text-slate-800 text-[11px]">
-                            {row.costCenter}
-                          </td>
-
-                          {/* 4. No. Equipment (Dedicated Column via VLOOKUP) */}
+                          {/* 3. No. Equipment (First!) */}
                           <td className="px-3 py-2 text-center bg-emerald-50/25 border-x border-emerald-100">
                             {row.equipment && row.equipment !== '-' ? (
                               <span className="font-mono font-bold text-[11px] text-emerald-900 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-300 inline-block shadow-2xs">
@@ -4091,16 +4176,21 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             )}
                           </td>
 
+                          {/* 4. Cost Center (Second!) */}
+                          <td className="px-3 py-2 text-center font-mono font-bold text-slate-800 text-[11px]">
+                            {row.costCenter}
+                          </td>
+
                           {/* 5. Deskripsi Kendaraan */}
-                          <td className="px-3 py-2">
-                            <div className="font-bold text-slate-800 text-[11px]">{row.description || '-'}</div>
+                          <td className="px-3 py-2 text-center">
+                            <div className="font-bold text-slate-800 text-[11px] truncate max-w-[160px] mx-auto">{row.description || '-'}</div>
                             <span className="bg-slate-100 text-slate-600 px-1 py-0.2 rounded text-[9px] font-mono">{row.objectType || 'VEH'}</span>
                           </td>
 
-                          {/* 4. Keterangan / Reference (ZESTHLP16PA) */}
-                          <td className="px-3 py-2 bg-slate-50/40">
+                          {/* 6. REFERENCE (Renamed & populated via No. Equipment lookup from ZESTHLP16PA) */}
+                          <td className="px-3 py-2 text-center bg-slate-50/40">
                             <div
-                              className="text-[10.5px] font-semibold text-slate-800 truncate max-w-[200px]"
+                              className="text-[10.5px] font-semibold text-slate-800 truncate max-w-[200px] mx-auto"
                               title={row.referenceAll || row.referencePrimary || '-'}
                             >
                               {row.referencePrimary || '-'}
@@ -4112,8 +4202,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             )}
                           </td>
 
-                          {/* 5. Solar (Liter) ── FIRST */}
-                          <td className="px-3 py-2 text-right font-mono font-black text-amber-950 bg-amber-50/40 border-x border-amber-100 text-xs">
+                          {/* 7. Solar (Liter) ── FIRST */}
+                          <td className="px-3 py-2 text-center font-mono font-black text-amber-950 bg-amber-50/40 border-x border-amber-100 text-xs">
                             {row.debitLiters > 0 ? (
                               <span>{row.debitLiters.toLocaleString('id-ID')} <span className="text-[9.5px] font-bold text-amber-700">L</span></span>
                             ) : (
@@ -4121,20 +4211,36 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             )}
                           </td>
 
-                          {/* 6. KM / HM ── SECOND */}
-                          <td className="px-3 py-2 text-right font-mono font-black text-blue-950 bg-blue-50/40 border-r border-blue-100 text-xs">
+                          {/* 8. KM / HM ── SECOND (With verification variance against ZESTHLP16PA) */}
+                          <td className="px-3 py-2 text-center font-mono font-black text-blue-950 bg-blue-50/40 border-r border-blue-100 text-xs">
                             {row.creditKm > 0 && (
-                              <div>{row.creditKm.toLocaleString('id-ID')} <span className="text-[9.5px] font-bold text-blue-700">KM</span></div>
+                              <div className="flex items-center justify-center gap-1">
+                                <span>{row.creditKm.toLocaleString('id-ID')} <span className="text-[9.5px] font-bold text-blue-700">KM</span></span>
+                                {row.reconcileStatus === 'MATCH' && (
+                                  <span className="text-emerald-600 text-[9px] font-bold" title="Sesuai 100% dengan logbook ZESTHLP16PA">✓</span>
+                                )}
+                                {row.reconcileStatus === 'DIFF' && (
+                                  <span className="text-amber-600 text-[9px] font-bold" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} KM`}>⚠️</span>
+                                )}
+                              </div>
                             )}
                             {row.creditHm > 0 && (
-                              <div>{row.creditHm.toLocaleString('id-ID')} <span className="text-[9.5px] font-bold text-purple-700">HM</span></div>
+                              <div className="flex items-center justify-center gap-1">
+                                <span>{row.creditHm.toLocaleString('id-ID')} <span className="text-[9.5px] font-bold text-purple-700">HM</span></span>
+                                {row.reconcileStatus === 'MATCH' && (
+                                  <span className="text-emerald-600 text-[9px] font-bold" title="Sesuai 100% dengan logbook ZESTHLP16PA">✓</span>
+                                )}
+                                {row.reconcileStatus === 'DIFF' && (
+                                  <span className="text-amber-600 text-[9px] font-bold" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} HM`}>⚠️</span>
+                                )}
+                              </div>
                             )}
                             {row.creditKm === 0 && row.creditHm === 0 && (
                               <span className="text-slate-300">-</span>
                             )}
                           </td>
 
-                          {/* 7. Rasio / Efisiensi */}
+                          {/* 9. Rasio / Efisiensi */}
                           <td className="px-3 py-2 text-center bg-emerald-50/30 border-r border-emerald-100">
                             {row.kmPerLiter > 0 && (
                               <span className={`font-mono font-black text-[11px] px-2 py-0.5 rounded-md inline-block ${
@@ -4159,16 +4265,16 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             )}
                           </td>
 
-                          {/* 8. Biaya Solar (Rp) */}
-                          <td className="px-3 py-2 text-right font-mono text-[11px] text-slate-700">
+                          {/* 10. Biaya Solar (Rp) */}
+                          <td className="px-3 py-2 text-center font-mono text-[11px] text-slate-700">
                             {row.debitRp > 0 ? `Rp ${row.debitRp.toLocaleString('id-ID')}` : '-'}
                           </td>
 
-                          {/* 9. Aksi (Detail) */}
+                          {/* 11. Aksi (Detail) */}
                           <td className="px-2.5 py-2 text-center no-print">
                             <button
                               type="button"
-                              onClick={() => { setSelectedFuelVeh(row); setFuelModalTab('zest'); }}
+                              onClick={() => { setSelectedFuelVeh(row); setFuelModalTab('reconcile'); }}
                               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[#064e3b] hover:bg-[#065f46] text-white shadow-2xs transition cursor-pointer"
                             >
                               <Eye size={11} /> Detail
@@ -4210,218 +4316,377 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       </div>
     )}
 
-    {/* ── Vehicle Transaction Detail Modal (Integrated with ZESTHLP16PA) ── */}
-    {selectedFuelVeh && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 no-print animate-in fade-in duration-200">
-        <div className="bg-white rounded-2xl border border-slate-300 shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
-          {/* Modal Header */}
-          <div className="bg-slate-900 text-white p-5 flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Fuel size={18} className="text-amber-400" />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-800">
-                  Detail Kendaraan, BBM & Reference Logbook
-                </span>
-              </div>
-              <h3 className="text-lg font-black text-white">{selectedFuelVeh.description || selectedFuelVeh.costCenter}</h3>
-              <p className="text-xs text-slate-300 mt-0.5">
-                Cost Center: <span className="font-mono font-bold text-amber-300">{selectedFuelVeh.costCenter}</span> · 
-                No. Equipment: <span className="font-mono font-bold text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-700">{selectedFuelVeh.equipment && selectedFuelVeh.equipment !== '-' ? selectedFuelVeh.equipment : 'Unmapped'}</span> · 
-                Unit: <span className="font-semibold">{selectedFuelVeh.plant} ({selectedFuelVeh.plantDesc})</span>
-              </p>
-            </div>
-            <button
-              onClick={() => setSelectedFuelVeh(null)}
-              className="text-slate-400 hover:text-white p-1 rounded-xl hover:bg-slate-800 transition cursor-pointer"
-            >
-              <X size={20} />
-            </button>
-          </div>
+    {/* ── Impeccable Detail Modal with ZESTHLP16PA vs SLARC Reconciliation ── */}
+    {selectedFuelVeh && (() => {
+      const slarcTotal = selectedFuelVeh.creditKm || selectedFuelVeh.creditHm || 0;
+      const zestTotal = selectedFuelVeh.zestTotalKmHm || 0;
+      const variance = Math.round((slarcTotal - zestTotal) * 100) / 100;
+      const uomLabel = selectedFuelVeh.creditKm > 0 ? 'KM' : 'HM';
 
-          {/* Modal Summary KPI Cards (Solar First) */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-4 bg-slate-50 border-b border-slate-200">
-            <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-[9.5px] font-bold text-amber-900 uppercase">1. Solar Masuk (Debit)</span>
-              <div className="text-base font-black text-amber-950 font-mono mt-0.5">
-                {selectedFuelVeh.debitLiters?.toLocaleString('id-ID')} <span className="text-xs font-semibold text-amber-800">L</span>
-              </div>
-              <span className="text-[10px] text-slate-500 font-medium truncate block">
-                Rp {selectedFuelVeh.debitRp?.toLocaleString('id-ID')}
-              </span>
-            </div>
+      // Build daily reconciliation list
+      const slarcDailyList = selectedFuelVeh.matchedSlarcDaily || [];
+      const zestDailyList = selectedFuelVeh.allZestLogs || [];
 
-            <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-[9.5px] font-bold text-blue-900 uppercase">2. Realisasi Kerja (Credit)</span>
-              <div className="text-base font-black text-blue-950 font-mono mt-0.5">
-                {selectedFuelVeh.creditKm > 0 ? `${selectedFuelVeh.creditKm.toLocaleString('id-ID')} KM` :
-                 selectedFuelVeh.creditHm > 0 ? `${selectedFuelVeh.creditHm.toLocaleString('id-ID')} HM` : '-'}
-              </div>
-              <span className="text-[10px] text-slate-500 font-medium">
-                Output Operasional
-              </span>
-            </div>
+      // Map combined dates
+      const combinedDateMap = new Map();
+      slarcDailyList.forEach(d => {
+        if (!combinedDateMap.has(d.d)) {
+          combinedDateMap.set(d.d, { date: d.d, slarcQty: 0, zestQty: 0, doc: d.doc, ref: d.n, u: d.u });
+        }
+        combinedDateMap.get(d.d).slarcQty += (d.q || 0);
+      });
+      zestDailyList.forEach(l => {
+        if (!combinedDateMap.has(l.date)) {
+          combinedDateMap.set(l.date, { date: l.date, slarcQty: 0, zestQty: 0, doc: l.document_number, ref: l.reference || l.remarks, u: l.uom });
+        }
+        const item = combinedDateMap.get(l.date);
+        item.zestQty += (parseFloat(l.hm_km) || 0);
+        if (!item.ref || item.ref === '-') item.ref = l.reference || l.remarks;
+        if (!item.doc || item.doc === '-') item.doc = l.document_number;
+      });
 
-            <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-[9.5px] font-bold text-emerald-900 uppercase">3. Rasio Efisiensi</span>
-              <div className="text-base font-black text-emerald-950 font-mono mt-0.5">
-                {selectedFuelVeh.kmPerLiter > 0 ? `${selectedFuelVeh.kmPerLiter} KM/L` :
-                 selectedFuelVeh.literPerHm > 0 ? `${selectedFuelVeh.literPerHm} L/HM` : '-'}
-              </div>
-              <span className="text-[10px] text-emerald-700 font-bold">
-                Status: {selectedFuelVeh.status}
-              </span>
-            </div>
+      const reconciliationRows = Array.from(combinedDateMap.values()).sort((a, b) => b.date.localeCompare(a.date));
 
-            <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-[9.5px] font-bold text-slate-500 uppercase">Biaya / Satuan</span>
-              <div className="text-base font-black text-slate-800 font-mono mt-0.5">
-                {selectedFuelVeh.costPerUnit > 0 ? `Rp ${selectedFuelVeh.costPerUnit.toLocaleString('id-ID')}` : '-'}
-              </div>
-              <span className="text-[10px] text-slate-500 font-medium">
-                {selectedFuelVeh.creditKm > 0 ? 'Per KM' : 'Per HM'}
-              </span>
-            </div>
-          </div>
-
-          {/* Modal Tab Controls */}
-          <div className="flex border-b border-slate-200 px-4 pt-3 gap-2 bg-white flex-wrap">
-            <button
-              onClick={() => setFuelModalTab('zest')}
-              className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
-                fuelModalTab === 'zest'
-                  ? 'border-emerald-600 text-emerald-900 bg-emerald-50/50 rounded-t-lg'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <Calendar size={13} className="text-emerald-600" /> Log Reference ZESTHLP16PA ({selectedFuelVeh.matchingLogs?.length || 0})
-            </button>
-            <button
-              onClick={() => setFuelModalTab('debit')}
-              className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
-                fuelModalTab === 'debit'
-                  ? 'border-amber-600 text-amber-900 bg-amber-50/50 rounded-t-lg'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <Droplet size={13} className="text-amber-600" /> Pengisian Solar (SALRD - Debit)
-            </button>
-            <button
-              onClick={() => setFuelModalTab('credit')}
-              className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
-                fuelModalTab === 'credit'
-                  ? 'border-blue-600 text-blue-900 bg-blue-50/50 rounded-t-lg'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <Activity size={13} className="text-blue-600" /> Realisasi Kerja (SLARC - Credit)
-            </button>
-          </div>
-
-          {/* Modal Tab Table Content */}
-          <div className="p-4 overflow-y-auto flex-1">
-            {/* TAB 1: ZESTHLP16PA LOGS & REFERENCES */}
-            {fuelModalTab === 'zest' && (
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 no-print animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-300 shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-slate-900 text-white p-5 flex items-start justify-between">
               <div>
-                {(selectedFuelVeh.matchingLogs || []).length === 0 ? (
-                  <div className="text-center py-10 text-slate-400">
-                    <Calendar size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
-                    <p className="font-semibold text-slate-600 text-xs">Belum ada catatan log ZESTHLP16PA untuk kendaraan ini pada periode terpilih.</p>
+                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                  <Fuel size={18} className="text-amber-400" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-950/60 px-2.5 py-0.5 rounded-full border border-amber-800">
+                    Audit Kendaraan: BBM Solar & Logbook Operasional
+                  </span>
+                </div>
+                <h3 className="text-lg font-black text-white">{selectedFuelVeh.description || selectedFuelVeh.costCenter}</h3>
+                <p className="text-xs text-slate-300 mt-1 flex items-center gap-2 flex-wrap">
+                  <span>No. Equipment: <strong className="font-mono text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-700">{selectedFuelVeh.equipment && selectedFuelVeh.equipment !== '-' ? selectedFuelVeh.equipment : 'Unmapped'}</strong></span>
+                  <span>·</span>
+                  <span>Cost Center: <strong className="font-mono text-amber-300">{selectedFuelVeh.costCenter}</strong></span>
+                  <span>·</span>
+                  <span>Unit: <strong className="text-white">{selectedFuelVeh.plant} ({selectedFuelVeh.plantDesc})</strong></span>
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedFuelVeh(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-xl hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Reconciliation Comparison Top Banner */}
+            <div className="bg-slate-50 border-b border-slate-200 p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs text-center">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">1. SLARC (Credit BBM SAP)</span>
+                  <div className="text-lg font-black text-blue-900 font-mono mt-0.5">
+                    {slarcTotal.toLocaleString('id-ID')} <span className="text-xs font-bold text-slate-500">{uomLabel}</span>
                   </div>
-                ) : (
-                  <table className="w-full text-[11px] border-collapse excel-cell-border">
+                  <span className="text-[9.5px] text-slate-400">Posting Output Aktivitas</span>
+                </div>
+
+                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs text-center">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">2. ZESTHLP16PA (Logbook)</span>
+                  <div className="text-lg font-black text-emerald-900 font-mono mt-0.5">
+                    {zestTotal.toLocaleString('id-ID')} <span className="text-xs font-bold text-slate-500">{uomLabel}</span>
+                  </div>
+                  <span className="text-[9.5px] text-slate-400">Total HM/KM dari Logbook</span>
+                </div>
+
+                <div className={`p-3 rounded-xl border text-center ${
+                  variance === 0 && (slarcTotal > 0 || zestTotal > 0)
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                    : slarcTotal > 0 && zestTotal > 0
+                    ? 'bg-amber-50 border-amber-200 text-amber-900'
+                    : 'bg-slate-100 border-slate-200 text-slate-700'
+                }`}>
+                  <span className="text-[10px] font-bold uppercase">Status Rekonsiliasi</span>
+                  <div className="text-sm font-black mt-0.5 flex items-center justify-center gap-1.5">
+                    {variance === 0 && (slarcTotal > 0 || zestTotal > 0) ? (
+                      <>
+                        <CheckCircle size={15} className="text-emerald-600" />
+                        <span>100% SESUAI (Klop)</span>
+                      </>
+                    ) : slarcTotal > 0 && zestTotal > 0 ? (
+                      <>
+                        <AlertTriangle size={15} className="text-amber-600" />
+                        <span>Selisih: {variance > 0 ? `+${variance}` : variance} {uomLabel}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Info size={15} className="text-slate-500" />
+                        <span>{slarcTotal > 0 ? 'Tercatat di SLARC' : 'Tercatat di ZEST'}</span>
+                      </>
+                    )}
+                  </div>
+                  <span className="text-[9.5px] font-medium block mt-0.5">
+                    {variance === 0 ? 'Tidak ada perbedaan nilai output' : 'Perlu sinkronisasi logbook'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Tabs */}
+            <div className="flex border-b border-slate-200 px-4 pt-3 gap-2 bg-white flex-wrap">
+              <button
+                onClick={() => setFuelModalTab('reconcile')}
+                className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
+                  fuelModalTab === 'reconcile'
+                    ? 'border-indigo-600 text-indigo-900 bg-indigo-50/50 rounded-t-lg'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Activity size={13} className="text-indigo-600" /> Verifikasi KM/HM ({reconciliationRows.length})
+              </button>
+              <button
+                onClick={() => setFuelModalTab('zest')}
+                className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
+                  fuelModalTab === 'zest'
+                    ? 'border-emerald-600 text-emerald-900 bg-emerald-50/50 rounded-t-lg'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Calendar size={13} className="text-emerald-600" /> Log ZESTHLP16PA ({selectedFuelVeh.allZestLogs?.length || 0})
+              </button>
+              <button
+                onClick={() => setFuelModalTab('debit')}
+                className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
+                  fuelModalTab === 'debit'
+                    ? 'border-amber-600 text-amber-900 bg-amber-50/50 rounded-t-lg'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Droplet size={13} className="text-amber-600" /> Pengisian Solar ({selectedFuelVeh.debitLiters || 0} L)
+              </button>
+              <button
+                onClick={() => setFuelModalTab('credit')}
+                className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
+                  fuelModalTab === 'credit'
+                    ? 'border-blue-600 text-blue-900 bg-blue-50/50 rounded-t-lg'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <FileSpreadsheet size={13} className="text-blue-600" /> Transaksi SLARC ({slarcDailyList.length})
+              </button>
+            </div>
+
+            {/* Modal Body Table Content */}
+            <div className="p-4 overflow-y-auto flex-1">
+              {/* TAB 1: RECONCILIATION SIDE BY SIDE */}
+              {fuelModalTab === 'reconcile' && (
+                <div>
+                  {reconciliationRows.length === 0 ? (
+                    <div className="text-center py-10 text-slate-400">
+                      <Activity size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
+                      <p className="font-semibold text-slate-600 text-xs">Belum ada data transaksi aktivitas harian untuk kendaraan ini.</p>
+                    </div>
+                  ) : (
+                    <table className="w-full text-[11px] border-collapse excel-cell-border text-center">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-700 font-extrabold uppercase text-[10px]">
+                          <th className="px-2.5 py-1.5 text-center w-10">No</th>
+                          <th className="px-3 py-1.5 text-center w-24">Tanggal</th>
+                          <th className="px-3 py-1.5 text-center w-28">No. Dokumen</th>
+                          <th className="px-3 py-1.5 text-center w-48">Reference / Keterangan</th>
+                          <th className="px-3 py-1.5 text-center w-24 bg-blue-50 text-blue-950 font-bold">SLARC</th>
+                          <th className="px-3 py-1.5 text-center w-24 bg-emerald-50 text-emerald-950 font-bold">ZESTHLP16PA</th>
+                          <th className="px-3 py-1.5 text-center w-20">Selisih</th>
+                          <th className="px-3 py-1.5 text-center w-24">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {reconciliationRows.map((r, i) => {
+                          const diff = Math.round((r.slarcQty - r.zestQty) * 100) / 100;
+                          const isMatch = Math.abs(diff) < 0.01 && r.slarcQty > 0 && r.zestQty > 0;
+
+                          return (
+                            <tr key={i} className="hover:bg-slate-50 text-center">
+                              <td className="px-2.5 py-1.5 text-center font-mono text-slate-400">{i + 1}</td>
+                              <td className="px-3 py-1.5 text-center font-mono font-medium text-slate-800">{r.date}</td>
+                              <td className="px-3 py-1.5 text-center font-mono text-[10px] text-slate-600">{r.doc || '-'}</td>
+                              <td className="px-3 py-1.5 text-center text-slate-800 font-semibold truncate max-w-xs">{r.ref || '-'}</td>
+                              <td className="px-3 py-1.5 text-center font-mono font-bold text-blue-900 bg-blue-50/30">
+                                {r.slarcQty > 0 ? r.slarcQty : '-'}
+                              </td>
+                              <td className="px-3 py-2 text-center font-mono font-bold text-emerald-900 bg-emerald-50/30">
+                                {r.zestQty > 0 ? r.zestQty : '-'}
+                              </td>
+                              <td className="px-3 py-1.5 text-center font-mono text-[10px]">
+                                {diff !== 0 ? (
+                                  <span className="text-amber-700 font-bold">{diff > 0 ? `+${diff}` : diff}</span>
+                                ) : (
+                                  <span className="text-emerald-700 font-bold">0</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-1.5 text-center">
+                                {isMatch ? (
+                                  <span className="inline-block px-2 py-0.5 text-[9px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                    Sesuai
+                                  </span>
+                                ) : r.slarcQty > 0 && r.zestQty > 0 ? (
+                                  <span className="inline-block px-2 py-0.5 text-[9px] font-bold rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                                    Selisih
+                                  </span>
+                                ) : (
+                                  <span className="inline-block px-2 py-0.5 text-[9px] font-medium rounded-full bg-slate-100 text-slate-600">
+                                    {r.slarcQty > 0 ? 'Hanya SLARC' : 'Hanya ZEST'}
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: ZESTHLP16PA LOGS & REFERENCES */}
+              {fuelModalTab === 'zest' && (
+                <div>
+                  {(selectedFuelVeh.allZestLogs || []).length === 0 ? (
+                    <div className="text-center py-10 text-slate-400">
+                      <Calendar size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
+                      <p className="font-semibold text-slate-600 text-xs">Belum ada catatan log ZESTHLP16PA untuk nomor equipment ini.</p>
+                    </div>
+                  ) : (
+                    <table className="w-full text-[11px] border-collapse excel-cell-border text-center">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-700 font-extrabold uppercase text-[10px]">
+                          <th className="px-2.5 py-1.5 text-center w-10">No</th>
+                          <th className="px-3 py-1.5 text-center w-24">Tanggal</th>
+                          <th className="px-3 py-1.5 text-center w-48">Reference (Rute / Pemakaian)</th>
+                          <th className="px-3 py-1.5 text-center">Remarks (Catatan)</th>
+                          <th className="px-3 py-1.5 text-center w-20">HM/KM</th>
+                          <th className="px-3 py-1.5 text-center w-24">Operator</th>
+                          <th className="px-3 py-1.5 text-center w-24">Lokasi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {(selectedFuelVeh.allZestLogs || []).map((l, i) => (
+                          <tr key={i} className="hover:bg-slate-50 text-center">
+                            <td className="px-2.5 py-1.5 text-center font-mono text-slate-400">{i + 1}</td>
+                            <td className="px-3 py-1.5 text-center font-mono font-medium text-slate-800">{l.date}</td>
+                            <td className="px-3 py-1.5 text-center font-bold text-emerald-900">{l.reference || '-'}</td>
+                            <td className="px-3 py-1.5 text-center text-slate-600">{l.remarks || '-'}</td>
+                            <td className="px-3 py-1.5 text-center font-mono font-bold text-slate-800">{l.hm_km}</td>
+                            <td className="px-3 py-1.5 text-center text-slate-600 font-mono text-[10px]">{l.operator || '-'}</td>
+                            <td className="px-3 py-1.5 text-center text-slate-500 font-mono text-[10px]">{l.location_code || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 3: DEBIT FUEL */}
+              {fuelModalTab === 'debit' && (() => {
+                const matchedDaily = (fuelData.daily || []).filter(d =>
+                  d.c === selectedFuelVeh.costCenter && d.t === 'D'
+                );
+
+                if (matchedDaily.length === 0) {
+                  return (
+                    <div className="text-center py-10 text-slate-400">
+                      <Droplet size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
+                      <p className="font-semibold text-slate-600 text-xs">Tidak ada detail transaksi pengisian solar harian tercatat untuk kendaraan ini.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <table className="w-full text-[11px] border-collapse excel-cell-border text-center">
                     <thead>
                       <tr className="bg-slate-100 text-slate-700 font-extrabold uppercase text-[10px]">
                         <th className="px-2.5 py-1.5 text-center w-10">No</th>
                         <th className="px-3 py-1.5 text-center w-24">Tanggal</th>
-                        <th className="px-3 py-1.5 text-left w-44">Reference (Rute / Pemakaian)</th>
-                        <th className="px-3 py-1.5 text-left">Remarks (Catatan)</th>
-                        <th className="px-3 py-1.5 text-right w-20">HM/KM</th>
-                        <th className="px-3 py-1.5 text-left w-24">Operator</th>
+                        <th className="px-3 py-1.5 text-center w-28">No. Dokumen</th>
+                        <th className="px-3 py-1.5 text-center w-24">Jumlah</th>
+                        <th className="px-3 py-1.5 text-center w-28">Nilai (Rp)</th>
+                        <th className="px-3 py-1.5 text-center">Uraian / SPBU</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
-                      {(selectedFuelVeh.matchingLogs || []).map((l, i) => (
-                        <tr key={i} className="hover:bg-slate-50">
+                      {matchedDaily.map((d, i) => (
+                        <tr key={i} className="hover:bg-slate-50 text-center">
                           <td className="px-2.5 py-1.5 text-center font-mono text-slate-400">{i + 1}</td>
-                          <td className="px-3 py-1.5 text-center font-mono font-medium text-slate-800">{l.date}</td>
-                          <td className="px-3 py-1.5 font-bold text-emerald-900">{l.reference || '-'}</td>
-                          <td className="px-3 py-1.5 text-slate-600">{l.remarks || '-'}</td>
-                          <td className="px-3 py-1.5 text-right font-mono font-bold text-slate-800">{l.hm_km}</td>
-                          <td className="px-3 py-1.5 text-slate-600 font-mono text-[10px]">{l.operator || '-'}</td>
+                          <td className="px-3 py-1.5 text-center font-mono font-medium text-slate-800">{d.d}</td>
+                          <td className="px-3 py-1.5 text-center font-mono text-[10px] text-slate-600">{d.doc || '-'}</td>
+                          <td className="px-3 py-1.5 text-center font-mono font-black text-amber-950">
+                            {d.q.toLocaleString('id-ID')} <span className="text-[10px] text-slate-500 font-normal">L</span>
+                          </td>
+                          <td className="px-3 py-1.5 text-center font-mono text-slate-700">
+                            {d.r > 0 ? `Rp ${d.r.toLocaleString('id-ID')}` : '-'}
+                          </td>
+                          <td className="px-3 py-1.5 text-center text-slate-600 text-[10.5px] truncate max-w-xs">{d.n || '-'}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                )}
-              </div>
-            )}
-
-            {/* TAB 2 & 3: DAILY FUEL & ACTIVITY */}
-            {fuelModalTab !== 'zest' && (() => {
-              const matchedDaily = (fuelData.daily || []).filter(d =>
-                d.c === selectedFuelVeh.costCenter &&
-                (fuelModalTab === 'debit' ? d.t === 'D' : d.t === 'C') &&
-                (!selectedFuelVeh.month || d.m === selectedFuelVeh.month)
-              );
-
-              if (matchedDaily.length === 0) {
-                return (
-                  <div className="text-center py-10 text-slate-400">
-                    <FileSpreadsheet size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
-                    <p className="font-semibold text-slate-600 text-xs">
-                      Tidak ada detail transaksi {fuelModalTab === 'debit' ? 'pengisian solar' : 'realisasi kerja'} tercatat untuk periode ini.
-                    </p>
-                  </div>
                 );
-              }
+              })()}
 
-              return (
-                <table className="w-full text-[11px] border-collapse excel-cell-border">
-                  <thead>
-                    <tr className="bg-slate-100 text-slate-700 font-extrabold uppercase text-[10px]">
-                      <th className="px-2.5 py-1.5 text-center w-10">No</th>
-                      <th className="px-3 py-1.5 text-center w-24">Tanggal</th>
-                      <th className="px-3 py-1.5 text-left w-28">No. Dokumen</th>
-                      <th className="px-3 py-1.5 text-right w-24">Jumlah</th>
-                      {fuelModalTab === 'debit' && <th className="px-3 py-1.5 text-right w-28">Nilai (Rp)</th>}
-                      <th className="px-3 py-1.5 text-left">Uraian / Keterangan</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {matchedDaily.map((d, i) => (
-                      <tr key={i} className="hover:bg-slate-50">
-                        <td className="px-2.5 py-1.5 text-center font-mono text-slate-400">{i + 1}</td>
-                        <td className="px-3 py-1.5 text-center font-mono font-medium text-slate-800">{d.d}</td>
-                        <td className="px-3 py-1.5 font-mono text-[10px] text-slate-600">{d.doc || '-'}</td>
-                        <td className="px-3 py-1.5 text-right font-mono font-black text-slate-900">
-                          {d.q.toLocaleString('id-ID')} <span className="text-[10px] text-slate-500 font-normal">{d.u}</span>
-                        </td>
-                        {fuelModalTab === 'debit' && (
-                          <td className="px-3 py-1.5 text-right font-mono text-slate-700">
-                            {d.r > 0 ? `Rp ${d.r.toLocaleString('id-ID')}` : '-'}
-                          </td>
-                        )}
-                        <td className="px-3 py-1.5 text-slate-600 text-[10.5px] truncate max-w-xs">{d.n || '-'}</td>
+              {/* TAB 4: SLARC DAILY CREDIT */}
+              {fuelModalTab === 'credit' && (() => {
+                const matchedDaily = (fuelData.daily || []).filter(d =>
+                  d.c === selectedFuelVeh.costCenter && d.t === 'C'
+                );
+
+                if (matchedDaily.length === 0) {
+                  return (
+                    <div className="text-center py-10 text-slate-400">
+                      <FileSpreadsheet size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
+                      <p className="font-semibold text-slate-600 text-xs">Tidak ada detail transaksi aktivitas SLARC tercatat untuk kendaraan ini.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <table className="w-full text-[11px] border-collapse excel-cell-border text-center">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-700 font-extrabold uppercase text-[10px]">
+                        <th className="px-2.5 py-1.5 text-center w-10">No</th>
+                        <th className="px-3 py-1.5 text-center w-24">Tanggal</th>
+                        <th className="px-3 py-1.5 text-center w-28">No. Dokumen</th>
+                        <th className="px-3 py-1.5 text-center w-24">Jumlah</th>
+                        <th className="px-3 py-1.5 text-center">Uraian SAP</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              );
-            })()}
-          </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {matchedDaily.map((d, i) => (
+                        <tr key={i} className="hover:bg-slate-50 text-center">
+                          <td className="px-2.5 py-1.5 text-center font-mono text-slate-400">{i + 1}</td>
+                          <td className="px-3 py-1.5 text-center font-mono font-medium text-slate-800">{d.d}</td>
+                          <td className="px-3 py-1.5 text-center font-mono text-[10px] text-slate-600">{d.doc || '-'}</td>
+                          <td className="px-3 py-1.5 text-center font-mono font-black text-blue-950">
+                            {d.q.toLocaleString('id-ID')} <span className="text-[10px] text-slate-500 font-normal">{d.u}</span>
+                          </td>
+                          <td className="px-3 py-1.5 text-center text-slate-600 text-[10.5px] truncate max-w-xs">{d.n || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
 
-          {/* Modal Footer */}
-          <div className="bg-slate-100 px-4 py-3 border-t border-slate-200 flex justify-end">
-            <button
-              onClick={() => setSelectedFuelVeh(null)}
-              className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-1.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
-            >
-              Tutup
-            </button>
+            {/* Modal Footer */}
+            <div className="bg-slate-100 px-4 py-3 border-t border-slate-200 flex justify-end">
+              <button
+                onClick={() => setSelectedFuelVeh(null)}
+                className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-1.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      );
+    })()}
 
 
         <WhatsAppSenderModal 
