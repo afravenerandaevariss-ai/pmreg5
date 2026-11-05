@@ -2782,7 +2782,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
 
           <div className="flex gap-2 shrink-0 flex-wrap">
-            {(isDevUser || isAdmin) && (
+            {isDevUser && (
               <>
                 <input type="file" id="raw-zest-file" className="hidden" accept=".xlsx,.xls" onChange={handleFileUpload} />
                 <button
