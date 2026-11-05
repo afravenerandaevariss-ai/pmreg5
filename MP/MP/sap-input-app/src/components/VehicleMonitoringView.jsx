@@ -4500,7 +4500,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
       // Build daily reconciliation list
       const slarcDailyList = selectedFuelVeh.matchedSlarcDaily || [];
-      const zestDailyList = selectedFuelVeh.allZestLogs || [];
+      const zestDailyList = selectedFuelVeh.matchedZestLogs || [];
 
       // Map combined dates
       const combinedDateMap = new Map();
@@ -4669,7 +4669,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Calendar size={13} className="text-emerald-600" /> Log ZESTHLP16PA ({selectedFuelVeh.allZestLogs?.length || 0})
+                <Calendar size={13} className="text-emerald-600" /> Log ZESTHLP16PA ({selectedFuelVeh.matchedZestLogs?.length || 0})
               </button>
               <button
                 onClick={() => setFuelModalTab('debit')}
@@ -4679,7 +4679,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Droplet size={13} className="text-amber-600" /> Pengisian Solar ({selectedFuelVeh.debitLiters || 0} L)
+                <Droplet size={13} className="text-amber-600" /> Pengisian Solar ({(fuelData.daily || []).filter(d => d.c === selectedFuelVeh.costCenter && d.t === 'D' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month)).length})
               </button>
               <button
                 onClick={() => setFuelModalTab('credit')}
@@ -4689,7 +4689,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <FileSpreadsheet size={13} className="text-blue-600" /> Transaksi SLARC ({slarcDailyList.length})
+                <FileSpreadsheet size={13} className="text-blue-600" /> Transaksi SLARC ({(fuelData.daily || []).filter(d => d.c === selectedFuelVeh.costCenter && d.t === 'C' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month)).length})
               </button>
             </div>
 
@@ -4760,20 +4760,58 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           );
                         })}
                       </tbody>
+                      <tfoot>
+                        <tr className="bg-slate-100 font-extrabold text-[11px] text-slate-800 border-t-2 border-slate-300">
+                          <td colSpan={4} className="px-3 py-2 text-center uppercase tracking-wide">
+                            Total ({reconciliationRows.length} Transaksi)
+                          </td>
+                          <td className="px-3 py-2 text-center font-mono font-black text-blue-950 bg-blue-100/50">
+                            {Math.round(reconciliationRows.reduce((acc, r) => acc + (r.slarcQty || 0), 0) * 100) / 100} <span className="text-[10px] text-slate-500 font-normal">{uomLabel}</span>
+                          </td>
+                          <td className="px-3 py-2 text-center font-mono font-black text-emerald-950 bg-emerald-100/50">
+                            {Math.round(reconciliationRows.reduce((acc, r) => acc + (r.zestQty || 0), 0) * 100) / 100} <span className="text-[10px] text-slate-500 font-normal">{uomLabel}</span>
+                          </td>
+                          <td className="px-3 py-2 text-center font-mono text-[10px]">
+                            {(() => {
+                              const totalSlarc = reconciliationRows.reduce((acc, r) => acc + (r.slarcQty || 0), 0);
+                              const totalZest = reconciliationRows.reduce((acc, r) => acc + (r.zestQty || 0), 0);
+                              const diff = Math.round((totalSlarc - totalZest) * 100) / 100;
+                              return diff !== 0 ? <span className="text-amber-700 font-bold">{diff > 0 ? `+${diff}` : diff}</span> : <span className="text-emerald-700 font-bold">0</span>;
+                            })()}
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <span className="text-[10px] font-bold text-slate-600">Ringkasan</span>
+                          </td>
+                        </tr>
+                      </tfoot>
                     </table>
                   )}
                 </div>
               )}
 
               {/* TAB 2: ZESTHLP16PA LOGS & REFERENCES */}
-              {fuelModalTab === 'zest' && (
-                <div>
-                  {(selectedFuelVeh.allZestLogs || []).length === 0 ? (
+              {fuelModalTab === 'zest' && (() => {
+                const zestList = (selectedFuelVeh.matchedZestLogs && selectedFuelVeh.matchedZestLogs.length > 0)
+                  ? selectedFuelVeh.matchedZestLogs
+                  : (selectedFuelVeh.allZestLogs || []);
+                const isDifferentPeriod = (!selectedFuelVeh.matchedZestLogs || selectedFuelVeh.matchedZestLogs.length === 0) && zestList.length > 0;
+
+                if (zestList.length === 0) {
+                  return (
                     <div className="text-center py-10 text-slate-400">
                       <Calendar size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
-                      <p className="font-semibold text-slate-600 text-xs">Belum ada catatan log ZESTHLP16PA untuk nomor equipment ini.</p>
+                      <p className="font-semibold text-slate-600 text-xs">Belum ada catatan log ZESTHLP16PA untuk nomor equipment ini di periode {selectedFuelVeh.month || 'ini'}.</p>
                     </div>
-                  ) : (
+                  );
+                }
+
+                return (
+                  <div>
+                    {isDifferentPeriod && (
+                      <div className="mb-3 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] flex items-center gap-2">
+                        <span className="font-bold">Info:</span> Menampilkan riwayat logbook dari periode sebelumnya ({selectedFuelVeh.referenceLatestPeriod || 'Bulan Lain'}) karena belum ada log ZEST untuk bulan {selectedFuelVeh.month}.
+                      </div>
+                    )}
                     <table className="w-full text-[11px] border-collapse excel-cell-border text-center">
                       <thead>
                         <tr className="bg-slate-100 text-slate-700 font-extrabold uppercase text-[10px]">
@@ -4787,7 +4825,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">
-                        {(selectedFuelVeh.allZestLogs || []).map((l, i) => (
+                        {zestList.map((l, i) => (
                           <tr key={i} className="hover:bg-slate-50 text-center">
                             <td className="px-2.5 py-1.5 text-center font-mono text-slate-400">{i + 1}</td>
                             <td className="px-3 py-1.5 text-center font-mono font-medium text-slate-800">{l.date}</td>
@@ -4799,22 +4837,35 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           </tr>
                         ))}
                       </tbody>
+                      <tfoot>
+                        <tr className="bg-emerald-50/80 font-extrabold text-[11px] text-slate-800 border-t-2 border-emerald-200">
+                          <td colSpan={4} className="px-3 py-2 text-center uppercase tracking-wide text-emerald-950">
+                            Total ZEST ({zestList.length} Log)
+                          </td>
+                          <td className="px-3 py-2 text-center font-mono font-black text-emerald-950">
+                            {Math.round(zestList.reduce((acc, l) => acc + (parseFloat(l.hm_km) || 0), 0) * 100) / 100} <span className="text-[10px] text-slate-500 font-normal">{uomLabel}</span>
+                          </td>
+                          <td colSpan={2} className="px-3 py-2 text-center text-[10px] text-emerald-900 font-medium">
+                            {isDifferentPeriod ? 'Riwayat Periode Lain' : 'Logbook Periode Ini'}
+                          </td>
+                        </tr>
+                      </tfoot>
                     </table>
-                  )}
-                </div>
-              )}
+                  </div>
+                );
+              })()}
 
               {/* TAB 3: DEBIT FUEL */}
               {fuelModalTab === 'debit' && (() => {
                 const matchedDaily = (fuelData.daily || []).filter(d =>
-                  d.c === selectedFuelVeh.costCenter && d.t === 'D'
+                  d.c === selectedFuelVeh.costCenter && d.t === 'D' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month)
                 );
 
                 if (matchedDaily.length === 0) {
                   return (
                     <div className="text-center py-10 text-slate-400">
                       <Droplet size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
-                      <p className="font-semibold text-slate-600 text-xs">Tidak ada detail transaksi pengisian solar harian tercatat untuk kendaraan ini.</p>
+                      <p className="font-semibold text-slate-600 text-xs">Tidak ada detail transaksi pengisian solar harian tercatat untuk kendaraan ini pada periode {selectedFuelVeh.month || 'ini'}.</p>
                     </div>
                   );
                 }
@@ -4847,6 +4898,22 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot>
+                      <tr className="bg-amber-50/80 font-extrabold text-[11px] text-slate-800 border-t-2 border-amber-200">
+                        <td colSpan={3} className="px-3 py-2 text-center uppercase tracking-wide text-amber-950">
+                          Total Pengisian ({matchedDaily.length} Transaksi)
+                        </td>
+                        <td className="px-3 py-2 text-center font-mono font-black text-amber-950">
+                          {Math.round(matchedDaily.reduce((acc, d) => acc + (d.q || 0), 0) * 100) / 100} <span className="text-[10px] text-slate-500 font-normal">L</span>
+                        </td>
+                        <td className="px-3 py-2 text-center font-mono font-bold text-slate-800">
+                          Rp {Math.round(matchedDaily.reduce((acc, d) => acc + (d.r || 0), 0)).toLocaleString('id-ID')}
+                        </td>
+                        <td className="px-3 py-2 text-center text-[10px] text-amber-900 font-medium">
+                          Total Pemakaian Debit SAP
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 );
               })()}
@@ -4854,14 +4921,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               {/* TAB 4: SLARC DAILY CREDIT */}
               {fuelModalTab === 'credit' && (() => {
                 const matchedDaily = (fuelData.daily || []).filter(d =>
-                  d.c === selectedFuelVeh.costCenter && d.t === 'C'
+                  d.c === selectedFuelVeh.costCenter && d.t === 'C' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month)
                 );
 
                 if (matchedDaily.length === 0) {
                   return (
                     <div className="text-center py-10 text-slate-400">
                       <FileSpreadsheet size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
-                      <p className="font-semibold text-slate-600 text-xs">Tidak ada detail transaksi aktivitas SLARC tercatat untuk kendaraan ini.</p>
+                      <p className="font-semibold text-slate-600 text-xs">Tidak ada detail transaksi aktivitas SLARC tercatat untuk kendaraan ini pada periode {selectedFuelVeh.month || 'ini'}.</p>
                     </div>
                   );
                 }
@@ -4890,6 +4957,19 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot>
+                      <tr className="bg-blue-50/80 font-extrabold text-[11px] text-slate-800 border-t-2 border-blue-200">
+                        <td colSpan={3} className="px-3 py-2 text-center uppercase tracking-wide text-blue-950">
+                          Total SLARC ({matchedDaily.length} Transaksi)
+                        </td>
+                        <td className="px-3 py-2 text-center font-mono font-black text-blue-950">
+                          {Math.round(matchedDaily.reduce((acc, d) => acc + (d.q || 0), 0) * 100) / 100} <span className="text-[10px] text-slate-600 font-normal">{matchedDaily[0]?.u || uomLabel}</span>
+                        </td>
+                        <td className="px-3 py-2 text-center text-[10px] text-blue-900 font-medium">
+                          Sesuai Ringkasan Aktivitas SAP
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 );
               })()}
