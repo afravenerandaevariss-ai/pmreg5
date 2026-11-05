@@ -4281,31 +4281,31 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         {/* ── Clean Table with Sticky/Freeze Header ── */}
         <div className="p-4 bg-white">
           <div className="overflow-auto max-h-[calc(100vh-270px)] min-h-[420px] excel-cell-border border border-slate-200 rounded-xl relative shadow-2xs">
-            <table className="w-full text-[11px] border-separate border-spacing-0">
+            <table className="w-full text-xs border-separate border-spacing-0">
               <thead className="sticky top-0 z-30 shadow-xs">
-                <tr className="bg-slate-100 text-slate-700 text-[10px] font-extrabold uppercase tracking-wider text-center whitespace-nowrap">
-                  <th className="sticky top-0 z-30 bg-slate-100 px-2.5 py-3 text-center w-12 border-b border-slate-300 shadow-2xs">No</th>
-                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center w-40 border-b border-slate-300 shadow-2xs">Kebun / Unit</th>
-                  <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-x border-emerald-200 border-b border-slate-300 px-3 py-3 text-center w-36 shadow-2xs">
+                <tr className="bg-slate-100 text-slate-800 text-[11px] font-black uppercase tracking-wider text-center whitespace-nowrap">
+                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center w-12 border-b border-slate-300">No</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center w-36 border-b border-slate-300">Kebun / Unit</th>
+                  <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-x border-emerald-200 border-b border-slate-300 px-3 py-3 text-center w-36">
                     No. Equipment
                   </th>
-                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center w-32 font-mono border-b border-slate-300 shadow-2xs">Cost Center</th>
-                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center min-w-[200px] border-b border-slate-300 shadow-2xs">Deskripsi Kendaraan</th>
-                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-800 px-3 py-3 text-center min-w-[220px] border-b border-slate-300 shadow-2xs">Reference</th>
-                  <th className="sticky top-0 z-30 bg-[#fffbeb] text-amber-950 font-black border-x border-amber-200 border-b border-slate-300 px-3 py-3 text-center w-32 shadow-2xs">
+                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center w-32 font-mono border-b border-slate-300">Cost Center</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 px-4 py-3 text-left min-w-[220px] border-b border-slate-300">Deskripsi Kendaraan</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-800 px-4 py-3 text-left min-w-[240px] border-b border-slate-300">Reference / Rute</th>
+                  <th className="sticky top-0 z-30 bg-[#fffbeb] text-amber-950 font-black border-x border-amber-200 border-b border-slate-300 px-3 py-3 text-center w-32">
                     Solar (Liter)
                   </th>
-                  <th className="sticky top-0 z-30 bg-[#eff6ff] text-blue-950 font-black border-r border-blue-200 border-b border-slate-300 px-3 py-3 text-center w-36 shadow-2xs">
+                  <th className="sticky top-0 z-30 bg-[#eff6ff] text-blue-950 font-black border-r border-blue-200 border-b border-slate-300 px-3 py-3 text-center w-36">
                     KM / HM
                   </th>
-                  <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-r border-emerald-200 border-b border-slate-300 px-3 py-3 text-center w-40 shadow-2xs">
+                  <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-r border-emerald-200 border-b border-slate-300 px-3 py-3 text-center w-36">
                     Rasio / Efisiensi
                   </th>
-                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-700 px-3 py-3 text-center w-40 border-b border-slate-300 shadow-2xs">Biaya Solar (Rp)</th>
-                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center w-24 no-print border-b border-slate-300 shadow-2xs">Aksi</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-800 px-4 py-3 text-right border-b border-slate-300 w-36">Biaya Solar</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center w-24 no-print border-b border-slate-300">Aksi</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
+              <tbody className="divide-y divide-slate-200 text-xs">
                 {fuelTableData.length === 0 ? (
                   <tr>
                     <td colSpan="11" className="text-center py-12 text-slate-400">
@@ -4325,42 +4325,45 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                       const isBoros = row.status === 'BOROS';
 
                       return (
-                        <tr key={`${row.month || fuelDate}_${row.costCenter}_${idx}`} className="hover:bg-slate-50 transition-colors text-center">
+                        <tr 
+                          key={`${row.month || fuelDate}_${row.costCenter}_${idx}`} 
+                          className="hover:bg-emerald-50/40 even:bg-slate-50/50 transition-colors"
+                        >
                           {/* 1. No */}
-                          <td className="px-2.5 py-2 text-center text-slate-500 font-mono">{rowNum}</td>
+                          <td className="px-3 py-2.5 text-center text-slate-500 font-mono font-bold text-xs">{rowNum}</td>
 
                           {/* 2. Kebun / Unit */}
-                          <td className="px-3 py-2 text-center">
-                            <div className="font-bold text-slate-900 text-[11px]">{row.plant}</div>
-                            <div className="text-[10px] text-slate-500 truncate max-w-[130px] mx-auto">{row.plantDesc || row.plant}</div>
+                          <td className="px-3 py-2.5 text-center">
+                            <div className="font-extrabold text-slate-900 text-xs">{row.plant}</div>
+                            <div className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">{row.plantDesc || row.plant}</div>
                           </td>
 
                           {/* 3. No. Equipment (First!) */}
-                          <td className="px-3 py-2 text-center bg-emerald-50/25 border-x border-emerald-100">
+                          <td className="px-3 py-2.5 text-center bg-emerald-50/30 border-x border-emerald-100">
                             {row.equipment && row.equipment !== '-' ? (
-                              <span className="font-mono font-bold text-[11px] text-emerald-900 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-300 inline-block shadow-2xs">
+                              <span className="font-mono font-black text-xs text-emerald-950 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-300 inline-block shadow-2xs tracking-wide">
                                 {row.equipment}
                               </span>
                             ) : (
-                              <span className="text-slate-400 font-mono text-[10px] italic">-</span>
+                              <span className="text-slate-400 font-mono text-xs italic">-</span>
                             )}
                           </td>
 
                           {/* 4. Cost Center (Second!) */}
-                          <td className="px-3 py-2 text-center font-mono font-bold text-slate-800 text-[11px]">
+                          <td className="px-3 py-2.5 text-center font-mono font-bold text-slate-800 text-xs">
                             {row.costCenter}
                           </td>
 
                           {/* 5. Deskripsi Kendaraan */}
-                          <td className="px-3 py-2 text-center">
-                            <div className="font-bold text-slate-800 text-[11px] truncate max-w-[160px] mx-auto">{row.description || '-'}</div>
-                            <span className="bg-slate-100 text-slate-600 px-1 py-0.2 rounded text-[9px] font-mono">{row.objectType || 'VEH'}</span>
+                          <td className="px-4 py-2.5 text-left">
+                            <div className="font-bold text-slate-900 text-xs leading-snug">{row.description || '-'}</div>
+                            <span className="inline-block mt-0.5 bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold">{row.objectType || 'VEH'}</span>
                           </td>
 
                           {/* 6. REFERENCE */}
-                          <td className="px-3 py-2 text-center bg-slate-50/40">
+                          <td className="px-4 py-2.5 text-left bg-slate-50/30">
                             <div
-                              className="text-[11px] font-semibold text-slate-800 truncate max-w-[220px] mx-auto"
+                              className="text-xs font-semibold text-slate-800 leading-snug"
                               title={row.referenceAll || row.referencePrimary || '-'}
                             >
                               {row.referencePrimary || '-'}
@@ -4368,11 +4371,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           </td>
 
                           {/* 7. Solar (Liter) ── FIRST */}
-                          <td className="px-3 py-2 text-center font-mono font-black text-amber-950 bg-amber-50/40 border-x border-amber-100 text-xs whitespace-nowrap">
+                          <td className="px-3 py-2.5 text-center font-mono font-black text-amber-950 bg-amber-50/40 border-x border-amber-100 text-xs whitespace-nowrap">
                             {row.debitLiters > 0 ? (
-                              <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap">
+                              <span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap font-mono font-black text-xs">
                                 <span>{row.debitLiters.toLocaleString('id-ID')}</span>
-                                <span className="text-[10px] font-bold text-amber-700">L</span>
+                                <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-1.5 py-0.2 rounded border border-amber-200">L</span>
                               </span>
                             ) : (
                               <span className="text-slate-300">-</span>
@@ -4380,28 +4383,28 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           </td>
 
                           {/* 8. KM / HM ── SECOND (With verification variance against ZESTHLP16PA) */}
-                          <td className="px-3 py-2 text-center font-mono font-black text-blue-950 bg-blue-50/40 border-r border-blue-100 text-xs whitespace-nowrap">
+                          <td className="px-3 py-2.5 text-center font-mono font-black text-blue-950 bg-blue-50/40 border-r border-blue-100 text-xs whitespace-nowrap">
                             {row.creditKm > 0 && (
                               <div className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
                                 <span>{row.creditKm.toLocaleString('id-ID')}</span>
-                                <span className="text-[10px] font-bold text-blue-700 bg-blue-100/70 border border-blue-200 px-1 py-0.2 rounded">KM</span>
+                                <span className="text-[10px] font-bold text-blue-800 bg-blue-100 border border-blue-200 px-1.5 py-0.2 rounded">KM</span>
                                 {row.reconcileStatus === 'MATCH' && (
-                                  <span className="text-emerald-600 text-[9px] font-bold" title="Sesuai 100% dengan logbook ZESTHLP16PA">✓</span>
+                                  <span className="text-emerald-600 text-xs font-bold" title="Sesuai 100% dengan logbook ZESTHLP16PA">✓</span>
                                 )}
                                 {row.reconcileStatus === 'DIFF' && (
-                                  <span className="text-amber-600 text-[9px] font-bold" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} KM`}>⚠️</span>
+                                  <span className="text-amber-600 text-xs font-bold" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} KM`}>⚠️</span>
                                 )}
                               </div>
                             )}
                             {row.creditHm > 0 && (
                               <div className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
                                 <span>{row.creditHm.toLocaleString('id-ID')}</span>
-                                <span className="text-[10px] font-bold text-purple-700 bg-purple-100/70 border border-purple-200 px-1 py-0.2 rounded">HM</span>
+                                <span className="text-[10px] font-bold text-purple-800 bg-purple-100 border border-purple-200 px-1.5 py-0.2 rounded">HM</span>
                                 {row.reconcileStatus === 'MATCH' && (
-                                  <span className="text-emerald-600 text-[9px] font-bold" title="Sesuai 100% dengan logbook ZESTHLP16PA">✓</span>
+                                  <span className="text-emerald-600 text-xs font-bold" title="Sesuai 100% dengan logbook ZESTHLP16PA">✓</span>
                                 )}
                                 {row.reconcileStatus === 'DIFF' && (
-                                  <span className="text-amber-600 text-[9px] font-bold" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} HM`}>⚠️</span>
+                                  <span className="text-amber-600 text-xs font-bold" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} HM`}>⚠️</span>
                                 )}
                               </div>
                             )}
@@ -4411,45 +4414,45 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           </td>
 
                           {/* 9. Rasio / Efisiensi */}
-                          <td className="px-3 py-2 text-center bg-emerald-50/30 border-r border-emerald-100 whitespace-nowrap">
+                          <td className="px-3 py-2.5 text-center bg-emerald-50/30 border-r border-emerald-100 whitespace-nowrap">
                             {row.kmPerLiter > 0 && (
                               <span className={`font-mono font-black text-xs px-2.5 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap ${
-                                isOptimal ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
-                                isBoros ? 'bg-rose-100 text-rose-800 border border-rose-200' :
-                                'bg-amber-100 text-amber-800 border border-amber-200'
+                                isOptimal ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' :
+                                isBoros ? 'bg-rose-100 text-rose-900 border border-rose-300' :
+                                'bg-amber-100 text-amber-900 border border-amber-300'
                               }`}>
                                 <span>{row.kmPerLiter}</span>
-                                <span className="text-[9.5px] font-bold opacity-80">KM/L</span>
+                                <span className="text-[9.5px] font-extrabold opacity-80">KM/L</span>
                               </span>
                             )}
                             {row.literPerHm > 0 && (
                               <span className={`font-mono font-black text-xs px-2.5 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap ${
-                                isOptimal ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
-                                isBoros ? 'bg-rose-100 text-rose-800 border border-rose-200' :
-                                'bg-amber-100 text-amber-800 border border-amber-200'
+                                isOptimal ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' :
+                                isBoros ? 'bg-rose-100 text-rose-900 border border-rose-300' :
+                                'bg-amber-100 text-amber-900 border border-amber-300'
                               }`}>
                                 <span>{row.literPerHm}</span>
-                                <span className="text-[9.5px] font-bold opacity-80">L/HM</span>
+                                <span className="text-[9.5px] font-extrabold opacity-80">L/HM</span>
                               </span>
                             )}
                             {row.kmPerLiter === 0 && row.literPerHm === 0 && (
-                              <span className="text-slate-400 text-[10px]">-</span>
+                              <span className="text-slate-400 text-xs">-</span>
                             )}
                           </td>
 
                           {/* 10. Biaya Solar (Rp) */}
-                          <td className="px-3 py-2 text-center font-mono text-[11px] text-slate-700 whitespace-nowrap">
+                          <td className="px-4 py-2.5 text-right font-mono font-bold text-xs text-slate-800 whitespace-nowrap">
                             {row.debitRp > 0 ? `Rp ${row.debitRp.toLocaleString('id-ID')}` : '-'}
                           </td>
 
                           {/* 11. Aksi (Detail) */}
-                          <td className="px-2.5 py-2 text-center no-print">
+                          <td className="px-3 py-2.5 text-center no-print">
                             <button
                               type="button"
                               onClick={() => { setSelectedFuelVeh(row); setFuelModalTab('reconcile'); }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[#064e3b] hover:bg-[#065f46] text-white shadow-2xs transition cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#064e3b] hover:bg-[#065f46] text-white shadow-xs transition hover:scale-[1.02] cursor-pointer"
                             >
-                              <Eye size={11} /> Detail
+                              <Eye size={12} /> Detail
                             </button>
                           </td>
                         </tr>
