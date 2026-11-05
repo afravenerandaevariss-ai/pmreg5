@@ -871,6 +871,20 @@ export async function fetchFuelDailyForMonth(yearMonth) {
   }
 }
 
+export async function saveFuelDailyForMonth(yearMonth, dailyRecords) {
+  if (!yearMonth || typeof yearMonth !== 'string') return { error: 'Invalid month' };
+  const numericId = 230100 + parseInt(yearMonth.substring(5, 7));
+  if (!supabase) return { error: 'Supabase not configured' };
+  try {
+    const { error } = await supabase
+      .from(T.hierarchy_data)
+      .upsert({ id: numericId, data: { month: yearMonth, daily: dailyRecords }, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+    return { error };
+  } catch(e) {
+    return { error: e.message };
+  }
+}
+
 export async function saveFuelData(fuelPayload) {
   const payload = Array.isArray(fuelPayload) ? { summaries: fuelPayload, daily: [] } : fuelPayload;
   const { error } = await saveSystemConfig('fuel_data', payload);

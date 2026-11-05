@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toPng } from 'html-to-image';
-import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, invalidateVehicleCache, fetchMasterEquipment, fetchZCOData, saveZCOData, getSystemConfig, fetchDailyLogs, fetchFuelData, saveFuelData, fetchFuelDailyForMonth } from '../lib/supabaseService';
+import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, invalidateVehicleCache, fetchMasterEquipment, fetchZCOData, saveZCOData, getSystemConfig, fetchDailyLogs, fetchFuelData, saveFuelData, fetchFuelDailyForMonth, saveFuelDailyForMonth } from '../lib/supabaseService';
 import WhatsAppSenderModal from './WhatsAppSenderModal';
 
 // â”€â”€â”€ Plant Master Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -813,13 +813,15 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   };
 
   // â”€â”€ Fuel Evaluation (SALRD & SLARC) Upload & Clear â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const handleFuelFileUpload = (e) => {
+  // ── Fuel Evaluation (SALRD & SLARC) Upload & Clear ────────────────────────────
+  const handleFuelUploadByMode = (e, uploadType = 'all') => {
     const file = e.target.files[0];
     if (!file) return;
     setLoading(true);
     setError(null);
     setFuelUploadInfo(null);
-    setUploadProgress('Membaca file Excel BBM (SALRD/SLARC)...');
+    const typeLabel = uploadType === 'salrd' ? 'SALRD (Debit BBM)' : uploadType === 'slarc' ? 'SLARC (Credit BBM)' : 'BBM (SALRD/SLARC)';
+    setUploadProgress(`Membaca file Excel ${typeLabel}...`);
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -835,6 +837,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             if (cc) eqMap[cc] = { equipment: m.equipment || '', description: m.description || '', plant: m.plant || '', objectType: m.object_type || m.objectType || '' };
           });
         }
+        (fuelData.summaries || []).forEach(s => {
+          const cc = String(s.costCenter || '').trim();
+          if (cc && !eqMap[cc]) {
+            eqMap[cc] = { equipment: s.equipment || '', description: s.description || '', plant: s.plant || '', objectType: s.objectType || '' };
+          }
+        });
 
         const ih08SheetName = workbook.SheetNames.find(s => s.toLowerCase().includes('ih08') || s.toLowerCase().includes('equip'));
         if (ih08SheetName) {
@@ -851,41 +859,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             }
           });
         }
-
-        setUploadProgress('Memproses transaksi SALRD (Debit) & SLARC (Credit)...');
-
-        const debitSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes('debit') || s.toLowerCase().includes('salrd'));
-        const creditSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes('credit') || s.toLowerCase().includes('slarc'));
-
-        const newDaily = [];
-        const monthlyAgg = {};
-
-        const getSummaryBucket = (month, costCenter, plantHint) => {
-          const key = `${month}_${costCenter}`;
-          if (!monthlyAgg[key]) {
-            const eqInfo = eqMap[costCenter] || {};
-            const plant = eqInfo.plant || plantHint || costCenter.substring(0, 4) || '';
-            const pInfo = PLANT_INFO[plant] || {};
-            monthlyAgg[key] = {
-              month,
-              costCenter,
-              equipment: eqInfo.equipment || '',
-              description: eqInfo.description || '',
-              plant,
-              plantDesc: pInfo.desc || plant,
-              wilayah: pInfo.wilayah || 'Regional 5',
-              objectType: eqInfo.objectType || (costCenter.includes('CAR') ? 'CAR' : costCenter.includes('TRU') ? 'DTRUCK' : costCenter.includes('TRA') ? 'TRACTOR' : 'VEHICLE'),
-              debitLiters: 0,
-              debitRp: 0,
-              creditKm: 0,
-              creditHm: 0,
-              txCount: 0,
-              slarcNarrations: new Set(),
-              partnerObjects: new Set()
-            };
-          }
-          return monthlyAgg[key];
-        };
 
         const parseDateVal = (raw) => {
           if (!raw) return null;
@@ -906,39 +879,76 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           return null;
         };
 
+        const uploadedAgg = {};
+        const getUploadBucket = (month, costCenter, plantHint) => {
+          const key = `${month}_${costCenter}`;
+          if (!uploadedAgg[key]) {
+            const eqInfo = eqMap[costCenter] || {};
+            const plant = eqInfo.plant || plantHint || costCenter.substring(0, 4) || '';
+            const pInfo = PLANT_INFO[plant] || {};
+            uploadedAgg[key] = {
+              month,
+              costCenter,
+              equipment: eqInfo.equipment || '',
+              description: eqInfo.description || '',
+              plant,
+              plantDesc: pInfo.desc || plant,
+              wilayah: pInfo.wilayah || 'Regional 5',
+              objectType: eqInfo.objectType || (costCenter.includes('CAR') ? 'CAR' : costCenter.includes('TRU') ? 'DTRUCK' : costCenter.includes('TRA') ? 'TRACTOR' : 'VEHICLE'),
+              debitLiters: 0,
+              debitRp: 0,
+              creditKm: 0,
+              creditHm: 0,
+              txCount: 0,
+              slarcNarrations: new Set(),
+              partnerObjects: new Set()
+            };
+          }
+          return uploadedAgg[key];
+        };
+
+        const newDaily = [];
         let debitRowsCount = 0;
         let creditRowsCount = 0;
 
-        if (debitSheetName) {
-          const ws = workbook.Sheets[debitSheetName];
-          const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-          for (const r of rows) {
-            const ce = String(r['Cost Element'] || '').trim();
-            const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || '').trim().toUpperCase();
-            if (ce !== '51100057' && uom !== 'L') continue;
+        const debitSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes('debit') || s.toLowerCase().includes('salrd'));
+        const creditSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes('credit') || s.toLowerCase().includes('slarc'));
 
-            const cc = String(r['Cost Center'] || '').trim();
-            if (!cc) continue;
+        // Process SALRD / Debit if applicable
+        if (uploadType === 'salrd' || uploadType === 'all') {
+          setUploadProgress('Memproses transaksi SALRD (Debit Solar)...');
+          const targetDebitSheet = debitSheetName
+            || (uploadType === 'salrd' ? workbook.SheetNames.find(s => !s.toLowerCase().includes('ih08') && !s.toLowerCase().includes('equip')) : null)
+            || (uploadType === 'salrd' ? workbook.SheetNames[0] : null);
 
-            const rawDate = r['Posting Date'] || r['Document Date'];
-            const dateStr = parseDateVal(rawDate);
-            const period = String(r['Period'] || '').trim();
-            const year = dateStr ? dateStr.substring(0, 4) : '2026';
-            const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : '2026-09');
+          if (targetDebitSheet && workbook.Sheets[targetDebitSheet]) {
+            const rows = XLSX.utils.sheet_to_json(workbook.Sheets[targetDebitSheet], { defval: '' });
+            for (const r of rows) {
+              const ce = String(r['Cost Element'] || r['CostElement'] || '').trim();
+              const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
+              if (ce !== '51100057' && uom !== 'L') continue;
 
-            const liters = Math.abs(parseFloat(r['Total quantity']) || 0);
-            const rupiah = Math.abs(parseFloat(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0) || 0);
-            const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
-            const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
-            const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
+              const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim();
+              if (!cc) continue;
 
-            const bucket = getSummaryBucket(monthStr, cc, plant);
-            bucket.debitLiters += liters;
-            bucket.debitRp += rupiah;
-            bucket.txCount += 1;
-            debitRowsCount++;
+              const rawDate = r['Posting Date'] || r['Document Date'] || r['Date'];
+              const dateStr = parseDateVal(rawDate);
+              const period = String(r['Period'] || '').trim();
+              const year = dateStr ? dateStr.substring(0, 4) : '2026';
+              const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : (targetMonth || '2026-08'));
 
-            if (newDaily.length < 3500) {
+              const liters = parseFloat(r['Total quantity'] || r['Qty'] || 0) || 0;
+              const rupiah = parseFloat(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0) || 0;
+              const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
+              const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
+              const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
+
+              const bucket = getUploadBucket(monthStr, cc, plant);
+              bucket.debitLiters += liters;
+              bucket.debitRp += rupiah;
+              bucket.txCount += 1;
+              debitRowsCount++;
+
               newDaily.push({
                 c: cc,
                 d: dateStr || `${monthStr}-01`,
@@ -955,48 +965,53 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           }
         }
 
-        if (creditSheetName) {
-          const ws = workbook.Sheets[creditSheetName];
-          const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-          for (const r of rows) {
-            const ce = String(r['Cost Element'] || '').trim();
-            const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || '').trim().toUpperCase();
-            const isKm = ce === '90043002' || uom === 'KM';
-            const isHm = ce === '90043003' || uom === 'HR' || uom === 'HM';
-            if (!isKm && !isHm) continue;
+        // Process SLARC / Credit if applicable
+        if (uploadType === 'slarc' || uploadType === 'all') {
+          setUploadProgress('Memproses transaksi SLARC (Credit KM/HM)...');
+          const targetCreditSheet = creditSheetName
+            || (uploadType === 'slarc' ? workbook.SheetNames.find(s => !s.toLowerCase().includes('ih08') && !s.toLowerCase().includes('equip')) : null)
+            || (uploadType === 'slarc' ? workbook.SheetNames[0] : null);
 
-            const cc = String(r['Cost Center'] || '').trim();
-            if (!cc) continue;
+          if (targetCreditSheet && workbook.Sheets[targetCreditSheet]) {
+            const rows = XLSX.utils.sheet_to_json(workbook.Sheets[targetCreditSheet], { defval: '' });
+            for (const r of rows) {
+              const ce = String(r['Cost Element'] || r['CostElement'] || '').trim();
+              const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
+              const isKm = ce === '90043002' || uom === 'KM';
+              const isHm = ce === '90043003' || uom === 'HR' || uom === 'HM';
+              if (!isKm && !isHm) continue;
 
-            const rawDate = r['Posting Date'] || r['Document Date'];
-            const dateStr = parseDateVal(rawDate);
-            const period = String(r['Period'] || '').trim();
-            const year = dateStr ? dateStr.substring(0, 4) : '2026';
-            const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : '2026-09');
+              const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim();
+              if (!cc) continue;
 
-            const qty = Math.abs(parseFloat(r['Total quantity']) || 0);
-            const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
-            const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
-            const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
+              const rawDate = r['Posting Date'] || r['Document Date'] || r['Date'];
+              const dateStr = parseDateVal(rawDate);
+              const period = String(r['Period'] || '').trim();
+              const year = dateStr ? dateStr.substring(0, 4) : '2026';
+              const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : (targetMonth || '2026-08'));
 
-            const bucket = getSummaryBucket(monthStr, cc, plant);
-            if (isKm) bucket.creditKm += qty;
-            if (isHm) bucket.creditHm += qty;
-            bucket.txCount += 1;
-            creditRowsCount++;
+              const qty = parseFloat(r['Total quantity'] || r['Qty'] || 0) || 0;
+              const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
+              const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
+              const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
 
-            const partnerObj = String(r['Partner object name'] || '').trim();
-            if (name && !name.toLowerCase().includes('pembulatan')) {
-              const clean = name.split('|')[0].trim();
-              if (clean && clean !== '1' && clean !== '-' && !clean.includes('/ E-')) {
-                bucket.slarcNarrations?.add(clean);
+              const bucket = getUploadBucket(monthStr, cc, plant);
+              if (isKm) bucket.creditKm += qty;
+              if (isHm) bucket.creditHm += qty;
+              bucket.txCount += 1;
+              creditRowsCount++;
+
+              const partnerObj = String(r['Partner object name'] || '').trim();
+              if (name && !name.toLowerCase().includes('pembulatan')) {
+                const clean = name.split('|')[0].trim();
+                if (clean && clean !== '1' && clean !== '-' && !clean.includes('/ E-')) {
+                  bucket.slarcNarrations?.add(clean);
+                }
               }
-            }
-            if (partnerObj && !partnerObj.toLowerCase().includes('administrasi')) {
-              bucket.partnerObjects?.add(partnerObj);
-            }
+              if (partnerObj && !partnerObj.toLowerCase().includes('administrasi')) {
+                bucket.partnerObjects?.add(partnerObj);
+              }
 
-            if (newDaily.length < 3500) {
               newDaily.push({
                 c: cc,
                 d: dateStr || `${monthStr}-01`,
@@ -1013,61 +1028,128 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           }
         }
 
-        // If neither debitSheet nor creditSheet found, attempt single-sheet parsing
-        if (!debitSheetName && !creditSheetName) {
+        // If uploadType is 'all' and neither sheet was found, parse firstSheet
+        if (uploadType === 'all' && !debitSheetName && !creditSheetName) {
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
-          for (const r of rows) {
-            const cc = String(r['Cost Center'] || r['CostCenter'] || '').trim();
-            if (!cc) continue;
-            const ce = String(r['Cost Element'] || '').trim();
-            const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
-            const rawDate = r['Posting Date'] || r['Document Date'] || r['Date'];
-            const dateStr = parseDateVal(rawDate);
-            const period = String(r['Period'] || '').trim();
-            const year = dateStr ? dateStr.substring(0, 4) : '2026';
-            const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : '2026-09');
-            const qty = Math.abs(parseFloat(r['Total quantity'] || r['Qty'] || 0) || 0);
-            const rupiah = Math.abs(parseFloat(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0) || 0);
-            const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
-            const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
-            const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
+          if (firstSheet) {
+            const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+            for (const r of rows) {
+              const cc = String(r['Cost Center'] || r['CostCenter'] || '').trim();
+              if (!cc) continue;
+              const ce = String(r['Cost Element'] || '').trim();
+              const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
+              const rawDate = r['Posting Date'] || r['Document Date'] || r['Date'];
+              const dateStr = parseDateVal(rawDate);
+              const period = String(r['Period'] || '').trim();
+              const year = dateStr ? dateStr.substring(0, 4) : '2026';
+              const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : (targetMonth || '2026-08'));
+              const qty = parseFloat(r['Total quantity'] || r['Qty'] || 0) || 0;
+              const rupiah = parseFloat(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0) || 0;
+              const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
+              const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
+              const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
 
-            if (ce === '51100057' || uom === 'L') {
-              const bucket = getSummaryBucket(monthStr, cc, plant);
-              bucket.debitLiters += qty;
-              bucket.debitRp += rupiah;
-              bucket.txCount += 1;
-              debitRowsCount++;
-              if (newDaily.length < 3500) {
+              if (ce === '51100057' || uom === 'L') {
+                const bucket = getUploadBucket(monthStr, cc, plant);
+                bucket.debitLiters += qty;
+                bucket.debitRp += rupiah;
+                bucket.txCount += 1;
+                debitRowsCount++;
                 newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'D', q: qty, u: 'L', r: rupiah, doc, n: name, p: plant });
-              }
-            } else if (ce === '90043002' || uom === 'KM') {
-              const bucket = getSummaryBucket(monthStr, cc, plant);
-              bucket.creditKm += qty;
-              bucket.txCount += 1;
-              creditRowsCount++;
-              if (newDaily.length < 3500) {
+              } else if (ce === '90043002' || uom === 'KM') {
+                const bucket = getUploadBucket(monthStr, cc, plant);
+                bucket.creditKm += qty;
+                bucket.txCount += 1;
+                creditRowsCount++;
                 newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'C', q: qty, u: 'KM', r: 0, doc, n: name, p: plant });
-              }
-            } else if (ce === '90043003' || uom === 'HR' || uom === 'HM') {
-              const bucket = getSummaryBucket(monthStr, cc, plant);
-              bucket.creditHm += qty;
-              bucket.txCount += 1;
-              creditRowsCount++;
-              if (newDaily.length < 3500) {
+              } else if (ce === '90043003' || uom === 'HR' || uom === 'HM') {
+                const bucket = getUploadBucket(monthStr, cc, plant);
+                bucket.creditHm += qty;
+                bucket.txCount += 1;
+                creditRowsCount++;
                 newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'C', q: qty, u: 'HM', r: 0, doc, n: name, p: plant });
               }
             }
           }
         }
 
-        // Calculate metrics
-        const calculatedSummaries = Object.values(monthlyAgg).map(b => {
-          const debitL = Math.round(b.debitLiters * 100) / 100;
-          const debitR = Math.round(b.debitRp);
-          const creditK = Math.round(b.creditKm * 100) / 100;
-          const creditH = Math.round(b.creditHm * 100) / 100;
+        const totalProcessedRows = debitRowsCount + creditRowsCount;
+        if (totalProcessedRows === 0) {
+          throw new Error(
+            uploadType === 'salrd'
+              ? 'Tidak ditemukan baris transaksi SALRD (Debit) dengan Cost Element 51100057 atau Unit "L".'
+              : uploadType === 'slarc'
+              ? 'Tidak ditemukan baris transaksi SLARC (Credit) dengan Cost Element 90043002/90043003 atau Unit "KM"/"HM".'
+              : 'Tidak ditemukan transaksi SALRD maupun SLARC yang valid dalam file Excel ini.'
+          );
+        }
+
+        // Merge with existing summaries preserving the counterpart side
+        const summaryMap = new Map();
+        (fuelData.summaries || []).forEach(s => {
+          summaryMap.set(`${s.month}_${s.costCenter}`, { ...s });
+        });
+
+        Object.values(uploadedAgg).forEach(upBucket => {
+          const key = `${upBucket.month}_${upBucket.costCenter}`;
+          const existing = summaryMap.get(key) || {
+            month: upBucket.month,
+            costCenter: upBucket.costCenter,
+            equipment: upBucket.equipment,
+            description: upBucket.description,
+            plant: upBucket.plant,
+            plantDesc: upBucket.plantDesc,
+            wilayah: upBucket.wilayah,
+            objectType: upBucket.objectType,
+            debitLiters: 0,
+            debitRp: 0,
+            creditKm: 0,
+            creditHm: 0,
+            txCount: 0,
+            slarcNarrations: [],
+            partnerObjects: []
+          };
+
+          if (uploadType === 'salrd') {
+            existing.debitLiters = Math.round(upBucket.debitLiters * 100) / 100;
+            existing.debitRp = Math.round(upBucket.debitRp);
+            if (!existing.equipment && upBucket.equipment) existing.equipment = upBucket.equipment;
+            if (!existing.description && upBucket.description) existing.description = upBucket.description;
+            if (!existing.plant && upBucket.plant) existing.plant = upBucket.plant;
+          } else if (uploadType === 'slarc') {
+            existing.creditKm = Math.round(upBucket.creditKm * 100) / 100;
+            existing.creditHm = Math.round(upBucket.creditHm * 100) / 100;
+            const narrList = Array.from(upBucket.slarcNarrations || []);
+            const partList = Array.from(upBucket.partnerObjects || []);
+            existing.slarcNarrations = narrList.slice(0, 5);
+            existing.partnerObjects = partList.slice(0, 3);
+            existing.slarcRefPrimary = narrList[0] || partList[0] || existing.slarcRefPrimary || null;
+            existing.slarcRefAll = narrList.join('; ') || partList.join('; ') || existing.slarcRefAll || null;
+            if (!existing.equipment && upBucket.equipment) existing.equipment = upBucket.equipment;
+            if (!existing.description && upBucket.description) existing.description = upBucket.description;
+            if (!existing.plant && upBucket.plant) existing.plant = upBucket.plant;
+          } else {
+            // 'all'
+            existing.debitLiters = Math.round(upBucket.debitLiters * 100) / 100;
+            existing.debitRp = Math.round(upBucket.debitRp);
+            existing.creditKm = Math.round(upBucket.creditKm * 100) / 100;
+            existing.creditHm = Math.round(upBucket.creditHm * 100) / 100;
+            const narrList = Array.from(upBucket.slarcNarrations || []);
+            const partList = Array.from(upBucket.partnerObjects || []);
+            existing.slarcNarrations = narrList.slice(0, 5);
+            existing.partnerObjects = partList.slice(0, 3);
+            existing.slarcRefPrimary = narrList[0] || partList[0] || existing.slarcRefPrimary || null;
+            existing.slarcRefAll = narrList.join('; ') || partList.join('; ') || existing.slarcRefAll || null;
+            if (upBucket.equipment) existing.equipment = upBucket.equipment;
+            if (upBucket.description) existing.description = upBucket.description;
+            if (upBucket.plant) existing.plant = upBucket.plant;
+          }
+
+          // Recalculate metrics
+          const debitL = existing.debitLiters || 0;
+          const debitR = existing.debitRp || 0;
+          const creditK = existing.creditKm || 0;
+          const creditH = existing.creditHm || 0;
 
           const kmPerL = debitL > 0 && creditK > 0 ? Number((creditK / debitL).toFixed(2)) : 0;
           const literPerH = debitL > 0 && creditH > 0 ? Number((debitL / creditH).toFixed(2)) : 0;
@@ -1076,7 +1158,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           if (creditK > 0) costPerUnit = Math.round(debitR / creditK);
           else if (creditH > 0) costPerUnit = Math.round(debitR / creditH);
 
-          const isHeavy = ['TRACTOR', 'EXCAVATOR', 'GRADER', 'WLOADER', 'HEAVY'].some(h => (b.objectType || '').toUpperCase().includes(h)) || creditH > 0;
+          const isHeavy = ['TRACTOR', 'EXCAVATOR', 'GRADER', 'WLOADER', 'HEAVY'].some(h => (existing.objectType || '').toUpperCase().includes(h)) || creditH > 0;
 
           let status = 'NORMAL';
           if (debitL === 0 && creditK === 0 && creditH === 0) {
@@ -1095,65 +1177,75 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             else status = 'BOROS';
           }
 
-          const narrList = Array.from(b.slarcNarrations || []);
-          const partList = Array.from(b.partnerObjects || []);
-          const slarcRefPrimary = narrList[0] || partList[0] || null;
-          const slarcRefAll = narrList.join('; ') || partList.join('; ') || null;
+          existing.kmPerLiter = kmPerL;
+          existing.literPerHm = literPerH;
+          existing.costPerUnit = costPerUnit;
+          existing.status = status;
 
-          return {
-            ...b,
-            debitLiters: debitL,
-            debitRp: debitR,
-            creditKm: creditK,
-            creditHm: creditH,
-            kmPerLiter: kmPerL,
-            literPerHm: literPerH,
-            costPerUnit,
-            status,
-            slarcRefPrimary,
-            slarcRefAll,
-            slarcNarrations: narrList.slice(0, 5),
-            partnerObjects: partList.slice(0, 3)
-          };
+          summaryMap.set(key, existing);
         });
 
-        // Merge with existing summaries
-        const summaryMap = new Map();
-        (fuelData.summaries || []).forEach(s => {
-          summaryMap.set(`${s.month}_${s.costCenter}`, s);
-        });
-        calculatedSummaries.forEach(s => {
-          summaryMap.set(`${s.month}_${s.costCenter}`, s);
-        });
         const mergedSummaries = Array.from(summaryMap.values());
 
-        // Deduplicate daily
-        const dailyMap = new Map();
-        (fuelData.daily || []).forEach(d => {
-          dailyMap.set(`${d.doc}_${d.c}_${d.d}_${d.t}`, d);
+        // Deduplicate & merge daily records
+        const uploadedKeys = new Set(newDaily.map(d => `${d.m}_${d.c}`));
+        const targetType = uploadType === 'salrd' ? 'D' : uploadType === 'slarc' ? 'C' : null;
+
+        const preservedDaily = (fuelData.daily || []).filter(d => {
+          if (targetType) {
+            if (d.t === targetType && uploadedKeys.has(`${d.m}_${d.c}`)) {
+              return false; // Replaced by new upload
+            }
+            return true;
+          }
+          return !uploadedKeys.has(`${d.m}_${d.c}`);
         });
-        newDaily.forEach(d => {
-          dailyMap.set(`${d.doc}_${d.c}_${d.d}_${d.t}`, d);
-        });
-        const mergedDaily = Array.from(dailyMap.values()).slice(-3000);
+
+        const mergedDaily = [...preservedDaily, ...newDaily].slice(-6000);
 
         setUploadProgress('Menyimpan data evaluasi BBM ke database server...');
         const payload = { summaries: mergedSummaries, daily: mergedDaily };
         const { error: saveErr } = await saveFuelData(payload);
         if (saveErr) throw new Error(saveErr);
 
+        // Update per-month storage for lazy-loaded modal details
+        const affectedMonths = Array.from(new Set(newDaily.map(d => d.m)));
+        for (const m of affectedMonths) {
+          try {
+            let fullMonthDaily = newDaily.filter(d => d.m === m);
+            const { data: existingMonthDaily } = await fetchFuelDailyForMonth(m);
+            if (Array.isArray(existingMonthDaily) && existingMonthDaily.length > 0) {
+              const counterpartDaily = existingMonthDaily.filter(d => {
+                if (targetType) {
+                  if (d.t !== targetType) return true;
+                  return !uploadedKeys.has(`${d.m}_${d.c}`);
+                }
+                return false;
+              });
+              fullMonthDaily = [...counterpartDaily, ...fullMonthDaily];
+            }
+            const dedupeMap = new Map();
+            fullMonthDaily.forEach(d => dedupeMap.set(`${d.doc || ''}_${d.c}_${d.d}_${d.t}_${d.q}`, d));
+            await saveFuelDailyForMonth(m, Array.from(dedupeMap.values()));
+          } catch(pmErr) {
+            console.warn('Per-month storage save warning:', pmErr);
+          }
+        }
+
         setFuelData(payload);
         setFuelUploadInfo({
+          type: uploadType,
           file: file.name,
+          rows: totalProcessedRows,
           debitRows: debitRowsCount,
           creditRows: creditRowsCount,
-          summariesCount: calculatedSummaries.length,
+          summariesCount: Object.keys(uploadedAgg).length,
           uploadedAt: new Date().toISOString()
         });
 
       } catch (err) {
         console.error(err);
-        setError('Error memproses file BBM: ' + (err.message || 'Gagal menyimpan ke server database'));
+        setError(`Error memproses file ${typeLabel}: ` + (err.message || 'Gagal menyimpan ke server database'));
       } finally {
         setLoading(false);
         setUploadProgress('');
@@ -1162,6 +1254,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     };
     reader.readAsArrayBuffer(file);
   };
+
+  const handleSalrdFileUpload = (e) => handleFuelUploadByMode(e, 'salrd');
+  const handleSlarcFileUpload = (e) => handleFuelUploadByMode(e, 'slarc');
+  const handleFuelFileUpload = (e) => handleFuelUploadByMode(e, 'all');
 
   const handleClearFuelData = async () => {
     setLoading(true);
@@ -2802,14 +2898,24 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   <Upload size={14} className="text-emerald-600" /> Upload ZCO_CCTR_01
                 </button>
 
-                <input type="file" id="raw-fuel-file" className="hidden" accept=".xlsx,.xls" onChange={handleFuelFileUpload} />
+                <input type="file" id="raw-salrd-file" className="hidden" accept=".xlsx,.xls" onChange={handleSalrdFileUpload} />
                 <button
-                  onClick={() => document.getElementById('raw-fuel-file').click()}
+                  onClick={() => document.getElementById('raw-salrd-file').click()}
                   disabled={loading}
                   className="bg-white text-slate-800 hover:bg-slate-100 px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50 transition border border-slate-200 cursor-pointer"
-                  title="Upload File Excel Evaluasi BBM (SALRD & SLARC / baru.xlsx)"
+                  title="Upload File Excel SALRD (Debit BBM / Pemakaian Solar)"
                 >
-                  <Upload size={14} className="text-amber-600" /> Upload BBM (SALRD/SLARC)
+                  <Upload size={14} className="text-amber-600" /> Upload SALRD (Debit)
+                </button>
+
+                <input type="file" id="raw-slarc-file" className="hidden" accept=".xlsx,.xls" onChange={handleSlarcFileUpload} />
+                <button
+                  onClick={() => document.getElementById('raw-slarc-file').click()}
+                  disabled={loading}
+                  className="bg-white text-slate-800 hover:bg-slate-100 px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50 transition border border-slate-200 cursor-pointer"
+                  title="Upload File Excel SLARC (Credit BBM / Realisasi KM/HM)"
+                >
+                  <Upload size={14} className="text-blue-600" /> Upload SLARC (Credit)
                 </button>
               </>
             )}
@@ -2871,9 +2977,16 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-xl flex items-start gap-3">
             <CheckCircle size={18} className="shrink-0 mt-0.5 text-amber-600" />
             <div className="text-sm">
-              <p className="font-bold text-xs">Upload BBM Berhasil: {fuelUploadInfo.file}</p>
+              <p className="font-bold text-xs">
+                {fuelUploadInfo.type === 'salrd' ? 'Upload SALRD (Debit) Berhasil' : fuelUploadInfo.type === 'slarc' ? 'Upload SLARC (Credit) Berhasil' : 'Upload BBM Berhasil'}: {fuelUploadInfo.file}
+              </p>
               <p className="text-amber-800 mt-0.5 text-[11px]">
-                Berhasil memproses {fuelUploadInfo.debitRows} baris Debit (SALRD) dan {fuelUploadInfo.creditRows} baris Credit (SLARC) untuk {fuelUploadInfo.summariesCount} rekap bulanan kendaraan.
+                {fuelUploadInfo.type === 'salrd'
+                  ? `Berhasil memproses ${fuelUploadInfo.rows} baris transaksi Debit (SALRD) untuk ${fuelUploadInfo.summariesCount} kendaraan.`
+                  : fuelUploadInfo.type === 'slarc'
+                  ? `Berhasil memproses ${fuelUploadInfo.rows} baris transaksi Credit (SLARC) untuk ${fuelUploadInfo.summariesCount} kendaraan.`
+                  : `Berhasil memproses ${fuelUploadInfo.debitRows} baris Debit (SALRD) dan ${fuelUploadInfo.creditRows} baris Credit (SLARC) untuk ${fuelUploadInfo.summariesCount} kendaraan.`
+                }
               </p>
             </div>
             <button onClick={() => setFuelUploadInfo(null)} className="ml-auto text-amber-400 hover:text-amber-600"><XCircle size={16} /></button>
@@ -4315,7 +4428,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                       <Fuel size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
                       <p className="font-semibold text-slate-600 text-xs">Tidak ada data kendaraan untuk filter ini.</p>
                       <p className="text-[11px] text-slate-400 mt-1">
-                        Silakan sesuaikan Tahun/Bulan/Tanggal atau gunakan tombol <span className="font-bold text-amber-700">Upload BBM</span> untuk memperbarui data.
+                        Silakan sesuaikan Tahun/Bulan/Tanggal atau gunakan tombol <span className="font-bold text-amber-700">Upload SALRD / SLARC</span> untuk memperbarui data.
                       </p>
                     </td>
                   </tr>
