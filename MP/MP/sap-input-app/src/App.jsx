@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+﻿import React, { useState, useMemo, useEffect } from 'react';
 import { Upload, FileSpreadsheet, Download, ChevronDown, ChevronUp, ChevronRight, CheckCircle, AlertCircle, Trash2, Calendar, Clock, User, FileText, Search, Filter, LogOut, Menu, Bell, MessageSquare, Database, ClipboardList, Settings, ChevronsLeft, ChevronsRight, LayoutDashboard, Plus, Minus, Activity, Share2, Copy, ClipboardCheck, Truck, Leaf, Flame, Zap, Cog, Wind, Hammer, Wrench, BookOpen, Eye, EyeOff, RefreshCw, ExternalLink, Lock, X, Edit3, Key, Check, ArrowRight } from 'lucide-react';
 import { parseMasterEQ, parseRegionalMP, exportToSAP, parseHierarchyReference } from './utils/excel';
 import { format } from 'date-fns';
@@ -572,6 +572,7 @@ function App() {
       return;
     }
 
+    if (isViewOnly) { setPasswordError('Akun TRIAL tidak dapat mengubah password.'); return; }
     setIsUpdatingPassword(true);
     const { error } = await updateUser(currentUser.nik, { password: passwordForm.new });
     setIsUpdatingPassword(false);
@@ -588,6 +589,10 @@ function App() {
 
   const handleSaveUser = async (e) => {
     e.preventDefault();
+    if (currentUser?.role?.toUpperCase() === 'TRIAL') {
+      alert('Akun TRIAL hanya dapat melihat data. Tidak dapat mengubah user.');
+      return;
+    }
     if (currentUser?.role?.toUpperCase() === 'USER') {
       alert('Role USER tidak memiliki akses untuk menambah atau mengubah user.');
       return;
@@ -615,6 +620,10 @@ function App() {
   };
 
   const handleDeleteUser = async (nik) => {
+    if (currentUser?.role?.toUpperCase() === 'TRIAL') {
+      alert('Akun TRIAL hanya dapat melihat data. Tidak dapat menghapus user.');
+      return;
+    }
     if (currentUser?.role?.toUpperCase() === 'USER') {
       alert('Role USER tidak memiliki akses untuk menghapus user.');
       return;
@@ -657,15 +666,17 @@ function App() {
     currentUser.role === 'Admin' || 
     currentUser.role?.toUpperCase() === 'ADMIN' || 
     currentUser.role?.toUpperCase() === 'REGIONAL' ||
-    currentUser.role?.toUpperCase() === 'DEV'
+    currentUser.role?.toUpperCase() === 'DEV' ||
+    currentUser.role?.toUpperCase() === 'TRIAL'
   );
 
-  const isDev = currentUser && currentUser.role?.toUpperCase() === 'DEV';
+  const isDev = currentUser && (currentUser.role?.toUpperCase() === 'DEV' || currentUser.role?.toUpperCase() === 'TRIAL');
+  const isViewOnly = currentUser && currentUser.role?.toUpperCase() === 'TRIAL';
 
   // Guard: Automatically redirect non-DEV users away from DEV-only tabs
   useEffect(() => {
     if (!currentUser) return;
-    const userIsDev = currentUser.role?.toUpperCase() === 'DEV';
+    const userIsDev = currentUser.role?.toUpperCase() === 'DEV' || currentUser.role?.toUpperCase() === 'TRIAL';
     const devOnlyTabs = ['verifikasi', 'table', 'monitoring', 'inbox', 'knowledge-base'];
     if (!userIsDev && devOnlyTabs.includes(activeTab)) {
       setActiveTab('dashboard');
@@ -947,6 +958,7 @@ function App() {
   const handleHierarchyUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (isViewOnly) { alert('Akun TRIAL hanya dapat melihat data. Upload dinonaktifkan.'); e.target.value = null; return; }
     try {
       setLoading(true);
       const data = await parseHierarchyReference(file);
@@ -970,6 +982,7 @@ function App() {
   const handleMasterUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (isViewOnly) { alert('Akun TRIAL hanya dapat melihat data. Upload dinonaktifkan.'); e.target.value = null; return; }
     try {
       setLoading(true);
       const newMap = await parseMasterEQ(file);
@@ -990,6 +1003,7 @@ function App() {
   const handleTemplateUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (isViewOnly) { alert('Akun TRIAL hanya dapat melihat data. Upload dinonaktifkan.'); e.target.value = null; return; }
     if (!masterMap) {
       setError("Silakan upload Master EQ terlebih dahulu!");
       return;
