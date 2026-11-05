@@ -1,0 +1,60 @@
+name: 🚀 Deploy PROD → VPS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'MP/MP/sap-input-app/src/**'
+      - 'MP/MP/sap-input-app/public/**'
+      - 'MP/MP/sap-input-app/package.json'
+      - 'MP/MP/sap-input-app/vite.config.js'
+      - 'MP/MP/sap-input-app/index.html'
+      - 'MP/MP/sap-input-app/vercel.json'
+  workflow_dispatch:
+
+jobs:
+  deploy-prod:
+    name: Build & Deploy to pmreg5.afratarigan.my.id
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: MP/MP/sap-input-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: MP/MP/sap-input-app
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+          PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
+        run: npm ci --prefer-offline
+
+      - name: Build PROD
+        working-directory: MP/MP/sap-input-app
+        env:
+          VITE_APP_ENV: production
+        run: npx vite build --mode production --outDir dist-prod
+
+      - name: Compress build
+        working-directory: MP/MP/sap-input-app
+        run: tar -czf deploy_prod.tar.gz -C dist-prod index.html assets
+
+      - name: Deploy via SSH
+        working-directory: MP/MP/sap-input-app
+        env:
+          SSHPASS: Akuhebat123#
+        run: |
+          sudo apt-get install -y sshpass
+          sshpass -e ssh -o StrictHostKeyChecking=no ubuntu@43.134.84.59 \
+            "sudo chmod -R 755 /var/www/pmreg5 && sudo chown -R ubuntu:www-data /var/www/pmreg5 && mkdir -p /var/www/pmreg5/dist"
+          sshpass -e scp -o StrictHostKeyChecking=no deploy_prod.tar.gz ubuntu@43.134.84.59:/tmp/deploy_prod.tar.gz
+          sshpass -e ssh -o StrictHostKeyChecking=no ubuntu@43.134.84.59 \
+            "tar -xzf /tmp/deploy_prod.tar.gz -C /var/www/pmreg5/dist && rm -f /tmp/deploy_prod.tar.gz && sudo chmod -R 755 /var/www/pmreg5/dist && sudo chown -R ubuntu:www-data /var/www/pmreg5/dist && pm2 restart pmreg5 pmreg5-auth pmreg5-postgrest 2>/dev/null || true && sudo nginx -t && sudo systemctl reload nginx"
+          echo "✅ PRODUCTION DEPLOYED → https://pmreg5.afratarigan.my.id"

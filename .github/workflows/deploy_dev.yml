@@ -1,0 +1,45 @@
+name: 🔧 Deploy DEV → Vercel
+
+on:
+  push:
+    branches: [devpmreg5]
+  workflow_dispatch:
+
+jobs:
+  deploy-dev-vercel:
+    name: Build & assign devpmreg5 alias on Vercel
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Get latest devpmreg5 preview URL from GitHub deployments
+        id: preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          COMMIT_SHA="${{ github.sha }}"
+          echo "Commit: $COMMIT_SHA"
+          sleep 30
+          URL=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/deployments?sha=$COMMIT_SHA&per_page=5" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(next((s['target_url'] for dep in d for s in [{'target_url': dep.get('payload',{}).get('web_url','')}] if s['target_url']), ''))")
+          echo "preview_url=$URL" >> $GITHUB_OUTPUT
+          echo "Preview URL: $URL"
+
+      - name: Report DEV deploy
+        run: |
+          echo "✅ DEV branch devpmreg5 pushed!"
+          echo "   Vercel auto-builds preview for each commit."
+          echo "   Latest preview: https://pmreg5-git-devpmreg5-keyusersapreg5-5782s-projects.vercel.app"
+          echo "   Shared alias  : https://devpmreg5.vercel.app"
