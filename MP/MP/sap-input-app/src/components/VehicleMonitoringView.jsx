@@ -4603,7 +4603,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
             {/* Reconciliation Comparison Top Banner */}
             <div className="bg-slate-50 border-b border-slate-200 p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+              <div className={`grid grid-cols-1 ${isDevUser ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3 items-center`}>
                 <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs text-center">
                   <span className="text-[10px] font-bold text-slate-500 uppercase">1. SLARC (Credit BBM SAP)</span>
                   <div className="text-lg font-black text-blue-900 font-mono mt-0.5">
@@ -4620,7 +4620,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   <span className="text-[9.5px] text-slate-400">Total HM/KM dari Logbook</span>
                 </div>
 
-                <div className={`p-3 rounded-xl border text-center ${
+                {isDevUser && (
+                  <div className={`p-3 rounded-xl border text-center ${
                   variance === 0 && (slarcTotal > 0 || zestTotal > 0)
                     ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
                     : slarcTotal > 0 && zestTotal > 0
@@ -4650,6 +4651,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     {variance === 0 ? 'Tidak ada perbedaan nilai output' : 'Perlu sinkronisasi logbook'}
                   </span>
                 </div>
+                )}
               </div>
             </div>
 
