@@ -40,7 +40,10 @@ jobs:
       # ── 3. Install dependencies ────────────────────────────────────────────
       - name: 📦 Install npm dependencies
         working-directory: MP/MP/sap-input-app
-        run: npm ci
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+          PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
+        run: npm install --prefer-offline
 
       # ── 4. Install Google Chrome Stable ───────────────────────────────────
       - name: 🌐 Install Google Chrome Stable
