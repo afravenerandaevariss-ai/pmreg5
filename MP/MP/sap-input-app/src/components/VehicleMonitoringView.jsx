@@ -2621,7 +2621,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   }, []);
 
   return (
-    <div className="bg-slate-50 min-h-full rounded-xl overflow-y-auto" style={{ maxHeight: 'calc(100vh - 80px)' }}>
+    <div className="min-h-full rounded-xl overflow-y-auto relative bg-[#f8fafc] bg-[radial-gradient(#cbd5e1_1.2px,transparent_1.2px)] [background-size:24px_24px]" style={{ maxHeight: 'calc(100vh - 80px)' }}>
+
+      {/* Subtle Ambient Palm Plantation Watermark Texture */}
+      <div 
+        className="fixed inset-0 z-0 bg-cover bg-center opacity-[0.035] grayscale pointer-events-none"
+        style={{ backgroundImage: "url('/sawit.jpg')" }}
+      />
 
       {/* ── Side Drawer ─────────────────────────────────────────── */}
       {drawerItem && (
@@ -4064,9 +4070,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
 
     {activeTab === 'fuel-evaluation' && (
-      <div className="bg-white rounded-2xl border border-slate-300 shadow-sm overflow-hidden max-w-[1250px] mx-auto w-full font-sans">
+      <div className="relative z-10 bg-white/95 backdrop-blur-xs rounded-2xl border border-slate-300 shadow-sm overflow-hidden max-w-[1250px] mx-auto w-full font-sans">
         {/* ── Single Unified Filter Bar (Tahun, Bulan, Tanggal, Kebun, Cari) ── */}
-        <div className="p-4 border-b border-slate-200 bg-slate-50/70 flex flex-col md:flex-row md:items-center justify-between gap-3 flex-wrap no-print">
+        <div className="p-4 border-b border-slate-200 bg-slate-50/80 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px] flex flex-col md:flex-row md:items-center justify-between gap-3 flex-wrap no-print">
           <div className="flex items-center gap-2.5 flex-wrap flex-1">
             {/* 1. Pilih Tahun */}
             <div className="flex flex-col">
@@ -4351,33 +4357,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             <span className="bg-slate-100 text-slate-600 px-1 py-0.2 rounded text-[9px] font-mono">{row.objectType || 'VEH'}</span>
                           </td>
 
-                          {/* 6. REFERENCE (Populated via Smart 4-Tier Fallback: ZEST Ref -> ZEST Job -> Ref. Terakhir -> SLARC SAP) */}
+                          {/* 6. REFERENCE */}
                           <td className="px-3 py-2 text-center bg-slate-50/40">
-                            <div className="flex flex-col items-center justify-center gap-0.5">
-                              <div
-                                className="text-[10.5px] font-semibold text-slate-800 truncate max-w-[200px] mx-auto"
-                                title={row.referenceAll || row.referencePrimary || '-'}
-                              >
-                                {row.referencePrimary || '-'}
-                              </div>
-                              <div className="flex items-center justify-center gap-1 flex-wrap">
-                                {row.referenceBadge && (
-                                  <span className={`text-[8.5px] font-bold px-1.5 py-0.2 rounded shadow-2xs ${
-                                    row.referencePriority === 3
-                                      ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                                      : row.referencePriority === 4
-                                      ? 'bg-blue-100 text-blue-900 border border-blue-300'
-                                      : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                                  }`}>
-                                    {row.referenceBadge}
-                                  </span>
-                                )}
-                                {row.referenceCount > 1 && (
-                                  <span className="text-[9px] text-slate-500 font-medium">
-                                    +{row.referenceCount - 1} lainnya
-                                  </span>
-                                )}
-                              </div>
+                            <div
+                              className="text-[11px] font-semibold text-slate-800 truncate max-w-[220px] mx-auto"
+                              title={row.referenceAll || row.referencePrimary || '-'}
+                            >
+                              {row.referencePrimary || '-'}
                             </div>
                           </td>
 
