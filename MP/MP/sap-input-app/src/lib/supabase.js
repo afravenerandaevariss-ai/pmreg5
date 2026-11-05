@@ -34,7 +34,7 @@ try {
 
   if (!envSupabaseUrl && typeof window !== 'undefined' && window.location) {
     const host = window.location.hostname;
-    if (host.includes('devpmreg5') || host === 'localhost' || host === '127.0.0.1') {
+    if (host.includes('devpmreg5') || host === 'localhost' || host === '127.0.0.1' || host.includes('devpmreg5.vercel.app')) {
       envSupabaseUrl = DEV_URL;
       envSupabaseAnonKey = DEV_ANON_KEY;
     } else if (host.includes('pmreg5.afratarigan.my.id') || (!host.includes('vercel.app') && host.includes('pmreg5'))) {
