@@ -4567,13 +4567,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
             {/* Source of Reference Info Banner */}
             <div className="px-5 pt-3 pb-0 bg-slate-50">
-              <div className="p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs flex-wrap ${
+              <div className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs flex-wrap ${
                 selectedFuelVeh.referencePriority === 1 || selectedFuelVeh.referencePriority === 2
                   ? 'bg-emerald-50/90 border-emerald-200 text-emerald-950'
                   : selectedFuelVeh.referencePriority === 3
                   ? 'bg-amber-50/90 border-amber-200 text-amber-950'
                   : 'bg-blue-50/90 border-blue-200 text-blue-950'
-              }">
+              }`}>
                 <div className="flex items-center gap-2">
                   <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
                     selectedFuelVeh.referencePriority === 1 || selectedFuelVeh.referencePriority === 2
