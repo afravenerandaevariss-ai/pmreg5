@@ -6,11 +6,12 @@ import {
   CheckCircle, AlertCircle, AlertTriangle, ChevronDown, ChevronUp,
   Filter, BarChart2, Layers, TrendingUp, Activity, Truck, Calendar,
   XCircle, Info, Eye, EyeOff, FileDown, Check, X, ArrowRight,
-  Copy, Printer, Coins, ShieldAlert, Send, Lock, Clock, MessageSquare
+  Copy, Printer, Coins, ShieldAlert, Send, Lock, Clock, MessageSquare,
+  Fuel, Gauge, Droplet, ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toPng } from 'html-to-image';
-import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, invalidateVehicleCache, fetchMasterEquipment, fetchZCOData, saveZCOData, getSystemConfig, fetchDailyLogs } from '../lib/supabaseService';
+import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, invalidateVehicleCache, fetchMasterEquipment, fetchZCOData, saveZCOData, getSystemConfig, fetchDailyLogs, fetchFuelData, saveFuelData } from '../lib/supabaseService';
 import WhatsAppSenderModal from './WhatsAppSenderModal';
 
 // ─── Plant Master Data ────────────────────────────────────────────────────────
@@ -322,6 +323,20 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [lastRefreshed, setLastRefreshed] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(''); // granular status during upload
 
+  // ── Fuel Evaluation State ──
+  const [fuelData, setFuelData] = useState({ summaries: [], daily: [] });
+  const [fuelUploadInfo, setFuelUploadInfo] = useState(null);
+  const [fuelViewMode, setFuelViewMode] = useState('monthly'); // 'monthly' | 'daily'
+  const [fuelSelectedPlant, setFuelSelectedPlant] = useState('ALL');
+  const [fuelSelectedWilayah, setFuelSelectedWilayah] = useState('ALL');
+  const [fuelFilterStatus, setFuelFilterStatus] = useState('ALL');
+  const [fuelSelectedMonth, setFuelSelectedMonth] = useState('');
+  const [searchFuel, setSearchFuel] = useState('');
+  const [fuelPage, setFuelPage] = useState(1);
+  const [selectedFuelVeh, setSelectedFuelVeh] = useState(null);
+  const [fuelModalTab, setFuelModalTab] = useState('debit'); // 'debit' | 'credit'
+  const FUEL_PAGE_SIZE = 25;
+
   // ── Load Data ────────────────────────────────────────────────────────────────
   // isManualRefresh: true  → tombol Refresh diklik, force-fetch vehicle_logs & master_map dari server
   //                  false → initial load, prioritaskan cache dulu agar cepat
@@ -341,18 +356,20 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       // vehicle_logs → selalu force-fetch saat manual refresh (transaksi aktif berubah sering)
       // vehicle_master, zco → force saat manual refresh
       // masterEquipment → cukup cache (jarang berubah, data besar)
-      const [vRes, lRes, eqRes, zRes, mapRes] = await Promise.all([
+      const [vRes, lRes, eqRes, zRes, mapRes, fRes] = await Promise.all([
         withTimeout(fetchVehicleMaster(isManualRefresh),            { data: [], error: null }),
         withTimeout(fetchVehicleLogs(isManualRefresh),              { data: [], error: null }),
         withTimeout(fetchMasterEquipment(),                         { data: [], error: null }),
         withTimeout(fetchZCOData(isManualRefresh),                  { data: [], error: null }),
         withTimeout(getSystemConfig('master_map', isManualRefresh), { data: null, error: null }),
+        withTimeout(fetchFuelData(isManualRefresh),                 { data: { summaries: [], daily: [] }, error: null }),
       ]);
 
       setVehicles(vRes.data || []);
       setLogs(lRes.data || []);
       setMasterEquipments(eqRes.data || []);
       setZcoData(zRes.data || []);
+      setFuelData(fRes?.data || { summaries: [], daily: [] });
 
       if (mapRes) {
         if (Array.isArray(mapRes)) {
@@ -419,7 +436,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   // USER: can see unit-checklist, summary-regional, log-raw, zco-reconciliation (filtered by their plant)
   // ADMIN/DEV: can see all tabs
   useEffect(() => {
-    const allowedUserTabs = ['unit-checklist', 'summary-regional', 'log-raw', 'zco-reconciliation'];
+    const allowedUserTabs = ['unit-checklist', 'summary-regional', 'log-raw', 'zco-reconciliation', 'fuel-evaluation'];
     if (!isAdmin && !allowedUserTabs.includes(activeTab)) {
       setActiveTab('unit-checklist');
     }
@@ -789,6 +806,345 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       await saveZCOData([]);
       setZcoData([]);
       setZcoUploadInfo(null);
+    } catch (e) { alert('Gagal: ' + e.message); }
+    finally { setLoading(false); }
+  };
+
+  // ── Fuel Evaluation (SALRD & SLARC) Upload & Clear ────────────────────────────
+  const handleFuelFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setLoading(true);
+    setError(null);
+    setFuelUploadInfo(null);
+    setUploadProgress('Membaca file Excel BBM (SALRD/SLARC)...');
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        setUploadProgress('Menganalisis lembar kerja...');
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+
+        const eqMap = {};
+        if (Array.isArray(masterEquipments)) {
+          masterEquipments.forEach(m => {
+            const cc = String(m.cost_center || m.costCenter || '').trim();
+            if (cc) eqMap[cc] = { equipment: m.equipment || '', description: m.description || '', plant: m.plant || '', objectType: m.object_type || m.objectType || '' };
+          });
+        }
+
+        const ih08SheetName = workbook.SheetNames.find(s => s.toLowerCase().includes('ih08') || s.toLowerCase().includes('equip'));
+        if (ih08SheetName) {
+          const ws = workbook.Sheets[ih08SheetName];
+          const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+          rows.forEach(r => {
+            const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim();
+            const eq = String(r['Equipment'] || r['No. Equipment'] || '').trim();
+            const desc = String(r['Description'] || r['Deskripsi Kendaraan'] || r['Description of technical object'] || '').trim();
+            const plant = String(r['MaintPlant'] || r['Plant'] || '').trim();
+            const objType = String(r['Object type'] || r['ObjectType'] || '').trim();
+            if (cc) {
+              eqMap[cc] = { equipment: eq, description: desc, plant, objectType: objType };
+            }
+          });
+        }
+
+        setUploadProgress('Memproses transaksi SALRD (Debit) & SLARC (Credit)...');
+
+        const debitSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes('debit') || s.toLowerCase().includes('salrd'));
+        const creditSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes('credit') || s.toLowerCase().includes('slarc'));
+
+        const newDaily = [];
+        const monthlyAgg = {};
+
+        const getSummaryBucket = (month, costCenter, plantHint) => {
+          const key = `${month}_${costCenter}`;
+          if (!monthlyAgg[key]) {
+            const eqInfo = eqMap[costCenter] || {};
+            const plant = eqInfo.plant || plantHint || costCenter.substring(0, 4) || '';
+            const pInfo = PLANT_INFO[plant] || {};
+            monthlyAgg[key] = {
+              month,
+              costCenter,
+              equipment: eqInfo.equipment || '',
+              description: eqInfo.description || '',
+              plant,
+              plantDesc: pInfo.desc || plant,
+              wilayah: pInfo.wilayah || 'Regional 5',
+              objectType: eqInfo.objectType || (costCenter.includes('CAR') ? 'CAR' : costCenter.includes('TRU') ? 'DTRUCK' : costCenter.includes('TRA') ? 'TRACTOR' : 'VEHICLE'),
+              debitLiters: 0,
+              debitRp: 0,
+              creditKm: 0,
+              creditHm: 0,
+              txCount: 0
+            };
+          }
+          return monthlyAgg[key];
+        };
+
+        const parseDateVal = (raw) => {
+          if (!raw) return null;
+          if (typeof raw === 'number' || (!isNaN(raw) && Number(raw) > 30000 && Number(raw) < 60000)) {
+            const d = excelSerialToDate(Number(raw));
+            return format(d, 'yyyy-MM-dd');
+          }
+          const s = String(raw).trim();
+          if (s.match(/^\d{4}-\d{2}-\d{2}/)) return s.substring(0, 10);
+          if (s.match(/^\d{2}\.\d{2}\.\d{4}/)) {
+            const parts = s.split('.');
+            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+          }
+          if (s.match(/^\d{2}\/\d{2}\/\d{4}/)) {
+            const parts = s.split('/');
+            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+          }
+          return null;
+        };
+
+        let debitRowsCount = 0;
+        let creditRowsCount = 0;
+
+        if (debitSheetName) {
+          const ws = workbook.Sheets[debitSheetName];
+          const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+          for (const r of rows) {
+            const ce = String(r['Cost Element'] || '').trim();
+            const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || '').trim().toUpperCase();
+            if (ce !== '51100057' && uom !== 'L') continue;
+
+            const cc = String(r['Cost Center'] || '').trim();
+            if (!cc) continue;
+
+            const rawDate = r['Posting Date'] || r['Document Date'];
+            const dateStr = parseDateVal(rawDate);
+            const period = String(r['Period'] || '').trim();
+            const year = dateStr ? dateStr.substring(0, 4) : '2026';
+            const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : '2026-09');
+
+            const liters = Math.abs(parseFloat(r['Total quantity']) || 0);
+            const rupiah = Math.abs(parseFloat(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0) || 0);
+            const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
+            const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
+            const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
+
+            const bucket = getSummaryBucket(monthStr, cc, plant);
+            bucket.debitLiters += liters;
+            bucket.debitRp += rupiah;
+            bucket.txCount += 1;
+            debitRowsCount++;
+
+            if (newDaily.length < 3500) {
+              newDaily.push({
+                c: cc,
+                d: dateStr || `${monthStr}-01`,
+                m: monthStr,
+                t: 'D',
+                q: liters,
+                u: 'L',
+                r: rupiah,
+                doc,
+                n: name,
+                p: plant
+              });
+            }
+          }
+        }
+
+        if (creditSheetName) {
+          const ws = workbook.Sheets[creditSheetName];
+          const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+          for (const r of rows) {
+            const ce = String(r['Cost Element'] || '').trim();
+            const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || '').trim().toUpperCase();
+            const isKm = ce === '90043002' || uom === 'KM';
+            const isHm = ce === '90043003' || uom === 'HR' || uom === 'HM';
+            if (!isKm && !isHm) continue;
+
+            const cc = String(r['Cost Center'] || '').trim();
+            if (!cc) continue;
+
+            const rawDate = r['Posting Date'] || r['Document Date'];
+            const dateStr = parseDateVal(rawDate);
+            const period = String(r['Period'] || '').trim();
+            const year = dateStr ? dateStr.substring(0, 4) : '2026';
+            const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : '2026-09');
+
+            const qty = Math.abs(parseFloat(r['Total quantity']) || 0);
+            const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
+            const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
+            const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
+
+            const bucket = getSummaryBucket(monthStr, cc, plant);
+            if (isKm) bucket.creditKm += qty;
+            if (isHm) bucket.creditHm += qty;
+            bucket.txCount += 1;
+            creditRowsCount++;
+
+            if (newDaily.length < 3500) {
+              newDaily.push({
+                c: cc,
+                d: dateStr || `${monthStr}-01`,
+                m: monthStr,
+                t: 'C',
+                q: qty,
+                u: isKm ? 'KM' : 'HM',
+                r: 0,
+                doc,
+                n: name,
+                p: plant
+              });
+            }
+          }
+        }
+
+        // If neither debitSheet nor creditSheet found, attempt single-sheet parsing
+        if (!debitSheetName && !creditSheetName) {
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+          for (const r of rows) {
+            const cc = String(r['Cost Center'] || r['CostCenter'] || '').trim();
+            if (!cc) continue;
+            const ce = String(r['Cost Element'] || '').trim();
+            const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
+            const rawDate = r['Posting Date'] || r['Document Date'] || r['Date'];
+            const dateStr = parseDateVal(rawDate);
+            const period = String(r['Period'] || '').trim();
+            const year = dateStr ? dateStr.substring(0, 4) : '2026';
+            const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : '2026-09');
+            const qty = Math.abs(parseFloat(r['Total quantity'] || r['Qty'] || 0) || 0);
+            const rupiah = Math.abs(parseFloat(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0) || 0);
+            const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
+            const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
+            const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
+
+            if (ce === '51100057' || uom === 'L') {
+              const bucket = getSummaryBucket(monthStr, cc, plant);
+              bucket.debitLiters += qty;
+              bucket.debitRp += rupiah;
+              bucket.txCount += 1;
+              debitRowsCount++;
+              if (newDaily.length < 3500) {
+                newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'D', q: qty, u: 'L', r: rupiah, doc, n: name, p: plant });
+              }
+            } else if (ce === '90043002' || uom === 'KM') {
+              const bucket = getSummaryBucket(monthStr, cc, plant);
+              bucket.creditKm += qty;
+              bucket.txCount += 1;
+              creditRowsCount++;
+              if (newDaily.length < 3500) {
+                newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'C', q: qty, u: 'KM', r: 0, doc, n: name, p: plant });
+              }
+            } else if (ce === '90043003' || uom === 'HR' || uom === 'HM') {
+              const bucket = getSummaryBucket(monthStr, cc, plant);
+              bucket.creditHm += qty;
+              bucket.txCount += 1;
+              creditRowsCount++;
+              if (newDaily.length < 3500) {
+                newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'C', q: qty, u: 'HM', r: 0, doc, n: name, p: plant });
+              }
+            }
+          }
+        }
+
+        // Calculate metrics
+        const calculatedSummaries = Object.values(monthlyAgg).map(b => {
+          const debitL = Math.round(b.debitLiters * 100) / 100;
+          const debitR = Math.round(b.debitRp);
+          const creditK = Math.round(b.creditKm * 100) / 100;
+          const creditH = Math.round(b.creditHm * 100) / 100;
+
+          const kmPerL = debitL > 0 && creditK > 0 ? Number((creditK / debitL).toFixed(2)) : 0;
+          const literPerH = debitL > 0 && creditH > 0 ? Number((debitL / creditH).toFixed(2)) : 0;
+
+          let costPerUnit = 0;
+          if (creditK > 0) costPerUnit = Math.round(debitR / creditK);
+          else if (creditH > 0) costPerUnit = Math.round(debitR / creditH);
+
+          const isHeavy = ['TRACTOR', 'EXCAVATOR', 'GRADER', 'WLOADER', 'HEAVY'].some(h => (b.objectType || '').toUpperCase().includes(h)) || creditH > 0;
+
+          let status = 'NORMAL';
+          if (debitL === 0 && creditK === 0 && creditH === 0) {
+            status = 'NO_DATA';
+          } else if (debitL === 0) {
+            status = 'NO_FUEL';
+          } else if (creditK === 0 && creditH === 0) {
+            status = 'NO_ACTIVITY';
+          } else if (isHeavy) {
+            if (literPerH <= 3.0) status = 'OPTIMAL';
+            else if (literPerH <= 5.0) status = 'NORMAL';
+            else status = 'BOROS';
+          } else {
+            if (kmPerL >= 3.5) status = 'OPTIMAL';
+            else if (kmPerL >= 2.0) status = 'NORMAL';
+            else status = 'BOROS';
+          }
+
+          return {
+            ...b,
+            debitLiters: debitL,
+            debitRp: debitR,
+            creditKm: creditK,
+            creditHm: creditH,
+            kmPerLiter: kmPerL,
+            literPerHm: literPerH,
+            costPerUnit,
+            status
+          };
+        });
+
+        // Merge with existing summaries
+        const summaryMap = new Map();
+        (fuelData.summaries || []).forEach(s => {
+          summaryMap.set(`${s.month}_${s.costCenter}`, s);
+        });
+        calculatedSummaries.forEach(s => {
+          summaryMap.set(`${s.month}_${s.costCenter}`, s);
+        });
+        const mergedSummaries = Array.from(summaryMap.values());
+
+        // Deduplicate daily
+        const dailyMap = new Map();
+        (fuelData.daily || []).forEach(d => {
+          dailyMap.set(`${d.doc}_${d.c}_${d.d}_${d.t}`, d);
+        });
+        newDaily.forEach(d => {
+          dailyMap.set(`${d.doc}_${d.c}_${d.d}_${d.t}`, d);
+        });
+        const mergedDaily = Array.from(dailyMap.values()).slice(-3000);
+
+        setUploadProgress('Menyimpan data evaluasi BBM ke database server...');
+        const payload = { summaries: mergedSummaries, daily: mergedDaily };
+        const { error: saveErr } = await saveFuelData(payload);
+        if (saveErr) throw new Error(saveErr);
+
+        setFuelData(payload);
+        setFuelUploadInfo({
+          file: file.name,
+          debitRows: debitRowsCount,
+          creditRows: creditRowsCount,
+          summariesCount: calculatedSummaries.length,
+          uploadedAt: new Date().toISOString()
+        });
+
+      } catch (err) {
+        console.error(err);
+        setError('Error memproses file BBM: ' + (err.message || 'Gagal menyimpan ke server database'));
+      } finally {
+        setLoading(false);
+        setUploadProgress('');
+        e.target.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleClearFuelData = async () => {
+    setLoading(true);
+    try {
+      await saveFuelData({ summaries: [], daily: [] });
+      setFuelData({ summaries: [], daily: [] });
+      setFuelUploadInfo(null);
     } catch (e) { alert('Gagal: ' + e.message); }
     finally { setLoading(false); }
   };
@@ -1383,6 +1739,167 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
   };
 
+  // ── Fuel Evaluation Computed Data ──────────────────────────────────────────
+  const fuelAvailableMonths = useMemo(() => {
+    const set = new Set((fuelData?.summaries || []).map(s => s.month));
+    return Array.from(set).filter(Boolean).sort().reverse();
+  }, [fuelData]);
+
+  const effectiveFuelMonth = useMemo(() => {
+    if (fuelSelectedMonth && fuelSelectedMonth !== 'ALL') return fuelSelectedMonth;
+    if (fuelAvailableMonths.includes(targetMonth)) return targetMonth;
+    return fuelAvailableMonths[0] || targetMonth;
+  }, [fuelSelectedMonth, fuelAvailableMonths, targetMonth]);
+
+  const filteredFuelSummaries = useMemo(() => {
+    let list = fuelData?.summaries || [];
+    if (effectiveFuelMonth && effectiveFuelMonth !== 'ALL') {
+      list = list.filter(s => s.month === effectiveFuelMonth);
+    }
+    const activePlant = (!isAdmin && currentUser?.plant && currentUser.plant !== 'ALL')
+      ? currentUser.plant
+      : (fuelSelectedPlant !== 'ALL' ? fuelSelectedPlant : (selectedPlant !== 'ALL' ? selectedPlant : 'ALL'));
+
+    if (activePlant !== 'ALL') {
+      list = list.filter(s => s.plant === activePlant);
+    }
+    if (fuelSelectedWilayah !== 'ALL') {
+      list = list.filter(s => (s.wilayah || '').toLowerCase() === fuelSelectedWilayah.toLowerCase());
+    }
+    if (fuelFilterStatus !== 'ALL') {
+      list = list.filter(s => s.status === fuelFilterStatus);
+    }
+    if (searchFuel.trim()) {
+      const q = searchFuel.toLowerCase();
+      list = list.filter(s =>
+        (s.costCenter || '').toLowerCase().includes(q) ||
+        (s.equipment || '').toLowerCase().includes(q) ||
+        (s.description || '').toLowerCase().includes(q) ||
+        (s.plant || '').toLowerCase().includes(q) ||
+        (s.plantDesc || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [fuelData, effectiveFuelMonth, fuelSelectedPlant, selectedPlant, fuelSelectedWilayah, fuelFilterStatus, searchFuel, isAdmin, currentUser]);
+
+  const fuelKPIs = useMemo(() => {
+    let totalDebitLiters = 0;
+    let totalDebitRp = 0;
+    let totalCreditKm = 0;
+    let totalCreditHm = 0;
+    let kmVehDebitLiters = 0;
+    let kmVehCreditKm = 0;
+    let hmVehDebitLiters = 0;
+    let hmVehCreditHm = 0;
+    let optimalCount = 0;
+    let normalCount = 0;
+    let borosCount = 0;
+
+    filteredFuelSummaries.forEach(s => {
+      totalDebitLiters += s.debitLiters || 0;
+      totalDebitRp += s.debitRp || 0;
+      totalCreditKm += s.creditKm || 0;
+      totalCreditHm += s.creditHm || 0;
+
+      if ((s.creditKm || 0) > 0) {
+        kmVehDebitLiters += s.debitLiters || 0;
+        kmVehCreditKm += s.creditKm || 0;
+      }
+      if ((s.creditHm || 0) > 0) {
+        hmVehDebitLiters += s.debitLiters || 0;
+        hmVehCreditHm += s.creditHm || 0;
+      }
+
+      if (s.status === 'OPTIMAL') optimalCount++;
+      else if (s.status === 'NORMAL') normalCount++;
+      else if (s.status === 'BOROS') borosCount++;
+    });
+
+    const avgKmL = kmVehDebitLiters > 0 ? Number((kmVehCreditKm / kmVehDebitLiters).toFixed(2)) : 0;
+    const avgLHm = hmVehCreditHm > 0 ? Number((hmVehDebitLiters / hmVehCreditHm).toFixed(2)) : 0;
+
+    return {
+      totalDebitLiters,
+      totalDebitRp,
+      totalCreditKm,
+      totalCreditHm,
+      avgKmL,
+      avgLHm,
+      optimalCount,
+      normalCount,
+      borosCount,
+      totalVehicles: filteredFuelSummaries.length
+    };
+  }, [filteredFuelSummaries]);
+
+  const filteredFuelDaily = useMemo(() => {
+    let list = fuelData?.daily || [];
+    if (effectiveFuelMonth && effectiveFuelMonth !== 'ALL') {
+      list = list.filter(d => d.m === effectiveFuelMonth);
+    }
+    if (targetInputDate) {
+      list = list.filter(d => d.d === targetInputDate);
+    }
+    const activePlant = (!isAdmin && currentUser?.plant && currentUser.plant !== 'ALL')
+      ? currentUser.plant
+      : (fuelSelectedPlant !== 'ALL' ? fuelSelectedPlant : (selectedPlant !== 'ALL' ? selectedPlant : 'ALL'));
+
+    if (activePlant !== 'ALL') {
+      list = list.filter(d => d.p === activePlant);
+    }
+    if (searchFuel.trim()) {
+      const q = searchFuel.toLowerCase();
+      list = list.filter(d =>
+        (d.c || '').toLowerCase().includes(q) ||
+        (d.doc || '').toLowerCase().includes(q) ||
+        (d.n || '').toLowerCase().includes(q) ||
+        (d.p || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [fuelData, effectiveFuelMonth, targetInputDate, fuelSelectedPlant, selectedPlant, searchFuel, isAdmin, currentUser]);
+
+  const handleExportFuel = () => {
+    const wb = XLSX.utils.book_new();
+    const rows = filteredFuelSummaries.map((s, idx) => ({
+      'No.': idx + 1,
+      'Bulan': s.month,
+      'Plant / Unit': `${s.plant} - ${s.plantDesc}`,
+      'Wilayah': s.wilayah,
+      'Cost Center': s.costCenter,
+      'No. Equipment': s.equipment,
+      'Deskripsi Kendaraan': s.description,
+      'Tipe / Objek': s.objectType,
+      'Debit Liter (BBM Masuk)': s.debitLiters,
+      'Debit Biaya (Rp)': s.debitRp,
+      'Credit KM (Realisasi KM)': s.creditKm,
+      'Credit HM (Realisasi Jam)': s.creditHm,
+      'Efisiensi KM/L': s.kmPerLiter || '-',
+      'Efisiensi L/HM': s.literPerHm || '-',
+      'Biaya per Satuan (Rp)': s.costPerUnit,
+      'Status Evaluasi': s.status
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Rekap Evaluasi BBM');
+
+    if (filteredFuelDaily.length > 0) {
+      const dailyRows = filteredFuelDaily.slice(0, 3000).map((d, idx) => ({
+        'No.': idx + 1,
+        'Tanggal': d.d,
+        'No. Dokumen': d.doc,
+        'Plant': d.p,
+        'Cost Center': d.c,
+        'Jenis': d.t === 'D' ? 'SALRD (Debit - BBM Masuk)' : 'SLARC (Credit - Realisasi Output)',
+        'Jumlah': d.q,
+        'Satuan': d.u,
+        'Biaya (Rp)': d.r || 0,
+        'Keterangan': d.n
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dailyRows), 'Transaksi Harian');
+    }
+
+    XLSX.writeFile(wb, `Evaluasi_BBM_Regional5_${effectiveFuelMonth}.xlsx`);
+  };
+
   const handleExportZCO = () => {
     const wb = XLSX.utils.book_new();
     const rows = filteredZCOData.map(r => ({
@@ -1800,6 +2317,16 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 >
                   <Upload size={14} className="text-emerald-600" /> Upload ZCO_CCTR_01
                 </button>
+
+                <input type="file" id="raw-fuel-file" className="hidden" accept=".xlsx,.xls" onChange={handleFuelFileUpload} />
+                <button
+                  onClick={() => document.getElementById('raw-fuel-file').click()}
+                  disabled={loading}
+                  className="bg-white text-slate-800 hover:bg-slate-100 px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50 transition border border-slate-200 cursor-pointer"
+                  title="Upload File Excel Evaluasi BBM (SALRD & SLARC / baru.xlsx)"
+                >
+                  <Upload size={14} className="text-amber-600" /> Upload BBM (SALRD/SLARC)
+                </button>
               </>
             )}
             {/* Show Refresh button only to admins; USER role gets silent auto-refresh */}
@@ -1856,6 +2383,18 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             <button onClick={() => setZcoUploadInfo(null)} className="ml-auto text-emerald-400 hover:text-emerald-600"><XCircle size={16} /></button>
           </div>
         )}
+        {fuelUploadInfo && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-xl flex items-start gap-3">
+            <CheckCircle size={18} className="shrink-0 mt-0.5 text-amber-600" />
+            <div className="text-sm">
+              <p className="font-bold text-xs">Upload BBM Berhasil: {fuelUploadInfo.file}</p>
+              <p className="text-amber-800 mt-0.5 text-[11px]">
+                Berhasil memproses {fuelUploadInfo.debitRows} baris Debit (SALRD) dan {fuelUploadInfo.creditRows} baris Credit (SLARC) untuk {fuelUploadInfo.summariesCount} rekap bulanan kendaraan.
+              </p>
+            </div>
+            <button onClick={() => setFuelUploadInfo(null)} className="ml-auto text-amber-400 hover:text-amber-600"><XCircle size={16} /></button>
+          </div>
+        )}
 
         {/* ── Tab Navigation ──────────────────────────────────────── */}
         {!screenshotMode && (
@@ -1866,6 +2405,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               { key: 'detail-veh',        label: '🚚 Daftar Kendaraan',      icon: Truck,           show: isAdmin },
               { key: 'log-raw',           label: '📄 Log Transaksi Asli',    icon: FileSpreadsheet, show: true },
               { key: 'zco-reconciliation',label: '💰 Verifikasi Biaya (ZCO)', icon: Coins,          show: true },
+              { key: 'fuel-evaluation',   label: '⛽ Evaluasi BBM (Solar)',    icon: Fuel,           show: true },
             ].filter(t => t.show).map(({ key, label, icon: Icon }) => (
               <button key={key} onClick={() => { setActiveTab(key); setError(null); }}
                 className={`flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold transition-colors duration-300 ${activeTab === key ? 'bg-gradient-to-tr from-[#064e3b] to-[#2dd4bf] text-white shadow-md shadow-emerald-900/20' : 'text-slate-500 hover:text-[#064e3b] hover:bg-emerald-50'}`}>
@@ -3046,6 +3586,641 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           )}
         </div>
       )}
+
+
+    {activeTab === 'fuel-evaluation' && (
+      <div className="bg-white rounded-2xl border border-slate-300 shadow-sm overflow-hidden max-w-[1250px] mx-auto w-full font-sans">
+        {/* ── Toolbar & Filters ─────────────────────────────────────── */}
+        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 flex-wrap bg-slate-50/50 no-print">
+          <div className="flex gap-2 flex-wrap items-center">
+            {/* View Mode Toggle */}
+            <div className="flex bg-slate-200/80 p-0.5 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => { setFuelViewMode('monthly'); setFuelPage(1); }}
+                className={`px-3 py-1.5 rounded-2xl text-xs font-bold transition flex items-center gap-1 ${
+                  fuelViewMode === 'monthly'
+                    ? 'bg-white text-emerald-800 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Calendar size={13} /> Rekap Bulanan
+              </button>
+              <button
+                type="button"
+                onClick={() => { setFuelViewMode('daily'); setFuelPage(1); }}
+                className={`px-3 py-1.5 rounded-2xl text-xs font-bold transition flex items-center gap-1 ${
+                  fuelViewMode === 'daily'
+                    ? 'bg-white text-emerald-800 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Clock size={13} /> Transaksi Harian
+              </button>
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 text-slate-400" size={14} />
+              <input
+                type="text"
+                placeholder="Cari Plat / Kendaraan / CC..."
+                value={searchFuel}
+                onChange={e => { setSearchFuel(e.target.value); setFuelPage(1); }}
+                className="pl-9 pr-3 py-1.5 border border-slate-200 rounded-2xl text-xs w-48 sm:w-56 focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white font-medium"
+              />
+            </div>
+
+            {/* Month Filter */}
+            <select
+              value={effectiveFuelMonth}
+              onChange={e => { setFuelSelectedMonth(e.target.value); setFuelPage(1); }}
+              className="px-3 py-1.5 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white font-semibold text-slate-700"
+            >
+              {fuelAvailableMonths.length > 0 ? (
+                fuelAvailableMonths.map(m => (
+                  <option key={m} value={m}>Bulan {m}</option>
+                ))
+              ) : (
+                <option value={targetMonth}>Bulan {targetMonth}</option>
+              )}
+            </select>
+
+            {/* Plant Filter */}
+            {isAdmin ? (
+              <select
+                value={fuelSelectedPlant}
+                onChange={e => { setFuelSelectedPlant(e.target.value); setFuelPage(1); }}
+                className="px-3 py-1.5 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white font-semibold text-slate-700"
+              >
+                <option value="ALL">Semua Kebun / Unit</option>
+                {allPlantsList.map(p => (
+                  <option key={p.code} value={p.code}>{p.code} - {p.desc}</option>
+                ))}
+              </select>
+            ) : (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-2xl text-[11px] font-bold text-emerald-800">
+                <span>{currentUser?.plant || selectedPlant}</span>
+              </div>
+            )}
+
+            {/* Wilayah Filter */}
+            <select
+              value={fuelSelectedWilayah}
+              onChange={e => { setFuelSelectedWilayah(e.target.value); setFuelPage(1); }}
+              className="px-3 py-1.5 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white text-slate-700"
+            >
+              <option value="ALL">Semua Wilayah</option>
+              <option value="Kal-Bar">Kal-Bar</option>
+              <option value="Kal-Sel-Teng">Kal-Sel-Teng</option>
+              <option value="Kal-Tim">Kal-Tim</option>
+            </select>
+
+            {/* Status Filter */}
+            {fuelViewMode === 'monthly' && (
+              <select
+                value={fuelFilterStatus}
+                onChange={e => { setFuelFilterStatus(e.target.value); setFuelPage(1); }}
+                className="px-3 py-1.5 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white font-semibold text-slate-700"
+              >
+                <option value="ALL">Semua Status Efisiensi</option>
+                <option value="OPTIMAL">🟢 Optimal</option>
+                <option value="NORMAL">🟡 Normal</option>
+                <option value="BOROS">🔴 Boros / Perlu Cek</option>
+                <option value="NO_DATA">⚪ Belum Ada Data</option>
+              </select>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="text-[11px] text-slate-500 font-medium hidden md:block">
+              Total: <span className="font-bold text-slate-800">
+                {fuelViewMode === 'monthly' ? filteredFuelSummaries.length : filteredFuelDaily.length}
+              </span> data
+            </div>
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-1 bg-[#064e3b] hover:bg-[#065f46] text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition"
+            >
+              <Printer size={13} /> Cetak
+            </button>
+            <button
+              onClick={handleExportFuel}
+              className="flex items-center gap-1 bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition"
+            >
+              <FileDown size={13} /> Ekspor Excel
+            </button>
+          </div>
+        </div>
+
+        {/* ── KPI Metric Cards ───────────────────────────────────────── */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-4 pb-2 bg-white no-print">
+          {/* Card 1: Total Pengisian BBM */}
+          <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3 flex flex-col justify-between shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider">Total Solar Masuk (Debit)</span>
+              <Droplet size={14} className="text-amber-600" />
+            </div>
+            <span className="text-base sm:text-lg font-black text-amber-950 font-mono mt-1">
+              {fuelKPIs.totalDebitLiters.toLocaleString('id-ID')} <span className="text-xs font-bold text-amber-800">L</span>
+            </span>
+            <span className="text-[10.5px] font-semibold text-amber-700 mt-0.5 truncate">
+              Rp {fuelKPIs.totalDebitRp.toLocaleString('id-ID')}
+            </span>
+          </div>
+
+          {/* Card 2: Total Realisasi Kerja */}
+          <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-3 flex flex-col justify-between shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-blue-900 uppercase tracking-wider">Realisasi Kerja (Credit)</span>
+              <Activity size={14} className="text-blue-600" />
+            </div>
+            <span className="text-base sm:text-lg font-black text-blue-950 font-mono mt-1">
+              {fuelKPIs.totalCreditKm.toLocaleString('id-ID')} <span className="text-xs font-bold text-blue-800">KM</span>
+            </span>
+            <span className="text-[10.5px] font-semibold text-blue-700 mt-0.5">
+              {fuelKPIs.totalCreditHm.toLocaleString('id-ID')} Jam (HM Alat Berat)
+            </span>
+          </div>
+
+          {/* Card 3: Rata-rata Rasio KM/L */}
+          <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-3 flex flex-col justify-between shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider">Efisiensi Mobil / Truk</span>
+              <Gauge size={14} className="text-emerald-600" />
+            </div>
+            <span className="text-base sm:text-lg font-black text-emerald-950 font-mono mt-1">
+              {fuelKPIs.avgKmL > 0 ? fuelKPIs.avgKmL : '-'} <span className="text-xs font-bold text-emerald-800">KM / L</span>
+            </span>
+            <span className="text-[10.5px] font-semibold text-emerald-700 mt-0.5">
+              Standar: ≥ 3.5 KM/Liter
+            </span>
+          </div>
+
+          {/* Card 4: Rata-rata Rasio L/HM */}
+          <div className="bg-purple-50/70 border border-purple-200/80 rounded-xl p-3 flex flex-col justify-between shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-purple-900 uppercase tracking-wider">Konsumsi Alat Berat</span>
+              <Fuel size={14} className="text-purple-600" />
+            </div>
+            <span className="text-base sm:text-lg font-black text-purple-950 font-mono mt-1">
+              {fuelKPIs.avgLHm > 0 ? fuelKPIs.avgLHm : '-'} <span className="text-xs font-bold text-purple-800">L / HM</span>
+            </span>
+            <span className="text-[10.5px] font-semibold text-purple-700 mt-0.5">
+              Standar: ≤ 3.0 L / Jam
+            </span>
+          </div>
+
+          {/* Card 5: Unit Perlu Evaluasi */}
+          <div className="bg-rose-50/70 border border-rose-200/80 rounded-xl p-3 flex flex-col justify-between shadow-2xs col-span-2 md:col-span-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-rose-900 uppercase tracking-wider">Perlu Evaluasi</span>
+              <AlertTriangle size={14} className="text-rose-600" />
+            </div>
+            <div className="flex items-baseline gap-1 mt-1">
+              <span className="text-base sm:text-lg font-black text-rose-950 font-mono">
+                {fuelKPIs.borosCount}
+              </span>
+              <span className="text-xs font-bold text-rose-800">Unit Boros</span>
+            </div>
+            <span className="text-[10.5px] font-semibold text-emerald-700 mt-0.5">
+              {fuelKPIs.optimalCount} Optimal · {fuelKPIs.normalCount} Normal
+            </span>
+          </div>
+        </div>
+
+        {/* ── Content: Monthly View ──────────────────────────────────── */}
+        {fuelViewMode === 'monthly' && (
+          <div className="p-4 bg-white">
+            <div className="overflow-x-auto excel-cell-border">
+              <table className="w-full text-[11px] border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 text-[10px] font-extrabold uppercase tracking-wider text-center">
+                    <th className="px-2.5 py-2 text-center w-10">No</th>
+                    <th className="px-3 py-2 text-left w-36">Kebun / Unit</th>
+                    <th className="px-3 py-2 text-left w-32">Cost Center</th>
+                    <th className="px-3 py-2 text-left">Kendaraan & Equipment</th>
+                    <th className="px-3 py-2 text-right bg-amber-50/50 text-amber-950">Debit Solar (L)</th>
+                    <th className="px-3 py-2 text-right bg-amber-50/50 text-amber-950">Debit Biaya (Rp)</th>
+                    <th className="px-3 py-2 text-right bg-blue-50/50 text-blue-950">Credit Realisasi</th>
+                    <th className="px-3 py-2 text-center bg-emerald-50/50 text-emerald-950">Efisiensi</th>
+                    <th className="px-3 py-2 text-right">Biaya / Satuan</th>
+                    <th className="px-3 py-2 text-center w-28">Status</th>
+                    <th className="px-2 py-2 text-center w-20 no-print">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {filteredFuelSummaries.length === 0 ? (
+                    <tr>
+                      <td colSpan="11" className="text-center py-10 text-slate-400">
+                        <Fuel size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
+                        <p className="font-semibold text-slate-600 text-xs">Belum ada data evaluasi BBM untuk filter ini.</p>
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          Silakan klik tombol <span className="font-bold text-amber-700">Upload BBM (SALRD/SLARC)</span> di atas untuk mengunggah file baru.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredFuelSummaries
+                      .slice((fuelPage - 1) * FUEL_PAGE_SIZE, fuelPage * FUEL_PAGE_SIZE)
+                      .map((row, idx) => {
+                        const rowNum = (fuelPage - 1) * FUEL_PAGE_SIZE + idx + 1;
+                        const isOptimal = row.status === 'OPTIMAL';
+                        const isNormal = row.status === 'NORMAL';
+                        const isBoros = row.status === 'BOROS';
+
+                        return (
+                          <tr key={`${row.month}_${row.costCenter}`} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-2.5 py-2 text-center text-slate-500 font-mono">{rowNum}</td>
+                            <td className="px-3 py-2">
+                              <span className="font-bold text-slate-800 text-[11px]">{row.plant}</span>
+                              <div className="text-[10px] text-slate-500 truncate max-w-[140px]">{row.plantDesc}</div>
+                              <span className="inline-block text-[9px] bg-slate-100 text-slate-600 px-1 py-0.2 rounded font-medium">{row.wilayah}</span>
+                            </td>
+                            <td className="px-3 py-2 font-mono font-bold text-slate-800 text-[11px]">
+                              {row.costCenter}
+                              {row.equipment && (
+                                <div className="text-[10px] text-slate-400 font-normal">Eq: {row.equipment}</div>
+                              )}
+                            </td>
+                            <td className="px-3 py-2">
+                              <span className="font-bold text-slate-800 text-[11px]">{row.description || '-'}</span>
+                              <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                <span className="bg-slate-100 px-1 py-0.2 rounded font-mono text-[9px]">{row.objectType || 'VEH'}</span>
+                                <span>· {row.txCount} trx</span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono font-bold text-amber-900 bg-amber-50/20">
+                              {row.debitLiters > 0 ? row.debitLiters.toLocaleString('id-ID') : '-'}
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono text-slate-700 bg-amber-50/20 text-[10.5px]">
+                              {row.debitRp > 0 ? `Rp ${row.debitRp.toLocaleString('id-ID')}` : '-'}
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono font-bold text-blue-900 bg-blue-50/20">
+                              {row.creditKm > 0 && <div>{row.creditKm.toLocaleString('id-ID')} <span className="text-[9px] font-normal text-blue-600">KM</span></div>}
+                              {row.creditHm > 0 && <div>{row.creditHm.toLocaleString('id-ID')} <span className="text-[9px] font-normal text-blue-600">HM</span></div>}
+                              {row.creditKm === 0 && row.creditHm === 0 && <span className="text-slate-400">-</span>}
+                            </td>
+                            <td className="px-3 py-2 text-center bg-emerald-50/20">
+                              {row.kmPerLiter > 0 && (
+                                <span className={`font-mono font-black text-xs px-2 py-0.5 rounded-full ${
+                                  row.kmPerLiter >= 3.5 ? 'bg-emerald-100 text-emerald-800' :
+                                  row.kmPerLiter >= 2.0 ? 'bg-amber-100 text-amber-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {row.kmPerLiter} <span className="text-[9px] font-bold">KM/L</span>
+                                </span>
+                              )}
+                              {row.literPerHm > 0 && (
+                                <span className={`font-mono font-black text-xs px-2 py-0.5 rounded-full ${
+                                  row.literPerHm <= 3.0 ? 'bg-emerald-100 text-emerald-800' :
+                                  row.literPerHm <= 5.0 ? 'bg-amber-100 text-amber-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {row.literPerHm} <span className="text-[9px] font-bold">L/HM</span>
+                                </span>
+                              )}
+                              {row.kmPerLiter === 0 && row.literPerHm === 0 && (
+                                <span className="text-slate-400 text-[10px]">-</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono text-[10.5px] text-slate-700">
+                              {row.costPerUnit > 0 ? (
+                                <span>
+                                  Rp {row.costPerUnit.toLocaleString('id-ID')}
+                                  <span className="text-[9px] text-slate-400 block">{row.creditKm > 0 ? '/ KM' : '/ HM'}</span>
+                                </span>
+                              ) : '-'}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {isOptimal && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                  <CheckCircle size={11} /> OPTIMAL
+                                </span>
+                              )}
+                              {isNormal && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                  NORMAL
+                                </span>
+                              )}
+                              {isBoros && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                                  <AlertCircle size={11} /> BOROS
+                                </span>
+                              )}
+                              {!isOptimal && !isNormal && !isBoros && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium bg-slate-100 text-slate-600">
+                                  {row.status === 'NO_FUEL' ? 'Belum Isi BBM' : row.status === 'NO_ACTIVITY' ? 'Belum Ada Log' : 'Belum Lengkap'}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-2 py-2 text-center no-print">
+                              <button
+                                type="button"
+                                onClick={() => { setSelectedFuelVeh(row); setFuelModalTab('debit'); }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-800 hover:bg-[#064e3b] text-white shadow-2xs transition"
+                              >
+                                <Eye size={11} /> Detail
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {filteredFuelSummaries.length > FUEL_PAGE_SIZE && (
+              <div className="flex items-center justify-between pt-4 border-t border-slate-200 text-xs no-print">
+                <span className="text-slate-500 font-medium">
+                  Halaman <strong className="text-slate-800">{fuelPage}</strong> dari <strong className="text-slate-800">{Math.ceil(filteredFuelSummaries.length / FUEL_PAGE_SIZE)}</strong>
+                </span>
+                <div className="flex gap-1.5">
+                  <button
+                    disabled={fuelPage === 1}
+                    onClick={() => setFuelPage(p => Math.max(1, p - 1))}
+                    className="px-3 py-1 bg-white border border-slate-200 rounded-lg font-bold disabled:opacity-40 hover:bg-slate-50"
+                  >
+                    Sebelumnya
+                  </button>
+                  <button
+                    disabled={fuelPage >= Math.ceil(filteredFuelSummaries.length / FUEL_PAGE_SIZE)}
+                    onClick={() => setFuelPage(p => p + 1)}
+                    className="px-3 py-1 bg-white border border-slate-200 rounded-lg font-bold disabled:opacity-40 hover:bg-slate-50"
+                  >
+                    Selanjutnya
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Content: Daily View ────────────────────────────────────── */}
+        {fuelViewMode === 'daily' && (
+          <div className="p-4 bg-white">
+            <div className="overflow-x-auto excel-cell-border">
+              <table className="w-full text-[11px] border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 text-[10px] font-extrabold uppercase tracking-wider text-center">
+                    <th className="px-2.5 py-2 text-center w-10">No</th>
+                    <th className="px-3 py-2 text-center w-24">Tanggal</th>
+                    <th className="px-3 py-2 text-left w-28">No. Dokumen</th>
+                    <th className="px-3 py-2 text-center w-16">Plant</th>
+                    <th className="px-3 py-2 text-left w-32">Cost Center</th>
+                    <th className="px-3 py-2 text-center w-36">Jenis Transaksi</th>
+                    <th className="px-3 py-2 text-right w-28">Kuantitas</th>
+                    <th className="px-3 py-2 text-right w-32">Nilai Rupiah</th>
+                    <th className="px-3 py-2 text-left">Keterangan / Uraian</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {filteredFuelDaily.length === 0 ? (
+                    <tr>
+                      <td colSpan="9" className="text-center py-10 text-slate-400">
+                        <Clock size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
+                        <p className="font-semibold text-slate-600 text-xs">Belum ada rincian transaksi harian untuk filter ini.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredFuelDaily
+                      .slice((fuelPage - 1) * FUEL_PAGE_SIZE, fuelPage * FUEL_PAGE_SIZE)
+                      .map((d, idx) => {
+                        const rowNum = (fuelPage - 1) * FUEL_PAGE_SIZE + idx + 1;
+                        const isDebit = d.t === 'D';
+
+                        return (
+                          <tr key={`${d.doc}_${d.c}_${d.d}_${idx}`} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-2.5 py-2 text-center text-slate-500 font-mono">{rowNum}</td>
+                            <td className="px-3 py-2 text-center font-mono font-medium text-slate-800">{d.d}</td>
+                            <td className="px-3 py-2 font-mono text-slate-600 text-[10.5px]">{d.doc || '-'}</td>
+                            <td className="px-3 py-2 text-center font-bold text-slate-700">{d.p}</td>
+                            <td className="px-3 py-2 font-mono font-bold text-slate-800">{d.c}</td>
+                            <td className="px-3 py-2 text-center">
+                              {isDebit ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                  <Droplet size={10} className="text-amber-600" /> SALRD (Debit)
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-blue-100 text-blue-900 border border-blue-300">
+                                  <Activity size={10} className="text-blue-600" /> SLARC (Credit)
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono font-black text-slate-900">
+                              {d.q.toLocaleString('id-ID')} <span className="text-[10px] font-bold text-slate-500">{d.u}</span>
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono text-slate-700 text-[10.5px]">
+                              {d.r > 0 ? `Rp ${d.r.toLocaleString('id-ID')}` : '-'}
+                            </td>
+                            <td className="px-3 py-2 text-slate-600 text-[11px] truncate max-w-[280px]">
+                              {d.n || '-'}
+                            </td>
+                          </tr>
+                        );
+                      })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {filteredFuelDaily.length > FUEL_PAGE_SIZE && (
+              <div className="flex items-center justify-between pt-4 border-t border-slate-200 text-xs no-print">
+                <span className="text-slate-500 font-medium">
+                  Halaman <strong className="text-slate-800">{fuelPage}</strong> dari <strong className="text-slate-800">{Math.ceil(filteredFuelDaily.length / FUEL_PAGE_SIZE)}</strong>
+                </span>
+                <div className="flex gap-1.5">
+                  <button
+                    disabled={fuelPage === 1}
+                    onClick={() => setFuelPage(p => Math.max(1, p - 1))}
+                    className="px-3 py-1 bg-white border border-slate-200 rounded-lg font-bold disabled:opacity-40 hover:bg-slate-50"
+                  >
+                    Sebelumnya
+                  </button>
+                  <button
+                    disabled={fuelPage >= Math.ceil(filteredFuelDaily.length / FUEL_PAGE_SIZE)}
+                    onClick={() => setFuelPage(p => p + 1)}
+                    className="px-3 py-1 bg-white border border-slate-200 rounded-lg font-bold disabled:opacity-40 hover:bg-slate-50"
+                  >
+                    Selanjutnya
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )}
+
+    {/* ── Vehicle Transaction Detail Modal ─────────────────────────── */}
+    {selectedFuelVeh && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 no-print animate-in fade-in duration-200">
+        <div className="bg-white rounded-2xl border border-slate-300 shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+          {/* Modal Header */}
+          <div className="bg-slate-900 text-white p-5 flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Fuel size={18} className="text-amber-400" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-800">
+                  Detail Riwayat BBM & Aktivitas Kendaraan
+                </span>
+              </div>
+              <h3 className="text-lg font-black text-white">{selectedFuelVeh.description || selectedFuelVeh.costCenter}</h3>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Cost Center: <span className="font-mono font-bold text-amber-300">{selectedFuelVeh.costCenter}</span> · 
+                Equipment: <span className="font-mono text-slate-300">{selectedFuelVeh.equipment || '-'}</span> · 
+                Unit: <span className="font-semibold">{selectedFuelVeh.plant} ({selectedFuelVeh.plantDesc})</span> · 
+                Bulan: <span className="font-bold text-emerald-400">{selectedFuelVeh.month}</span>
+              </p>
+            </div>
+            <button
+              onClick={() => setSelectedFuelVeh(null)}
+              className="text-slate-400 hover:text-white p-1 rounded-xl hover:bg-slate-800 transition"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Modal Summary KPI Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-4 bg-slate-50 border-b border-slate-200">
+            <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+              <span className="text-[9.5px] font-bold text-slate-500 uppercase">Total Solar Masuk (Debit)</span>
+              <div className="text-base font-black text-amber-900 font-mono mt-0.5">
+                {selectedFuelVeh.debitLiters.toLocaleString('id-ID')} <span className="text-xs font-semibold text-slate-500">L</span>
+              </div>
+              <span className="text-[10px] text-slate-500 font-medium truncate block">
+                Rp {selectedFuelVeh.debitRp.toLocaleString('id-ID')}
+              </span>
+            </div>
+
+            <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+              <span className="text-[9.5px] font-bold text-slate-500 uppercase">Realisasi Kerja (Credit)</span>
+              <div className="text-base font-black text-blue-900 font-mono mt-0.5">
+                {selectedFuelVeh.creditKm > 0 ? `${selectedFuelVeh.creditKm.toLocaleString('id-ID')} KM` :
+                 selectedFuelVeh.creditHm > 0 ? `${selectedFuelVeh.creditHm.toLocaleString('id-ID')} HM` : '-'}
+              </div>
+              <span className="text-[10px] text-slate-500 font-medium">
+                {selectedFuelVeh.creditHm > 0 && selectedFuelVeh.creditKm > 0 ? `${selectedFuelVeh.creditHm} HM` : 'Total output kerja'}
+              </span>
+            </div>
+
+            <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+              <span className="text-[9.5px] font-bold text-slate-500 uppercase">Rasio Efisiensi BBM</span>
+              <div className="text-base font-black text-emerald-900 font-mono mt-0.5">
+                {selectedFuelVeh.kmPerLiter > 0 ? `${selectedFuelVeh.kmPerLiter} KM/L` :
+                 selectedFuelVeh.literPerHm > 0 ? `${selectedFuelVeh.literPerHm} L/HM` : '-'}
+              </div>
+              <span className="text-[10px] text-emerald-700 font-bold">
+                Status: {selectedFuelVeh.status}
+              </span>
+            </div>
+
+            <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+              <span className="text-[9.5px] font-bold text-slate-500 uppercase">Biaya Operasi / Unit</span>
+              <div className="text-base font-black text-slate-800 font-mono mt-0.5">
+                {selectedFuelVeh.costPerUnit > 0 ? `Rp ${selectedFuelVeh.costPerUnit.toLocaleString('id-ID')}` : '-'}
+              </div>
+              <span className="text-[10px] text-slate-500 font-medium">
+                {selectedFuelVeh.creditKm > 0 ? 'Per Kilometer' : 'Per Jam Kerja'}
+              </span>
+            </div>
+          </div>
+
+          {/* Modal Tab Controls */}
+          <div className="flex border-b border-slate-200 px-4 pt-3 gap-2 bg-white">
+            <button
+              onClick={() => setFuelModalTab('debit')}
+              className={`px-4 py-2 text-xs font-bold border-b-2 transition flex items-center gap-1.5 ${
+                fuelModalTab === 'debit'
+                  ? 'border-amber-600 text-amber-900 bg-amber-50/40 rounded-t-lg'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Droplet size={13} className="text-amber-600" /> Riwayat Pengisian Solar (SALRD - Debit)
+            </button>
+            <button
+              onClick={() => setFuelModalTab('credit')}
+              className={`px-4 py-2 text-xs font-bold border-b-2 transition flex items-center gap-1.5 ${
+                fuelModalTab === 'credit'
+                  ? 'border-blue-600 text-blue-900 bg-blue-50/40 rounded-t-lg'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Activity size={13} className="text-blue-600" /> Riwayat Realisasi Kerja (SLARC - Credit)
+            </button>
+          </div>
+
+          {/* Modal Table Content */}
+          <div className="p-4 overflow-y-auto flex-1">
+            {(() => {
+              const matchedDaily = (fuelData.daily || []).filter(d =>
+                d.c === selectedFuelVeh.costCenter &&
+                (fuelModalTab === 'debit' ? d.t === 'D' : d.t === 'C') &&
+                (!selectedFuelVeh.month || d.m === selectedFuelVeh.month)
+              );
+
+              if (matchedDaily.length === 0) {
+                return (
+                  <div className="text-center py-12 text-slate-400">
+                    <FileSpreadsheet size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
+                    <p className="font-semibold text-slate-600 text-xs">
+                      Tidak ada detail transaksi {fuelModalTab === 'debit' ? 'pengisian solar' : 'realisasi kerja'} tercatat untuk periode ini.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <table className="w-full text-[11px] border-collapse excel-cell-border">
+                  <thead>
+                    <tr className="bg-slate-100 text-slate-700 font-extrabold uppercase text-[10px]">
+                      <th className="px-2.5 py-1.5 text-center w-10">No</th>
+                      <th className="px-3 py-1.5 text-center w-24">Tanggal</th>
+                      <th className="px-3 py-1.5 text-left w-28">No. Dokumen</th>
+                      <th className="px-3 py-1.5 text-right w-24">Jumlah</th>
+                      {fuelModalTab === 'debit' && <th className="px-3 py-1.5 text-right w-28">Nilai (Rp)</th>}
+                      <th className="px-3 py-1.5 text-left">Uraian / Keterangan</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {matchedDaily.map((d, i) => (
+                      <tr key={i} className="hover:bg-slate-50">
+                        <td className="px-2.5 py-1.5 text-center font-mono text-slate-400">{i + 1}</td>
+                        <td className="px-3 py-1.5 text-center font-mono font-medium text-slate-800">{d.d}</td>
+                        <td className="px-3 py-1.5 font-mono text-[10px] text-slate-600">{d.doc || '-'}</td>
+                        <td className="px-3 py-1.5 text-right font-mono font-black text-slate-900">
+                          {d.q.toLocaleString('id-ID')} <span className="text-[10px] text-slate-500 font-normal">{d.u}</span>
+                        </td>
+                        {fuelModalTab === 'debit' && (
+                          <td className="px-3 py-1.5 text-right font-mono text-slate-700">
+                            {d.r > 0 ? `Rp ${d.r.toLocaleString('id-ID')}` : '-'}
+                          </td>
+                        )}
+                        <td className="px-3 py-1.5 text-slate-600 text-[10.5px] truncate max-w-xs">{d.n || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              );
+            })()}
+          </div>
+
+          {/* Modal Footer */}
+          <div className="bg-slate-100 px-4 py-3 border-t border-slate-200 flex justify-end">
+            <button
+              onClick={() => setSelectedFuelVeh(null)}
+              className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-1.5 rounded-xl text-xs font-bold transition shadow-xs"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
 
         <WhatsAppSenderModal 
           isOpen={showWAModal} 

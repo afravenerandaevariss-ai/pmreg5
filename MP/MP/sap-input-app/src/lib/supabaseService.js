@@ -232,6 +232,8 @@ export function resolveConfigNumericId(id) {
   if (strId === 'doc_details') return 17;
   if (strId === 'knowledge_base') return 18;
   if (strId === 'import_logs') return 19;
+  if (strId === 'fuel_data') return 21;
+  if (strId === 'fuel_daily') return 22;
 
   // Dynamic monthly IK17 keys: e.g. "ik17_2026-09" -> 202609
   if (strId.startsWith('ik17_')) {
@@ -283,7 +285,7 @@ export async function getSystemConfig(id, forceRefresh = false) {
   const numericId = resolveConfigNumericId(id);
 
   // Large blob configs are never cached in localStorage to avoid quota issues
-  const LARGE_CONFIG_IDS = new Set([2, 3, 7, 8, 9, 10, 14, 15, 16]);
+  const LARGE_CONFIG_IDS = new Set([2, 3, 7, 8, 9, 10, 14, 15, 16, 21, 22]);
   const cacheKey = `sys_cfg_${T.hierarchy_data}_${numericId}`;
 
   if (!forceRefresh) {
@@ -797,6 +799,31 @@ export async function saveVehicleData(vehicles, logs) {
   return { data: { vehicles: mergedVehicles, logs: mergedLogs }, error: null };
 }
 
+
+
+// ============================================================
+// VEHICLE FUEL EVALUATION DATA (id=21)
+// Stores monthly summaries & daily transactions for SALRD (Debit) & SLARC (Credit)
+// ============================================================
+
+export async function fetchFuelData(forceRefresh = false) {
+  const { data, error } = await getSystemConfig('fuel_data', forceRefresh);
+  if (error || !data) return { data: { summaries: [], daily: [] }, error: error ? (error.message || String(error)) : null };
+  if (Array.isArray(data)) return { data: { summaries: data, daily: [] }, error: null };
+  return { 
+    data: {
+      summaries: Array.isArray(data.summaries) ? data.summaries : [],
+      daily: Array.isArray(data.daily) ? data.daily : []
+    }, 
+    error: null 
+  };
+}
+
+export async function saveFuelData(fuelPayload) {
+  const payload = Array.isArray(fuelPayload) ? { summaries: fuelPayload, daily: [] } : fuelPayload;
+  const { error } = await saveSystemConfig('fuel_data', payload);
+  return { error };
+}
 
 export async function fetchZCOData(forceRefresh = false) {
   const { data, error } = await getSystemConfig('zco_data', forceRefresh);
