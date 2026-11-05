@@ -53,6 +53,145 @@ function HeaderClock() {
   );
 }
 
+
+function DevWebLockView({ onUnlock }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleUnlock = (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    const u = (username || '').trim();
+    const p = (password || '').trim();
+
+    if (u === 'Admin' && p === 'Akuhebat#1') {
+      setTimeout(() => {
+        setLoading(false);
+        onUnlock();
+      }, 200);
+    } else {
+      setLoading(false);
+      setError('Kunci Web DEV salah! Username atau Password tidak sesuai.');
+    }
+  };
+
+  return (
+    <div className="flex flex-col min-h-screen bg-slate-900 font-sans relative overflow-hidden select-none">
+      <div 
+        className="absolute inset-0 z-0 bg-cover bg-center opacity-10 grayscale scale-105 pointer-events-none"
+        style={{ backgroundImage: "url('/sawit.jpg')" }}
+      />
+      <div className="absolute inset-0 z-0 bg-gradient-to-tr from-[#022c22] via-[#064e3b]/85 to-[#0f172a] mix-blend-multiply" />
+      <div className="absolute -top-32 -left-32 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="relative z-10 flex-1 flex flex-col justify-center items-center px-4 py-12">
+        <div className="flex items-center gap-3 bg-white/95 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/20 shadow-2xl mb-8">
+          <img src="/danantara-indonesia_800.png" alt="Danantara" className="h-6 object-contain" />
+          <div className="w-[1px] h-5 bg-slate-200" />
+          <img src="/Logo_BUMN_Untuk_Indonesia_2020.svg.webp" alt="BUMN" className="h-4.5 object-contain" />
+          <div className="w-[1px] h-5 bg-slate-200" />
+          <img src="/Logo_Holding_Perkebunan_Nusantara_III.png" alt="Holding" className="h-6 object-contain" />
+          <div className="w-[1px] h-5 bg-slate-200" />
+          <img src="/logo ptpnimages.png" alt="PTPN" className="h-6 object-contain" />
+        </div>
+
+        <div className="w-full max-w-md bg-white/95 backdrop-blur-xl p-8 md:p-9 rounded-3xl shadow-2xl border border-white/40">
+          <div className="flex flex-col items-center text-center mb-6">
+            <div className="w-14 h-14 bg-gradient-to-br from-emerald-600 to-teal-700 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-950/30 mb-4 ring-4 ring-emerald-100">
+              <Lock size={26} className="text-white" />
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/15 border border-amber-500/30 rounded-full text-[11px] font-bold text-amber-800 uppercase tracking-wider mb-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              Situs DEV Terkunci
+            </div>
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight">
+              Kunci Web devpmreg5
+            </h1>
+            <p className="text-slate-500 text-xs mt-1.5 leading-relaxed">
+              Masukkan kredensial pengembang untuk membuka akses ke portal DEV PM SAP.
+            </p>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 text-red-700 p-3 rounded-xl mb-5 text-xs font-medium border border-red-200 flex items-center gap-2">
+              <AlertCircle size={16} className="flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleUnlock} className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                Username DEV
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Masukkan Username"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:outline-none transition-colors text-sm font-medium shadow-xs"
+                required
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                Password Web
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Masukkan Password"
+                  className="w-full px-4 py-2.5 pr-10 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:outline-none transition-colors text-sm font-medium shadow-xs"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-2 py-3 bg-[#064e3b] hover:bg-[#047857] active:scale-[0.99] text-white font-bold rounded-xl text-sm transition-all shadow-md shadow-emerald-950/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {loading ? (
+                <span>Membuka Kunci...</span>
+              ) : (
+                <>
+                  <Key size={16} />
+                  <span>Buka Kunci Web</span>
+                  <ArrowRight size={15} />
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 pt-4 border-t border-slate-100 text-center">
+            <span className="text-[11px] text-slate-400">
+              PT Perkebunan Nusantara IV Regional V &bull; Modul PM
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LoginView({ onLogin }) {
   const [nik, setNik] = useState('');
   const [password, setPassword] = useState('');
@@ -205,20 +344,13 @@ function LoginView({ onLogin }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 mb-2">
+          <div className="mb-2">
             <h2 className="text-[28px] font-black text-slate-800 tracking-tight leading-tight">
               Modul PM SAP
             </h2>
-            {IS_DEV_ENV && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-700 border border-amber-500/30 animate-pulse">
-                DEV PLAYGROUND
-              </span>
-            )}
           </div>
           <p className="text-slate-500 text-sm mb-8 font-medium">
-            {IS_DEV_ENV 
-              ? 'Taman Bermain (Database Terisolasi - Aman untuk Testing)' 
-              : 'Silakan otentikasi dengan NIK Anda.'}
+            Silakan otentikasi dengan NIK Anda.
           </p>
 
           {error && (
@@ -229,38 +361,16 @@ function LoginView({ onLogin }) {
           )}
 
           <form onSubmit={handleLogin} className="space-y-6">
-            {IS_DEV_ENV && (
-              <div className="p-3.5 bg-emerald-50/90 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs text-emerald-900 shadow-xs">
-                <div className="flex items-center gap-2">
-                  <span className="text-base">🔑</span>
-                  <div>
-                    <div className="font-bold text-[11px] uppercase tracking-wide text-emerald-700">Kunci Web DEV</div>
-                    <div className="font-mono text-xs font-semibold text-emerald-900">Admin / Akuhebat#1</div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNik('Admin');
-                    setPassword('Akuhebat#1');
-                  }}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer"
-                >
-                  Pakai Kunci
-                </button>
-              </div>
-            )}
-
             <div className="space-y-1.5">
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Nomor Induk Karyawan (NIK) / Username
+                Nomor Induk Karyawan (NIK)
               </label>
               <input 
                 type="text" 
-                maxLength="20"
+                maxLength="8"
                 value={nik}
-                onChange={(e) => setNik(e.target.value.trim())}
-                placeholder={IS_DEV_ENV ? "Contoh: 19010048 atau Admin" : "Contoh: 12345678"}
+                onChange={(e) => setNik(e.target.value.replace(/\D/g, ''))}
+                placeholder="Contoh: 12345678"
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-[#064e3b]/20 focus:border-[#064e3b] focus:outline-none transition-colors text-sm font-medium shadow-sm"
                 required
                 autoFocus
@@ -527,6 +637,14 @@ const getUnitName = (plant, existingName) => {
 };
 
 function App() {
+  const [devWebUnlocked, setDevWebUnlocked] = useState(() => {
+    if (!IS_DEV_ENV) return true;
+    try {
+      return sessionStorage.getItem('devpmreg5_web_unlocked') === '1';
+    } catch (e) {
+      return false;
+    }
+  });
   // One-time startup: clear stale localStorage keys for large configs (master_map, template_data).
   // These were previously cached in localStorage causing Distrik/Kebun plants to not appear
   // in Master Data Equipment filter. Run once per browser session.
@@ -1183,6 +1301,19 @@ function App() {
       <div className="bg-white">
         <VehicleMonitoringView currentUser={screenshotUser} screenshotMode={true} />
       </div>
+    );
+  }
+
+  if (IS_DEV_ENV && !devWebUnlocked) {
+    return (
+      <DevWebLockView 
+        onUnlock={() => {
+          try {
+            sessionStorage.setItem('devpmreg5_web_unlocked', '1');
+          } catch (e) {}
+          setDevWebUnlocked(true);
+        }} 
+      />
     );
   }
 
