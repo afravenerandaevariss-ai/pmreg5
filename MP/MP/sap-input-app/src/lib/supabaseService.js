@@ -1,4 +1,4 @@
-import { supabase, IS_DEV_ENV } from '../lib/supabase.js';
+﻿import { supabase, IS_DEV_ENV } from '../lib/supabase.js';
 
 // ============================================================
 // TABLE NAME RESOLVER
@@ -190,9 +190,9 @@ const memoryCache = new Map();
 // ============================================================
 // DAILY LOGS IN-MEMORY CACHE
 // Hanya di memori (tidak localStorage/sessionStorage), sehingga:
-// - Refresh halaman → cache kosong → data selalu fresh dari Supabase ✅
-// - Ganti filter plant/bulan dalam sesi yg sama → pakai cache (cepat) ✅
-// - Setelah save/upload data baru → cache di-invalidate → fetch ulang ✅
+// - Refresh halaman â†’ cache kosong â†’ data selalu fresh dari Supabase âœ…
+// - Ganti filter plant/bulan dalam sesi yg sama â†’ pakai cache (cepat) âœ…
+// - Setelah save/upload data baru â†’ cache di-invalidate â†’ fetch ulang âœ…
 // ============================================================
 const dailyLogsCache = new Map(); // key: "plant__yearMonth"
 
@@ -662,7 +662,7 @@ export async function getGSheetHistory() {
 // VEHICLES (ZESTHLP16PA)
 // ============================================================
 
-// ── Vehicle Master & Logs (stored in hierarchy_data id=8 & id=9) ─────────────
+// â”€â”€ Vehicle Master & Logs (stored in hierarchy_data id=8 & id=9) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const VEHICLE_CACHE_KEY_MASTER = 'veh_master_cache_v1';
 const VEHICLE_CACHE_KEY_LOGS   = 'veh_logs_cache_v1';
@@ -702,7 +702,7 @@ export async function fetchVehicleMaster(forceRefresh = false) {
   return { data: result, error: null };
 }
 
-// ── Vehicle Logs ─────────────────────────────────────────────────────────────
+// â”€â”€ Vehicle Logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchVehicleLogs(forceRefresh = false) {
   if (!supabase) return { data: [], error: 'Supabase not configured' };
@@ -739,7 +739,7 @@ export async function fetchVehicleLogs(forceRefresh = false) {
   return { data: result, error: null };
 }
 
-// ── Invalidate vehicle caches ────────────────────────────────────────────────
+// â”€â”€ Invalidate vehicle caches â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function invalidateVehicleCache() {
   memoryCache.delete(VEHICLE_CACHE_KEY_MASTER);
   memoryCache.delete(VEHICLE_CACHE_KEY_LOGS);
@@ -755,7 +755,7 @@ export function invalidateVehicleCache() {
   try { localStorage.removeItem(cacheKeyLogs); } catch (e) {}
 }
 
-// ── Save Vehicle Data (stored in hierarchy_data id=8 & id=9) ─────────────────
+// â”€â”€ Save Vehicle Data (stored in hierarchy_data id=8 & id=9) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function saveVehicleData(vehicles, logs) {
   if (!supabase) return { error: 'Supabase not configured' };
@@ -802,21 +802,73 @@ export async function saveVehicleData(vehicles, logs) {
 
 
 // ============================================================
-// VEHICLE FUEL EVALUATION DATA (id=21)
-// Stores monthly summaries & daily transactions for SALRD (Debit) & SLARC (Credit)
+// VEHICLE FUEL EVALUATION DATA (id=21 + id=22)
+// id=21: Stores monthly summaries & recent daily transactions (Aug-Sep)
+// id=22: Stores supplemental daily transactions for older months (Jan-Jul)
+//        data can be: Array (flat) or { chunks: [[...],[...]] } (split uploads)
 // ============================================================
 
 export async function fetchFuelData(forceRefresh = false) {
+  // Fetch primary fuel_data (summaries + recent daily)
   const { data, error } = await getSystemConfig('fuel_data', forceRefresh);
   if (error || !data) return { data: { summaries: [], daily: [] }, error: error ? (error.message || String(error)) : null };
-  if (Array.isArray(data)) return { data: { summaries: data, daily: [] }, error: null };
-  return { 
+
+  const summaries = Array.isArray(data) ? data : (Array.isArray(data.summaries) ? data.summaries : []);
+  const primaryDaily = Array.isArray(data) ? [] : (Array.isArray(data.daily) ? data.daily : []);
+
+  // Fetch supplemental daily data from fuel_daily (ID 22) — older months Jan-Jul
+  let supplementalDaily = [];
+  try {
+    const { data: dailyData } = await getSystemConfig('fuel_daily', forceRefresh);
+    if (Array.isArray(dailyData)) {
+      // Flat array of daily records
+      supplementalDaily = dailyData;
+    } else if (dailyData && Array.isArray(dailyData.chunks)) {
+      // Chunked storage: { chunks: [[...jan-apr...], [...may-jul...]] }
+      supplementalDaily = dailyData.chunks.flat();
+    }
+  } catch (_) {
+    // If supplemental fetch fails, continue with primary only
+  }
+
+  // Merge and deduplicate daily records by doc+cc+date+type key
+  const dailyMap = new Map();
+  for (const d of primaryDaily) {
+    dailyMap.set(`${d.doc}_${d.c}_${d.d}_${d.t}`, d);
+  }
+  for (const d of supplementalDaily) {
+    const key = `${d.doc}_${d.c}_${d.d}_${d.t}`;
+    if (!dailyMap.has(key)) dailyMap.set(key, d);
+  }
+
+  return {
     data: {
-      summaries: Array.isArray(data.summaries) ? data.summaries : [],
-      daily: Array.isArray(data.daily) ? data.daily : []
-    }, 
-    error: null 
+      summaries,
+      daily: Array.from(dailyMap.values())
+    },
+    error: null
   };
+}
+
+// Fetch daily records for a specific month from per-month storage (IDs 230101-230112)
+// Key pattern: 'fuel_m_2026-01' → ID 230101, 'fuel_m_2026-07' → 230107, etc.
+export async function fetchFuelDailyForMonth(yearMonth) {
+  if (!yearMonth || typeof yearMonth !== 'string') return { data: [], error: 'Invalid month' };
+  const ym = yearMonth.replace('-', '').substring(0, 6); // '2026-01' → '202601'
+  const numericId = 230100 + parseInt(yearMonth.substring(5, 7)); // e.g. '2026-01' -> 230101, '2026-07' -> 230107
+  if (!supabase) return { data: [], error: 'Supabase not configured' };
+  try {
+    const { data: row, error } = await supabase
+      .from(T.hierarchy_data)
+      .select('data')
+      .eq('id', numericId)
+      .single();
+    if (error || !row) return { data: [], error: null }; // Not found = no data for this month
+    const daily = row.data?.daily;
+    return { data: Array.isArray(daily) ? daily : [], error: null };
+  } catch(e) {
+    return { data: [], error: e.message };
+  }
 }
 
 export async function saveFuelData(fuelPayload) {
