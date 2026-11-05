@@ -397,11 +397,12 @@ function buildParentChildMaps(equipments) {
 
   // Pass 1: Register true parents with plant isolation key: `${plant}_${parentDesc}`
   (equipments || []).forEach(eq => {
-    const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+    const eqKey = String(eq.eqNum || eq.eq_num || eq.equipment || '').trim();
     const desc = String(eq.description || '').trim();
     const pDesc = String(eq.induk || eq.parentEquipment || desc).trim();
     const plant = String(eq.plant || '').trim().toUpperCase();
-    if (eqKey && desc && (desc === pDesc || eq.type === 'Induk')) {
+    const isInduk = eq.type === 'Induk' || eq.eq_type === 'Induk' || String(eq.type || '').toUpperCase() === 'INDUK' || String(eq.eq_type || '').toUpperCase() === 'INDUK' || (desc && desc === pDesc);
+    if (eqKey && desc && isInduk) {
       const normDesc = normalizeDesc(desc);
       if (plant) parentDescToEqNum[`${plant}_${normDesc}`] = eqKey;
       if (plant) parentDescToEqNum[`${plant}_${desc}`] = eqKey;
@@ -414,16 +415,16 @@ function buildParentChildMaps(equipments) {
   // Pass 2: Map every eqKey -> Parent EqNum in O(1) time
   const eqToParentEqNum = {};
   (equipments || []).forEach(eq => {
-    const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+    const eqKey = String(eq.eqNum || eq.eq_num || eq.equipment || '').trim();
     if (!eqKey) return;
 
-    // 1. Direct parent EqNum if explicitly registered on equipment
-    const directParentNum = String(eq.parentEqNum || eq.parent_eq_num || '').trim();
+    // 1. Direct parent EqNum if explicitly registered on equipment (Superior Equipment / Superord.Equip)
+    const directParentNum = String(eq.parentEqNum || eq.parent_eq_num || eq.superior_equipment || eq.superord_equip || eq.superordEquip || '').trim();
     if (directParentNum && directParentNum !== eqKey) {
       eqToParentEqNum[eqKey] = directParentNum;
       return;
     }
-    if (eq.type === 'Induk' || eq.eq_type === 'Induk') {
+    if (eq.type === 'Induk' || eq.eq_type === 'Induk' || String(eq.type || '').toUpperCase() === 'INDUK' || String(eq.eq_type || '').toUpperCase() === 'INDUK') {
       eqToParentEqNum[eqKey] = eqKey;
       return;
     }

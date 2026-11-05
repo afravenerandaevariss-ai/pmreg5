@@ -867,7 +867,6 @@ export async function fetchFuelData(forceRefresh = false) {
 // Key pattern: 'fuel_m_2026-01' → ID 230101, 'fuel_m_2026-07' → 230107, etc.
 export async function fetchFuelDailyForMonth(yearMonth) {
   if (!yearMonth || typeof yearMonth !== 'string') return { data: [], error: 'Invalid month' };
-  const ym = yearMonth.replace('-', '').substring(0, 6); // '2026-01' → '202601'
   const numericId = 230100 + parseInt(yearMonth.substring(5, 7)); // e.g. '2026-01' -> 230101, '2026-07' -> 230107
   if (!supabase) return { data: [], error: 'Supabase not configured' };
   try {
@@ -876,9 +875,20 @@ export async function fetchFuelDailyForMonth(yearMonth) {
       .select('data')
       .eq('id', numericId)
       .single();
-    if (error || !row) return { data: [], error: null }; // Not found = no data for this month
-    const daily = row.data?.daily;
-    return { data: Array.isArray(daily) ? daily : [], error: null };
+    if (!error && row && Array.isArray(row.data?.daily) && row.data.daily.length > 0) {
+      return { data: row.data.daily, error: null };
+    }
+    // Fallback: check main fuel storage (id=21) which also contains daily transactions
+    const { data: mainRow } = await supabase
+      .from(T.hierarchy_data)
+      .select('data')
+      .eq('id', 21)
+      .single();
+    if (mainRow?.data?.daily && Array.isArray(mainRow.data.daily)) {
+      const filtered = mainRow.data.daily.filter(d => d.m === yearMonth || (d.d && d.d.startsWith(yearMonth)));
+      return { data: filtered, error: null };
+    }
+    return { data: [], error: null };
   } catch(e) {
     return { data: [], error: e.message };
   }

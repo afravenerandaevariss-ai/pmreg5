@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { format, differenceInCalendarDays, eachDayOfInterval, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { id } from 'date-fns/locale';
 import {
@@ -4625,8 +4625,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
     {/* â”€â”€ Impeccable Detail Modal with ZESTHLP16PA vs SLARC Reconciliation â”€â”€ */}
     {selectedFuelVeh && (() => {
+      const isDateInMonth = (dStr, mStr) => {
+        if (!mStr) return true;
+        return (dStr && (dStr === mStr || dStr.startsWith(mStr)));
+      };
+
       const dailyDebitForVeh = (fuelData.daily || []).filter(d => 
-        d.c === selectedFuelVeh.costCenter && d.t === 'D' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month)
+        d.c === selectedFuelVeh.costCenter && d.t === 'D' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month || isDateInMonth(d.d, selectedFuelVeh.month))
       );
       const dailyDebitLiters = dailyDebitForVeh.reduce((acc, d) => acc + (d.q || 0), 0);
       const dailyDebitRp = dailyDebitForVeh.reduce((acc, d) => acc + (d.r || 0), 0);
@@ -4640,7 +4645,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         : (selectedFuelVeh.debitRp && selectedFuelVeh.debitRp > 0 ? selectedFuelVeh.debitRp : 0);
 
       const dailyCreditForVeh = (fuelData.daily || []).filter(d => 
-        d.c === selectedFuelVeh.costCenter && d.t === 'C' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month)
+        d.c === selectedFuelVeh.costCenter && d.t === 'C' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month || isDateInMonth(d.d, selectedFuelVeh.month))
       );
       const dailyCreditQty = dailyCreditForVeh.reduce((acc, d) => acc + (d.q || 0), 0);
 
@@ -4650,7 +4655,20 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           ? (selectedFuelVeh.creditKm || selectedFuelVeh.creditHm)
           : 0);
 
-      const zestTotal = selectedFuelVeh.zestTotalKmHm || 0;
+      // Clean reference helper ensuring no blank '-' or placeholder '1'
+      const cleanRefVal = (val) => {
+        const s = String(val || '').trim();
+        if (!s || s === '-' || s === '1') return '';
+        return s;
+      };
+
+      // Raw ZEST logs lookup
+      const rawZestLogs = (selectedFuelVeh.equipment && selectedFuelVeh.equipment !== '-') ? (zestLogsByEquipment.get(selectedFuelVeh.equipment) || []) : [];
+      const zestDailyList = (selectedFuelVeh.matchedZestLogs && selectedFuelVeh.matchedZestLogs.length > 0)
+        ? selectedFuelVeh.matchedZestLogs
+        : rawZestLogs.filter(l => !selectedFuelVeh.month || isDateInMonth(l.date, selectedFuelVeh.month));
+
+      const zestTotal = zestDailyList.reduce((acc, l) => acc + (parseFloat(l.hm_km) || 0), 0) || selectedFuelVeh.zestTotalKmHm || 0;
       const variance = Math.round((slarcTotal - zestTotal) * 100) / 100;
       const uomLabel = (selectedFuelVeh.creditKm > 0 || dailyCreditForVeh.some(d => d.u === 'KM'))
         ? 'KM'
@@ -4660,26 +4678,38 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         ? 'HM'
         : 'KM';
 
-      // Build daily reconciliation list
-      const slarcDailyList = selectedFuelVeh.matchedSlarcDaily || [];
-      const zestDailyList = selectedFuelVeh.matchedZestLogs || [];
+      // Build daily reconciliation list (SLARC + ZEST aligned by date)
+      const slarcDailyList = dailyCreditForVeh.length > 0 ? dailyCreditForVeh : (selectedFuelVeh.matchedSlarcDaily || []);
 
       // Map combined dates
       const combinedDateMap = new Map();
       slarcDailyList.forEach(d => {
-        if (!combinedDateMap.has(d.d)) {
-          combinedDateMap.set(d.d, { date: d.d, slarcQty: 0, zestQty: 0, doc: d.doc, ref: d.n, u: d.u });
+        const dateKey = d.d;
+        if (!dateKey) return;
+        const slarcRef = cleanRefVal(d.n);
+        if (!combinedDateMap.has(dateKey)) {
+          combinedDateMap.set(dateKey, { date: dateKey, slarcQty: 0, zestQty: 0, doc: d.doc, ref: slarcRef, u: d.u });
         }
-        combinedDateMap.get(d.d).slarcQty += (d.q || 0);
+        combinedDateMap.get(dateKey).slarcQty += (d.q || 0);
       });
       zestDailyList.forEach(l => {
-        if (!combinedDateMap.has(l.date)) {
-          combinedDateMap.set(l.date, { date: l.date, slarcQty: 0, zestQty: 0, doc: l.document_number, ref: l.reference || l.remarks, u: l.uom });
+        const dateKey = l.date;
+        if (!dateKey) return;
+        const zestRef = cleanRefVal(l.reference) || cleanRefVal(l.remarks) || cleanRefVal(JOB_CODE_DESC[l.job_code]);
+        if (!combinedDateMap.has(dateKey)) {
+          combinedDateMap.set(dateKey, { date: dateKey, slarcQty: 0, zestQty: 0, doc: l.document_number, ref: zestRef, u: l.uom });
         }
-        const item = combinedDateMap.get(l.date);
+        const item = combinedDateMap.get(dateKey);
         item.zestQty += (parseFloat(l.hm_km) || 0);
-        if (!item.ref || item.ref === '-') item.ref = l.reference || l.remarks;
+        if (zestRef) item.ref = zestRef;
         if (!item.doc || item.doc === '-') item.doc = l.document_number;
+      });
+
+      // Final pass on reconciliation items to resolve clean description
+      combinedDateMap.forEach(item => {
+        if (!item.ref || item.ref === '-' || item.ref === '1') {
+          item.ref = cleanRefVal(selectedFuelVeh.referencePrimary) || cleanRefVal(selectedFuelVeh.slarcRefPrimary) || 'Realisasi Operasional';
+        }
       });
 
       const reconciliationRows = Array.from(combinedDateMap.values()).sort((a, b) => b.date.localeCompare(a.date));
@@ -4892,7 +4922,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Droplet size={13} className="text-amber-600" /> Pengisian Solar ({(fuelData.daily || []).filter(d => d.c === selectedFuelVeh.costCenter && d.t === 'D' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month)).length})
+                <Droplet size={13} className="text-amber-600" /> Pengisian Solar ({dailyDebitForVeh.length})
               </button>
               <button
                 onClick={() => setFuelModalTab('credit')}
@@ -4902,7 +4932,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <FileSpreadsheet size={13} className="text-blue-600" /> Transaksi SLARC ({(fuelData.daily || []).filter(d => d.c === selectedFuelVeh.costCenter && d.t === 'C' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month)).length})
+                <FileSpreadsheet size={13} className="text-blue-600" /> Transaksi SLARC ({dailyCreditForVeh.length})
               </button>
             </div>
 
@@ -5042,8 +5072,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           <tr key={i} className="hover:bg-slate-50 text-center">
                             <td className="px-2.5 py-1.5 text-center font-mono text-slate-400">{i + 1}</td>
                             <td className="px-3 py-1.5 text-center font-mono font-medium text-slate-800">{l.date}</td>
-                            <td className="px-3 py-1.5 text-center font-bold text-emerald-900">{l.reference || '-'}</td>
-                            <td className="px-3 py-1.5 text-center text-slate-600">{l.remarks || '-'}</td>
+                            <td className="px-3 py-1.5 text-center font-bold text-emerald-900">{cleanRefVal(l.reference) || cleanRefVal(l.remarks) || '-'}</td>
+                            <td className="px-3 py-1.5 text-center text-slate-600">{cleanRefVal(l.remarks) || '-'}</td>
                             <td className="px-3 py-1.5 text-center font-mono font-bold text-slate-800">{l.hm_km}</td>
                             <td className="px-3 py-1.5 text-center text-slate-600 font-mono text-[10px]">{l.operator || '-'}</td>
                             <td className="px-3 py-1.5 text-center text-slate-500 font-mono text-[10px]">{l.location_code || '-'}</td>
@@ -5070,9 +5100,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
               {/* TAB 3: DEBIT FUEL */}
               {effectiveModalTab === 'debit' && (() => {
-                const matchedDaily = (fuelData.daily || []).filter(d =>
-                  d.c === selectedFuelVeh.costCenter && d.t === 'D' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month)
-                );
+                const matchedDaily = dailyDebitForVeh;
 
                 if (matchedDaily.length === 0) {
                   return (
@@ -5133,9 +5161,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
               {/* TAB 4: SLARC DAILY CREDIT */}
               {effectiveModalTab === 'credit' && (() => {
-                const matchedDaily = (fuelData.daily || []).filter(d =>
-                  d.c === selectedFuelVeh.costCenter && d.t === 'C' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month)
-                );
+                const matchedDaily = dailyCreditForVeh;
 
                 if (matchedDaily.length === 0) {
                   return (

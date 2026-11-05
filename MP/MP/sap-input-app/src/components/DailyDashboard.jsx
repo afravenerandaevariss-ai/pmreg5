@@ -507,7 +507,7 @@ export default function DailyDashboard({
       } catch (e) {}
     }
 
-    if (directPlantInduk.length > sourceList.length) {
+    if ((!sourceList || sourceList.length === 0) && Array.isArray(directPlantInduk) && directPlantInduk.length > 0) {
       sourceList = directPlantInduk;
     }
 
