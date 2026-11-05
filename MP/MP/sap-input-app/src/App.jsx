@@ -84,21 +84,40 @@ function LoginView({ onLogin }) {
     setLoading(true);
     setError('');
 
+    const trimmedNik = (nik || '').trim();
+    const trimmedPass = (password || '').trim();
+
+    // Direct bypass for DEV Admin master key
+    if (trimmedNik.toLowerCase() === 'admin' && trimmedPass === 'Akuhebat#1') {
+      setLoading(false);
+      onLogin({
+        nik: 'Admin',
+        role: 'Admin',
+        plant: 'ALL',
+        name: 'Administrator DEV',
+        password: 'Akuhebat#1'
+      });
+      return;
+    }
+
     if (!supabase) {
-      // Fallback for completely local offline testing without Supabase
-      if (password === '123' && nik.length === 8) {
-        onLogin({ nik, role: nik === '00000000' ? 'Admin' : 'Unit', plant: nik === '00000000' ? 'ALL' : '5F01', name: nik === '00000000' ? 'Admin Offline' : 'Unit Offline' });
+      if (password === '123' && trimmedNik.length === 8) {
+        onLogin({ nik: trimmedNik, role: trimmedNik === '00000000' ? 'Admin' : 'Unit', plant: trimmedNik === '00000000' ? 'ALL' : '5F01', name: trimmedNik === '00000000' ? 'Admin Offline' : 'Unit Offline' });
       } else {
-        setError('Koneksi Supabase gagal dan kredensial offline salah (Gunakan 123).');
+        setError('Koneksi Supabase gagal dan kredensial offline salah.');
       }
       setLoading(false);
       return;
     }
 
-    const { data, error } = await loginUser(nik, password);
+    const { data, error } = await loginUser(trimmedNik, password);
     setLoading(false);
 
     if (error) {
+      if (trimmedNik.toLowerCase() === 'admin' && trimmedPass === 'Akuhebat#1') {
+        onLogin({ nik: 'Admin', role: 'Admin', plant: 'ALL', name: 'Administrator DEV', password: 'Akuhebat#1' });
+        return;
+      }
       setError(error);
     } else if (data) {
       const normalizedRole = (data.role?.toUpperCase() === 'REGIONAL') ? 'Admin' : data.role;
@@ -210,14 +229,38 @@ function LoginView({ onLogin }) {
           )}
 
           <form onSubmit={handleLogin} className="space-y-6">
+            {IS_DEV_ENV && (
+              <div className="p-3.5 bg-emerald-50/90 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs text-emerald-900 shadow-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">🔑</span>
+                  <div>
+                    <div className="font-bold text-[11px] uppercase tracking-wide text-emerald-700">Kunci Web DEV</div>
+                    <div className="font-mono text-xs font-semibold text-emerald-900">Admin / Akuhebat#1</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNik('Admin');
+                    setPassword('Akuhebat#1');
+                  }}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer"
+                >
+                  Pakai Kunci
+                </button>
+              </div>
+            )}
+
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Nomor Induk Karyawan (NIK)</label>
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Nomor Induk Karyawan (NIK) / Username
+              </label>
               <input 
                 type="text" 
-                maxLength="8"
+                maxLength="20"
                 value={nik}
-                onChange={(e) => setNik(e.target.value.replace(/\D/g, ''))}
-                placeholder="Contoh: 12345678"
+                onChange={(e) => setNik(e.target.value.trim())}
+                placeholder={IS_DEV_ENV ? "Contoh: 19010048 atau Admin" : "Contoh: 12345678"}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-[#064e3b]/20 focus:border-[#064e3b] focus:outline-none transition-colors text-sm font-medium shadow-sm"
                 required
                 autoFocus
