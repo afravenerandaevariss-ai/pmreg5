@@ -1,4 +1,4 @@
-name: 🚀 Deploy PROD → VPS
+name: 🚀 Deploy PROD → Vercel
 
 on:
   push:
@@ -10,11 +10,12 @@ on:
       - 'MP/MP/sap-input-app/vite.config.js'
       - 'MP/MP/sap-input-app/index.html'
       - 'MP/MP/sap-input-app/vercel.json'
+      - 'MP/MP/sap-input-app/package-lock.json'
   workflow_dispatch:
 
 jobs:
   deploy-prod:
-    name: Build & Deploy to pmreg5.afratarigan.my.id
+    name: Build & Verify PROD (Vercel auto-deploys)
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -36,25 +37,16 @@ jobs:
           PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
         run: npm ci --prefer-offline
 
-      - name: Build PROD
+      - name: Build PROD (verify only - Vercel builds automatically on push)
         working-directory: MP/MP/sap-input-app
         env:
           VITE_APP_ENV: production
+          VITE_SUPABASE_URL: https://pabnvxlvrussdfhisxzn.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_btvgcbyES8_4w5x3dE-atg_kYfUAii4
         run: npx vite build --mode production --outDir dist-prod
 
-      - name: Compress build
-        working-directory: MP/MP/sap-input-app
-        run: tar -czf deploy_prod.tar.gz -C dist-prod index.html assets
-
-      - name: Deploy via SSH
-        working-directory: MP/MP/sap-input-app
-        env:
-          SSHPASS: Akuhebat123#
+      - name: Done
         run: |
-          sudo apt-get install -y sshpass
-          sshpass -e ssh -o StrictHostKeyChecking=no ubuntu@43.134.84.59 \
-            "sudo chmod -R 755 /var/www/pmreg5 && sudo chown -R ubuntu:www-data /var/www/pmreg5 && mkdir -p /var/www/pmreg5/dist"
-          sshpass -e scp -o StrictHostKeyChecking=no deploy_prod.tar.gz ubuntu@43.134.84.59:/tmp/deploy_prod.tar.gz
-          sshpass -e ssh -o StrictHostKeyChecking=no ubuntu@43.134.84.59 \
-            "tar -xzf /tmp/deploy_prod.tar.gz -C /var/www/pmreg5/dist && rm -f /tmp/deploy_prod.tar.gz && sudo chmod -R 755 /var/www/pmreg5/dist && sudo chown -R ubuntu:www-data /var/www/pmreg5/dist && pm2 restart pmreg5 pmreg5-auth pmreg5-postgrest 2>/dev/null || true && sudo nginx -t && sudo systemctl reload nginx"
-          echo "✅ PRODUCTION DEPLOYED → https://pmreg5.afratarigan.my.id"
+          echo "✅ PRODUCTION build verified!"
+          echo "   Vercel auto-deploys main branch → https://pmreg5.vercel.app"
+          echo "   Custom domain                   → https://pmreg5.afratarigan.my.id"
