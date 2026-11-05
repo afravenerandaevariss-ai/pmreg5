@@ -909,8 +909,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               const year = dateStr ? dateStr.substring(0, 4) : '2026';
               const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : (targetMonth || '2026-08'));
 
-              const liters = parseFloat(r['Total quantity'] || r['Qty'] || 0) || 0;
-              const rupiah = parseFloat(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0) || 0;
+              const liters = Math.abs(parseFloat(r['Total quantity'] || r['Qty'] || 0) || 0);
+              const rupiah = Math.abs(parseFloat(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0) || 0);
               const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
               const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
               const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
@@ -957,7 +957,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               const year = dateStr ? dateStr.substring(0, 4) : '2026';
               const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : (targetMonth || '2026-08'));
 
-              const qty = parseFloat(r['Total quantity'] || r['Qty'] || 0) || 0;
+              const qty = Math.abs(parseFloat(r['Total quantity'] || r['Qty'] || 0) || 0);
               const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
               const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
               const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
@@ -994,8 +994,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               const period = String(r['Period'] || '').trim();
               const year = dateStr ? dateStr.substring(0, 4) : '2026';
               const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : (targetMonth || '2026-08'));
-              const qty = parseFloat(r['Total quantity'] || r['Qty'] || 0) || 0;
-              const rupiah = parseFloat(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0) || 0;
+              const qty = Math.abs(parseFloat(r['Total quantity'] || r['Qty'] || 0) || 0);
+              const rupiah = Math.abs(parseFloat(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0) || 0);
               const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
               const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
               const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
@@ -1083,7 +1083,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
           // Save complete merged month daily data to per-month storage
           try {
-            await saveFuelDailyForMonth(m, completeMonthDaily);
+            const { error: pmErr } = await saveFuelDailyForMonth(m, completeMonthDaily);
+            if (pmErr) {
+              const pmMsg = pmErr?.message || (typeof pmErr === 'string' ? pmErr : JSON.stringify(pmErr));
+              console.warn(`Save per-month storage for ${m} warning:`, pmMsg);
+            }
           } catch(pmErr) {
             console.warn(`Save per-month storage for ${m} warning:`, pmErr);
           }
@@ -1092,7 +1096,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         // 5. Combine other unaffected months with the updated affected months for fuelData.daily
         const otherMonthsDaily = (fuelData.daily || []).filter(d => !affectedMonths.includes(d.m));
         const allAffectedMonthDaily = Object.values(allUpdatedDailyByMonth).flat();
-        const mergedDaily = [...otherMonthsDaily, ...allAffectedMonthDaily].slice(-25000);
+        const mergedDaily = [...otherMonthsDaily, ...allAffectedMonthDaily];
+        // For ID 21 persistent storage, only keep recent active daily items to keep payload < 1MB
+        const recentDailyForStorage = allAffectedMonthDaily.length > 0 ? allAffectedMonthDaily.slice(-3000) : mergedDaily.slice(-3000);
 
         // 6. AUTO-UPDATE SUMMARIES: Recalculate summaries from the COMPLETE merged set of transactions
         const summaryMap = new Map();
@@ -1223,11 +1229,15 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         const mergedSummaries = Array.from(summaryMap.values());
 
         setUploadProgress('Menyimpan data evaluasi BBM ke database server...');
-        const payload = { summaries: mergedSummaries, daily: mergedDaily };
-        const { error: saveErr } = await saveFuelData(payload);
-        if (saveErr) throw new Error(saveErr);
+        const storagePayload = { summaries: mergedSummaries, daily: recentDailyForStorage };
+        const { error: saveErr } = await saveFuelData(storagePayload);
+        if (saveErr) {
+          const msg = saveErr?.message || (typeof saveErr === 'string' ? saveErr : JSON.stringify(saveErr));
+          throw new Error(msg || 'Gagal menyimpan ke server database');
+        }
 
-        setFuelData(payload);
+        // Keep all loaded daily in client React state for instant responsiveness
+        setFuelData({ summaries: mergedSummaries, daily: mergedDaily });
         setFuelUploadInfo({
           type: uploadType,
           file: file.name,
@@ -1240,8 +1250,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         });
 
       } catch (err) {
-        console.error(err);
-        setError(`Error memproses file ${typeLabel}: ` + (err.message || 'Gagal menyimpan ke server database'));
+        console.error('Fuel upload error:', err);
+        const errMsg = err?.message || (typeof err === 'string' ? err : 'Gagal menyimpan ke server database');
+        setError(`Error memproses file ${typeLabel}: ${errMsg}`);
       } finally {
         setLoading(false);
         setUploadProgress('');
@@ -2418,18 +2429,18 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     let hmVal = 0;
 
     fuelTableData.forEach(r => {
-      totalLiters += r.debitLiters || 0;
-      totalCost += r.debitRp || 0;
-      totalKm += r.creditKm || 0;
-      totalHm += r.creditHm || 0;
+      totalLiters += Math.abs(r.debitLiters || 0);
+      totalCost += Math.abs(r.debitRp || 0);
+      totalKm += Math.abs(r.creditKm || 0);
+      totalHm += Math.abs(r.creditHm || 0);
 
-      if ((r.creditKm || 0) > 0) {
-        kmLiters += r.debitLiters || 0;
-        kmVal += r.creditKm || 0;
+      if (Math.abs(r.creditKm || 0) > 0) {
+        kmLiters += Math.abs(r.debitLiters || 0);
+        kmVal += Math.abs(r.creditKm || 0);
       }
-      if ((r.creditHm || 0) > 0) {
-        hmLiters += r.debitLiters || 0;
-        hmVal += r.creditHm || 0;
+      if (Math.abs(r.creditHm || 0) > 0) {
+        hmLiters += Math.abs(r.debitLiters || 0);
+        hmVal += Math.abs(r.creditHm || 0);
       }
     });
 
