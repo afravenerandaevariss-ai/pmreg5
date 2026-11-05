@@ -244,7 +244,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   // Normalize role string — handles all DB variants: 'USER','Unit','unit','UNIT'
   const roleUpper = currentUser?.role?.toUpperCase() || '';
 
-  const isDevUser = roleUpper === 'DEV' || roleUpper === 'TRIAL' || currentUser?.nik?.toLowerCase() === 'admin';
+  // Strictly role DEV only (ADMIN and USER are both hidden)
+  const isDevUser = roleUpper === 'DEV';
 
   // Explicit USER/UNIT check — blocks regardless of plant value
   const isUserRole = roleUpper === 'USER' || roleUpper === 'UNIT';
