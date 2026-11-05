@@ -648,11 +648,13 @@ function App() {
   // One-time startup: clear stale localStorage keys for large configs (master_map, template_data).
   // These were previously cached in localStorage causing Distrik/Kebun plants to not appear
   // in Master Data Equipment filter. Run once per browser session.
-  if (!sessionStorage.getItem('_cache_busted_v2')) {
+  if (!sessionStorage.getItem('_cache_busted_v3')) {
     try {
       localStorage.removeItem('sys_cfg_hierarchy_data_2');
       localStorage.removeItem('sys_cfg_hierarchy_data_3');
-      sessionStorage.setItem('_cache_busted_v2', '1');
+      sessionStorage.removeItem('sys_cfg_hierarchy_data_2');
+      sessionStorage.removeItem('sys_cfg_hierarchy_data_3');
+      sessionStorage.setItem('_cache_busted_v3', '1');
     } catch(e) {}
   }
 

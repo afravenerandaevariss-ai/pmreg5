@@ -438,7 +438,7 @@ export default function DailyDashboard({
 
   // Automatically fetch template_data if not yet available
   useEffect(() => {
-    getSystemConfig('template_data').then(res => {
+    getSystemConfig('template_data', true).then(res => {
       if (res.data && Array.isArray(res.data.equipments)) {
         setInternalTemplateData(res.data);
         if (typeof setEquipments === 'function') setEquipments(res.data.equipments);
