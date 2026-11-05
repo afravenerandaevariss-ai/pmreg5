@@ -415,6 +415,19 @@ function buildParentChildMaps(equipments) {
   const eqToParentEqNum = {};
   (equipments || []).forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
+    if (!eqKey) return;
+
+    // 1. Direct parent EqNum if explicitly registered on equipment
+    const directParentNum = String(eq.parentEqNum || eq.parent_eq_num || '').trim();
+    if (directParentNum && directParentNum !== eqKey) {
+      eqToParentEqNum[eqKey] = directParentNum;
+      return;
+    }
+    if (eq.type === 'Induk' || eq.eq_type === 'Induk') {
+      eqToParentEqNum[eqKey] = eqKey;
+      return;
+    }
+
     const desc = String(eq.description || '').trim();
     const pDesc = String(eq.induk || eq.parentEquipment || desc).trim();
     const plant = String(eq.plant || '').trim().toUpperCase();
@@ -490,6 +503,7 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   const readingIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Counter Reading') || h.toLowerCase().includes('reading')));
   const readByIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Read By') || h.toLowerCase().includes('read by')));
   const measuringPtIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Measuring point') || h.toLowerCase().includes('meas. point') || h.toLowerCase().includes('measuring pt')));
+  const diffIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.startsWith('Difference') || h.includes('(1 char)')));
   let shortTextIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
   if (shortTextIdx === -1) shortTextIdx = 10;
 
@@ -550,7 +564,7 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
       if (descColIdx !== -1) rowData[descColIdx] = eq.description || eq.induk || eqKey;
     }
     
-    const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx, measuringPtIdx, eqColIdx, descColIdx);
+    const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx, measuringPtIdx, diffIdx, eqColIdx, descColIdx);
     while (rowData.length <= maxColIdx) {
       rowData.push("");
     }
@@ -569,6 +583,7 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     if (readingIdx !== -1) rowData[readingIdx] = readingStr;
     const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
     if (readByIdx !== -1) rowData[readByIdx] = readByVal;
+    if (diffIdx !== -1) rowData[diffIdx] = 'x';
     
     // Ensure measuring point column is 100% fully populated for all parent & sub-equipments
     if (measuringPtIdx !== -1) {
@@ -624,6 +639,7 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
 
     const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
     if (readByIdx !== -1) newRow[readByIdx] = readByVal;
+    if (diffIdx !== -1) newRow[diffIdx] = 'x';
 
     if (measuringPtIdx !== -1) {
       const masterMp = masterMap ? (masterMap.get(logEqNum)?.measuringPoint || masterMap.get(logEqNum.replace(/^0+/, ''))?.measuringPoint) : '';
@@ -662,6 +678,7 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
   const fileName = `hm${plantCode}-${dateStr}.xlsx`;
   
   XLSX.writeFile(wb2, fileName);
+  return wb2;
 }
 
 /**
@@ -719,6 +736,7 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
   const readingIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Counter Reading') || h.toLowerCase().includes('reading')));
   const readByIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Read By') || h.toLowerCase().includes('read by')));
   const measuringPtIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Measuring point') || h.toLowerCase().includes('meas. point') || h.toLowerCase().includes('measuring pt')));
+  const diffIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.startsWith('Difference') || h.includes('(1 char)')));
   let shortTextIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
   if (shortTextIdx === -1) shortTextIdx = 10;
 
@@ -778,7 +796,7 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
       if (descColIdx !== -1) rowData[descColIdx] = eq.description || eq.induk || eqKey;
     }
 
-    const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx, measuringPtIdx, eqColIdx, descColIdx);
+    const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx, measuringPtIdx, diffIdx, eqColIdx, descColIdx);
     while (rowData.length <= maxColIdx) rowData.push('');
 
     let readingStr = total.toString();
@@ -792,6 +810,7 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     if (readingIdx !== -1) rowData[readingIdx] = readingStr;
     const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
     if (readByIdx !== -1) rowData[readByIdx] = readByVal;
+    if (diffIdx !== -1) rowData[diffIdx] = 'x';
 
     // Ensure measuring point column is 100% fully populated for all parent & sub-equipments
     if (measuringPtIdx !== -1) {
@@ -851,6 +870,7 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
 
     const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
     if (readByIdx !== -1) newRow[readByIdx] = readByVal;
+    if (diffIdx !== -1) newRow[diffIdx] = 'x';
 
     if (measuringPtIdx !== -1) {
       const masterMp = masterMap ? (masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint) : '';
@@ -885,6 +905,7 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
   const dateStrEnd = cleanEnd.length === 3 ? `${cleanEnd[2]}${cleanEnd[1]}${cleanEnd[0].slice(-2)}` : format(new Date(endDate), 'ddMMyy');
   const fileName = `hm${plantCode}-akum_${dateStrStart}-${dateStrEnd}.xlsx`;
   XLSX.writeFile(wb, fileName);
+  return wb;
 }
 
 /**
@@ -907,6 +928,7 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
   const readingIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Counter Reading') || h.toLowerCase().includes('reading')));
   const readByIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Read By') || h.toLowerCase().includes('read by')));
   const measuringPtIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.includes('Measuring point') || h.toLowerCase().includes('meas. point') || h.toLowerCase().includes('measuring pt')));
+  const diffIdx = cleanHeaders.findIndex(h => typeof h === 'string' && (h.startsWith('Difference') || h.includes('(1 char)')));
   let shortTextIdx = cleanHeaders.findIndex(h => typeof h === 'string' && h.toLowerCase().includes('short text'));
   if (shortTextIdx === -1) shortTextIdx = 10;
 
@@ -1008,7 +1030,7 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
         if (descColIdx !== -1) rowData[descColIdx] = eq.description || eq.induk || eqKey;
       }
 
-      const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx, measuringPtIdx, eqColIdx, descColIdx);
+      const maxColIdx = Math.max(dateIdx, timeIdx, readingIdx, readByIdx, shortTextIdx, measuringPtIdx, diffIdx, eqColIdx, descColIdx);
       while (rowData.length <= maxColIdx) rowData.push('');
 
       let readingStr = duration.toString();
@@ -1022,6 +1044,7 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       if (readingIdx !== -1) rowData[readingIdx] = readingStr;
       const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
       if (readByIdx !== -1) rowData[readByIdx] = readByVal;
+    if (diffIdx !== -1) rowData[diffIdx] = 'x';
       
       // Ensure measuring point column is 100% fully populated for all parent & sub-equipments
       if (measuringPtIdx !== -1) {
@@ -1079,6 +1102,7 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
 
       const readByVal = (docDetails.readBy && docDetails.readBy.trim() ? docDetails.readBy.trim() : 'ADMIN').substring(0, 12);
       if (readByIdx !== -1) newRow[readByIdx] = readByVal;
+    if (diffIdx !== -1) newRow[diffIdx] = 'x';
 
       if (measuringPtIdx !== -1) {
         const masterMp = masterMap ? (masterMap.get(eqKey)?.measuringPoint || masterMap.get(eqKey.replace(/^0+/, ''))?.measuringPoint) : '';
@@ -1113,6 +1137,7 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
   const dateStrEnd = cleanEnd.length === 3 ? `${cleanEnd[2]}${cleanEnd[1]}${cleanEnd[0].slice(-2)}` : format(new Date(endDate), 'ddMMyy');
   const fileName = `hm${plantCode}-kumulatif_${dateStrStart}-${dateStrEnd}.xlsx`;
   XLSX.writeFile(wb, fileName);
+  return wb;
 }
 
 export function exportMonthlyToSAP(headers, originalData, equipments, logsMap, docDetails, masterMapParam) {
@@ -1202,6 +1227,7 @@ export function exportMonthlyToSAP(headers, originalData, equipments, logsMap, d
   const fileName = `hm${plantCode}-perhari_${dateStrStart}-${dateStrEnd}_${timeStr}.xlsx`;
   
   XLSX.writeFile(wb, fileName);
+  return wb;
 }
 
 /**
