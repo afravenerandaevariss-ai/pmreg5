@@ -4070,7 +4070,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
 
     {activeTab === 'fuel-evaluation' && (
-      <div className="relative z-10 bg-white/95 backdrop-blur-xs rounded-2xl border border-slate-300 shadow-sm overflow-hidden w-full font-sans">
+      <div className="relative z-10 bg-white/95 backdrop-blur-xs rounded-2xl border border-slate-300 shadow-sm overflow-hidden max-w-[1400px] mx-auto w-full font-sans">
         {/* ── Single Unified Filter Bar (Tahun, Bulan, Tanggal, Kebun, Cari) ── */}
         <div className="p-4 border-b border-slate-200 bg-slate-50/80 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px] flex flex-col md:flex-row md:items-center justify-between gap-3 flex-wrap no-print">
           <div className="flex items-center gap-2.5 flex-wrap flex-1">
@@ -4290,8 +4290,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     No. Equipment
                   </th>
                   <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center w-32 font-mono border-b border-slate-300">Cost Center</th>
-                  <th className="sticky top-0 z-30 bg-slate-100 px-4 py-3 text-left min-w-[220px] border-b border-slate-300">Deskripsi Kendaraan</th>
-                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-800 px-4 py-3 text-left min-w-[240px] border-b border-slate-300">Reference / Rute</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center min-w-[200px] border-b border-slate-300">Deskripsi Kendaraan</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-800 px-3 py-3 text-center min-w-[220px] border-b border-slate-300">Reference / Rute</th>
                   <th className="sticky top-0 z-30 bg-[#fffbeb] text-amber-950 font-black border-x border-amber-200 border-b border-slate-300 px-3 py-3 text-center w-32">
                     Solar (Liter)
                   </th>
@@ -4301,7 +4301,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-r border-emerald-200 border-b border-slate-300 px-3 py-3 text-center w-36">
                     Rasio / Efisiensi
                   </th>
-                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-800 px-4 py-3 text-right border-b border-slate-300 w-36">Biaya Solar</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-800 px-3 py-3 text-center border-b border-slate-300 w-36">Biaya Solar</th>
                   <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center w-24 no-print border-b border-slate-300">Aksi</th>
                 </tr>
               </thead>
@@ -4355,13 +4355,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           </td>
 
                           {/* 5. Deskripsi Kendaraan */}
-                          <td className="px-4 py-2.5 text-left">
+                          <td className="px-3.5 py-2.5 text-center">
                             <div className="font-bold text-slate-900 text-xs leading-snug">{row.description || '-'}</div>
                             <span className="inline-block mt-0.5 bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold">{row.objectType || 'VEH'}</span>
                           </td>
 
                           {/* 6. REFERENCE */}
-                          <td className="px-4 py-2.5 text-left bg-slate-50/30">
+                          <td className="px-3.5 py-2.5 text-center bg-slate-50/30">
                             <div
                               className="text-xs font-semibold text-slate-800 leading-snug"
                               title={row.referenceAll || row.referencePrimary || '-'}
@@ -4441,7 +4441,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           </td>
 
                           {/* 10. Biaya Solar (Rp) */}
-                          <td className="px-4 py-2.5 text-right font-mono font-bold text-xs text-slate-800 whitespace-nowrap">
+                          <td className="px-3 py-2.5 text-center font-mono font-bold text-xs text-slate-800 whitespace-nowrap">
                             {row.debitRp > 0 ? `Rp ${row.debitRp.toLocaleString('id-ID')}` : '-'}
                           </td>
 
