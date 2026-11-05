@@ -808,6 +808,19 @@ export async function saveVehicleData(vehicles, logs) {
 //        data can be: Array (flat) or { chunks: [[...],[...]] } (split uploads)
 // ============================================================
 
+export function makeFuelTxKey(d) {
+  if (!d) return '';
+  const dPart = String(d.d || '').trim();
+  const cPart = String(d.c || '').trim();
+  const tPart = String(d.t || '').trim();
+  const docPart = String(d.doc || '').trim();
+  const qPart = Math.round((parseFloat(d.q) || 0) * 100) / 100;
+  const rPart = Math.round(parseFloat(d.r) || 0);
+  const uPart = String(d.u || '').trim().toUpperCase();
+  const nPart = String(d.n || '').trim();
+  return `${dPart}_${cPart}_${tPart}_${docPart}_${qPart}_${rPart}_${uPart}_${nPart}`;
+}
+
 export async function fetchFuelData(forceRefresh = false) {
   // Fetch primary fuel_data (summaries + recent daily)
   const { data, error } = await getSystemConfig('fuel_data', forceRefresh);
@@ -834,10 +847,10 @@ export async function fetchFuelData(forceRefresh = false) {
   // Merge and deduplicate daily records by doc+cc+date+type key
   const dailyMap = new Map();
   for (const d of primaryDaily) {
-    dailyMap.set(`${d.doc}_${d.c}_${d.d}_${d.t}`, d);
+    dailyMap.set(makeFuelTxKey(d), d);
   }
   for (const d of supplementalDaily) {
-    const key = `${d.doc}_${d.c}_${d.d}_${d.t}`;
+    const key = makeFuelTxKey(d);
     if (!dailyMap.has(key)) dailyMap.set(key, d);
   }
 

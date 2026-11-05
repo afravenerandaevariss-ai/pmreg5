@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toPng } from 'html-to-image';
-import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, invalidateVehicleCache, fetchMasterEquipment, fetchZCOData, saveZCOData, getSystemConfig, fetchDailyLogs, fetchFuelData, saveFuelData, fetchFuelDailyForMonth, saveFuelDailyForMonth } from '../lib/supabaseService';
+import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, invalidateVehicleCache, fetchMasterEquipment, fetchZCOData, saveZCOData, getSystemConfig, fetchDailyLogs, fetchFuelData, saveFuelData, fetchFuelDailyForMonth, saveFuelDailyForMonth, makeFuelTxKey } from '../lib/supabaseService';
 import WhatsAppSenderModal from './WhatsAppSenderModal';
 
 // â”€â”€â”€ Plant Master Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -879,34 +879,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           return null;
         };
 
-        const uploadedAgg = {};
-        const getUploadBucket = (month, costCenter, plantHint) => {
-          const key = `${month}_${costCenter}`;
-          if (!uploadedAgg[key]) {
-            const eqInfo = eqMap[costCenter] || {};
-            const plant = eqInfo.plant || plantHint || costCenter.substring(0, 4) || '';
-            const pInfo = PLANT_INFO[plant] || {};
-            uploadedAgg[key] = {
-              month,
-              costCenter,
-              equipment: eqInfo.equipment || '',
-              description: eqInfo.description || '',
-              plant,
-              plantDesc: pInfo.desc || plant,
-              wilayah: pInfo.wilayah || 'Regional 5',
-              objectType: eqInfo.objectType || (costCenter.includes('CAR') ? 'CAR' : costCenter.includes('TRU') ? 'DTRUCK' : costCenter.includes('TRA') ? 'TRACTOR' : 'VEHICLE'),
-              debitLiters: 0,
-              debitRp: 0,
-              creditKm: 0,
-              creditHm: 0,
-              txCount: 0,
-              slarcNarrations: new Set(),
-              partnerObjects: new Set()
-            };
-          }
-          return uploadedAgg[key];
-        };
-
         const newDaily = [];
         let debitRowsCount = 0;
         let creditRowsCount = 0;
@@ -914,7 +886,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         const debitSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes('debit') || s.toLowerCase().includes('salrd'));
         const creditSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes('credit') || s.toLowerCase().includes('slarc'));
 
-        // Process SALRD / Debit if applicable
+        // 1. Process SALRD / Debit transactions
         if (uploadType === 'salrd' || uploadType === 'all') {
           setUploadProgress('Memproses transaksi SALRD (Debit Solar)...');
           const targetDebitSheet = debitSheetName
@@ -943,12 +915,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
               const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
 
-              const bucket = getUploadBucket(monthStr, cc, plant);
-              bucket.debitLiters += liters;
-              bucket.debitRp += rupiah;
-              bucket.txCount += 1;
               debitRowsCount++;
-
               newDaily.push({
                 c: cc,
                 d: dateStr || `${monthStr}-01`,
@@ -965,7 +932,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           }
         }
 
-        // Process SLARC / Credit if applicable
+        // 2. Process SLARC / Credit transactions
         if (uploadType === 'slarc' || uploadType === 'all') {
           setUploadProgress('Memproses transaksi SLARC (Credit KM/HM)...');
           const targetCreditSheet = creditSheetName
@@ -995,23 +962,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
               const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
 
-              const bucket = getUploadBucket(monthStr, cc, plant);
-              if (isKm) bucket.creditKm += qty;
-              if (isHm) bucket.creditHm += qty;
-              bucket.txCount += 1;
               creditRowsCount++;
-
-              const partnerObj = String(r['Partner object name'] || '').trim();
-              if (name && !name.toLowerCase().includes('pembulatan')) {
-                const clean = name.split('|')[0].trim();
-                if (clean && clean !== '1' && clean !== '-' && !clean.includes('/ E-')) {
-                  bucket.slarcNarrations?.add(clean);
-                }
-              }
-              if (partnerObj && !partnerObj.toLowerCase().includes('administrasi')) {
-                bucket.partnerObjects?.add(partnerObj);
-              }
-
               newDaily.push({
                 c: cc,
                 d: dateStr || `${monthStr}-01`,
@@ -1028,7 +979,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           }
         }
 
-        // If uploadType is 'all' and neither sheet was found, parse firstSheet
+        // 3. Fallback for single-sheet when 'all' mode
         if (uploadType === 'all' && !debitSheetName && !creditSheetName) {
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
           if (firstSheet) {
@@ -1050,22 +1001,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
 
               if (ce === '51100057' || uom === 'L') {
-                const bucket = getUploadBucket(monthStr, cc, plant);
-                bucket.debitLiters += qty;
-                bucket.debitRp += rupiah;
-                bucket.txCount += 1;
                 debitRowsCount++;
                 newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'D', q: qty, u: 'L', r: rupiah, doc, n: name, p: plant });
               } else if (ce === '90043002' || uom === 'KM') {
-                const bucket = getUploadBucket(monthStr, cc, plant);
-                bucket.creditKm += qty;
-                bucket.txCount += 1;
                 creditRowsCount++;
                 newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'C', q: qty, u: 'KM', r: 0, doc, n: name, p: plant });
               } else if (ce === '90043003' || uom === 'HR' || uom === 'HM') {
-                const bucket = getUploadBucket(monthStr, cc, plant);
-                bucket.creditHm += qty;
-                bucket.txCount += 1;
                 creditRowsCount++;
                 newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'C', q: qty, u: 'HM', r: 0, doc, n: name, p: plant });
               }
@@ -1084,162 +1025,217 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           );
         }
 
-        // Merge with existing summaries preserving the counterpart side
+        setUploadProgress('Menyinkronkan data lama dan menggabungkan transaksi baru...');
+
+        // 4. INCREMENTAL APPEND: Load existing daily transactions for affected months & merge without losing old files
+        const affectedMonths = Array.from(new Set(newDaily.map(d => d.m)));
+        let totalNewlyAdded = 0;
+        let totalExistingKept = 0;
+        const allUpdatedDailyByMonth = {};
+
+        for (const m of affectedMonths) {
+          // Collect existing transactions for month m from memory state
+          const existingForMonth = (fuelData.daily || []).filter(d => d.m === m);
+          let storageForMonth = [];
+          try {
+            const { data: mDaily } = await fetchFuelDailyForMonth(m);
+            if (Array.isArray(mDaily) && mDaily.length > 0) {
+              storageForMonth = mDaily;
+            }
+          } catch(e) {
+            console.warn(`Fetch storage for month ${m} warning:`, e);
+          }
+
+          // Build map of existing transactions for month m
+          const monthMap = new Map();
+          for (const d of existingForMonth) {
+            monthMap.set(makeFuelTxKey(d), d);
+          }
+          for (const d of storageForMonth) {
+            const k = makeFuelTxKey(d);
+            if (!monthMap.has(k)) monthMap.set(k, d);
+          }
+
+          const existingCountBefore = monthMap.size;
+          let addedForMonth = 0;
+
+          // Merge newly uploaded transactions for month m (only add if not already in monthMap)
+          const newForThisMonth = newDaily.filter(d => d.m === m);
+          for (const d of newForThisMonth) {
+            const k = makeFuelTxKey(d);
+            if (!monthMap.has(k)) {
+              monthMap.set(k, d);
+              addedForMonth++;
+            } else {
+              // Row already existed: enrich with any richer text/doc if previously empty
+              const exist = monthMap.get(k);
+              if (!exist.doc && d.doc) exist.doc = d.doc;
+              if (!exist.n && d.n) exist.n = d.n;
+              if (!exist.p && d.p) exist.p = d.p;
+            }
+          }
+
+          totalExistingKept += existingCountBefore;
+          totalNewlyAdded += addedForMonth;
+
+          const completeMonthDaily = Array.from(monthMap.values());
+          allUpdatedDailyByMonth[m] = completeMonthDaily;
+
+          // Save complete merged month daily data to per-month storage
+          try {
+            await saveFuelDailyForMonth(m, completeMonthDaily);
+          } catch(pmErr) {
+            console.warn(`Save per-month storage for ${m} warning:`, pmErr);
+          }
+        }
+
+        // 5. Combine other unaffected months with the updated affected months for fuelData.daily
+        const otherMonthsDaily = (fuelData.daily || []).filter(d => !affectedMonths.includes(d.m));
+        const allAffectedMonthDaily = Object.values(allUpdatedDailyByMonth).flat();
+        const mergedDaily = [...otherMonthsDaily, ...allAffectedMonthDaily].slice(-25000);
+
+        // 6. AUTO-UPDATE SUMMARIES: Recalculate summaries from the COMPLETE merged set of transactions
         const summaryMap = new Map();
         (fuelData.summaries || []).forEach(s => {
           summaryMap.set(`${s.month}_${s.costCenter}`, { ...s });
         });
 
-        Object.values(uploadedAgg).forEach(upBucket => {
-          const key = `${upBucket.month}_${upBucket.costCenter}`;
-          const existing = summaryMap.get(key) || {
-            month: upBucket.month,
-            costCenter: upBucket.costCenter,
-            equipment: upBucket.equipment,
-            description: upBucket.description,
-            plant: upBucket.plant,
-            plantDesc: upBucket.plantDesc,
-            wilayah: upBucket.wilayah,
-            objectType: upBucket.objectType,
-            debitLiters: 0,
-            debitRp: 0,
-            creditKm: 0,
-            creditHm: 0,
-            txCount: 0,
-            slarcNarrations: [],
-            partnerObjects: []
-          };
+        let affectedVehiclesCount = 0;
 
-          if (uploadType === 'salrd') {
-            existing.debitLiters = Math.round(upBucket.debitLiters * 100) / 100;
-            existing.debitRp = Math.round(upBucket.debitRp);
-            if (!existing.equipment && upBucket.equipment) existing.equipment = upBucket.equipment;
-            if (!existing.description && upBucket.description) existing.description = upBucket.description;
-            if (!existing.plant && upBucket.plant) existing.plant = upBucket.plant;
-          } else if (uploadType === 'slarc') {
-            existing.creditKm = Math.round(upBucket.creditKm * 100) / 100;
-            existing.creditHm = Math.round(upBucket.creditHm * 100) / 100;
-            const narrList = Array.from(upBucket.slarcNarrations || []);
-            const partList = Array.from(upBucket.partnerObjects || []);
-            existing.slarcNarrations = narrList.slice(0, 5);
-            existing.partnerObjects = partList.slice(0, 3);
-            existing.slarcRefPrimary = narrList[0] || partList[0] || existing.slarcRefPrimary || null;
-            existing.slarcRefAll = narrList.join('; ') || partList.join('; ') || existing.slarcRefAll || null;
-            if (!existing.equipment && upBucket.equipment) existing.equipment = upBucket.equipment;
-            if (!existing.description && upBucket.description) existing.description = upBucket.description;
-            if (!existing.plant && upBucket.plant) existing.plant = upBucket.plant;
-          } else {
-            // 'all'
-            existing.debitLiters = Math.round(upBucket.debitLiters * 100) / 100;
-            existing.debitRp = Math.round(upBucket.debitRp);
-            existing.creditKm = Math.round(upBucket.creditKm * 100) / 100;
-            existing.creditHm = Math.round(upBucket.creditHm * 100) / 100;
-            const narrList = Array.from(upBucket.slarcNarrations || []);
-            const partList = Array.from(upBucket.partnerObjects || []);
-            existing.slarcNarrations = narrList.slice(0, 5);
-            existing.partnerObjects = partList.slice(0, 3);
-            existing.slarcRefPrimary = narrList[0] || partList[0] || existing.slarcRefPrimary || null;
-            existing.slarcRefAll = narrList.join('; ') || partList.join('; ') || existing.slarcRefAll || null;
-            if (upBucket.equipment) existing.equipment = upBucket.equipment;
-            if (upBucket.description) existing.description = upBucket.description;
-            if (upBucket.plant) existing.plant = upBucket.plant;
+        for (const m of affectedMonths) {
+          const monthDaily = allUpdatedDailyByMonth[m] || [];
+          const byCC = {};
+          for (const d of monthDaily) {
+            if (!byCC[d.c]) byCC[d.c] = [];
+            byCC[d.c].push(d);
           }
 
-          // Recalculate metrics
-          const debitL = existing.debitLiters || 0;
-          const debitR = existing.debitRp || 0;
-          const creditK = existing.creditKm || 0;
-          const creditH = existing.creditHm || 0;
+          const allCostCentersForMonth = new Set([
+            ...Object.keys(byCC),
+            ...(fuelData.summaries || []).filter(s => s.month === m).map(s => s.costCenter)
+          ]);
 
-          const kmPerL = debitL > 0 && creditK > 0 ? Number((creditK / debitL).toFixed(2)) : 0;
-          const literPerH = debitL > 0 && creditH > 0 ? Number((debitL / creditH).toFixed(2)) : 0;
+          affectedVehiclesCount += allCostCentersForMonth.size;
 
-          let costPerUnit = 0;
-          if (creditK > 0) costPerUnit = Math.round(debitR / creditK);
-          else if (creditH > 0) costPerUnit = Math.round(debitR / creditH);
+          for (const cc of allCostCentersForMonth) {
+            const key = `${m}_${cc}`;
+            const existing = summaryMap.get(key) || {
+              month: m,
+              costCenter: cc,
+              equipment: '',
+              description: '',
+              plant: cc.substring(0, 4) || '',
+              plantDesc: PLANT_INFO[cc.substring(0, 4)]?.desc || cc.substring(0, 4),
+              wilayah: PLANT_INFO[cc.substring(0, 4)]?.wilayah || 'Regional 5',
+              objectType: cc.includes('CAR') ? 'CAR' : cc.includes('TRU') ? 'DTRUCK' : cc.includes('TRA') ? 'TRACTOR' : 'VEHICLE',
+              debitLiters: 0,
+              debitRp: 0,
+              creditKm: 0,
+              creditHm: 0,
+              txCount: 0,
+              slarcNarrations: [],
+              partnerObjects: []
+            };
 
-          const isHeavy = ['TRACTOR', 'EXCAVATOR', 'GRADER', 'WLOADER', 'HEAVY'].some(h => (existing.objectType || '').toUpperCase().includes(h)) || creditH > 0;
+            // Fill equipment info if missing
+            const eqInfo = eqMap[cc] || {};
+            if (!existing.equipment && eqInfo.equipment) existing.equipment = eqInfo.equipment;
+            if (!existing.description && eqInfo.description) existing.description = eqInfo.description;
+            if (!existing.plant && eqInfo.plant) {
+              existing.plant = eqInfo.plant;
+              existing.plantDesc = PLANT_INFO[eqInfo.plant]?.desc || eqInfo.plant;
+              existing.wilayah = PLANT_INFO[eqInfo.plant]?.wilayah || 'Regional 5';
+            }
+            if (eqInfo.objectType) existing.objectType = eqInfo.objectType;
 
-          let status = 'NORMAL';
-          if (debitL === 0 && creditK === 0 && creditH === 0) {
-            status = 'NO_DATA';
-          } else if (debitL === 0) {
-            status = 'NO_FUEL';
-          } else if (creditK === 0 && creditH === 0) {
-            status = 'NO_ACTIVITY';
-          } else if (isHeavy) {
-            if (literPerH <= 3.0) status = 'OPTIMAL';
-            else if (literPerH <= 5.0) status = 'NORMAL';
-            else status = 'BOROS';
-          } else {
-            if (kmPerL >= 3.5) status = 'OPTIMAL';
-            else if (kmPerL >= 2.0) status = 'NORMAL';
-            else status = 'BOROS';
+            const txs = byCC[cc] || [];
+            const txsD = txs.filter(d => d.t === 'D');
+            const txsC = txs.filter(d => d.t === 'C');
+
+            // Auto update debit if there are debit daily transactions
+            if (txsD.length > 0) {
+              existing.debitLiters = Math.round(txsD.reduce((sum, d) => sum + (parseFloat(d.q) || 0), 0) * 100) / 100;
+              existing.debitRp = Math.round(txsD.reduce((sum, d) => sum + (parseFloat(d.r) || 0), 0));
+            }
+            // Auto update credit if there are credit daily transactions
+            if (txsC.length > 0) {
+              existing.creditKm = Math.round(txsC.filter(d => d.u === 'KM').reduce((sum, d) => sum + (parseFloat(d.q) || 0), 0) * 100) / 100;
+              existing.creditHm = Math.round(txsC.filter(d => d.u === 'HM').reduce((sum, d) => sum + (parseFloat(d.q) || 0), 0) * 100) / 100;
+
+              const narrations = new Set(existing.slarcNarrations || []);
+              const partnerObjs = new Set(existing.partnerObjects || []);
+              for (const d of txsC) {
+                if (d.n && !d.n.toLowerCase().includes('pembulatan')) {
+                  const clean = d.n.split('|')[0].trim();
+                  if (clean && clean !== '1' && clean !== '-' && !clean.includes('/ E-')) narrations.add(clean);
+                }
+                if (d.p && !d.p.toLowerCase().includes('administrasi')) partnerObjs.add(d.p);
+              }
+              existing.slarcNarrations = Array.from(narrations).slice(0, 5);
+              existing.partnerObjects = Array.from(partnerObjs).slice(0, 3);
+              existing.slarcRefPrimary = existing.slarcNarrations[0] || existing.partnerObjects[0] || existing.slarcRefPrimary || null;
+              existing.slarcRefAll = Array.from(narrations).join('; ') || Array.from(partnerObjs).join('; ') || existing.slarcRefAll || null;
+            }
+
+            existing.txCount = txs.length > 0 ? txs.length : (existing.txCount || 0);
+
+            // Recalculate metrics
+            const debitL = existing.debitLiters || 0;
+            const debitR = existing.debitRp || 0;
+            const creditK = existing.creditKm || 0;
+            const creditH = existing.creditHm || 0;
+
+            const kmPerL = debitL > 0 && creditK > 0 ? Number((creditK / debitL).toFixed(2)) : 0;
+            const literPerH = debitL > 0 && creditH > 0 ? Number((debitL / creditH).toFixed(2)) : 0;
+
+            let costPerUnit = 0;
+            if (creditK > 0) costPerUnit = Math.round(debitR / creditK);
+            else if (creditH > 0) costPerUnit = Math.round(debitR / creditH);
+
+            const isHeavy = ['TRACTOR', 'EXCAVATOR', 'GRADER', 'WLOADER', 'HEAVY'].some(h => (existing.objectType || '').toUpperCase().includes(h)) || creditH > 0;
+
+            let status = 'NORMAL';
+            if (debitL === 0 && creditK === 0 && creditH === 0) {
+              status = 'NO_DATA';
+            } else if (debitL === 0) {
+              status = 'NO_FUEL';
+            } else if (creditK === 0 && creditH === 0) {
+              status = 'NO_ACTIVITY';
+            } else if (isHeavy) {
+              if (literPerH <= 3.0) status = 'OPTIMAL';
+              else if (literPerH <= 5.0) status = 'NORMAL';
+              else status = 'BOROS';
+            } else {
+              if (kmPerL >= 3.5) status = 'OPTIMAL';
+              else if (kmPerL >= 2.0) status = 'NORMAL';
+              else status = 'BOROS';
+            }
+
+            existing.kmPerLiter = kmPerL;
+            existing.literPerHm = literPerH;
+            existing.costPerUnit = costPerUnit;
+            existing.status = status;
+
+            summaryMap.set(key, existing);
           }
-
-          existing.kmPerLiter = kmPerL;
-          existing.literPerHm = literPerH;
-          existing.costPerUnit = costPerUnit;
-          existing.status = status;
-
-          summaryMap.set(key, existing);
-        });
+        }
 
         const mergedSummaries = Array.from(summaryMap.values());
-
-        // Deduplicate & merge daily records
-        const uploadedKeys = new Set(newDaily.map(d => `${d.m}_${d.c}`));
-        const targetType = uploadType === 'salrd' ? 'D' : uploadType === 'slarc' ? 'C' : null;
-
-        const preservedDaily = (fuelData.daily || []).filter(d => {
-          if (targetType) {
-            if (d.t === targetType && uploadedKeys.has(`${d.m}_${d.c}`)) {
-              return false; // Replaced by new upload
-            }
-            return true;
-          }
-          return !uploadedKeys.has(`${d.m}_${d.c}`);
-        });
-
-        const mergedDaily = [...preservedDaily, ...newDaily].slice(-6000);
 
         setUploadProgress('Menyimpan data evaluasi BBM ke database server...');
         const payload = { summaries: mergedSummaries, daily: mergedDaily };
         const { error: saveErr } = await saveFuelData(payload);
         if (saveErr) throw new Error(saveErr);
 
-        // Update per-month storage for lazy-loaded modal details
-        const affectedMonths = Array.from(new Set(newDaily.map(d => d.m)));
-        for (const m of affectedMonths) {
-          try {
-            let fullMonthDaily = newDaily.filter(d => d.m === m);
-            const { data: existingMonthDaily } = await fetchFuelDailyForMonth(m);
-            if (Array.isArray(existingMonthDaily) && existingMonthDaily.length > 0) {
-              const counterpartDaily = existingMonthDaily.filter(d => {
-                if (targetType) {
-                  if (d.t !== targetType) return true;
-                  return !uploadedKeys.has(`${d.m}_${d.c}`);
-                }
-                return false;
-              });
-              fullMonthDaily = [...counterpartDaily, ...fullMonthDaily];
-            }
-            const dedupeMap = new Map();
-            fullMonthDaily.forEach(d => dedupeMap.set(`${d.doc || ''}_${d.c}_${d.d}_${d.t}_${d.q}`, d));
-            await saveFuelDailyForMonth(m, Array.from(dedupeMap.values()));
-          } catch(pmErr) {
-            console.warn('Per-month storage save warning:', pmErr);
-          }
-        }
-
         setFuelData(payload);
         setFuelUploadInfo({
           type: uploadType,
           file: file.name,
-          rows: totalProcessedRows,
-          debitRows: debitRowsCount,
-          creditRows: creditRowsCount,
-          summariesCount: Object.keys(uploadedAgg).length,
+          totalProcessed: totalProcessedRows,
+          newAdded: totalNewlyAdded,
+          existingKept: totalExistingKept,
+          summariesCount: affectedVehiclesCount,
+          affectedMonths: affectedMonths.join(', '),
           uploadedAt: new Date().toISOString()
         });
 
@@ -2981,12 +2977,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 {fuelUploadInfo.type === 'salrd' ? 'Upload SALRD (Debit) Berhasil' : fuelUploadInfo.type === 'slarc' ? 'Upload SLARC (Credit) Berhasil' : 'Upload BBM Berhasil'}: {fuelUploadInfo.file}
               </p>
               <p className="text-amber-800 mt-0.5 text-[11px]">
-                {fuelUploadInfo.type === 'salrd'
-                  ? `Berhasil memproses ${fuelUploadInfo.rows} baris transaksi Debit (SALRD) untuk ${fuelUploadInfo.summariesCount} kendaraan.`
-                  : fuelUploadInfo.type === 'slarc'
-                  ? `Berhasil memproses ${fuelUploadInfo.rows} baris transaksi Credit (SLARC) untuk ${fuelUploadInfo.summariesCount} kendaraan.`
-                  : `Berhasil memproses ${fuelUploadInfo.debitRows} baris Debit (SALRD) dan ${fuelUploadInfo.creditRows} baris Credit (SLARC) untuk ${fuelUploadInfo.summariesCount} kendaraan.`
-                }
+                {fuelUploadInfo.newAdded !== undefined
+                  ? `Berhasil menambahkan ${fuelUploadInfo.newAdded} transaksi baru ke database (mempertahankan ${fuelUploadInfo.existingKept || 0} transaksi lama). Rekap bulanan untuk ${fuelUploadInfo.summariesCount} kendaraan [${fuelUploadInfo.affectedMonths}] otomatis diperbarui.`
+                  : `Berhasil memproses ${fuelUploadInfo.totalProcessed || fuelUploadInfo.rows || 0} baris transaksi.`}
               </p>
             </div>
             <button onClick={() => setFuelUploadInfo(null)} className="ml-auto text-amber-400 hover:text-amber-600"><XCircle size={16} /></button>
@@ -4571,23 +4564,21 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                                 // Lazy-load daily data for this vehicle's month if not yet loaded
                                 const targetMonth = row.month;
                                 if (targetMonth && !fuelLoadedMonthsRef.current.has(targetMonth)) {
-                                  const hasData = (fuelData.daily || []).some(d => d.m === targetMonth);
-                                  if (!hasData) {
-                                    fuelLoadedMonthsRef.current.add(targetMonth); // Mark as loading
-                                    try {
-                                      const { data: monthlyDaily } = await fetchFuelDailyForMonth(targetMonth);
-                                      if (monthlyDaily && monthlyDaily.length > 0) {
-                                        setFuelData(prev => {
-                                          // Deduplicate by doc+cc+date+type
-                                          const existing = new Map((prev.daily || []).map(d => [`${d.doc}_${d.c}_${d.d}_${d.t}`, d]));
-                                          for (const d of monthlyDaily) {
-                                            const k = `${d.doc}_${d.c}_${d.d}_${d.t}`;
-                                            if (!existing.has(k)) existing.set(k, d);
-                                          }
-                                          return { ...prev, daily: Array.from(existing.values()) };
-                                        });
-                                      }
-                                    } catch(_) { /* ignore errors, show empty tabs */ }
+                                  fuelLoadedMonthsRef.current.add(targetMonth); // Mark as loaded
+                                  try {
+                                    const { data: monthlyDaily } = await fetchFuelDailyForMonth(targetMonth);
+                                    if (monthlyDaily && monthlyDaily.length > 0) {
+                                      setFuelData(prev => {
+                                        const existing = new Map((prev.daily || []).map(d => [makeFuelTxKey(d), d]));
+                                        for (const d of monthlyDaily) {
+                                          const k = makeFuelTxKey(d);
+                                          if (!existing.has(k)) existing.set(k, d);
+                                        }
+                                        return { ...prev, daily: Array.from(existing.values()) };
+                                      });
+                                    }
+                                  } catch(e) {
+                                    console.warn('Lazy-load month daily warning:', e);
                                   }
                                 }
                               }}
