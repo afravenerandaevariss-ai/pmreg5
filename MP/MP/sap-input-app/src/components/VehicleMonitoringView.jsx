@@ -1760,6 +1760,74 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return Array.from(set).sort().reverse();
   }, [fuelData]);
 
+  // ── Database VLOOKUP: Cost Center -> Equipment Master ───────────────────────
+  const costCenterToEquipmentMap = useMemo(() => {
+    const map = new Map();
+
+    // 1. From masterMap (17k+ entries from system config)
+    if (masterMap && masterMap.size > 0) {
+      masterMap.forEach((val, eqNum) => {
+        if (val && val.costCenter) {
+          const cc = String(val.costCenter).trim().toUpperCase();
+          if (cc && !map.has(cc)) {
+            map.set(cc, {
+              equipment: String(eqNum || '').trim(),
+              description: val.description || '',
+              plant: val.plant || '',
+              objectType: val.objectType || ''
+            });
+          }
+        }
+      });
+    }
+
+    // 2. From masterEquipments
+    if (Array.isArray(masterEquipments)) {
+      masterEquipments.forEach(item => {
+        const cc = String(item.costCenter || item.cost_center || '').trim().toUpperCase();
+        if (cc && (!map.has(cc) || !map.get(cc).equipment)) {
+          map.set(cc, {
+            equipment: String(item.eqNum || item.equipment || '').trim(),
+            description: item.description || '',
+            plant: item.plant || '',
+            objectType: item.objectType || item.type || ''
+          });
+        }
+      });
+    }
+
+    // 3. From vehicle master list (vehicles)
+    if (Array.isArray(vehicles)) {
+      vehicles.forEach(v => {
+        const cc = String(v.cost_center || v.costCenter || '').trim().toUpperCase();
+        if (cc && (!map.has(cc) || !map.get(cc).equipment)) {
+          map.set(cc, {
+            equipment: String(v.vehicle_code || '').trim(),
+            description: v.description || '',
+            plant: v.plant || '',
+            objectType: v.object_type || ''
+          });
+        }
+      });
+    }
+
+    // 4. From fuelData.summaries
+    (fuelData?.summaries || []).forEach(s => {
+      const cc = String(s.costCenter || '').trim().toUpperCase();
+      const eq = String(s.equipment || '').trim();
+      if (cc && eq && eq !== '-' && (!map.has(cc) || !map.get(cc).equipment || map.get(cc).equipment === '-')) {
+        map.set(cc, {
+          equipment: eq,
+          description: s.description || '',
+          plant: s.plant || '',
+          objectType: s.objectType || ''
+        });
+      }
+    });
+
+    return map;
+  }, [masterMap, masterEquipments, vehicles, fuelData?.summaries]);
+
   // Index ZESTHLP16PA logs by vehicle and date/month for fast reference lookup
   const zestLogsByVehMonth = useMemo(() => {
     const map = new Map();
@@ -1836,9 +1904,18 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       }
 
       result = list.map(s => {
-        const refInfo = getRefInfo(s.equipment, s.costCenter, s.month, false);
+        const ccKey = String(s.costCenter || '').trim().toUpperCase();
+        const eqLookup = costCenterToEquipmentMap.get(ccKey);
+        const resolvedEquipment = (s.equipment && s.equipment !== '-') ? s.equipment : (eqLookup?.equipment || '-');
+        const resolvedDescription = s.description || eqLookup?.description || `Kendaraan ${s.costCenter}`;
+        const resolvedPlant = s.plant || eqLookup?.plant || s.costCenter.substring(0, 4);
+        const refInfo = getRefInfo(resolvedEquipment, s.costCenter, s.month, false);
         return {
           ...s,
+          equipment: resolvedEquipment,
+          description: resolvedDescription,
+          plant: resolvedPlant,
+          plantDesc: s.plantDesc || PLANT_INFO[resolvedPlant]?.desc || resolvedPlant,
           referencePrimary: refInfo.primary,
           referenceAll: refInfo.all,
           referenceCount: refInfo.count,
@@ -1929,7 +2006,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       }
 
       result = activeList.map(v => {
-        const refInfo = getRefInfo(v.equipment, v.costCenter, fuelDate, true);
+        const ccKey = String(v.costCenter || '').trim().toUpperCase();
+        const eqLookup = costCenterToEquipmentMap.get(ccKey);
+        const resolvedEquipment = (v.equipment && v.equipment !== '-') ? v.equipment : (eqLookup?.equipment || '-');
+        const resolvedDescription = v.description || eqLookup?.description || `Kendaraan ${v.costCenter}`;
+        const resolvedPlant = v.plant || eqLookup?.plant || v.costCenter.substring(0, 4);
+        const refInfo = getRefInfo(resolvedEquipment, v.costCenter, fuelDate, true);
         const kmPerL = v.debitLiters > 0 && v.creditKm > 0 ? Number((v.creditKm / v.debitLiters).toFixed(2)) : 0;
         const literPerH = v.debitLiters > 0 && v.creditHm > 0 ? Number((v.debitLiters / v.creditHm).toFixed(2)) : 0;
         const isHeavy = ['TRACTOR', 'EXCAVATOR', 'GRADER', 'WLOADER'].some(h => (v.objectType || '').toUpperCase().includes(h)) || v.creditHm > 0;
@@ -1945,6 +2027,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
         return {
           ...v,
+          equipment: resolvedEquipment,
+          description: resolvedDescription,
+          plant: resolvedPlant,
+          plantDesc: v.plantDesc || PLANT_INFO[resolvedPlant]?.desc || resolvedPlant,
           kmPerLiter: kmPerL,
           literPerHm: literPerH,
           costPerUnit: v.creditKm > 0 ? Math.round(v.debitRp / v.creditKm) : (v.creditHm > 0 ? Math.round(v.debitRp / v.creditHm) : 0),
@@ -1971,7 +2057,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
 
     return result;
-  }, [fuelData, fuelYear, fuelMonth, fuelDate, fuelPlant, searchFuel, zestLogsByVehMonth, zestLogsByVehDate, logs, isAdmin, currentUser]);
+  }, [fuelData, fuelYear, fuelMonth, fuelDate, fuelPlant, searchFuel, zestLogsByVehMonth, zestLogsByVehDate, logs, costCenterToEquipmentMap, isAdmin, currentUser]);
 
   const fuelKPIs = useMemo(() => {
     let totalLiters = 0;
@@ -2019,7 +2105,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       'No.': idx + 1,
       'Kebun / Unit': `${s.plant} - ${s.plantDesc}`,
       'Cost Center': s.costCenter,
-      'Kendaraan & Equipment': `${s.description || '-'} (Eq: ${s.equipment || '-'}, ${s.objectType || 'VEH'})`,
+      'No. Equipment': s.equipment || '-',
+      'Deskripsi Kendaraan': s.description || '-',
+      'Tipe Objek': s.objectType || 'VEH',
       'Keterangan / Reference (ZESTHLP16PA)': s.referenceAll || s.referencePrimary || '-',
       'Solar (Liter)': s.debitLiters || 0,
       'KM / HM': s.creditKm > 0 ? `${s.creditKm} KM` : (s.creditHm > 0 ? `${s.creditHm} HM` : '-'),
@@ -3937,9 +4025,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <thead>
                 <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 text-[10px] font-extrabold uppercase tracking-wider text-center">
                   <th className="px-2.5 py-2.5 text-center w-10">No</th>
-                  <th className="px-3 py-2.5 text-left w-36">Kebun / Unit & Cost Center</th>
-                  <th className="px-3 py-2.5 text-left w-48">Kendaraan & Equipment</th>
-                  <th className="px-3 py-2.5 text-left w-52 bg-slate-50/70">Keterangan / Reference (ZESTHLP16PA)</th>
+                  <th className="px-3 py-2.5 text-left w-36">Kebun / Unit</th>
+                  <th className="px-3 py-2.5 text-left w-28">Cost Center</th>
+                  <th className="px-3 py-2.5 text-center w-32 bg-emerald-50/70 text-emerald-950 font-black border-x border-emerald-200">
+                    No. Equipment
+                  </th>
+                  <th className="px-3 py-2.5 text-left w-44">Deskripsi Kendaraan</th>
+                  <th className="px-3 py-2.5 text-left w-48 bg-slate-50/70">Keterangan / Reference (ZESTHLP16PA)</th>
                   <th className="px-3 py-2.5 text-right w-28 bg-amber-50/70 text-amber-950 font-black border-x border-amber-200">
                     Solar (Liter)
                   </th>
@@ -3956,7 +4048,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <tbody className="divide-y divide-slate-200">
                 {fuelTableData.length === 0 ? (
                   <tr>
-                    <td colSpan="9" className="text-center py-12 text-slate-400">
+                    <td colSpan="11" className="text-center py-12 text-slate-400">
                       <Fuel size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
                       <p className="font-semibold text-slate-600 text-xs">Tidak ada data kendaraan untuk filter ini.</p>
                       <p className="text-[11px] text-slate-400 mt-1">
@@ -3977,19 +4069,32 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           {/* 1. No */}
                           <td className="px-2.5 py-2 text-center text-slate-500 font-mono">{rowNum}</td>
 
-                          {/* 2. Kebun / Unit & Cost Center */}
+                          {/* 2. Kebun / Unit */}
                           <td className="px-3 py-2">
-                            <div className="font-mono font-bold text-slate-900 text-[11px]">{row.costCenter}</div>
-                            <div className="text-[10px] text-slate-500 truncate max-w-[130px]">{row.plant} - {row.plantDesc}</div>
+                            <div className="font-bold text-slate-900 text-[11px]">{row.plant}</div>
+                            <div className="text-[10px] text-slate-500 truncate max-w-[125px]">{row.plantDesc || row.plant}</div>
                           </td>
 
-                          {/* 3. Kendaraan & Equipment */}
+                          {/* 3. Cost Center */}
+                          <td className="px-3 py-2 font-mono font-bold text-slate-800 text-[11px]">
+                            {row.costCenter}
+                          </td>
+
+                          {/* 4. No. Equipment (Dedicated Column via VLOOKUP) */}
+                          <td className="px-3 py-2 text-center bg-emerald-50/25 border-x border-emerald-100">
+                            {row.equipment && row.equipment !== '-' ? (
+                              <span className="font-mono font-bold text-[11px] text-emerald-900 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-300 inline-block shadow-2xs">
+                                {row.equipment}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-mono text-[10px] italic">-</span>
+                            )}
+                          </td>
+
+                          {/* 5. Deskripsi Kendaraan */}
                           <td className="px-3 py-2">
                             <div className="font-bold text-slate-800 text-[11px]">{row.description || '-'}</div>
-                            <div className="text-[10px] text-slate-400 flex items-center gap-1.5 font-mono">
-                              <span>Eq: {row.equipment || '-'}</span>
-                              <span className="bg-slate-100 text-slate-600 px-1 py-0.2 rounded text-[9px]">{row.objectType || 'VEH'}</span>
-                            </div>
+                            <span className="bg-slate-100 text-slate-600 px-1 py-0.2 rounded text-[9px] font-mono">{row.objectType || 'VEH'}</span>
                           </td>
 
                           {/* 4. Keterangan / Reference (ZESTHLP16PA) */}
@@ -4121,7 +4226,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <h3 className="text-lg font-black text-white">{selectedFuelVeh.description || selectedFuelVeh.costCenter}</h3>
               <p className="text-xs text-slate-300 mt-0.5">
                 Cost Center: <span className="font-mono font-bold text-amber-300">{selectedFuelVeh.costCenter}</span> · 
-                Equipment: <span className="font-mono text-slate-300">{selectedFuelVeh.equipment || '-'}</span> · 
+                No. Equipment: <span className="font-mono font-bold text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-700">{selectedFuelVeh.equipment && selectedFuelVeh.equipment !== '-' ? selectedFuelVeh.equipment : 'Unmapped'}</span> · 
                 Unit: <span className="font-semibold">{selectedFuelVeh.plant} ({selectedFuelVeh.plantDesc})</span>
               </p>
             </div>
