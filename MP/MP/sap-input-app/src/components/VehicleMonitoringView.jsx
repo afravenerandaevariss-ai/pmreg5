@@ -876,7 +876,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               debitRp: 0,
               creditKm: 0,
               creditHm: 0,
-              txCount: 0
+              txCount: 0,
+              slarcNarrations: new Set(),
+              partnerObjects: new Set()
             };
           }
           return monthlyAgg[key];
@@ -980,6 +982,17 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             bucket.txCount += 1;
             creditRowsCount++;
 
+            const partnerObj = String(r['Partner object name'] || '').trim();
+            if (name && !name.toLowerCase().includes('pembulatan')) {
+              const clean = name.split('|')[0].trim();
+              if (clean && clean !== '1' && clean !== '-' && !clean.includes('/ E-')) {
+                bucket.slarcNarrations?.add(clean);
+              }
+            }
+            if (partnerObj && !partnerObj.toLowerCase().includes('administrasi')) {
+              bucket.partnerObjects?.add(partnerObj);
+            }
+
             if (newDaily.length < 3500) {
               newDaily.push({
                 c: cc,
@@ -1079,6 +1092,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             else status = 'BOROS';
           }
 
+          const narrList = Array.from(b.slarcNarrations || []);
+          const partList = Array.from(b.partnerObjects || []);
+          const slarcRefPrimary = narrList[0] || partList[0] || null;
+          const slarcRefAll = narrList.join('; ') || partList.join('; ') || null;
+
           return {
             ...b,
             debitLiters: debitL,
@@ -1088,7 +1106,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             kmPerLiter: kmPerL,
             literPerHm: literPerH,
             costPerUnit,
-            status
+            status,
+            slarcRefPrimary,
+            slarcRefAll,
+            slarcNarrations: narrList.slice(0, 5),
+            partnerObjects: partList.slice(0, 3)
           };
         });
 
@@ -1828,6 +1850,27 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return map;
   }, [masterMap, masterEquipments, vehicles, fuelData?.summaries]);
 
+  // Fast index of master vehicles by vehicle_code
+  const masterVehiclesByCode = useMemo(() => {
+    const map = new Map();
+    (vehicles || []).forEach(v => {
+      if (v && v.vehicle_code) {
+        map.set(String(v.vehicle_code).trim(), v);
+      }
+    });
+    return map;
+  }, [vehicles]);
+
+  // Fast index of ZCO data by Cost Center
+  const zcoMapByCC = useMemo(() => {
+    const map = new Map();
+    (zcoData || []).forEach(z => {
+      const cc = String(z.costCenter || z['Cost Center'] || z.cc || '').trim().toUpperCase();
+      if (cc) map.set(cc, z);
+    });
+    return map;
+  }, [zcoData]);
+
   // ── Pre-Index ZESTHLP16PA Logs by No. Equipment & Date ─────────────────────
   const zestLogsByEquipment = useMemo(() => {
     const map = new Map();
@@ -1866,10 +1909,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       ? currentUser.plant
       : fuelPlant;
 
-    // Helper to extract rich reference from ZEST logs and SLARC
-    const getRefAndReconcile = (equipment, costCenter, ymOrDate, isDate = false) => {
+    // Helper implementing Smart 4-Tier Fallback for REFERENCE and KM/HM reconciliation
+    const resolveSmartReference = (equipment, costCenter, ymOrDate, isDate = false, summaryObj = null) => {
       const eqLogs = (equipment && equipment !== '-') ? (zestLogsByEquipment.get(equipment) || []) : [];
-      const ccLogs = (costCenter && costCenter !== '-') ? (slarcDailyByCostCenter.get(costCenter.toUpperCase()) || []) : [];
+      const ccLogs = (costCenter && costCenter !== '-') ? (slarcDailyByCostCenter.get(String(costCenter || '').trim().toUpperCase()) || []) : [];
 
       let matchedZest = [];
       let matchedSlarc = [];
@@ -1887,56 +1930,183 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         }
       }
 
-      // Fallback: If no ZEST logs in this specific month, check ALL available logs for this equipment
-      let refLogsPool = matchedZest;
-      if (refLogsPool.length === 0 && eqLogs.length > 0) {
-        refLogsPool = eqLogs;
-      }
-
-      const refList = [];
-      refLogsPool.forEach(l => {
-        const ref = (l.reference || '').trim();
-        const rem = (l.remarks || '').trim();
-        const job = JOB_CODE_DESC[l.job_code] || '';
-        let text = '';
-        if (ref && ref !== '1') {
-          text = rem && rem !== ref ? `${ref} (${rem})` : ref;
-        } else if (rem) {
-          text = rem;
-        } else if (job) {
-          text = job;
-        }
-        if (text && !refList.includes(text)) {
-          refList.push(text);
-        }
-      });
-
-      // Secondary fallback: Extract route/narration from SLARC
-      if (refList.length === 0) {
-        const pool = matchedSlarc.length > 0 ? matchedSlarc : ccLogs;
-        pool.forEach(d => {
-          const parts = String(d.n || '').split('|');
-          const text = parts[0].trim();
-          if (text && !refList.includes(text)) {
-            refList.push(text);
-          }
-        });
-      }
-
       // Sum ZEST KM/HM for reconciliation comparison
       let zestKmHmTotal = 0;
       matchedZest.forEach(l => {
         zestKmHmTotal += parseFloat(l.hm_km) || 0;
       });
 
+      // ============================================================
+      // PRIORITY 1: REFERENCE from ZESTHLP16PA matching No. Equipment + period
+      // ============================================================
+      const p1List = [];
+      matchedZest.forEach(l => {
+        const ref = (l.reference || '').trim();
+        if (ref && ref !== '1' && ref !== '-' && !p1List.includes(ref)) {
+          p1List.push(ref);
+        }
+      });
+
+      if (p1List.length > 0) {
+        return {
+          primary: p1List[0],
+          all: p1List.join('; '),
+          count: p1List.length,
+          priority: 1,
+          source: 'ZESTHLP16PA',
+          badge: null,
+          zestLogs: eqLogs,
+          matchedZest,
+          matchedSlarc,
+          zestKmHmTotal: Math.round(zestKmHmTotal * 100) / 100
+        };
+      }
+
+      // ============================================================
+      // PRIORITY 2: JOB CODE / Pekerjaan Utama / Remarks / Lokasi from ZESTHLP16PA in period
+      // ============================================================
+      const p2List = [];
+      matchedZest.forEach(l => {
+        const rem = (l.remarks || '').trim();
+        const job = (JOB_CODE_DESC[l.job_code] || l.job_code || '').trim();
+        const loc = (l.location || '').trim();
+        let text = '';
+        if (rem && rem !== '1' && rem !== '-') {
+          text = loc && !rem.includes(loc) ? `${rem} (${loc})` : rem;
+        } else if (job) {
+          text = loc ? `${job} (${loc})` : job;
+        }
+        if (text && !p2List.includes(text)) {
+          p2List.push(text);
+        }
+      });
+
+      // Also check vehicle master main job for this equipment
+      if (p2List.length === 0 && equipment && equipment !== '-') {
+        const masterObj = masterVehiclesByCode.get(equipment);
+        if (masterObj?.pekerjaan_utama) {
+          p2List.push(masterObj.pekerjaan_utama);
+        }
+      }
+
+      if (p2List.length > 0) {
+        return {
+          primary: p2List[0],
+          all: p2List.join('; '),
+          count: p2List.length,
+          priority: 2,
+          source: 'ZEST_JOB',
+          badge: null,
+          zestLogs: eqLogs,
+          matchedZest,
+          matchedSlarc,
+          zestKmHmTotal: Math.round(zestKmHmTotal * 100) / 100
+        };
+      }
+
+      // ============================================================
+      // PRIORITY 3: Latest known REFERENCE / Pekerjaan Utama from ZESTHLP16PA (other months)
+      // ============================================================
+      if (eqLogs.length > 0) {
+        const p3List = [];
+        let latestPeriod = '';
+        eqLogs.forEach(l => {
+          const ref = (l.reference || '').trim();
+          const rem = (l.remarks || '').trim();
+          const job = (JOB_CODE_DESC[l.job_code] || l.job_code || '').trim();
+          let text = '';
+          if (ref && ref !== '1' && ref !== '-') text = rem && rem !== ref ? `${ref} (${rem})` : ref;
+          else if (rem && rem !== '1' && rem !== '-') text = rem;
+          else if (job) text = job;
+          if (text && !p3List.includes(text)) {
+            p3List.push(text);
+            if (!latestPeriod && l.date) latestPeriod = l.date.substring(0, 7);
+          }
+        });
+
+        if (p3List.length > 0) {
+          return {
+            primary: p3List[0],
+            all: p3List.join('; '),
+            count: p3List.length,
+            priority: 3,
+            source: 'ZEST_LATEST',
+            badge: 'Ref. Terakhir',
+            latestPeriod,
+            zestLogs: eqLogs,
+            matchedZest,
+            matchedSlarc,
+            zestKmHmTotal: Math.round(zestKmHmTotal * 100) / 100
+          };
+        }
+      }
+
+      // ============================================================
+      // PRIORITY 4: Transaction description / text from SLARC (Credit) / ZCO
+      // ============================================================
+      const p4List = [];
+      // 4a. Check enriched summary fields
+      if (summaryObj?.slarcNarrations && Array.isArray(summaryObj.slarcNarrations) && summaryObj.slarcNarrations.length > 0) {
+        summaryObj.slarcNarrations.forEach(n => {
+          if (n && !p4List.includes(n)) p4List.push(n);
+        });
+      } else if (summaryObj?.slarcRefPrimary) {
+        p4List.push(summaryObj.slarcRefPrimary);
+      }
+
+      // 4b. Check daily SLARC records
+      const slarcPool = matchedSlarc.length > 0 ? matchedSlarc : ccLogs;
+      slarcPool.forEach(d => {
+        const text = String(d.n || '').split('|')[0].trim();
+        if (text && text !== '1' && text !== '-' && !text.includes('/ E-') && !text.toLowerCase().includes('pembulatan') && !p4List.includes(text)) {
+          p4List.push(text);
+        }
+      });
+
+      // 4c. Check partner object categories (e.g. TM - PENGANGKUTAN BUAH)
+      if (p4List.length === 0 && summaryObj?.partnerObjects && Array.isArray(summaryObj.partnerObjects)) {
+        summaryObj.partnerObjects.forEach(p => {
+          if (p && !p4List.includes(p)) p4List.push(p);
+        });
+      }
+
+      // 4d. Check ZCO activity if available
+      if (p4List.length === 0 && costCenter) {
+        const zcoMatch = zcoMapByCC.get(String(costCenter).trim().toUpperCase());
+        if (zcoMatch?.activity) {
+          p4List.push(`Aktivitas: ${zcoMatch.activity}`);
+        }
+      }
+
+      if (p4List.length > 0) {
+        return {
+          primary: p4List[0],
+          all: p4List.join('; '),
+          count: p4List.length,
+          priority: 4,
+          source: 'SLARC',
+          badge: 'SLARC',
+          zestLogs: eqLogs,
+          matchedZest,
+          matchedSlarc,
+          zestKmHmTotal: Math.round(zestKmHmTotal * 100) / 100
+        };
+      }
+
+      // ============================================================
+      // FALLBACK: Absolutely no activity record found
+      // ============================================================
       return {
-        primary: refList[0] || '-',
-        all: refList.join('; ') || '-',
-        count: refList.length,
+        primary: '-',
+        all: '-',
+        count: 0,
+        priority: 0,
+        source: 'NONE',
+        badge: null,
         zestLogs: eqLogs,
         matchedZest,
         matchedSlarc,
-        zestKmHmTotal: Math.round(zestKmHmTotal * 100) / 100
+        zestKmHmTotal: 0
       };
     };
 
@@ -1961,7 +2131,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         const resolvedEquipment = (s.equipment && s.equipment !== '-') ? s.equipment : (eqLookup?.equipment || '-');
         const resolvedDescription = s.description || eqLookup?.description || `Kendaraan ${s.costCenter}`;
         const resolvedPlant = s.plant || eqLookup?.plant || s.costCenter.substring(0, 4);
-        const refData = getRefAndReconcile(resolvedEquipment, s.costCenter, s.month, false);
+        const refData = resolveSmartReference(resolvedEquipment, s.costCenter, s.month, false, s);
 
         // Verification between SLARC (Credit) and ZESTHLP16PA
         const slarcTotal = s.creditKm || s.creditHm || 0;
@@ -1985,6 +2155,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           referencePrimary: refData.primary,
           referenceAll: refData.all,
           referenceCount: refData.count,
+          referencePriority: refData.priority,
+          referenceBadge: refData.badge,
+          referenceSource: refData.source,
+          referenceLatestPeriod: refData.latestPeriod,
           allZestLogs: refData.zestLogs,
           matchedZestLogs: refData.matchedZest,
           matchedSlarcDaily: refData.matchedSlarc,
@@ -2015,74 +2189,60 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             debitRp: 0,
             creditKm: 0,
             creditHm: 0,
-            hasData: false
+            txCount: 0,
+            slarcRefPrimary: s.slarcRefPrimary,
+            slarcRefAll: s.slarcRefAll,
+            slarcNarrations: s.slarcNarrations,
+            partnerObjects: s.partnerObjects
           });
         }
       });
 
       dayDaily.forEach(d => {
-        const cc = d.c;
+        const cc = String(d.c || '').trim().toUpperCase();
         if (!vehMap.has(cc)) {
+          const eqLookup = costCenterToEquipmentMap.get(cc);
+          const p = d.p || cc.substring(0, 4);
           vehMap.set(cc, {
             costCenter: cc,
-            equipment: '',
-            description: d.n || cc,
-            plant: d.p,
-            plantDesc: PLANT_INFO[d.p]?.desc || d.p,
-            wilayah: PLANT_INFO[d.p]?.wilayah || 'Regional 5',
-            objectType: 'VEHICLE',
-            month: d.m,
+            equipment: eqLookup?.equipment || '-',
+            description: eqLookup?.description || `Kendaraan ${cc}`,
+            plant: p,
+            plantDesc: PLANT_INFO[p]?.desc || p,
+            wilayah: PLANT_INFO[p]?.wilayah || 'Regional 5',
+            objectType: eqLookup?.objectType || 'VEH',
+            month: fuelDate.substring(0, 7),
             debitLiters: 0,
             debitRp: 0,
             creditKm: 0,
             creditHm: 0,
-            hasData: false
+            txCount: 0
           });
         }
-        const item = vehMap.get(cc);
-        item.hasData = true;
+        const v = vehMap.get(cc);
+        v.txCount += 1;
         if (d.t === 'D') {
-          item.debitLiters += d.q || 0;
-          item.debitRp += d.r || 0;
+          v.debitLiters += (d.q || 0);
+          v.debitRp += (d.r || 0);
         } else if (d.t === 'C') {
-          if (d.u === 'KM') item.creditKm += d.q || 0;
-          else item.creditHm += d.q || 0;
+          if (d.u === 'KM') v.creditKm += (d.q || 0);
+          else v.creditHm += (d.q || 0);
         }
       });
 
-      dayLogs.forEach(l => {
-        const code = String(l.vehicle_code || '').trim();
-        let item = null;
-        for (const v of vehMap.values()) {
-          if (v.equipment === code || v.costCenter === code) {
-            item = v;
-            break;
-          }
-        }
-        if (item) {
-          item.hasData = true;
-          const uom = String(l.uom || '').toUpperCase();
-          const isHm = uom === 'HM' || uom === 'HR';
-          if (isHm) {
-            if (item.creditHm === 0) item.creditHm += (l.hm_km || 0);
-          } else {
-            if (item.creditKm === 0) item.creditKm += (l.hm_km || 0);
-          }
-        }
-      });
-
-      let activeList = Array.from(vehMap.values()).filter(v => v.hasData);
+      let list = Array.from(vehMap.values());
       if (activePlant !== 'ALL') {
-        activeList = activeList.filter(v => v.plant === activePlant);
+        list = list.filter(v => v.plant === activePlant);
       }
+      list = list.filter(v => v.debitLiters > 0 || v.creditKm > 0 || v.creditHm > 0 || v.txCount > 0);
 
-      result = activeList.map(v => {
+      result = list.map(v => {
         const ccKey = String(v.costCenter || '').trim().toUpperCase();
         const eqLookup = costCenterToEquipmentMap.get(ccKey);
         const resolvedEquipment = (v.equipment && v.equipment !== '-') ? v.equipment : (eqLookup?.equipment || '-');
         const resolvedDescription = v.description || eqLookup?.description || `Kendaraan ${v.costCenter}`;
         const resolvedPlant = v.plant || eqLookup?.plant || v.costCenter.substring(0, 4);
-        const refData = getRefAndReconcile(resolvedEquipment, v.costCenter, fuelDate, true);
+        const refData = resolveSmartReference(resolvedEquipment, v.costCenter, fuelDate, true, v);
 
         const kmPerL = v.debitLiters > 0 && v.creditKm > 0 ? Number((v.creditKm / v.debitLiters).toFixed(2)) : 0;
         const literPerH = v.debitLiters > 0 && v.creditHm > 0 ? Number((v.debitLiters / v.creditHm).toFixed(2)) : 0;
@@ -2122,6 +2282,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           referencePrimary: refData.primary,
           referenceAll: refData.all,
           referenceCount: refData.count,
+          referencePriority: refData.priority,
+          referenceBadge: refData.badge,
+          referenceSource: refData.source,
+          referenceLatestPeriod: refData.latestPeriod,
           allZestLogs: refData.zestLogs,
           matchedZestLogs: refData.matchedZest,
           matchedSlarcDaily: refData.matchedSlarc,
@@ -2146,7 +2310,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
 
     return result;
-  }, [fuelData, fuelYear, fuelMonth, fuelDate, fuelPlant, searchFuel, zestLogsByEquipment, slarcDailyByCostCenter, logs, costCenterToEquipmentMap, isAdmin, currentUser]);
+  }, [fuelData, fuelYear, fuelMonth, fuelDate, fuelPlant, searchFuel, zestLogsByEquipment, slarcDailyByCostCenter, logs, costCenterToEquipmentMap, isAdmin, currentUser, masterVehiclesByCode, zcoMapByCC]);
 
   const fuelKPIs = useMemo(() => {
     let totalLiters = 0;
@@ -4187,19 +4351,34 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             <span className="bg-slate-100 text-slate-600 px-1 py-0.2 rounded text-[9px] font-mono">{row.objectType || 'VEH'}</span>
                           </td>
 
-                          {/* 6. REFERENCE (Renamed & populated via No. Equipment lookup from ZESTHLP16PA) */}
+                          {/* 6. REFERENCE (Populated via Smart 4-Tier Fallback: ZEST Ref -> ZEST Job -> Ref. Terakhir -> SLARC SAP) */}
                           <td className="px-3 py-2 text-center bg-slate-50/40">
-                            <div
-                              className="text-[10.5px] font-semibold text-slate-800 truncate max-w-[200px] mx-auto"
-                              title={row.referenceAll || row.referencePrimary || '-'}
-                            >
-                              {row.referencePrimary || '-'}
-                            </div>
-                            {row.referenceCount > 1 && (
-                              <div className="text-[9.5px] text-emerald-700 font-medium">
-                                +{row.referenceCount - 1} aktivitas lainnya
+                            <div className="flex flex-col items-center justify-center gap-0.5">
+                              <div
+                                className="text-[10.5px] font-semibold text-slate-800 truncate max-w-[200px] mx-auto"
+                                title={row.referenceAll || row.referencePrimary || '-'}
+                              >
+                                {row.referencePrimary || '-'}
                               </div>
-                            )}
+                              <div className="flex items-center justify-center gap-1 flex-wrap">
+                                {row.referenceBadge && (
+                                  <span className={`text-[8.5px] font-bold px-1.5 py-0.2 rounded shadow-2xs ${
+                                    row.referencePriority === 3
+                                      ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                      : row.referencePriority === 4
+                                      ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                                      : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                                  }`}>
+                                    {row.referenceBadge}
+                                  </span>
+                                )}
+                                {row.referenceCount > 1 && (
+                                  <span className="text-[9px] text-slate-500 font-medium">
+                                    +{row.referenceCount - 1} lainnya
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </td>
 
                           {/* 7. Solar (Liter) ── FIRST */}
@@ -4346,6 +4525,16 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       });
 
       const reconciliationRows = Array.from(combinedDateMap.values()).sort((a, b) => b.date.localeCompare(a.date));
+      if (reconciliationRows.length === 0 && (slarcTotal > 0 || zestTotal > 0)) {
+        reconciliationRows.push({
+          date: selectedFuelVeh.month || 'Periode Ini',
+          doc: 'SAP Credit (SLARC)',
+          ref: selectedFuelVeh.referencePrimary || selectedFuelVeh.slarcRefPrimary || 'Realisasi SAP Bulanan',
+          slarcQty: slarcTotal,
+          zestQty: zestTotal,
+          u: uomLabel
+        });
+      }
 
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 no-print animate-in fade-in duration-200">
@@ -4374,6 +4563,42 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               >
                 <X size={20} />
               </button>
+            </div>
+
+            {/* Source of Reference Info Banner */}
+            <div className="px-5 pt-3 pb-0 bg-slate-50">
+              <div className="p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs flex-wrap ${
+                selectedFuelVeh.referencePriority === 1 || selectedFuelVeh.referencePriority === 2
+                  ? 'bg-emerald-50/90 border-emerald-200 text-emerald-950'
+                  : selectedFuelVeh.referencePriority === 3
+                  ? 'bg-amber-50/90 border-amber-200 text-amber-950'
+                  : 'bg-blue-50/90 border-blue-200 text-blue-950'
+              }">
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                    selectedFuelVeh.referencePriority === 1 || selectedFuelVeh.referencePriority === 2
+                      ? 'bg-emerald-200 text-emerald-900'
+                      : selectedFuelVeh.referencePriority === 3
+                      ? 'bg-amber-200 text-amber-900'
+                      : 'bg-blue-200 text-blue-900'
+                  }`}>
+                    {selectedFuelVeh.referencePriority === 1 ? 'P1: ZEST REF' :
+                     selectedFuelVeh.referencePriority === 2 ? 'P2: ZEST PEKERJAAN' :
+                     selectedFuelVeh.referencePriority === 3 ? `P3: REF. TERAKHIR (${selectedFuelVeh.referenceLatestPeriod || 'Bulan Lain'})` :
+                     'P4: SLARC SAP (CREDIT)'}
+                  </span>
+                  <span className="font-semibold text-[11px]">
+                    <strong className="text-slate-800">Keterangan:</strong> {selectedFuelVeh.referenceAll || selectedFuelVeh.referencePrimary || '-'}
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-500 font-medium italic">
+                  {selectedFuelVeh.referencePriority === 4
+                    ? 'Logbook ZESTHLP16PA belum di-upload (Keterangan diambil dari SAP SLARC)'
+                    : selectedFuelVeh.referencePriority === 3
+                    ? `Diambil dari riwayat logbook terakhir (${selectedFuelVeh.referenceLatestPeriod})`
+                    : 'Terhubung langsung dengan logbook ZESTHLP16PA'}
+                </span>
+              </div>
             </div>
 
             {/* Reconciliation Comparison Top Banner */}
