@@ -4521,10 +4521,38 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
     {/* â”€â”€ Impeccable Detail Modal with ZESTHLP16PA vs SLARC Reconciliation â”€â”€ */}
     {selectedFuelVeh && (() => {
-      const slarcTotal = selectedFuelVeh.creditKm || selectedFuelVeh.creditHm || 0;
+      const dailyDebitForVeh = (fuelData.daily || []).filter(d => 
+        d.c === selectedFuelVeh.costCenter && d.t === 'D' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month)
+      );
+      const dailyDebitLiters = dailyDebitForVeh.reduce((acc, d) => acc + (d.q || 0), 0);
+      const dailyDebitRp = dailyDebitForVeh.reduce((acc, d) => acc + (d.r || 0), 0);
+
+      const fuelLiters = (selectedFuelVeh.debitLiters && selectedFuelVeh.debitLiters > 0)
+        ? selectedFuelVeh.debitLiters
+        : (dailyDebitLiters > 0 ? Math.round(dailyDebitLiters * 100) / 100 : 0);
+
+      const fuelCostRp = (selectedFuelVeh.debitRp && selectedFuelVeh.debitRp > 0)
+        ? selectedFuelVeh.debitRp
+        : Math.round(dailyDebitRp);
+
+      const dailyCreditForVeh = (fuelData.daily || []).filter(d => 
+        d.c === selectedFuelVeh.costCenter && d.t === 'C' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month)
+      );
+      const dailyCreditQty = dailyCreditForVeh.reduce((acc, d) => acc + (d.q || 0), 0);
+
+      const slarcTotal = (selectedFuelVeh.creditKm || selectedFuelVeh.creditHm || 0) > 0
+        ? (selectedFuelVeh.creditKm || selectedFuelVeh.creditHm)
+        : (dailyCreditQty > 0 ? Math.round(dailyCreditQty * 100) / 100 : 0);
+
       const zestTotal = selectedFuelVeh.zestTotalKmHm || 0;
       const variance = Math.round((slarcTotal - zestTotal) * 100) / 100;
-      const uomLabel = selectedFuelVeh.creditKm > 0 ? 'KM' : 'HM';
+      const uomLabel = (selectedFuelVeh.creditKm > 0 || dailyCreditForVeh.some(d => d.u === 'KM'))
+        ? 'KM'
+        : (selectedFuelVeh.creditHm > 0 || dailyCreditForVeh.some(d => d.u === 'HM' || d.u === 'HR'))
+        ? 'HM'
+        : (selectedFuelVeh.objectType && ['TRACTOR', 'EXCAVATOR', 'GRADER', 'WLOADER', 'HEAVY'].some(h => (selectedFuelVeh.objectType || '').toUpperCase().includes(h)))
+        ? 'HM'
+        : 'KM';
 
       // Build daily reconciliation list
       const slarcDailyList = selectedFuelVeh.matchedSlarcDaily || [];
@@ -4630,54 +4658,96 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
             {/* Reconciliation Comparison Top Banner */}
             <div className="bg-slate-50 border-b border-slate-200 p-4">
-              <div className={`grid grid-cols-1 ${isDevUser ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3 items-center`}>
-                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs text-center">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase">1. SLARC (Credit BBM SAP)</span>
+              <div className={`grid grid-cols-1 ${isDevUser ? 'sm:grid-cols-4' : 'sm:grid-cols-2'} gap-3 items-center`}>
+                {/* 1. Bahan Bakar (L) */}
+                <div 
+                  onClick={() => setFuelModalTab('debit')}
+                  className={`bg-white p-3 rounded-xl border transition shadow-2xs text-center cursor-pointer hover:scale-[1.01] ${
+                    effectiveModalTab === 'debit' ? 'border-amber-400 ring-2 ring-amber-100 bg-amber-50/20' : 'border-slate-200 hover:border-amber-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-amber-900 uppercase">
+                    <Droplet size={11} className="text-amber-600" />
+                    <span>1. Bahan Bakar (L)</span>
+                  </div>
+                  <div className="text-lg font-black text-amber-950 font-mono mt-0.5">
+                    {fuelLiters.toLocaleString('id-ID')} <span className="text-xs font-bold text-slate-500">L</span>
+                  </div>
+                  <span className="text-[9.5px] text-slate-500 font-medium">
+                    {fuelCostRp > 0 ? `Rp ${fuelCostRp.toLocaleString('id-ID')} · Total Pemakaian Solar` : 'Total Pemakaian Solar'}
+                  </span>
+                </div>
+
+                {/* 2. KM/HM */}
+                <div 
+                  onClick={() => setFuelModalTab('credit')}
+                  className={`bg-white p-3 rounded-xl border transition shadow-2xs text-center cursor-pointer hover:scale-[1.01] ${
+                    effectiveModalTab === 'credit' ? 'border-blue-400 ring-2 ring-blue-100 bg-blue-50/20' : 'border-slate-200 hover:border-blue-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-blue-900 uppercase">
+                    <Activity size={11} className="text-blue-600" />
+                    <span>{isDevUser ? '2. KM/HM (SLARC)' : '2. KM/HM'}</span>
+                  </div>
                   <div className="text-lg font-black text-blue-900 font-mono mt-0.5">
                     {slarcTotal.toLocaleString('id-ID')} <span className="text-xs font-bold text-slate-500">{uomLabel}</span>
                   </div>
                   <span className="text-[9.5px] text-slate-400">Posting Output Aktivitas</span>
                 </div>
 
-                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs text-center">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase">2. ZESTHLP16PA (Logbook)</span>
-                  <div className="text-lg font-black text-emerald-900 font-mono mt-0.5">
-                    {zestTotal.toLocaleString('id-ID')} <span className="text-xs font-bold text-slate-500">{uomLabel}</span>
-                  </div>
-                  <span className="text-[9.5px] text-slate-400">Total HM/KM dari Logbook</span>
-                </div>
-
                 {isDevUser && (
-                  <div className={`p-3 rounded-xl border text-center ${
-                  variance === 0 && (slarcTotal > 0 || zestTotal > 0)
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                    : slarcTotal > 0 && zestTotal > 0
-                    ? 'bg-amber-50 border-amber-200 text-amber-900'
-                    : 'bg-slate-100 border-slate-200 text-slate-700'
-                }`}>
-                  <span className="text-[10px] font-bold uppercase">Status Rekonsiliasi</span>
-                  <div className="text-sm font-black mt-0.5 flex items-center justify-center gap-1.5">
-                    {variance === 0 && (slarcTotal > 0 || zestTotal > 0) ? (
-                      <>
-                        <CheckCircle size={15} className="text-emerald-600" />
-                        <span>100% SESUAI (Klop)</span>
-                      </>
-                    ) : slarcTotal > 0 && zestTotal > 0 ? (
-                      <>
-                        <AlertTriangle size={15} className="text-amber-600" />
-                        <span>Selisih: {variance > 0 ? `+${variance}` : variance} {uomLabel}</span>
-                      </>
-                    ) : (
-                      <>
-                        <Info size={15} className="text-slate-500" />
-                        <span>{slarcTotal > 0 ? 'Tercatat di SLARC' : 'Tercatat di ZEST'}</span>
-                      </>
-                    )}
-                  </div>
-                  <span className="text-[9.5px] font-medium block mt-0.5">
-                    {variance === 0 ? 'Tidak ada perbedaan nilai output' : 'Perlu sinkronisasi logbook'}
-                  </span>
-                </div>
+                  <>
+                    {/* 3. ZESTHLP16PA (Logbook) - DEV ONLY */}
+                    <div 
+                      onClick={() => setFuelModalTab('zest')}
+                      className={`bg-white p-3 rounded-xl border transition shadow-2xs text-center cursor-pointer hover:scale-[1.01] ${
+                        effectiveModalTab === 'zest' ? 'border-emerald-400 ring-2 ring-emerald-100 bg-emerald-50/20' : 'border-slate-200 hover:border-emerald-200'
+                      }`}
+                    >
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">3. ZESTHLP16PA (Logbook)</span>
+                      <div className="text-lg font-black text-emerald-900 font-mono mt-0.5">
+                        {zestTotal.toLocaleString('id-ID')} <span className="text-xs font-bold text-slate-500">{uomLabel}</span>
+                      </div>
+                      <span className="text-[9.5px] text-slate-400">Total HM/KM dari Logbook</span>
+                    </div>
+
+                    {/* 4. Status Rekonsiliasi - DEV ONLY */}
+                    <div 
+                      onClick={() => setFuelModalTab('reconcile')}
+                      className={`p-3 rounded-xl border text-center transition cursor-pointer hover:scale-[1.01] ${
+                        effectiveModalTab === 'reconcile' ? 'ring-2 ring-emerald-200 ' : ''
+                      }${
+                        variance === 0 && (slarcTotal > 0 || zestTotal > 0)
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                          : slarcTotal > 0 && zestTotal > 0
+                          ? 'bg-amber-50 border-amber-200 text-amber-900'
+                          : 'bg-slate-100 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <span className="text-[10px] font-bold uppercase">Status Rekonsiliasi</span>
+                      <div className="text-sm font-black mt-0.5 flex items-center justify-center gap-1.5">
+                        {variance === 0 && (slarcTotal > 0 || zestTotal > 0) ? (
+                          <>
+                            <CheckCircle size={15} className="text-emerald-600" />
+                            <span>100% SESUAI (Klop)</span>
+                          </>
+                        ) : slarcTotal > 0 && zestTotal > 0 ? (
+                          <>
+                            <AlertTriangle size={15} className="text-amber-600" />
+                            <span>Selisih: {variance > 0 ? `+${variance}` : variance} {uomLabel}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Info size={15} className="text-slate-500" />
+                            <span>{slarcTotal > 0 ? 'Tercatat di SLARC' : 'Tercatat di ZEST'}</span>
+                          </>
+                        )}
+                      </div>
+                      <span className="text-[9.5px] font-medium block mt-0.5">
+                        {variance === 0 ? 'Tidak ada perbedaan nilai output' : 'Perlu sinkronisasi logbook'}
+                      </span>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
