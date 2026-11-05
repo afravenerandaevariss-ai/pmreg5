@@ -1,4 +1,4 @@
-import fs from 'fs';
+﻿import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import puppeteer from 'puppeteer-core';
@@ -93,12 +93,24 @@ const MAX_RETRIES = 3;
 // ─────────────────────────────────────────────────────────────
 async function detectLatestDataMonth() {
   if (process.env.REPORT_MONTH) return process.env.REPORT_MONTH; // override manual
+  // Gunakan Supabase URL secara langsung — bukan APP_URL (front-end) yang tidak punya /rest/v1/
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://pabnvxlvrussdfhisxzn.supabase.co';
+  const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
   try {
     const res = await fetch(
-      `${APP_URL}/rest/v1/vehicle_logs?select=date&order=date.desc&limit=1`,
-      { headers: { 'Accept': 'application/json' } }
+      `${supabaseUrl}/rest/v1/vehicle_logs?select=date&order=date.desc&limit=1`,
+      {
+        headers: {
+          'Accept': 'application/json',
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+        }
+      }
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[PERIODE] Supabase responded HTTP ${res.status}. Memakai default bulan berjalan.`);
+      return null;
+    }
     const rows = await res.json();
     const maxDate = rows?.[0]?.date;
     if (!maxDate) return null;
@@ -169,7 +181,7 @@ function getChromePath() {
   );
 }
 
-async function logStep(msg) {
+function logStep(msg) {
   console.log(`[${new Date().toISOString()}] ⏳ ${msg}`);
 }
 
@@ -441,9 +453,9 @@ async function captureCmmsScreenshot() {
       logStep(`[CMMS] Attempt ${attempt}/${MAX_RETRIES}...`);
       browser = await puppeteer.launch({
         executablePath: getChromePath(),
-        headless: true,
+        headless: 'new',
         protocolTimeout: 300000,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--window-size=1920,1080']
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--use-gl=swiftshader', '--use-angle=swiftshader-webgl', '--force-color-profile=srgb', '--run-all-compositor-stages-before-draw', '--disable-features=VizDisplayCompositor', '--window-size=1920,1080']
       });
 
       const page = await browser.newPage();
