@@ -244,7 +244,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   // Normalize role string — handles all DB variants: 'USER','Unit','unit','UNIT'
   const roleUpper = currentUser?.role?.toUpperCase() || '';
 
-  const isDevUser = roleUpper === 'DEV';
+  const isDevUser = roleUpper === 'DEV' || roleUpper === 'TRIAL' || currentUser?.nik?.toLowerCase() === 'admin';
 
   // Explicit USER/UNIT check — blocks regardless of plant value
   const isUserRole = roleUpper === 'USER' || roleUpper === 'UNIT';
@@ -4449,7 +4449,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           <td className="px-3 py-2.5 text-center no-print">
                             <button
                               type="button"
-                              onClick={() => { setSelectedFuelVeh(row); setFuelModalTab('reconcile'); }}
+                              onClick={() => { setSelectedFuelVeh(row); setFuelModalTab(isDevUser ? 'reconcile' : 'debit'); }}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#064e3b] hover:bg-[#065f46] text-white shadow-xs transition hover:scale-[1.02] cursor-pointer"
                             >
                               <Eye size={12} /> Detail
@@ -4521,6 +4521,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       });
 
       const reconciliationRows = Array.from(combinedDateMap.values()).sort((a, b) => b.date.localeCompare(a.date));
+      const effectiveModalTab = (!isDevUser && (fuelModalTab === 'reconcile' || fuelModalTab === 'zest')) ? 'debit' : fuelModalTab;
       if (reconciliationRows.length === 0 && (slarcTotal > 0 || zestTotal > 0)) {
         reconciliationRows.push({
           date: selectedFuelVeh.month || 'Periode Ini',
@@ -4561,8 +4562,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               </button>
             </div>
 
-            {/* Source of Reference Info Banner */}
-            <div className="px-5 pt-3 pb-0 bg-slate-50">
+            {/* Source of Reference Info Banner (Role DEV only) */}
+            {isDevUser && (
+              <div className="px-5 pt-3 pb-0 bg-slate-50">
               <div className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs flex-wrap ${
                 selectedFuelVeh.referencePriority === 1 || selectedFuelVeh.referencePriority === 2
                   ? 'bg-emerald-50/90 border-emerald-200 text-emerald-950'
@@ -4595,7 +4597,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     : 'Terhubung langsung dengan logbook ZESTHLP16PA'}
                 </span>
               </div>
-            </div>
+              </div>
+            )}
 
             {/* Reconciliation Comparison Top Banner */}
             <div className="bg-slate-50 border-b border-slate-200 p-4">
@@ -4651,10 +4654,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
             {/* Modal Tabs */}
             <div className="flex border-b border-slate-200 px-4 pt-3 gap-2 bg-white flex-wrap">
+              {isDevUser && (
+                <>
               <button
                 onClick={() => setFuelModalTab('reconcile')}
                 className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
-                  fuelModalTab === 'reconcile'
+                  effectiveModalTab === 'reconcile'
                     ? 'border-indigo-600 text-indigo-900 bg-indigo-50/50 rounded-t-lg'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
@@ -4664,17 +4669,19 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <button
                 onClick={() => setFuelModalTab('zest')}
                 className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
-                  fuelModalTab === 'zest'
+                  effectiveModalTab === 'zest'
                     ? 'border-emerald-600 text-emerald-900 bg-emerald-50/50 rounded-t-lg'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
                 <Calendar size={13} className="text-emerald-600" /> Log ZESTHLP16PA ({selectedFuelVeh.matchedZestLogs?.length || 0})
               </button>
+                              </>
+              )}
               <button
                 onClick={() => setFuelModalTab('debit')}
                 className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
-                  fuelModalTab === 'debit'
+                  effectiveModalTab === 'debit'
                     ? 'border-amber-600 text-amber-900 bg-amber-50/50 rounded-t-lg'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
@@ -4684,7 +4691,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <button
                 onClick={() => setFuelModalTab('credit')}
                 className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
-                  fuelModalTab === 'credit'
+                  effectiveModalTab === 'credit'
                     ? 'border-blue-600 text-blue-900 bg-blue-50/50 rounded-t-lg'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
@@ -4696,7 +4703,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             {/* Modal Body Table Content */}
             <div className="p-4 overflow-y-auto flex-1">
               {/* TAB 1: RECONCILIATION SIDE BY SIDE */}
-              {fuelModalTab === 'reconcile' && (
+              {isDevUser && effectiveModalTab === 'reconcile' && (
                 <div>
                   {reconciliationRows.length === 0 ? (
                     <div className="text-center py-10 text-slate-400">
@@ -4790,7 +4797,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               )}
 
               {/* TAB 2: ZESTHLP16PA LOGS & REFERENCES */}
-              {fuelModalTab === 'zest' && (() => {
+              {isDevUser && effectiveModalTab === 'zest' && (() => {
                 const zestList = (selectedFuelVeh.matchedZestLogs && selectedFuelVeh.matchedZestLogs.length > 0)
                   ? selectedFuelVeh.matchedZestLogs
                   : (selectedFuelVeh.allZestLogs || []);
@@ -4856,7 +4863,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               })()}
 
               {/* TAB 3: DEBIT FUEL */}
-              {fuelModalTab === 'debit' && (() => {
+              {effectiveModalTab === 'debit' && (() => {
                 const matchedDaily = (fuelData.daily || []).filter(d =>
                   d.c === selectedFuelVeh.costCenter && d.t === 'D' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month)
                 );
@@ -4919,7 +4926,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               })()}
 
               {/* TAB 4: SLARC DAILY CREDIT */}
-              {fuelModalTab === 'credit' && (() => {
+              {effectiveModalTab === 'credit' && (() => {
                 const matchedDaily = (fuelData.daily || []).filter(d =>
                   d.c === selectedFuelVeh.costCenter && d.t === 'C' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month)
                 );
