@@ -175,7 +175,7 @@ export async function fetchHierarchyData() {
     .from(T.hierarchy_data)
     .select('data')
     .eq('id', 1)
-    .single();
+    .maybeSingle();
   if (error) {
     if (error.code === 'PGRST116' || error.status === 406) {
       return { data: null, error: null };
@@ -313,7 +313,7 @@ export async function getSystemConfig(id, forceRefresh = false) {
     .from(T.hierarchy_data)
     .select('data')
     .eq('id', numericId)
-    .single();
+    .maybeSingle();
 
   if (error) {
     if (error.code === 'PGRST116' || error.status === 406) {
@@ -513,7 +513,7 @@ export async function loginUser(nik, password) {
       .from(T.app_users)
       .select('*')
       .ilike('nik', cleanNik)
-      .single();
+      .maybeSingle();
     data = result.data;
     error = result.error;
   } catch (networkErr) {
@@ -573,7 +573,7 @@ export async function getUserByNik(nik) {
     .from(T.app_users)
     .select('*')
     .eq('nik', nik)
-    .single();
+    .maybeSingle();
 
   if (error) return { data: null, error: 'NIK tidak ditemukan' };
   return { data, error: null };
@@ -653,7 +653,7 @@ export async function getGSheetHistory() {
     .from(T.hierarchy_data)
     .select('data')
     .eq('id', 5)
-    .single();
+    .maybeSingle();
   if (error) return { data: [], error: null };
   return { data: Array.isArray(data?.data) ? data.data : [], error: null };
 }

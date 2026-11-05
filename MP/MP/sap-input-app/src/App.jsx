@@ -367,9 +367,9 @@ function LoginView({ onLogin }) {
               </label>
               <input 
                 type="text" 
-                maxLength="8"
+                maxLength="16"
                 value={nik}
-                onChange={(e) => setNik(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => setNik(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
                 placeholder="Contoh: 12345678"
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-[#064e3b]/20 focus:border-[#064e3b] focus:outline-none transition-colors text-sm font-medium shadow-sm"
                 required
