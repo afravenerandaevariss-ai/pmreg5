@@ -4256,7 +4256,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         </div>
 
         {/* ── Active Filter Status Badge ── */}
-        <div className="px-4 py-2 bg-slate-100/60 border-y border-slate-200 flex items-center justify-between text-xs text-slate-600">
+        <div className="sticky top-0 z-20 px-4 py-2.5 bg-slate-100/95 backdrop-blur-xs border-y border-slate-200 flex items-center justify-between text-xs text-slate-600 shadow-2xs">
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-700">Filter Aktif:</span>
             <span className="bg-white border border-slate-300 px-2 py-0.5 rounded-md font-semibold text-slate-800">
@@ -4278,31 +4278,31 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         </div>
 
-        {/* ── Clean Table (Centered, Symmetrical, No. Equipment First, Then Cost Center) ── */}
+        {/* ── Clean Table with Sticky/Freeze Header ── */}
         <div className="p-4 bg-white">
-          <div className="overflow-x-auto excel-cell-border">
-            <table className="w-full text-[11px] border-collapse">
-              <thead>
-                <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 text-[10px] font-extrabold uppercase tracking-wider text-center whitespace-nowrap">
-                  <th className="px-2.5 py-3 text-center w-12">No</th>
-                  <th className="px-3 py-3 text-center w-40">Kebun / Unit</th>
-                  <th className="px-3 py-3 text-center w-36 bg-emerald-50/70 text-emerald-950 font-black border-x border-emerald-200">
+          <div className="overflow-auto max-h-[calc(100vh-270px)] min-h-[420px] excel-cell-border border border-slate-200 rounded-xl relative shadow-2xs">
+            <table className="w-full text-[11px] border-separate border-spacing-0">
+              <thead className="sticky top-0 z-30 shadow-xs">
+                <tr className="bg-slate-100 text-slate-700 text-[10px] font-extrabold uppercase tracking-wider text-center whitespace-nowrap">
+                  <th className="sticky top-0 z-30 bg-slate-100 px-2.5 py-3 text-center w-12 border-b border-slate-300 shadow-2xs">No</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center w-40 border-b border-slate-300 shadow-2xs">Kebun / Unit</th>
+                  <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-x border-emerald-200 border-b border-slate-300 px-3 py-3 text-center w-36 shadow-2xs">
                     No. Equipment
                   </th>
-                  <th className="px-3 py-3 text-center w-32 font-mono">Cost Center</th>
-                  <th className="px-3 py-3 text-center min-w-[200px]">Deskripsi Kendaraan</th>
-                  <th className="px-3 py-3 text-center min-w-[220px] bg-slate-50/70 text-slate-800">Reference</th>
-                  <th className="px-3 py-3 text-center w-32 bg-amber-50/70 text-amber-950 font-black border-x border-amber-200">
+                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center w-32 font-mono border-b border-slate-300 shadow-2xs">Cost Center</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center min-w-[200px] border-b border-slate-300 shadow-2xs">Deskripsi Kendaraan</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-800 px-3 py-3 text-center min-w-[220px] border-b border-slate-300 shadow-2xs">Reference</th>
+                  <th className="sticky top-0 z-30 bg-[#fffbeb] text-amber-950 font-black border-x border-amber-200 border-b border-slate-300 px-3 py-3 text-center w-32 shadow-2xs">
                     Solar (Liter)
                   </th>
-                  <th className="px-3 py-3 text-center w-36 bg-blue-50/70 text-blue-950 font-black border-r border-blue-200">
+                  <th className="sticky top-0 z-30 bg-[#eff6ff] text-blue-950 font-black border-r border-blue-200 border-b border-slate-300 px-3 py-3 text-center w-36 shadow-2xs">
                     KM / HM
                   </th>
-                  <th className="px-3 py-3 text-center w-40 bg-emerald-50/70 text-emerald-950 font-black border-r border-emerald-200">
+                  <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-r border-emerald-200 border-b border-slate-300 px-3 py-3 text-center w-40 shadow-2xs">
                     Rasio / Efisiensi
                   </th>
-                  <th className="px-3 py-3 text-center w-40 text-slate-700">Biaya Solar (Rp)</th>
-                  <th className="px-3 py-3 text-center w-24 no-print">Aksi</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-700 px-3 py-3 text-center w-40 border-b border-slate-300 shadow-2xs">Biaya Solar (Rp)</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center w-24 no-print border-b border-slate-300 shadow-2xs">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
