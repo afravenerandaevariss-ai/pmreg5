@@ -4527,22 +4527,24 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       const dailyDebitLiters = dailyDebitForVeh.reduce((acc, d) => acc + (d.q || 0), 0);
       const dailyDebitRp = dailyDebitForVeh.reduce((acc, d) => acc + (d.r || 0), 0);
 
-      const fuelLiters = (selectedFuelVeh.debitLiters && selectedFuelVeh.debitLiters > 0)
-        ? selectedFuelVeh.debitLiters
-        : (dailyDebitLiters > 0 ? Math.round(dailyDebitLiters * 100) / 100 : 0);
+      const fuelLiters = dailyDebitForVeh.length > 0
+        ? Math.round(dailyDebitLiters * 100) / 100
+        : (selectedFuelVeh.debitLiters && selectedFuelVeh.debitLiters > 0 ? selectedFuelVeh.debitLiters : 0);
 
-      const fuelCostRp = (selectedFuelVeh.debitRp && selectedFuelVeh.debitRp > 0)
-        ? selectedFuelVeh.debitRp
-        : Math.round(dailyDebitRp);
+      const fuelCostRp = dailyDebitForVeh.length > 0
+        ? Math.round(dailyDebitRp)
+        : (selectedFuelVeh.debitRp && selectedFuelVeh.debitRp > 0 ? selectedFuelVeh.debitRp : 0);
 
       const dailyCreditForVeh = (fuelData.daily || []).filter(d => 
         d.c === selectedFuelVeh.costCenter && d.t === 'C' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month)
       );
       const dailyCreditQty = dailyCreditForVeh.reduce((acc, d) => acc + (d.q || 0), 0);
 
-      const slarcTotal = (selectedFuelVeh.creditKm || selectedFuelVeh.creditHm || 0) > 0
-        ? (selectedFuelVeh.creditKm || selectedFuelVeh.creditHm)
-        : (dailyCreditQty > 0 ? Math.round(dailyCreditQty * 100) / 100 : 0);
+      const slarcTotal = dailyCreditForVeh.length > 0
+        ? Math.round(dailyCreditQty * 100) / 100
+        : ((selectedFuelVeh.creditKm || selectedFuelVeh.creditHm || 0) > 0
+          ? (selectedFuelVeh.creditKm || selectedFuelVeh.creditHm)
+          : 0);
 
       const zestTotal = selectedFuelVeh.zestTotalKmHm || 0;
       const variance = Math.round((slarcTotal - zestTotal) * 100) / 100;
@@ -4995,11 +4997,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           <td className="px-2.5 py-1.5 text-center font-mono text-slate-400">{i + 1}</td>
                           <td className="px-3 py-1.5 text-center font-mono font-medium text-slate-800">{d.d}</td>
                           <td className="px-3 py-1.5 text-center font-mono text-[10px] text-slate-600">{d.doc || '-'}</td>
-                          <td className="px-3 py-1.5 text-center font-mono font-black text-amber-950">
-                            {d.q.toLocaleString('id-ID')} <span className="text-[10px] text-slate-500 font-normal">L</span>
+                          <td className={`px-3 py-1.5 text-center font-mono font-black ${d.q < 0 ? 'text-red-600' : 'text-amber-950'}`}>
+                            {d.q < 0 ? `- ${Math.abs(d.q).toLocaleString('id-ID')}` : d.q.toLocaleString('id-ID')} <span className="text-[10px] text-slate-500 font-normal">L</span>
                           </td>
-                          <td className="px-3 py-1.5 text-center font-mono text-slate-700">
-                            {d.r > 0 ? `Rp ${d.r.toLocaleString('id-ID')}` : '-'}
+                          <td className={`px-3 py-1.5 text-center font-mono ${d.r < 0 ? 'text-red-600 font-bold' : 'text-slate-700'}`}>
+                            {d.r !== 0 ? `${d.r < 0 ? '- Rp ' : 'Rp '}${Math.abs(d.r).toLocaleString('id-ID')}` : '-'}
                           </td>
                           <td className="px-3 py-1.5 text-center text-slate-600 text-[10.5px] truncate max-w-xs">{d.n || '-'}</td>
                         </tr>
