@@ -831,14 +831,34 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         const workbook = XLSX.read(data, { type: 'array' });
 
         const eqMap = {};
+        if (masterMap && masterMap.size > 0) {
+          masterMap.forEach((val, eqNum) => {
+            if (!val || !val.costCenter) return;
+            const cc = String(val.costCenter).trim().toUpperCase();
+            const desc = val.description || '';
+            const plant = val.plant || '';
+            const isVeh = String(eqNum).startsWith('20000');
+            if (!eqMap[cc] || (isVeh && !eqMap[cc].equipment?.startsWith('20000'))) {
+              eqMap[cc] = { equipment: String(eqNum).trim(), description: desc, plant, objectType: val.objectType || (cc.includes('CAR') ? 'CAR' : cc.includes('TRU') ? 'DTRUCK' : 'VEH') };
+            }
+          });
+        }
         if (Array.isArray(masterEquipments)) {
           masterEquipments.forEach(m => {
-            const cc = String(m.cost_center || m.costCenter || '').trim();
-            if (cc) eqMap[cc] = { equipment: m.equipment || '', description: m.description || '', plant: m.plant || '', objectType: m.object_type || m.objectType || '' };
+            const cc = String(m.cost_center || m.costCenter || '').trim().toUpperCase();
+            const eqNum = String(m.eq_num || m.eqNum || m.equipment || '').trim();
+            const desc = m.description || '';
+            const plant = m.plant || '';
+            if (cc) {
+              const isVeh = eqNum.startsWith('20000');
+              if (!eqMap[cc] || (isVeh && !eqMap[cc].equipment?.startsWith('20000'))) {
+                eqMap[cc] = { equipment: eqNum, description: desc, plant, objectType: m.object_type || m.objectType || (cc.includes('CAR') ? 'CAR' : cc.includes('TRU') ? 'DTRUCK' : 'VEH') };
+              }
+            }
           });
         }
         (fuelData.summaries || []).forEach(s => {
-          const cc = String(s.costCenter || '').trim();
+          const cc = String(s.costCenter || '').trim().toUpperCase();
           if (cc && !eqMap[cc]) {
             eqMap[cc] = { equipment: s.equipment || '', description: s.description || '', plant: s.plant || '', objectType: s.objectType || '' };
           }
@@ -849,7 +869,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           const ws = workbook.Sheets[ih08SheetName];
           const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
           rows.forEach(r => {
-            const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim();
+            const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim().toUpperCase();
             const eq = String(r['Equipment'] || r['No. Equipment'] || '').trim();
             const desc = String(r['Description'] || r['Deskripsi Kendaraan'] || r['Description of technical object'] || '').trim();
             const plant = String(r['MaintPlant'] || r['Plant'] || '').trim();
@@ -1143,17 +1163,16 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               partnerObjects: []
             };
 
-            // Fill equipment info if missing
+            // Fill equipment info from PM Master Data
             const eqInfo = eqMap[cc] || {};
-            if (!existing.equipment && eqInfo.equipment) existing.equipment = eqInfo.equipment;
-            if (!existing.description && eqInfo.description) existing.description = eqInfo.description;
-            if (!existing.plant && eqInfo.plant) {
+            if (eqInfo.equipment) existing.equipment = eqInfo.equipment;
+            if (eqInfo.description) existing.description = eqInfo.description;
+            if (eqInfo.plant) {
               existing.plant = eqInfo.plant;
               existing.plantDesc = PLANT_INFO[eqInfo.plant]?.desc || eqInfo.plant;
               existing.wilayah = PLANT_INFO[eqInfo.plant]?.wilayah || 'Regional 5';
             }
             if (eqInfo.objectType) existing.objectType = eqInfo.objectType;
-
             const txs = byCC[cc] || [];
             const txsD = txs.filter(d => d.t === 'D');
             const txsC = txs.filter(d => d.t === 'C');
@@ -1888,74 +1907,136 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return Array.from(set).sort().reverse();
   }, [fuelData]);
 
-  // â”€â”€ Database VLOOKUP: Cost Center -> Equipment Master â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const costCenterToEquipmentMap = useMemo(() => {
-    const map = new Map();
+  // ── Database VLOOKUP: Equipment & Cost Center -> PM Master Data ────────────────────────
+  const { pmMasterByEquipment, pmMasterByCostCenter } = useMemo(() => {
+    const byEq = new Map();
+    const byCC = new Map();
 
-    // 1. From masterMap (17k+ entries from system config)
-    if (masterMap && masterMap.size > 0) {
-      masterMap.forEach((val, eqNum) => {
-        if (val && val.costCenter) {
-          const cc = String(val.costCenter).trim().toUpperCase();
-          if (cc && !map.has(cc)) {
-            map.set(cc, {
-              equipment: String(eqNum || '').trim(),
-              description: val.description || '',
-              plant: val.plant || '',
-              objectType: val.objectType || ''
-            });
+    const registerItem = (eqNum, desc, cc, plant, objType) => {
+      const eq = String(eqNum || '').trim();
+      const cleanCC = String(cc || '').trim().toUpperCase();
+      const cleanDesc = String(desc || '').trim();
+      const cleanPlant = String(plant || (cleanCC ? cleanCC.substring(0, 4) : '')).trim();
+
+      if (!eq && !cleanCC) return;
+
+      let type = objType || '';
+      if (!type) {
+        if (cleanCC.includes('CAR') || /^(mobil|pajero|strada|triton|hilux|innova|avanza)/i.test(cleanDesc)) type = 'CAR';
+        else if (cleanCC.includes('DTR') || cleanCC.includes('TRU') || /dump\s*truck|truk|truck/i.test(cleanDesc)) type = 'DTRUCK';
+        else if (cleanCC.includes('TRA') || /traktor|tractor/i.test(cleanDesc)) type = 'TRACTOR';
+        else if (cleanCC.includes('GRA') || /grader/i.test(cleanDesc)) type = 'GRADER';
+        else if (cleanCC.includes('COM') || /vibrator|compactor|bomag/i.test(cleanDesc)) type = 'COMPACTOR';
+        else if (cleanCC.includes('EXC') || /excavator/i.test(cleanDesc)) type = 'EXCAVATOR';
+        else if (cleanCC.includes('QUT') || /quick\s*truck/i.test(cleanDesc)) type = 'QUICK TRUCK';
+        else if (eq.startsWith('20000')) type = 'VEH';
+      }
+
+      const item = {
+        equipment: eq,
+        description: cleanDesc,
+        costCenter: cleanCC,
+        plant: cleanPlant,
+        objectType: type
+      };
+
+      if (eq) {
+        if (!byEq.has(eq) || (cleanDesc && cleanDesc !== eq && byEq.get(eq).description === eq)) {
+          byEq.set(eq, item);
+        }
+        const unpadded = eq.replace(/^0+/, '');
+        if (unpadded !== eq && (!byEq.has(unpadded) || (cleanDesc && cleanDesc !== unpadded && byEq.get(unpadded).description === unpadded))) {
+          byEq.set(unpadded, item);
+        }
+      }
+
+      if (cleanCC) {
+        if (!byCC.has(cleanCC)) {
+          byCC.set(cleanCC, item);
+        } else {
+          const existing = byCC.get(cleanCC);
+          const isVehicleEq = eq.startsWith('20000');
+          const existingIsVehicleEq = existing.equipment?.startsWith('20000');
+          if (isVehicleEq && !existingIsVehicleEq) {
+            byCC.set(cleanCC, item);
+          } else if (cleanDesc && (!existing.description || existing.description === existing.equipment)) {
+            byCC.set(cleanCC, item);
           }
         }
+      }
+    };
+
+    // 1. From masterMap (17k+ entries from PM Master Data)
+    if (masterMap && masterMap.size > 0) {
+      masterMap.forEach((val, eqNum) => {
+        if (!val) return;
+        const desc = typeof val === 'string' ? '' : (val.description || '');
+        const cc = typeof val === 'string' ? '' : (val.costCenter || '');
+        const plant = typeof val === 'string' ? val : (val.plant || '');
+        const objType = typeof val === 'string' ? '' : (val.objectType || '');
+        registerItem(eqNum, desc, cc, plant, objType);
       });
     }
 
-    // 2. From masterEquipments
+    // 2. From masterEquipments (master_equipment DB table)
     if (Array.isArray(masterEquipments)) {
       masterEquipments.forEach(item => {
-        const cc = String(item.costCenter || item.cost_center || '').trim().toUpperCase();
-        if (cc && (!map.has(cc) || !map.get(cc).equipment)) {
-          map.set(cc, {
-            equipment: String(item.eqNum || item.equipment || '').trim(),
-            description: item.description || '',
-            plant: item.plant || '',
-            objectType: item.objectType || item.type || ''
-          });
-        }
+        const eqNum = item.eqNum || item.eq_num || item.equipment || '';
+        const desc = item.description || '';
+        const cc = item.costCenter || item.cost_center || '';
+        const plant = item.plant || '';
+        const objType = item.objectType || item.type || item.object_type || '';
+        registerItem(eqNum, desc, cc, plant, objType);
       });
     }
 
     // 3. From vehicle master list (vehicles)
     if (Array.isArray(vehicles)) {
       vehicles.forEach(v => {
-        const cc = String(v.cost_center || v.costCenter || '').trim().toUpperCase();
-        if (cc && (!map.has(cc) || !map.get(cc).equipment)) {
-          map.set(cc, {
-            equipment: String(v.vehicle_code || '').trim(),
-            description: v.description || '',
-            plant: v.plant || '',
-            objectType: v.object_type || ''
-          });
-        }
+        const eqNum = v.vehicle_code || '';
+        const desc = v.description || '';
+        const cc = v.cost_center || v.costCenter || '';
+        const plant = v.plant || '';
+        const objType = v.object_type || '';
+        registerItem(eqNum, desc, cc, plant, objType);
       });
     }
 
-    // 4. From fuelData.summaries
-    (fuelData?.summaries || []).forEach(s => {
-      const cc = String(s.costCenter || '').trim().toUpperCase();
-      const eq = String(s.equipment || '').trim();
-      if (cc && eq && eq !== '-' && (!map.has(cc) || !map.get(cc).equipment || map.get(cc).equipment === '-')) {
-        map.set(cc, {
-          equipment: eq,
-          description: s.description || '',
-          plant: s.plant || '',
-          objectType: s.objectType || ''
-        });
+    return { pmMasterByEquipment: byEq, pmMasterByCostCenter: byCC };
+  }, [masterMap, masterEquipments, vehicles]);
+
+  // Backward compatibility alias for any existing references
+  const costCenterToEquipmentMap = pmMasterByCostCenter;
+
+  // Dedicated VLOOKUP function based on Equipment Number & Cost Center on PM Master Data
+  const lookupMasterPM = useCallback((eqNum, costCenter) => {
+    const cleanEq = String(eqNum || '').trim();
+    const cleanCC = String(costCenter || '').trim().toUpperCase();
+
+    // Priority 1: VLOOKUP by Equipment Number in PM Master Data
+    if (cleanEq && cleanEq !== '-') {
+      const match = pmMasterByEquipment.get(cleanEq) || pmMasterByEquipment.get(cleanEq.replace(/^0+/, ''));
+      if (match && match.description && match.description !== cleanEq) {
+        return match;
       }
-    });
+    }
 
-    return map;
-  }, [masterMap, masterEquipments, vehicles, fuelData?.summaries]);
+    // Priority 2: VLOOKUP by Cost Center in PM Master Data
+    if (cleanCC && cleanCC !== '-') {
+      const match = pmMasterByCostCenter.get(cleanCC);
+      if (match && match.description) {
+        return match;
+      }
+    }
 
+    // Priority 3: Fallback equipment match
+    if (cleanEq && cleanEq !== '-') {
+      const match = pmMasterByEquipment.get(cleanEq) || pmMasterByEquipment.get(cleanEq.replace(/^0+/, ''));
+      if (match) return match;
+    }
+
+    return null;
+  }, [pmMasterByEquipment, pmMasterByCostCenter]);
   // Fast index of master vehicles by vehicle_code
   const masterVehiclesByCode = useMemo(() => {
     const map = new Map();
@@ -2233,10 +2314,17 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
       result = list.map(s => {
         const ccKey = String(s.costCenter || '').trim().toUpperCase();
-        const eqLookup = costCenterToEquipmentMap.get(ccKey);
-        const resolvedEquipment = (s.equipment && s.equipment !== '-') ? s.equipment : (eqLookup?.equipment || '-');
-        const resolvedDescription = s.description || eqLookup?.description || `Kendaraan ${s.costCenter}`;
-        const resolvedPlant = s.plant || eqLookup?.plant || s.costCenter.substring(0, 4);
+        const rawEq = (s.equipment && s.equipment !== '-') ? String(s.equipment).trim() : '';
+        const masterMatch = lookupMasterPM(rawEq, ccKey);
+
+        const resolvedEquipment = masterMatch?.equipment || rawEq || '-';
+        const resolvedDescription = masterMatch?.description || (
+          s.description && !s.description.includes('Sedang Perbaikan') && !s.description.includes('Au58:') && !s.description.includes('Solar =') && !s.description.toLowerCase().startsWith('dinas ke')
+            ? s.description
+            : `Kendaraan ${ccKey}`
+        );
+        const resolvedPlant = masterMatch?.plant || s.plant || (ccKey ? ccKey.substring(0, 4) : '');
+        const resolvedObjectType = masterMatch?.objectType || s.objectType || (ccKey.includes('CAR') ? 'CAR' : ccKey.includes('TRU') ? 'DTRUCK' : 'VEH');
         const refData = resolveSmartReference(resolvedEquipment, s.costCenter, s.month, false, s);
 
         // Verification between SLARC (Credit) and ZESTHLP16PA
@@ -2258,6 +2346,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           description: resolvedDescription,
           plant: resolvedPlant,
           plantDesc: s.plantDesc || PLANT_INFO[resolvedPlant]?.desc || resolvedPlant,
+          objectType: resolvedObjectType,
           referencePrimary: refData.primary,
           referenceAll: refData.all,
           referenceCount: refData.count,
@@ -2344,10 +2433,17 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
       result = list.map(v => {
         const ccKey = String(v.costCenter || '').trim().toUpperCase();
-        const eqLookup = costCenterToEquipmentMap.get(ccKey);
-        const resolvedEquipment = (v.equipment && v.equipment !== '-') ? v.equipment : (eqLookup?.equipment || '-');
-        const resolvedDescription = v.description || eqLookup?.description || `Kendaraan ${v.costCenter}`;
-        const resolvedPlant = v.plant || eqLookup?.plant || v.costCenter.substring(0, 4);
+        const rawEq = (v.equipment && v.equipment !== '-') ? String(v.equipment).trim() : '';
+        const masterMatch = lookupMasterPM(rawEq, ccKey);
+
+        const resolvedEquipment = masterMatch?.equipment || rawEq || '-';
+        const resolvedDescription = masterMatch?.description || (
+          v.description && !v.description.includes('Sedang Perbaikan') && !v.description.includes('Au58:') && !v.description.includes('Solar =') && !v.description.toLowerCase().startsWith('dinas ke')
+            ? v.description
+            : `Kendaraan ${ccKey}`
+        );
+        const resolvedPlant = masterMatch?.plant || v.plant || (ccKey ? ccKey.substring(0, 4) : '');
+        const resolvedObjectType = masterMatch?.objectType || v.objectType || (ccKey.includes('CAR') ? 'CAR' : ccKey.includes('TRU') ? 'DTRUCK' : 'VEH');
         const refData = resolveSmartReference(resolvedEquipment, v.costCenter, fuelDate, true, v);
 
         const kmPerL = v.debitLiters > 0 && v.creditKm > 0 ? Number((v.creditKm / v.debitLiters).toFixed(2)) : 0;
@@ -2381,6 +2477,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           description: resolvedDescription,
           plant: resolvedPlant,
           plantDesc: v.plantDesc || PLANT_INFO[resolvedPlant]?.desc || resolvedPlant,
+          objectType: resolvedObjectType,
           kmPerLiter: kmPerL,
           literPerHm: literPerH,
           costPerUnit: v.creditKm > 0 ? Math.round(v.debitRp / v.creditKm) : (v.creditHm > 0 ? Math.round(v.debitRp / v.creditHm) : 0),
@@ -2416,7 +2513,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
 
     return result;
-  }, [fuelData, fuelYear, fuelMonth, fuelDate, fuelPlant, searchFuel, zestLogsByEquipment, slarcDailyByCostCenter, logs, costCenterToEquipmentMap, isAdmin, currentUser, masterVehiclesByCode, zcoMapByCC]);
+  }, [fuelData, fuelYear, fuelMonth, fuelDate, fuelPlant, searchFuel, zestLogsByEquipment, slarcDailyByCostCenter, logs, costCenterToEquipmentMap, lookupMasterPM, isAdmin, currentUser, masterVehiclesByCode, zcoMapByCC]);
 
   const fuelKPIs = useMemo(() => {
     let totalLiters = 0;
