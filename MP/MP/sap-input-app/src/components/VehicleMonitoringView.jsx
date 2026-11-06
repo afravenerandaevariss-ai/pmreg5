@@ -14,7 +14,7 @@ import { toPng } from 'html-to-image';
 import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, invalidateVehicleCache, fetchMasterEquipment, fetchZCOData, saveZCOData, getSystemConfig, fetchDailyLogs, fetchFuelData, saveFuelData, fetchFuelDailyForMonth, saveFuelDailyForMonth, makeFuelTxKey } from '../lib/supabaseService';
 import WhatsAppSenderModal from './WhatsAppSenderModal';
 
-// --- Plant Master Data --------------------------------------------------------
+// ─── Plant Master Data ────────────────────────────────────────────────────────
 const PLANT_INFO = {
   // Kal-Bar
   "5E01": { desc: "KEBUN GUNUNG MELIAU",    wilayah: "Kal-Bar" },
@@ -52,7 +52,22 @@ const PLANT_INFO = {
   "5E19": { desc: "KEBUN LONGKALI",         wilayah: "Kal-Tim" },
 };
 
-// --- Job Code Master ----------------------------------------------------------
+export const MONTH_NAMES = [
+  { val: '01', label: 'Januari' },
+  { val: '02', label: 'Februari' },
+  { val: '03', label: 'Maret' },
+  { val: '04', label: 'April' },
+  { val: '05', label: 'Mei' },
+  { val: '06', label: 'Juni' },
+  { val: '07', label: 'Juli' },
+  { val: '08', label: 'Agustus' },
+  { val: '09', label: 'September' },
+  { val: '10', label: 'Oktober' },
+  { val: '11', label: 'November' },
+  { val: '12', label: 'Desember' },
+];
+
+// ─── Job Code Master ──────────────────────────────────────────────────────────
 const JOB_CODE_DESC = {
   "11210": "Angkut Hasil Panen (Lain)",
   "11602": "Angkut Bahan (Kebun)",
@@ -83,14 +98,141 @@ const JOB_CODE_DESC = {
   "EQ002": "Equipment Maintenance",
 };
 
-// --- UoM Labels ---------------------------------------------------------------
+// ─── UoM Labels ───────────────────────────────────────────────────────────────
 const UOM_LABEL = { KG: "Kilogram", KM: "Kilometer", HM: "Jam Operasi", M: "Meter", HA: "Hektar", M3: "Meter Kubik", HK: "Hari Kerja" };
 
-// --- Helpers ------------------------------------------------------------------
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function excelSerialToDate(serial) {
   const utcDays = Math.floor(serial - 25569);
   const dateInfo = new Date(utcDays * 86400 * 1000);
   return new Date(dateInfo.getUTCFullYear(), dateInfo.getUTCMonth(), dateInfo.getUTCDate());
+}
+export function parseSapNumber(raw) {
+  if (raw === null || raw === undefined || raw === '') return 0;
+  if (typeof raw === 'number') return isNaN(raw) ? 0 : raw;
+  let s = String(raw).trim();
+  if (!s || s === '-') return 0;
+  let isNeg = false;
+  if (s.endsWith('-')) {
+    isNeg = true;
+    s = s.slice(0, -1).trim();
+  } else if (s.startsWith('-')) {
+    isNeg = true;
+    s = s.substring(1).trim();
+  }
+  if (s.includes('.') && s.includes(',')) {
+    s = s.replace(/\./g, '').replace(/,/g, '.');
+  } else if (s.includes('.')) {
+    const parts = s.split('.');
+    if (parts.length > 2) {
+      s = s.replace(/\./g, '');
+    } else if (parts[1].length === 3 && parts[0].length >= 1) {
+      s = s.replace(/\./g, '');
+    }
+  } else if (s.includes(',')) {
+    s = s.replace(/,/g, '.');
+  }
+  const num = parseFloat(s);
+  if (isNaN(num)) return 0;
+  return isNeg ? -num : num;
+}
+
+
+// ─── Fuel Efficiency Evaluation Rules Matrix (MID(5,3) with 10% Tolerance) ────
+export const VEHICLE_EFFICIENCY_RULES = {
+  CAR: { name: 'Mobil Penumpang', type: 'KM/L', target: 7.0, tolerance: 0.10, desc: 'Min 7.0 KM/L' },
+  DTR: { name: 'Dump Truck',      type: 'KM/L', target: 5.0, tolerance: 0.10, desc: 'Min 5.0 KM/L' },
+  MOT: { name: 'Sepeda Motor',    type: 'KM/L', target: 30.0, tolerance: 0.10, desc: 'Min 30.0 KM/L' },
+  QUT: { name: 'Quick Truck',     type: 'L/HM', target: 1.5, tolerance: 0.10, desc: 'Maks 1.5 L/HM' },
+  WLD: { name: 'Mini Wheel Dump', type: 'L/HM', target: 5.5, tolerance: 0.10, desc: 'Maks 5.5 L/HM' },
+  TRA: { name: 'Wheel Tractor',   type: 'L/HM', target: 7.0, tolerance: 0.10, desc: 'Maks 7.0 L/HM' },
+  COM: { name: 'Compactor',       type: 'L/HM', target: 8.0, tolerance: 0.10, desc: 'Maks 8.0 L/HM' },
+  TRB: { name: 'Traktor Besar',   type: 'L/HM', target: 9.0, tolerance: 0.10, desc: 'Maks 9.0 L/HM' },
+  GRA: { name: 'Motor Grader',    type: 'L/HM', target: 12.0, tolerance: 0.10, desc: 'Maks 12.0 L/HM' },
+  WLO: { name: 'Wheel Loader',    type: 'L/HM', target: 12.0, tolerance: 0.10, desc: 'Maks 12.0 L/HM' },
+  EXC: { name: 'Excavator',       type: 'L/HM', target: 18.0, tolerance: 0.10, desc: 'Maks 18.0 L/HM' },
+};
+
+export function getVehicleTypeCode(costCenter, fallbackType = '') {
+  const cc = String(costCenter || '').trim().toUpperCase();
+  if (cc.length >= 7) {
+    const code = cc.substring(4, 7);
+    if (VEHICLE_EFFICIENCY_RULES[code]) return code;
+  }
+  const fb = String(fallbackType || '').trim().toUpperCase();
+  if (VEHICLE_EFFICIENCY_RULES[fb]) return fb;
+  for (const k of Object.keys(VEHICLE_EFFICIENCY_RULES)) {
+    if (cc.includes(k) || fb.includes(k)) return k;
+  }
+  return 'CAR';
+}
+export function extractLitersFromText(text) {
+  if (!text) return 0;
+  const m = String(text).match(/(\d+(?:[.,]\d+)?)\s*(?:ltr|liter|l\b)/i);
+  return m ? parseFloat(m[1].replace(',', '.')) : 0;
+}
+
+export function evaluateFuelEfficiency(costCenter, debitLiters, creditKm, creditHm, fallbackType = '', refText = '') {
+  const code = getVehicleTypeCode(costCenter, fallbackType);
+  const rule = VEHICLE_EFFICIENCY_RULES[code] || VEHICLE_EFFICIENCY_RULES.CAR;
+  const isKmL = rule.type === 'KM/L';
+  const debitL = Math.max(0, parseFloat(debitLiters) || 0);
+  const creditK = Math.max(0, parseFloat(creditKm) || 0);
+  const creditH = Math.max(0, parseFloat(creditHm) || 0);
+
+  // Check dummy standby/rusak/libur (SAP operators post dummy 1 KM/HM when idle or broken)
+  const isStandby = (debitL === 0 && ((creditK > 0 && creditK <= 2) || (creditH > 0 && creditH <= 2)) &&
+    /standby|standbaye|rusak|libur|perbaikan|servis|breakdown/i.test(refText));
+
+  if (isStandby) {
+    return {
+      status: 'STANDBY',
+      ratioVal: 0,
+      uom: rule.type,
+      color: 'slate',
+      isStandby: true,
+      badgeLabel: 'Standby / Rusak',
+      targetText: 'Unit Standby / Rusak / Libur (Dummy 1 KM/HM SAP)',
+      rule,
+      code
+    };
+  }
+
+  if (debitL === 0 && creditK === 0 && creditH === 0) {
+    return { status: 'NO_DATA', ratioVal: 0, uom: rule.type, color: 'slate', badgeLabel: 'Tanpa Data', targetText: rule.desc, rule, code };
+  }
+  if (debitL === 0) {
+    return { status: 'NO_FUEL', ratioVal: 0, uom: rule.type, color: 'amber', isNoFuel: true, badgeLabel: 'Tanpa Solar', targetText: 'Aktivitas Tercatat Tanpa Pengisian Solar (Sewa/Pool)', rule, code };
+  }
+  if ((isKmL && creditK === 0) || (!isKmL && creditH === 0)) {
+    return { status: 'NO_ACTIVITY', ratioVal: 0, uom: rule.type, color: 'amber', badgeLabel: isKmL ? 'Tanpa KM' : 'Tanpa HM', targetText: rule.desc, rule, code };
+  }
+
+  if (isKmL) {
+    const ratio = Number((creditK / debitL).toFixed(2));
+    const targetMin = rule.target;
+    const warningMin = Number((targetMin * (1 - rule.tolerance)).toFixed(2)); // 10% tolerance
+
+    if (ratio >= targetMin) {
+      return { status: 'OPTIMAL', ratioVal: ratio, uom: 'KM/L', color: 'emerald', badgeLabel: 'Efisien', targetText: rule.desc, rule, code };
+    } else if (ratio >= warningMin) {
+      return { status: 'NORMAL', ratioVal: ratio, uom: 'KM/L', color: 'amber', badgeLabel: 'Waspada (10%)', targetText: rule.desc, rule, code };
+    } else {
+      return { status: 'BOROS', ratioVal: ratio, uom: 'KM/L', color: 'red', badgeLabel: 'Boros', targetText: rule.desc, rule, code };
+    }
+  } else {
+    const ratio = Number((debitL / creditH).toFixed(2));
+    const targetMax = rule.target;
+    const warningMax = Number((targetMax * (1 + rule.tolerance)).toFixed(2)); // 10% tolerance
+
+    if (ratio <= targetMax) {
+      return { status: 'OPTIMAL', ratioVal: ratio, uom: 'L/HM', color: 'emerald', badgeLabel: 'Efisien', targetText: rule.desc, rule, code };
+    } else if (ratio <= warningMax) {
+      return { status: 'NORMAL', ratioVal: ratio, uom: 'L/HM', color: 'amber', badgeLabel: 'Waspada (10%)', targetText: rule.desc, rule, code };
+    } else {
+      return { status: 'BOROS', ratioVal: ratio, uom: 'L/HM', color: 'red', badgeLabel: 'Boros', targetText: rule.desc, rule, code };
+    }
+  }
 }
 
 function formatDateStr(rawDate) {
@@ -150,7 +292,7 @@ const StatusBadge = ({ status, text }) => {
   );
 };
 
-// --- WA Schedule Badge --------------------------------------------------------
+// ─── WA Schedule Badge ────────────────────────────────────────────────────────
 function WAScheduleBadge({ onOpen }) {
   const [countdown, setCountdown] = React.useState('');
   const [nextLabel, setNextLabel] = React.useState('');
@@ -232,7 +374,7 @@ function WAScheduleBadge({ onOpen }) {
   );
 }
 
-// --- Main Component -----------------------------------------------------------
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   // Dev-only check: strictly true in local dev / localhost only
   const isLocalDev = Boolean(
@@ -240,7 +382,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname))
   );
 
-  // --- Role Detection --------------------------------------------------------
+  // ─── Role Detection ────────────────────────────────────────────────────────
   // Normalize role string — handles all DB variants: 'USER','Unit','unit','UNIT'
   const roleUpper = currentUser?.role?.toUpperCase() || '';
 
@@ -324,30 +466,62 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [lastRefreshed, setLastRefreshed] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(''); // granular status during upload
 
-  // -- Fuel Evaluation State (Simplified & Unified) --
+  // ── Fuel Evaluation State (Simplified & Unified) ──
   const [fuelData, setFuelData] = useState({ summaries: [], daily: [] });
   const [fuelUploadInfo, setFuelUploadInfo] = useState(null);
   const [fuelYear, setFuelYear] = useState('2026');
-  const [fuelMonth, setFuelMonth] = useState('09');
-  const [fuelDate, setFuelDate] = useState('');
+  const [fuelMonths, setFuelMonths] = useState(['09']); // multi-month array: e.g. ['09'], ['09', '10'], or ['ALL']
+  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
+  const monthDropdownRef = React.useRef(null);
+  const [fuelStartDate, setFuelStartDate] = useState(''); // YYYY-MM-DD
+  const [fuelEndDate, setFuelEndDate]     = useState(''); // YYYY-MM-DD
+
+  // Close month dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (monthDropdownRef.current && !monthDropdownRef.current.contains(event.target)) {
+        setShowMonthDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const monthDropdownLabel = useMemo(() => {
+    const isAll = fuelMonths.includes('ALL') || fuelMonths.length === 12;
+    if (isAll) return 'Semua Bulan (01 - 12)';
+    if (fuelMonths.length === 0) return 'Pilih Bulan (0 Bulan)';
+
+    const sorted = [...fuelMonths].sort();
+    if (sorted.length === 1) {
+      const found = MONTH_NAMES.find(m => m.val === sorted[0]);
+      return found ? `${found.val} - ${found.label}` : sorted[0];
+    }
+
+    return `${sorted.length} Bulan Dipilih`;
+  }, [fuelMonths]);
+
+  // Backward-compatible computed helpers
+  const fuelMonth = fuelMonths.length === 1 ? fuelMonths[0] : (fuelMonths.includes('ALL') ? 'ALL' : fuelMonths.join(', '));
+  const fuelDate = (fuelStartDate && fuelEndDate && fuelStartDate === fuelEndDate) ? fuelStartDate : (fuelStartDate || fuelEndDate || '');
   const [fuelPlant, setFuelPlant] = useState('ALL');
+  const [fuelStatusFilter, setFuelStatusFilter] = useState('ALL');
   const [searchFuel, setSearchFuel] = useState('');
-  // Track which months have been lazy-loaded from per-month storage (IDs 230101-230112)
   const fuelLoadedMonthsRef = React.useRef(new Set());
   const [fuelPage, setFuelPage] = useState(1);
   const [selectedFuelVeh, setSelectedFuelVeh] = useState(null);
   const [fuelModalTab, setFuelModalTab] = useState('zest'); // 'zest' | 'debit' | 'credit'
   const FUEL_PAGE_SIZE = 25;
 
-  // -- Load Data ----------------------------------------------------------------
-  // isManualRefresh: true  -> tombol Refresh diklik, force-fetch vehicle_logs & master_map dari server
-  //                  false -> initial load, prioritaskan cache dulu agar cepat
+  // ── Load Data ────────────────────────────────────────────────────────────────
+  // isManualRefresh: true  → tombol Refresh diklik, force-fetch vehicle_logs & master_map dari server
+  //                  false → initial load, prioritaskan cache dulu agar cepat
   const loadData = useCallback(async (isManualRefresh = false) => {
     setLoading(true);
     setError(null);
     try {
       // vehicle_logs (2.2k+ rows, 2 halaman PostgREST) butuh ~19s di PROD.
-      // Timeout 15s membuat fallback {data:[]} menang balapan -> seluruh transaksi tampil 0.
+      // Timeout 15s membuat fallback {data:[]} menang balapan → seluruh transaksi tampil 0.
       const TIMEOUT_MS = 90000;
       const withTimeout = (promise, fallback = { data: [], error: null }) =>
         Promise.race([
@@ -355,9 +529,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           new Promise(resolve => setTimeout(() => resolve(fallback), TIMEOUT_MS))
         ]);
 
-      // vehicle_logs -> selalu force-fetch saat manual refresh (transaksi aktif berubah sering)
-      // vehicle_master, zco -> force saat manual refresh
-      // masterEquipment -> cukup cache (jarang berubah, data besar)
+      // vehicle_logs → selalu force-fetch saat manual refresh (transaksi aktif berubah sering)
+      // vehicle_master, zco → force saat manual refresh
+      // masterEquipment → cukup cache (jarang berubah, data besar)
       const [vRes, lRes, eqRes, zRes, mapRes, fRes] = await Promise.all([
         withTimeout(fetchVehicleMaster(isManualRefresh),            { data: [], error: null }),
         withTimeout(fetchVehicleLogs(isManualRefresh),              { data: [], error: null }),
@@ -418,6 +592,47 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
   useEffect(() => { loadData(false); }, [loadData]);
 
+  // Automatically lazy-load monthly daily records when a date range is active
+  useEffect(() => {
+    if (!fuelStartDate && !fuelEndDate) return;
+    const sMonth = fuelStartDate ? fuelStartDate.substring(0, 7) : `${fuelYear}-09`;
+    const eMonth = fuelEndDate ? fuelEndDate.substring(0, 7) : sMonth;
+
+    const monthsToLoad = new Set();
+    const sYr = parseInt(sMonth.substring(0, 4));
+    const sM = parseInt(sMonth.substring(5, 7));
+    const eYr = parseInt(eMonth.substring(0, 4));
+    const eM = parseInt(eMonth.substring(5, 7));
+
+    for (let y = sYr; y <= eYr; y++) {
+      const startMo = y === sYr ? sM : 1;
+      const endMo = y === eYr ? eM : 12;
+      for (let m = startMo; m <= endMo; m++) {
+        monthsToLoad.add(`${y}-${String(m).padStart(2, '0')}`);
+      }
+    }
+
+    monthsToLoad.forEach(async (ym) => {
+      if (!fuelLoadedMonthsRef.current.has(ym)) {
+        fuelLoadedMonthsRef.current.add(ym);
+        try {
+          const { data: mDaily } = await fetchFuelDailyForMonth(ym);
+          if (mDaily && mDaily.length > 0) {
+            setFuelData(prev => {
+              const map = new Map((prev.daily || []).map(d => [`${d.doc}_${d.c}_${d.d}_${d.t}`, d]));
+              for (const d of mDaily) {
+                map.set(`${d.doc}_${d.c}_${d.d}_${d.t}`, d);
+              }
+              return { ...prev, daily: Array.from(map.values()) };
+            });
+          }
+        } catch(e) {
+          console.warn(`Lazy-load monthly daily for ${ym} warning:`, e);
+        }
+      }
+    });
+  }, [fuelStartDate, fuelEndDate, fuelYear]);
+
 
   // Strictly lock selectedPlant to user's plant for non-admins
   useEffect(() => {
@@ -445,7 +660,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   }, [isAdmin, activeTab]);
 
 
-  // -- Excel Upload -------------------------------------------------------------
+  // ── Excel Upload ─────────────────────────────────────────────────────────────
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -693,7 +908,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     reader.readAsArrayBuffer(file);
   };
 
-  // -- Clear Data ---------------------------------------------------------------
+  // ── Clear Data ───────────────────────────────────────────────────────────────
   const handleClearData = async () => {
     setLoading(true);
     try {
@@ -704,7 +919,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     finally { setLoading(false); }
   };
 
-  // -- ZCO Upload & Clear -------------------------------------------------------
+  // ── ZCO Upload & Clear ───────────────────────────────────────────────────────
   const handleZCOFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -812,7 +1027,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     finally { setLoading(false); }
   };
 
-  // -- Fuel Evaluation (SALRD & SLARC) Upload & Clear ----------------------------
+  // ── Fuel Evaluation (SALRD & SLARC) Upload & Clear ────────────────────────────
   // ── Fuel Evaluation (SALRD & SLARC) Upload & Clear ────────────────────────────
   const handleFuelUploadByMode = (e, uploadType = 'all') => {
     const file = e.target.files[0];
@@ -831,14 +1046,34 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         const workbook = XLSX.read(data, { type: 'array' });
 
         const eqMap = {};
+        if (masterMap && masterMap.size > 0) {
+          masterMap.forEach((val, eqNum) => {
+            if (!val || !val.costCenter) return;
+            const cc = String(val.costCenter).trim().toUpperCase();
+            const desc = val.description || '';
+            const plant = val.plant || '';
+            const isVeh = String(eqNum).startsWith('20000');
+            if (!eqMap[cc] || (isVeh && !eqMap[cc].equipment?.startsWith('20000'))) {
+              eqMap[cc] = { equipment: String(eqNum).trim(), description: desc, plant, objectType: val.objectType || (cc.includes('CAR') ? 'CAR' : cc.includes('TRU') ? 'DTRUCK' : 'VEH') };
+            }
+          });
+        }
         if (Array.isArray(masterEquipments)) {
           masterEquipments.forEach(m => {
-            const cc = String(m.cost_center || m.costCenter || '').trim();
-            if (cc) eqMap[cc] = { equipment: m.equipment || '', description: m.description || '', plant: m.plant || '', objectType: m.object_type || m.objectType || '' };
+            const cc = String(m.cost_center || m.costCenter || '').trim().toUpperCase();
+            const eqNum = String(m.eq_num || m.eqNum || m.equipment || '').trim();
+            const desc = m.description || '';
+            const plant = m.plant || '';
+            if (cc) {
+              const isVeh = eqNum.startsWith('20000');
+              if (!eqMap[cc] || (isVeh && !eqMap[cc].equipment?.startsWith('20000'))) {
+                eqMap[cc] = { equipment: eqNum, description: desc, plant, objectType: m.object_type || m.objectType || (cc.includes('CAR') ? 'CAR' : cc.includes('TRU') ? 'DTRUCK' : 'VEH') };
+              }
+            }
           });
         }
         (fuelData.summaries || []).forEach(s => {
-          const cc = String(s.costCenter || '').trim();
+          const cc = String(s.costCenter || '').trim().toUpperCase();
           if (cc && !eqMap[cc]) {
             eqMap[cc] = { equipment: s.equipment || '', description: s.description || '', plant: s.plant || '', objectType: s.objectType || '' };
           }
@@ -849,7 +1084,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           const ws = workbook.Sheets[ih08SheetName];
           const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
           rows.forEach(r => {
-            const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim();
+            const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim().toUpperCase();
             const eq = String(r['Equipment'] || r['No. Equipment'] || '').trim();
             const desc = String(r['Description'] || r['Deskripsi Kendaraan'] || r['Description of technical object'] || '').trim();
             const plant = String(r['MaintPlant'] || r['Plant'] || '').trim();
@@ -862,19 +1097,21 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
         const parseDateVal = (raw) => {
           if (!raw) return null;
+          if (raw instanceof Date && !isNaN(raw)) {
+            return format(raw, 'yyyy-MM-dd');
+          }
           if (typeof raw === 'number' || (!isNaN(raw) && Number(raw) > 30000 && Number(raw) < 60000)) {
             const d = excelSerialToDate(Number(raw));
             return format(d, 'yyyy-MM-dd');
           }
           const s = String(raw).trim();
           if (s.match(/^\d{4}-\d{2}-\d{2}/)) return s.substring(0, 10);
-          if (s.match(/^\d{2}\.\d{2}\.\d{4}/)) {
-            const parts = s.split('.');
-            return `${parts[2]}-${parts[1]}-${parts[0]}`;
-          }
-          if (s.match(/^\d{2}\/\d{2}\/\d{4}/)) {
-            const parts = s.split('/');
-            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+          if (s.match(/^\d{1,2}[-/. ]\d{1,2}[-/. ]\d{4}/)) {
+            const parts = s.split(/[-/. ]/);
+            const day = parts[0].padStart(2, '0');
+            const month = parts[1].padStart(2, '0');
+            const year = parts[2];
+            return `${year}-${month}-${day}`;
           }
           return null;
         };
@@ -895,25 +1132,77 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
           if (targetDebitSheet && workbook.Sheets[targetDebitSheet]) {
             const rows = XLSX.utils.sheet_to_json(workbook.Sheets[targetDebitSheet], { defval: '' });
-            for (const r of rows) {
-              const ce = String(r['Cost Element'] || r['CostElement'] || '').trim();
-              const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
-              if (ce !== '51100057' && uom !== 'L') continue;
+            console.log(`[SALRD Ingestion] Sheet "${targetDebitSheet}" total rows before filter: ${rows.length}`);
+            let excludedNonFuel = 0;
+            let debitReversals = 0;
 
-              const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim();
+            for (const r of rows) {
+              const rawCe = String(r['Cost Element'] || r['CostElement'] || '').trim();
+              const ce = rawCe.replace(/^0+/, '');
+              const rawUom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
+              const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
+              const matDesc = String(r['Material Description'] || '').trim();
+              const fullText = `${name} ${matDesc}`;
+
+              const isStandardFuelUom = ['L', 'LTR', 'LITER'].includes(rawUom);
+              let parsedLitersFromText = 0;
+              const isFuelCostElement = ce === '51100057';
+
+              if (!isFuelCostElement) {
+                if (isStandardFuelUom || ce === '51100065' || ce === '51100064' || ce === '51100104') {
+                  excludedNonFuel++;
+                }
+                continue;
+              }
+
+              let isAcceptedUom = isStandardFuelUom;
+              if (!isAcceptedUom) {
+                parsedLitersFromText = extractLitersFromText(fullText);
+                const isFuelText = /solar|dexlite|biodiesel|gasoline|bbm|bahan bakar/i.test(fullText);
+                if (parsedLitersFromText > 0 || isFuelText || !rawUom) {
+                  isAcceptedUom = true;
+                }
+              }
+
+              if (!isAcceptedUom) {
+                excludedNonFuel++;
+                continue;
+              }
+
+              const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim().toUpperCase();
               if (!cc) continue;
 
               const rawDate = r['Posting Date'] || r['Document Date'] || r['Date'];
               const dateStr = parseDateVal(rawDate);
               const period = String(r['Period'] || '').trim();
               const year = dateStr ? dateStr.substring(0, 4) : '2026';
-              const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : (targetMonth || '2026-08'));
+              const periodNum = parseInt(period, 10);
+              const hasValidPeriod = !isNaN(periodNum) && periodNum >= 1 && periodNum <= 12;
+              const monthStr = hasValidPeriod
+                ? `${year}-${String(periodNum).padStart(2, '0')}`
+                : (dateStr ? dateStr.substring(0, 7) : (targetMonth || '2026-09'));
 
-              const liters = Math.abs(parseFloat(r['Total quantity'] || r['Qty'] || 0) || 0);
-              const rupiah = Math.abs(parseFloat(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0) || 0);
+              const drCr = String(r['Dr/Cr indicator'] || r['Dr/Cr'] || r['Dr/C'] || '').trim().toUpperCase();
+              const isReversal = drCr === 'C' || drCr === 'H';
+
+              let liters = parseSapNumber(r['Total quantity'] || r['Qty'] || 0);
+              let rupiah = parseSapNumber(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0);
+
+              if (liters === 0 && parsedLitersFromText > 0) {
+                liters = parsedLitersFromText;
+              }
+
+              if (isReversal) {
+                debitReversals++;
+                liters = -Math.abs(liters);
+                rupiah = -Math.abs(rupiah);
+              } else {
+                liters = Math.abs(liters);
+                rupiah = Math.abs(rupiah);
+              }
+
               const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
-              const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
-              const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
+              const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim().toUpperCase();
 
               debitRowsCount++;
               newDaily.push({
@@ -929,6 +1218,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 p: plant
               });
             }
+            console.log(`[SALRD Ingestion] Accepted normalized 51100057+L/Text: ${debitRowsCount} rows (Reversals: ${debitReversals}), Excluded non-fuel rows: ${excludedNonFuel}`);
           }
         }
 
@@ -941,26 +1231,43 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
           if (targetCreditSheet && workbook.Sheets[targetCreditSheet]) {
             const rows = XLSX.utils.sheet_to_json(workbook.Sheets[targetCreditSheet], { defval: '' });
+            console.log(`[SLARC Ingestion] Sheet "${targetCreditSheet}" total rows before deduplication: ${rows.length}`);
+            const seenCreditUploadKeys = new Set();
+            let creditDupsSkipped = 0;
+
             for (const r of rows) {
-              const ce = String(r['Cost Element'] || r['CostElement'] || '').trim();
+              const rawCe = String(r['Cost Element'] || r['CostElement'] || '').trim();
+              const ce = rawCe.replace(/^0+/, '');
               const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
               const isKm = ce === '90043002' || uom === 'KM';
               const isHm = ce === '90043003' || uom === 'HR' || uom === 'HM';
               if (!isKm && !isHm) continue;
 
-              const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim();
+              const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim().toUpperCase();
               if (!cc) continue;
 
               const rawDate = r['Posting Date'] || r['Document Date'] || r['Date'];
               const dateStr = parseDateVal(rawDate);
               const period = String(r['Period'] || '').trim();
               const year = dateStr ? dateStr.substring(0, 4) : '2026';
-              const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : (targetMonth || '2026-08'));
+              const periodNum = parseInt(period, 10);
+              const hasValidPeriod = !isNaN(periodNum) && periodNum >= 1 && periodNum <= 12;
+              const monthStr = hasValidPeriod
+                ? `${year}-${String(periodNum).padStart(2, '0')}`
+                : (dateStr ? dateStr.substring(0, 7) : (targetMonth || '2026-09'));
 
-              const qty = Math.abs(parseFloat(r['Total quantity'] || r['Qty'] || 0) || 0);
+              const qty = Math.abs(parseSapNumber(r['Total quantity'] || r['Qty'] || 0) || 0);
               const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
               const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
-              const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
+              const cleanName = name.split('|')[0].trim().toLowerCase();
+              const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim().toUpperCase();
+              // Deduplicate double-posted or paired SAP allocation documents (same cc, date, uom, qty, activity)
+              const dedupKey = `${cc}_${dateStr || monthStr}_${isKm ? 'KM' : 'HM'}_${qty}_${cleanName}`;
+              if (seenCreditUploadKeys.has(dedupKey)) {
+                creditDupsSkipped++;
+                continue;
+              }
+              seenCreditUploadKeys.add(dedupKey);
 
               creditRowsCount++;
               newDaily.push({
@@ -976,6 +1283,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 p: plant
               });
             }
+            console.log(`[SLARC Ingestion] Accepted unique SLARC rows: ${creditRowsCount}, Deduplicated paired allocations: ${creditDupsSkipped}`);
           }
         }
 
@@ -984,31 +1292,65 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
           if (firstSheet) {
             const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+            const seenCreditFallbackKeys = new Set();
             for (const r of rows) {
-              const cc = String(r['Cost Center'] || r['CostCenter'] || '').trim();
-              if (!cc) continue;
-              const ce = String(r['Cost Element'] || '').trim();
-              const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
+              const rawCc = String(r['Cost Center'] || r['CostCenter'] || '').trim().toUpperCase();
+              if (!rawCc) continue;
+              const rawCe = String(r['Cost Element'] || '').trim();
+              const ce = rawCe.replace(/^0+/, '');
+              const rawUom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
               const rawDate = r['Posting Date'] || r['Document Date'] || r['Date'];
               const dateStr = parseDateVal(rawDate);
               const period = String(r['Period'] || '').trim();
               const year = dateStr ? dateStr.substring(0, 4) : '2026';
-              const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : (targetMonth || '2026-08'));
-              const qty = Math.abs(parseFloat(r['Total quantity'] || r['Qty'] || 0) || 0);
-              const rupiah = Math.abs(parseFloat(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0) || 0);
+              const periodNum = parseInt(period, 10);
+              const hasValidPeriod = !isNaN(periodNum) && periodNum >= 1 && periodNum <= 12;
+              const monthStr = hasValidPeriod
+                ? `${year}-${String(periodNum).padStart(2, '0')}`
+                : (dateStr ? dateStr.substring(0, 7) : (targetMonth || '2026-09'));
+
+              const drCr = String(r['Dr/Cr indicator'] || r['Dr/Cr'] || r['Dr/C'] || '').trim().toUpperCase();
+              const isReversal = drCr === 'C' || drCr === 'H';
+              let qty = parseSapNumber(r['Total quantity'] || r['Qty'] || 0);
+              let rupiah = parseSapNumber(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0);
               const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
               const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
-              const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
+              const matDesc = String(r['Material Description'] || '').trim();
+              const fullText = `${name} ${matDesc}`;
+              const plant = String(r['Plant'] || rawCc.substring(0, 4) || '').trim().toUpperCase();
 
-              if (ce === '51100057' || uom === 'L') {
-                debitRowsCount++;
-                newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'D', q: qty, u: 'L', r: rupiah, doc, n: name, p: plant });
-              } else if (ce === '90043002' || uom === 'KM') {
-                creditRowsCount++;
-                newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'C', q: qty, u: 'KM', r: 0, doc, n: name, p: plant });
-              } else if (ce === '90043003' || uom === 'HR' || uom === 'HM') {
-                creditRowsCount++;
-                newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'C', q: qty, u: 'HM', r: 0, doc, n: name, p: plant });
+              const isStandardFuelUom = ['L', 'LTR', 'LITER'].includes(rawUom);
+              let parsedLiters = 0;
+              if (ce === '51100057') {
+                let isAcc = isStandardFuelUom;
+                if (!isAcc) {
+                  parsedLiters = extractLitersFromText(fullText);
+                  if (parsedLiters > 0 || /solar|dexlite|biodiesel|gasoline|bbm|bahan bakar/i.test(fullText) || !rawUom) {
+                    isAcc = true;
+                  }
+                }
+                if (isAcc) {
+                  if (qty === 0 && parsedLiters > 0) qty = parsedLiters;
+                  if (isReversal) {
+                    qty = -Math.abs(qty);
+                    rupiah = -Math.abs(rupiah);
+                  } else {
+                    qty = Math.abs(qty);
+                    rupiah = Math.abs(rupiah);
+                  }
+                  debitRowsCount++;
+                  newDaily.push({ c: rawCc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'D', q: qty, u: 'L', r: rupiah, doc, n: name, p: plant });
+                }
+              } else if (ce === '90043002' || rawUom === 'KM' || ce === '90043003' || rawUom === 'HR' || rawUom === 'HM') {
+                const isKm = ce === '90043002' || rawUom === 'KM';
+                const cleanQty = Math.abs(qty);
+                const cleanName = name.split('|')[0].trim().toLowerCase();
+                const dedupKey = `${rawCc}_${dateStr || monthStr}_${isKm ? 'KM' : 'HM'}_${cleanQty}_${cleanName}`;
+                if (!seenCreditFallbackKeys.has(dedupKey)) {
+                  seenCreditFallbackKeys.add(dedupKey);
+                  creditRowsCount++;
+                  newDaily.push({ c: rawCc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'C', q: cleanQty, u: isKm ? 'KM' : 'HM', r: 0, doc, n: name, p: plant });
+                }
               }
             }
           }
@@ -1143,17 +1485,16 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               partnerObjects: []
             };
 
-            // Fill equipment info if missing
+            // Fill equipment info from PM Master Data
             const eqInfo = eqMap[cc] || {};
-            if (!existing.equipment && eqInfo.equipment) existing.equipment = eqInfo.equipment;
-            if (!existing.description && eqInfo.description) existing.description = eqInfo.description;
-            if (!existing.plant && eqInfo.plant) {
+            if (eqInfo.equipment) existing.equipment = eqInfo.equipment;
+            if (eqInfo.description) existing.description = eqInfo.description;
+            if (eqInfo.plant) {
               existing.plant = eqInfo.plant;
               existing.plantDesc = PLANT_INFO[eqInfo.plant]?.desc || eqInfo.plant;
               existing.wilayah = PLANT_INFO[eqInfo.plant]?.wilayah || 'Regional 5';
             }
             if (eqInfo.objectType) existing.objectType = eqInfo.objectType;
-
             const txs = byCC[cc] || [];
             const txsD = txs.filter(d => d.t === 'D');
             const txsC = txs.filter(d => d.t === 'C');
@@ -1165,9 +1506,18 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             }
             // Auto update credit if there are credit daily transactions
             if (txsC.length > 0) {
-              existing.creditKm = Math.round(txsC.filter(d => d.u === 'KM').reduce((sum, d) => sum + (parseFloat(d.q) || 0), 0) * 100) / 100;
-              existing.creditHm = Math.round(txsC.filter(d => d.u === 'HM').reduce((sum, d) => sum + (parseFloat(d.q) || 0), 0) * 100) / 100;
-
+              // Deduplicate double-posted or paired SAP allocation documents (same date, uom, qty, activity)
+              const seenCreditKeys = new Set();
+              const dedupedTxsC = [];
+              for (const d of txsC) {
+                const k = `${d.d || ''}_${d.u || ''}_${Math.abs(parseFloat(d.q) || 0)}_${String(d.n || '').split('|')[0].trim().toLowerCase()}`;
+                if (!seenCreditKeys.has(k)) {
+                  seenCreditKeys.add(k);
+                  dedupedTxsC.push(d);
+                }
+              }
+              existing.creditKm = Math.round(dedupedTxsC.filter(d => d.u === 'KM').reduce((sum, d) => sum + (parseFloat(d.q) || 0), 0) * 100) / 100;
+              existing.creditHm = Math.round(dedupedTxsC.filter(d => d.u === 'HM' || d.u === 'HR').reduce((sum, d) => sum + (parseFloat(d.q) || 0), 0) * 100) / 100;
               const narrations = new Set(existing.slarcNarrations || []);
               const partnerObjs = new Set(existing.partnerObjects || []);
               for (const d of txsC) {
@@ -1276,7 +1626,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     finally { setLoading(false); }
   };
 
-  // -- Filter month logs --------------------------------------------------------
+  // ── Filter month logs ────────────────────────────────────────────────────────
   const monthLogs = useMemo(() => {
     const start = `${targetMonth}-01`;
     const end   = `${targetMonth}-31`;
@@ -1321,7 +1671,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
   }, [targetMonth, targetInputDate]);
 
-  // -- Summary per Plant --------------------------------------------------------
+  // ── Summary per Plant ────────────────────────────────────────────────────────
   const summaryData = useMemo(() => {
     const targetDate = new Date(targetInputDate);
     const list = [];
@@ -1469,7 +1819,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return result;
   }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetMonth, targetInputDate, autoWorkingDays, selectedWilayah, searchPlant, filterStatus, sortBy, sortAsc, masterEquipments, masterMap, isAdmin, currentUser]);
 
-  // -- Unit Focused Mode calculations ------------------------------------------
+  // ── Unit Focused Mode calculations ──────────────────────────────────────────
   const unitFocusedData = useMemo(() => {
     if (!effectivePlant) return { vehiclesList: [], kpis: { total: 0, active: 0, avgDays: 0, lastUpdate: '-', statusColor: 'grey', statusText: 'Belum Ada Data' } };
 
@@ -1601,7 +1951,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     };
   }, [vehicles, activeMonthLogs, selectedPlant, targetMonth, targetInputDate, masterEquipments]);
 
-  // -- Per-Vehicle Detail (all plants, original tab) ---------------------------
+  // ── Per-Vehicle Detail (all plants, original tab) ───────────────────────────
   const vehicleDetailData = useMemo(() => {
     const tDate = new Date(targetInputDate);
     
@@ -1671,7 +2021,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return result;
   }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetInputDate, selectedWilayah, searchVehicle, filterStatus, currentUser, isAdmin]);
 
-  // -- Filtered Log Records (Original Logs tab) ---------------------------------
+  // ── Filtered Log Records (Original Logs tab) ─────────────────────────────────
   const filteredLogs = useMemo(() => {
     let result = showCancelled ? monthLogs : activeMonthLogs;
     
@@ -1696,7 +2046,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return result;
   }, [monthLogs, activeMonthLogs, showCancelled, selectedWilayah, searchVehicle, filterUoM, filterJobCode, currentUser, isAdmin]);
 
-  // -- Aggregate Stats -----------------------------------------------------------
+  // ── Aggregate Stats ───────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const active = summaryData.filter(r => r.totalTx > 0).length;
     const totalTx = monthLogs.length;
@@ -1709,7 +2059,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return { active, totalTx, totalCancelled, totalVeh, upToDate, late, notUpToDate, avgPct };
   }, [summaryData, monthLogs, cancelledMonthLogs, vehicles]);
 
-  // -- Export --------------------------------------------------------------------
+  // ── Export ────────────────────────────────────────────────────────────────────
   const handleExportSummary = () => {
     const wb = XLSX.utils.book_new();
     const rows = summaryData.map(r => ({
@@ -1754,7 +2104,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       
       const zeroTx = sorted.filter(item => item.totalTx === 0);
       if (zeroTx.length > 0) {
-        text += `\n*⚠️ Unit Tanpa Transaksi:* \n`;
+        text += `\n*⚠️ Unit Tanpa Transaksi:* \n`;
         text += zeroTx.map(item => `${item.plant} (${item.desc})`).join(', ') + '\n';
       }
       
@@ -1866,96 +2216,143 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
   };
 
-  // -- Fuel Evaluation Computed Data & ZESTHLP16PA Mapping -------------------
-  const MONTH_NAMES = [
-    { val: '01', label: 'Januari' },
-    { val: '02', label: 'Februari' },
-    { val: '03', label: 'Maret' },
-    { val: '04', label: 'April' },
-    { val: '05', label: 'Mei' },
-    { val: '06', label: 'Juni' },
-    { val: '07', label: 'Juli' },
-    { val: '08', label: 'Agustus' },
-    { val: '09', label: 'September' },
-    { val: '10', label: 'Oktober' },
-    { val: '11', label: 'November' },
-    { val: '12', label: 'Desember' },
-  ];
-
+  // ── Fuel Evaluation Computed Data & ZESTHLP16PA Mapping ───────────────────
   const fuelAvailableYears = useMemo(() => {
     const set = new Set((fuelData?.summaries || []).map(s => s.month?.substring(0, 4)).filter(Boolean));
     if (set.size === 0) set.add('2026');
     return Array.from(set).sort().reverse();
   }, [fuelData]);
 
-  // -- Database VLOOKUP: Cost Center -> Equipment Master -----------------------
-  const costCenterToEquipmentMap = useMemo(() => {
-    const map = new Map();
+  // ── Database VLOOKUP: Equipment & Cost Center -> PM Master Data ────────────────────────
+  const { pmMasterByEquipment, pmMasterByCostCenter } = useMemo(() => {
+    const byEq = new Map();
+    const byCC = new Map();
 
-    // 1. From masterMap (17k+ entries from system config)
-    if (masterMap && masterMap.size > 0) {
-      masterMap.forEach((val, eqNum) => {
-        if (val && val.costCenter) {
-          const cc = String(val.costCenter).trim().toUpperCase();
-          if (cc && !map.has(cc)) {
-            map.set(cc, {
-              equipment: String(eqNum || '').trim(),
-              description: val.description || '',
-              plant: val.plant || '',
-              objectType: val.objectType || ''
-            });
+    const registerItem = (eqNum, desc, cc, plant, objType) => {
+      const eq = String(eqNum || '').trim();
+      const cleanCC = String(cc || '').trim().toUpperCase();
+      const cleanDesc = String(desc || '').trim();
+      const cleanPlant = String(plant || (cleanCC ? cleanCC.substring(0, 4) : '')).trim();
+
+      if (!eq && !cleanCC) return;
+
+      let type = objType || '';
+      if (!type) {
+        if (cleanCC.includes('CAR') || /^(mobil|pajero|strada|triton|hilux|innova|avanza)/i.test(cleanDesc)) type = 'CAR';
+        else if (cleanCC.includes('DTR') || cleanCC.includes('TRU') || /dump\s*truck|truk|truck/i.test(cleanDesc)) type = 'DTRUCK';
+        else if (cleanCC.includes('TRA') || /traktor|tractor/i.test(cleanDesc)) type = 'TRACTOR';
+        else if (cleanCC.includes('GRA') || /grader/i.test(cleanDesc)) type = 'GRADER';
+        else if (cleanCC.includes('COM') || /vibrator|compactor|bomag/i.test(cleanDesc)) type = 'COMPACTOR';
+        else if (cleanCC.includes('EXC') || /excavator/i.test(cleanDesc)) type = 'EXCAVATOR';
+        else if (cleanCC.includes('QUT') || /quick\s*truck/i.test(cleanDesc)) type = 'QUICK TRUCK';
+        else if (eq.startsWith('20000')) type = 'VEH';
+      }
+
+      const item = {
+        equipment: eq,
+        description: cleanDesc,
+        costCenter: cleanCC,
+        plant: cleanPlant,
+        objectType: type
+      };
+
+      if (eq) {
+        if (!byEq.has(eq) || (cleanDesc && cleanDesc !== eq && byEq.get(eq).description === eq)) {
+          byEq.set(eq, item);
+        }
+        const unpadded = eq.replace(/^0+/, '');
+        if (unpadded !== eq && (!byEq.has(unpadded) || (cleanDesc && cleanDesc !== unpadded && byEq.get(unpadded).description === unpadded))) {
+          byEq.set(unpadded, item);
+        }
+      }
+
+      if (cleanCC) {
+        if (!byCC.has(cleanCC)) {
+          byCC.set(cleanCC, item);
+        } else {
+          const existing = byCC.get(cleanCC);
+          const isVehicleEq = eq.startsWith('20000');
+          const existingIsVehicleEq = existing.equipment?.startsWith('20000');
+          if (isVehicleEq && !existingIsVehicleEq) {
+            byCC.set(cleanCC, item);
+          } else if (cleanDesc && (!existing.description || existing.description === existing.equipment)) {
+            byCC.set(cleanCC, item);
           }
         }
+      }
+    };
+
+    // 1. From masterMap (17k+ entries from PM Master Data)
+    if (masterMap && masterMap.size > 0) {
+      masterMap.forEach((val, eqNum) => {
+        if (!val) return;
+        const desc = typeof val === 'string' ? '' : (val.description || '');
+        const cc = typeof val === 'string' ? '' : (val.costCenter || '');
+        const plant = typeof val === 'string' ? val : (val.plant || '');
+        const objType = typeof val === 'string' ? '' : (val.objectType || '');
+        registerItem(eqNum, desc, cc, plant, objType);
       });
     }
 
-    // 2. From masterEquipments
+    // 2. From masterEquipments (master_equipment DB table)
     if (Array.isArray(masterEquipments)) {
       masterEquipments.forEach(item => {
-        const cc = String(item.costCenter || item.cost_center || '').trim().toUpperCase();
-        if (cc && (!map.has(cc) || !map.get(cc).equipment)) {
-          map.set(cc, {
-            equipment: String(item.eqNum || item.equipment || '').trim(),
-            description: item.description || '',
-            plant: item.plant || '',
-            objectType: item.objectType || item.type || ''
-          });
-        }
+        const eqNum = item.eqNum || item.eq_num || item.equipment || '';
+        const desc = item.description || '';
+        const cc = item.costCenter || item.cost_center || '';
+        const plant = item.plant || '';
+        const objType = item.objectType || item.type || item.object_type || '';
+        registerItem(eqNum, desc, cc, plant, objType);
       });
     }
 
     // 3. From vehicle master list (vehicles)
     if (Array.isArray(vehicles)) {
       vehicles.forEach(v => {
-        const cc = String(v.cost_center || v.costCenter || '').trim().toUpperCase();
-        if (cc && (!map.has(cc) || !map.get(cc).equipment)) {
-          map.set(cc, {
-            equipment: String(v.vehicle_code || '').trim(),
-            description: v.description || '',
-            plant: v.plant || '',
-            objectType: v.object_type || ''
-          });
-        }
+        const eqNum = v.vehicle_code || '';
+        const desc = v.description || '';
+        const cc = v.cost_center || v.costCenter || '';
+        const plant = v.plant || '';
+        const objType = v.object_type || '';
+        registerItem(eqNum, desc, cc, plant, objType);
       });
     }
 
-    // 4. From fuelData.summaries
-    (fuelData?.summaries || []).forEach(s => {
-      const cc = String(s.costCenter || '').trim().toUpperCase();
-      const eq = String(s.equipment || '').trim();
-      if (cc && eq && eq !== '-' && (!map.has(cc) || !map.get(cc).equipment || map.get(cc).equipment === '-')) {
-        map.set(cc, {
-          equipment: eq,
-          description: s.description || '',
-          plant: s.plant || '',
-          objectType: s.objectType || ''
-        });
+    return { pmMasterByEquipment: byEq, pmMasterByCostCenter: byCC };
+  }, [masterMap, masterEquipments, vehicles]);
+
+  // Backward compatibility alias for any existing references
+  const costCenterToEquipmentMap = pmMasterByCostCenter;
+
+  // Dedicated VLOOKUP function based on Equipment Number & Cost Center on PM Master Data
+  const lookupMasterPM = useCallback((eqNum, costCenter) => {
+    const cleanEq = String(eqNum || '').trim();
+    const cleanCC = String(costCenter || '').trim().toUpperCase();
+
+    // Priority 1: VLOOKUP by Equipment Number in PM Master Data
+    if (cleanEq && cleanEq !== '-') {
+      const match = pmMasterByEquipment.get(cleanEq) || pmMasterByEquipment.get(cleanEq.replace(/^0+/, ''));
+      if (match && match.description && match.description !== cleanEq) {
+        return match;
       }
-    });
+    }
 
-    return map;
-  }, [masterMap, masterEquipments, vehicles, fuelData?.summaries]);
+    // Priority 2: VLOOKUP by Cost Center in PM Master Data
+    if (cleanCC && cleanCC !== '-') {
+      const match = pmMasterByCostCenter.get(cleanCC);
+      if (match && match.description) {
+        return match;
+      }
+    }
 
+    // Priority 3: Fallback equipment match
+    if (cleanEq && cleanEq !== '-') {
+      const match = pmMasterByEquipment.get(cleanEq) || pmMasterByEquipment.get(cleanEq.replace(/^0+/, ''));
+      if (match) return match;
+    }
+
+    return null;
+  }, [pmMasterByEquipment, pmMasterByCostCenter]);
   // Fast index of master vehicles by vehicle_code
   const masterVehiclesByCode = useMemo(() => {
     const map = new Map();
@@ -1977,7 +2374,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return map;
   }, [zcoData]);
 
-  // -- Pre-Index ZESTHLP16PA Logs by No. Equipment & Date ---------------------
+  // ── Pre-Index ZESTHLP16PA Logs by No. Equipment & Date ─────────────────────
   const zestLogsByEquipment = useMemo(() => {
     const map = new Map();
     (logs || []).forEach(l => {
@@ -2008,9 +2405,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return map;
   }, [fuelData?.daily]);
 
-  // Main Fuel Table Data with Deep Reference & Reconciliation Mapping
-  const fuelTableData = useMemo(() => {
-    const targetPeriod = fuelMonth === 'ALL' ? fuelYear : `${fuelYear}-${fuelMonth}`;
+  // Main Fuel Table Data with Deep Reference, Reconciliation, Multi-Month & Date Range Aggregation
+  const rawFuelTableData = useMemo(() => {
+    const isDateRange = Boolean(fuelStartDate || fuelEndDate);
     const activePlant = (!isAdmin && currentUser?.plant && currentUser.plant !== 'ALL')
       ? currentUser.plant
       : fuelPlant;
@@ -2020,31 +2417,29 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       const eqLogs = (equipment && equipment !== '-') ? (zestLogsByEquipment.get(equipment) || []) : [];
       const ccLogs = (costCenter && costCenter !== '-') ? (slarcDailyByCostCenter.get(String(costCenter || '').trim().toUpperCase()) || []) : [];
 
-      let matchedZest = [];
-      let matchedSlarc = [];
+      let matchedZest;
+      let matchedSlarc;
 
       if (isDate) {
         matchedZest = eqLogs.filter(l => l.date === ymOrDate);
         matchedSlarc = ccLogs.filter(d => d.d === ymOrDate);
       } else {
-        if (fuelMonth !== 'ALL') {
-          matchedZest = eqLogs.filter(l => l.date && l.date.startsWith(ymOrDate));
-          matchedSlarc = ccLogs.filter(d => d.m === ymOrDate);
+        if (fuelMonths.length === 1 && !fuelMonths.includes('ALL')) {
+          const mKey = `${fuelYear}-${fuelMonths[0]}`;
+          matchedZest = eqLogs.filter(l => l.date && l.date.startsWith(mKey));
+          matchedSlarc = ccLogs.filter(d => d.m === mKey);
         } else {
           matchedZest = eqLogs.filter(l => l.date && l.date.startsWith(fuelYear));
           matchedSlarc = ccLogs.filter(d => d.m && d.m.startsWith(fuelYear));
         }
       }
 
-      // Sum ZEST KM/HM for reconciliation comparison
       let zestKmHmTotal = 0;
       matchedZest.forEach(l => {
         zestKmHmTotal += parseFloat(l.hm_km) || 0;
       });
 
-      // ============================================================
-      // PRIORITY 1: REFERENCE from ZESTHLP16PA matching No. Equipment + period
-      // ============================================================
+      // Priority 1
       const p1List = [];
       matchedZest.forEach(l => {
         const ref = (l.reference || '').trim();
@@ -2068,9 +2463,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         };
       }
 
-      // ============================================================
-      // PRIORITY 2: JOB CODE / Pekerjaan Utama / Remarks / Lokasi from ZESTHLP16PA in period
-      // ============================================================
+      // Priority 2
       const p2List = [];
       matchedZest.forEach(l => {
         const rem = (l.remarks || '').trim();
@@ -2087,22 +2480,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         }
       });
 
-      // Also check vehicle master main job for this equipment
-      if (p2List.length === 0 && equipment && equipment !== '-') {
-        const masterObj = masterVehiclesByCode.get(equipment);
-        if (masterObj?.pekerjaan_utama) {
-          p2List.push(masterObj.pekerjaan_utama);
-        }
-      }
-
       if (p2List.length > 0) {
         return {
           primary: p2List[0],
           all: p2List.join('; '),
           count: p2List.length,
           priority: 2,
-          source: 'ZEST_JOB',
-          badge: null,
+          source: 'ZESTHLP16PA',
+          badge: 'ZEST-JOB',
           zestLogs: eqLogs,
           matchedZest,
           matchedSlarc,
@@ -2110,25 +2495,23 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         };
       }
 
-      // ============================================================
-      // PRIORITY 3: Latest known REFERENCE / Pekerjaan Utama from ZESTHLP16PA (other months)
-      // ============================================================
+      // Priority 3
       if (eqLogs.length > 0) {
+        const sortedLogs = [...eqLogs].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
         const p3List = [];
-        let latestPeriod = '';
-        eqLogs.forEach(l => {
+        let latestPeriod = null;
+
+        for (const l of sortedLogs) {
           const ref = (l.reference || '').trim();
           const rem = (l.remarks || '').trim();
           const job = (JOB_CODE_DESC[l.job_code] || l.job_code || '').trim();
-          let text = '';
-          if (ref && ref !== '1' && ref !== '-') text = rem && rem !== ref ? `${ref} (${rem})` : ref;
-          else if (rem && rem !== '1' && rem !== '-') text = rem;
-          else if (job) text = job;
+          const text = (ref && ref !== '1' && ref !== '-') ? ref : (rem && rem !== '1' && rem !== '-') ? rem : job;
           if (text && !p3List.includes(text)) {
             p3List.push(text);
             if (!latestPeriod && l.date) latestPeriod = l.date.substring(0, 7);
           }
-        });
+          if (p3List.length >= 3) break;
+        }
 
         if (p3List.length > 0) {
           return {
@@ -2136,8 +2519,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             all: p3List.join('; '),
             count: p3List.length,
             priority: 3,
-            source: 'ZEST_LATEST',
-            badge: 'Ref. Terakhir',
+            source: 'ZESTHLP16PA_HISTORICAL',
+            badge: `ZEST ${latestPeriod || 'HIST'}`,
             latestPeriod,
             zestLogs: eqLogs,
             matchedZest,
@@ -2147,11 +2530,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         }
       }
 
-      // ============================================================
-      // PRIORITY 4: Transaction description / text from SLARC (Credit) / ZCO
-      // ============================================================
+      // Priority 4
       const p4List = [];
-      // 4a. Check enriched summary fields
       if (summaryObj?.slarcNarrations && Array.isArray(summaryObj.slarcNarrations) && summaryObj.slarcNarrations.length > 0) {
         summaryObj.slarcNarrations.forEach(n => {
           if (n && !p4List.includes(n)) p4List.push(n);
@@ -2160,7 +2540,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         p4List.push(summaryObj.slarcRefPrimary);
       }
 
-      // 4b. Check daily SLARC records
       const slarcPool = matchedSlarc.length > 0 ? matchedSlarc : ccLogs;
       slarcPool.forEach(d => {
         const text = String(d.n || '').split('|')[0].trim();
@@ -2169,14 +2548,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         }
       });
 
-      // 4c. Check partner object categories (e.g. TM - PENGANGKUTAN BUAH)
       if (p4List.length === 0 && summaryObj?.partnerObjects && Array.isArray(summaryObj.partnerObjects)) {
         summaryObj.partnerObjects.forEach(p => {
           if (p && !p4List.includes(p)) p4List.push(p);
         });
       }
 
-      // 4d. Check ZCO activity if available
       if (p4List.length === 0 && costCenter) {
         const zcoMatch = zcoMapByCC.get(String(costCenter).trim().toUpperCase());
         if (zcoMatch?.activity) {
@@ -2199,9 +2576,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         };
       }
 
-      // ============================================================
-      // FALLBACK: Absolutely no activity record found
-      // ============================================================
       return {
         primary: '-',
         all: '-',
@@ -2216,67 +2590,16 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       };
     };
 
-    let result = [];
+    let result;
 
-    if (!fuelDate) {
-      // -- Rekap Bulanan --
-      let list = fuelData?.summaries || [];
-      if (fuelMonth === 'ALL') {
-        list = list.filter(s => s.month?.startsWith(fuelYear));
-      } else {
-        list = list.filter(s => s.month === targetPeriod);
-      }
-
-      if (activePlant !== 'ALL') {
-        list = list.filter(s => s.plant === activePlant);
-      }
-
-      result = list.map(s => {
-        const ccKey = String(s.costCenter || '').trim().toUpperCase();
-        const eqLookup = costCenterToEquipmentMap.get(ccKey);
-        const resolvedEquipment = (s.equipment && s.equipment !== '-') ? s.equipment : (eqLookup?.equipment || '-');
-        const resolvedDescription = s.description || eqLookup?.description || `Kendaraan ${s.costCenter}`;
-        const resolvedPlant = s.plant || eqLookup?.plant || s.costCenter.substring(0, 4);
-        const refData = resolveSmartReference(resolvedEquipment, s.costCenter, s.month, false, s);
-
-        // Verification between SLARC (Credit) and ZESTHLP16PA
-        const slarcTotal = s.creditKm || s.creditHm || 0;
-        const zestTotal = refData.zestKmHmTotal;
-        const diff = Math.round((slarcTotal - zestTotal) * 100) / 100;
-        let reconcileStatus = 'NONE';
-        if (slarcTotal > 0 && zestTotal > 0) {
-          reconcileStatus = Math.abs(diff) < 0.01 ? 'MATCH' : 'DIFF';
-        } else if (slarcTotal > 0) {
-          reconcileStatus = 'SLARC_ONLY';
-        } else if (zestTotal > 0) {
-          reconcileStatus = 'ZEST_ONLY';
-        }
-
-        return {
-          ...s,
-          equipment: resolvedEquipment,
-          description: resolvedDescription,
-          plant: resolvedPlant,
-          plantDesc: s.plantDesc || PLANT_INFO[resolvedPlant]?.desc || resolvedPlant,
-          referencePrimary: refData.primary,
-          referenceAll: refData.all,
-          referenceCount: refData.count,
-          referencePriority: refData.priority,
-          referenceBadge: refData.badge,
-          referenceSource: refData.source,
-          referenceLatestPeriod: refData.latestPeriod,
-          allZestLogs: refData.zestLogs,
-          matchedZestLogs: refData.matchedZest,
-          matchedSlarcDaily: refData.matchedSlarc,
-          zestTotalKmHm: zestTotal,
-          varianceKmHm: diff,
-          reconcileStatus
-        };
+    if (isDateRange) {
+      // Date Range Filter
+      const inRangeDaily = (fuelData?.daily || []).filter(d => {
+        if (!d.d) return false;
+        if (fuelStartDate && d.d < fuelStartDate) return false;
+        if (fuelEndDate && d.d > fuelEndDate) return false;
+        return true;
       });
-    } else {
-      // -- Filter Tanggal Spesifik (Harian Drill-Down) --
-      const dayDaily = (fuelData?.daily || []).filter(d => d.d === fuelDate);
-      const dayLogs = (logs || []).filter(l => l.date === fuelDate);
 
       const vehMap = new Map();
 
@@ -2290,7 +2613,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             plantDesc: s.plantDesc,
             wilayah: s.wilayah,
             objectType: s.objectType,
-            month: s.month,
+            month: `${fuelStartDate || ''} s/d ${fuelEndDate || ''}`,
             debitLiters: 0,
             debitRp: 0,
             creditKm: 0,
@@ -2304,20 +2627,20 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         }
       });
 
-      dayDaily.forEach(d => {
+      inRangeDaily.forEach(d => {
         const cc = String(d.c || '').trim().toUpperCase();
         if (!vehMap.has(cc)) {
-          const eqLookup = costCenterToEquipmentMap.get(cc);
+          const master = lookupMasterPM('', cc);
           const p = d.p || cc.substring(0, 4);
           vehMap.set(cc, {
             costCenter: cc,
-            equipment: eqLookup?.equipment || '-',
-            description: eqLookup?.description || `Kendaraan ${cc}`,
+            equipment: master?.equipment || '-',
+            description: master?.description || `Kendaraan ${cc}`,
             plant: p,
             plantDesc: PLANT_INFO[p]?.desc || p,
             wilayah: PLANT_INFO[p]?.wilayah || 'Regional 5',
-            objectType: eqLookup?.objectType || 'VEH',
-            month: fuelDate.substring(0, 7),
+            objectType: master?.objectType || 'VEH',
+            month: `${fuelStartDate || ''} s/d ${fuelEndDate || ''}`,
             debitLiters: 0,
             debitRp: 0,
             creditKm: 0,
@@ -2344,26 +2667,28 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
       result = list.map(v => {
         const ccKey = String(v.costCenter || '').trim().toUpperCase();
-        const eqLookup = costCenterToEquipmentMap.get(ccKey);
-        const resolvedEquipment = (v.equipment && v.equipment !== '-') ? v.equipment : (eqLookup?.equipment || '-');
-        const resolvedDescription = v.description || eqLookup?.description || `Kendaraan ${v.costCenter}`;
-        const resolvedPlant = v.plant || eqLookup?.plant || v.costCenter.substring(0, 4);
-        const refData = resolveSmartReference(resolvedEquipment, v.costCenter, fuelDate, true, v);
+        const rawEq = (v.equipment && v.equipment !== '-') ? String(v.equipment).trim() : '';
+        const masterMatch = lookupMasterPM(rawEq, ccKey);
 
-        const kmPerL = v.debitLiters > 0 && v.creditKm > 0 ? Number((v.creditKm / v.debitLiters).toFixed(2)) : 0;
-        const literPerH = v.debitLiters > 0 && v.creditHm > 0 ? Number((v.debitLiters / v.creditHm).toFixed(2)) : 0;
-        const isHeavy = ['TRACTOR', 'EXCAVATOR', 'GRADER', 'WLOADER'].some(h => (v.objectType || '').toUpperCase().includes(h)) || v.creditHm > 0;
-        let status = 'NORMAL';
-        if (v.debitLiters === 0 && v.creditKm === 0 && v.creditHm === 0) status = 'NO_DATA';
-        else if (isHeavy) {
-          if (literPerH > 0 && literPerH <= 3.0) status = 'OPTIMAL';
-          else if (literPerH > 5.0) status = 'BOROS';
-        } else {
-          if (kmPerL >= 3.5) status = 'OPTIMAL';
-          else if (kmPerL > 0 && kmPerL < 2.0) status = 'BOROS';
-        }
+        const resolvedEquipment = masterMatch?.equipment || rawEq || '-';
+        const resolvedDescription = masterMatch?.description || (
+          v.description && !v.description.includes('Sedang Perbaikan') && !v.description.includes('Au58:') && !v.description.includes('Solar =') && !v.description.toLowerCase().startsWith('dinas ke')
+            ? v.description
+            : `Kendaraan ${ccKey}`
+        );
+        const resolvedPlant = masterMatch?.plant || v.plant || (ccKey ? ccKey.substring(0, 4) : '');
+        const resolvedObjectType = masterMatch?.objectType || v.objectType || (ccKey.includes('CAR') ? 'CAR' : ccKey.includes('TRU') ? 'DTRUCK' : 'VEH');
+        const refData = resolveSmartReference(resolvedEquipment, v.costCenter, fuelStartDate || v.month, true, v);
 
-        const slarcTotal = v.creditKm || v.creditHm || 0;
+        const debitL = Math.round(v.debitLiters * 100) / 100;
+        const debitR = Math.round(v.debitRp);
+        const creditK = Math.round(v.creditKm * 100) / 100;
+        const creditH = Math.round(v.creditHm * 100) / 100;
+
+        // Apply Task 1 BBM Efficiency Evaluation Matrix (MID(5,3) with 10% tolerance & Standby handling)
+        const refText = `${refData.primary || ''} ${refData.all || ''} ${v.slarcRefPrimary || ''} ${v.description || ''}`;
+        const eff = evaluateFuelEfficiency(ccKey, debitL, creditK, creditH, resolvedObjectType, refText);
+        const slarcTotal = creditK || creditH || 0;
         const zestTotal = refData.zestKmHmTotal;
         const diff = Math.round((slarcTotal - zestTotal) * 100) / 100;
         let reconcileStatus = 'NONE';
@@ -2381,10 +2706,123 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           description: resolvedDescription,
           plant: resolvedPlant,
           plantDesc: v.plantDesc || PLANT_INFO[resolvedPlant]?.desc || resolvedPlant,
-          kmPerLiter: kmPerL,
-          literPerHm: literPerH,
-          costPerUnit: v.creditKm > 0 ? Math.round(v.debitRp / v.creditKm) : (v.creditHm > 0 ? Math.round(v.debitRp / v.creditHm) : 0),
-          status,
+          objectType: resolvedObjectType,
+          debitLiters: debitL,
+          debitRp: debitR,
+          creditKm: creditK,
+          creditHm: creditH,
+          kmPerLiter: eff.uom === 'KM/L' ? eff.ratioVal : 0,
+          literPerHm: eff.uom === 'L/HM' ? eff.ratioVal : 0,
+          costPerUnit: creditK > 0 ? Math.round(debitR / creditK) : (creditH > 0 ? Math.round(debitR / creditH) : 0),
+          status: eff.status,
+          efficiency: eff,
+          referencePrimary: refData.primary,
+          referenceAll: refData.all,
+          referenceCount: refData.count,
+          referencePriority: refData.priority,
+          referenceBadge: refData.badge,
+          referenceSource: refData.source,
+          referenceLatestPeriod: refData.latestPeriod,
+          allZestLogs: refData.zestLogs,
+          matchedZestLogs: refData.matchedZest,
+          matchedSlarcDaily: refData.matchedSlarc,
+          zestTotalKmHm: zestTotal,
+          varianceKmHm: diff,
+          reconcileStatus
+        };
+      });
+    } else {
+      // Multi-Month Filter
+      const isAllMonths = fuelMonths.includes('ALL') || fuelMonths.length === 0;
+      const targetMonths = isAllMonths ? [] : fuelMonths.map(m => `${fuelYear}-${m}`);
+
+      let list = fuelData?.summaries || [];
+      if (isAllMonths) {
+        list = list.filter(s => s.month?.startsWith(fuelYear));
+      } else {
+        list = list.filter(s => targetMonths.includes(s.month));
+      }
+
+      if (activePlant !== 'ALL') {
+        list = list.filter(s => s.plant === activePlant);
+      }
+
+      if (isAllMonths || fuelMonths.length > 1) {
+        const aggregatedMap = new Map();
+        list.forEach(s => {
+          const cc = s.costCenter;
+          if (!aggregatedMap.has(cc)) {
+            aggregatedMap.set(cc, {
+              ...s,
+              month: isAllMonths ? `${fuelYear} (Semua Bulan)` : fuelMonths.join(', '),
+              debitLiters: 0,
+              debitRp: 0,
+              creditKm: 0,
+              creditHm: 0,
+              txCount: 0
+            });
+          }
+          const cur = aggregatedMap.get(cc);
+          cur.debitLiters += (s.debitLiters || 0);
+          cur.debitRp += (s.debitRp || 0);
+          cur.creditKm += (s.creditKm || 0);
+          cur.creditHm += (s.creditHm || 0);
+          cur.txCount += (s.txCount || 0);
+        });
+        list = Array.from(aggregatedMap.values());
+      }
+
+      result = list.map(s => {
+        const ccKey = String(s.costCenter || '').trim().toUpperCase();
+        const rawEq = (s.equipment && s.equipment !== '-') ? String(s.equipment).trim() : '';
+        const masterMatch = lookupMasterPM(rawEq, ccKey);
+
+        const resolvedEquipment = masterMatch?.equipment || rawEq || '-';
+        const resolvedDescription = masterMatch?.description || (
+          s.description && !s.description.includes('Sedang Perbaikan') && !s.description.includes('Au58:') && !s.description.includes('Solar =') && !s.description.toLowerCase().startsWith('dinas ke')
+            ? s.description
+            : `Kendaraan ${ccKey}`
+        );
+        const resolvedPlant = masterMatch?.plant || s.plant || (ccKey ? ccKey.substring(0, 4) : '');
+        const resolvedObjectType = masterMatch?.objectType || s.objectType || (ccKey.includes('CAR') ? 'CAR' : ccKey.includes('TRU') ? 'DTRUCK' : 'VEH');
+        const refData = resolveSmartReference(resolvedEquipment, s.costCenter, s.month, false, s);
+
+        const debitL = Math.round((s.debitLiters || 0) * 100) / 100;
+        const debitR = Math.round(s.debitRp || 0);
+        const creditK = Math.round((s.creditKm || 0) * 100) / 100;
+        const creditH = Math.round((s.creditHm || 0) * 100) / 100;
+
+        // Apply Task 1 BBM Efficiency Evaluation Matrix (MID(5,3) with 10% tolerance & Standby handling)
+        const refText = `${refData.primary || ''} ${refData.all || ''} ${s.slarcRefPrimary || ''} ${s.description || ''}`;
+        const eff = evaluateFuelEfficiency(ccKey, debitL, creditK, creditH, resolvedObjectType, refText);
+        const slarcTotal = creditK || creditH || 0;
+        const zestTotal = refData.zestKmHmTotal;
+        const diff = Math.round((slarcTotal - zestTotal) * 100) / 100;
+        let reconcileStatus = 'NONE';
+        if (slarcTotal > 0 && zestTotal > 0) {
+          reconcileStatus = Math.abs(diff) < 0.01 ? 'MATCH' : 'DIFF';
+        } else if (slarcTotal > 0) {
+          reconcileStatus = 'SLARC_ONLY';
+        } else if (zestTotal > 0) {
+          reconcileStatus = 'ZEST_ONLY';
+        }
+
+        return {
+          ...s,
+          equipment: resolvedEquipment,
+          description: resolvedDescription,
+          plant: resolvedPlant,
+          plantDesc: s.plantDesc || PLANT_INFO[resolvedPlant]?.desc || resolvedPlant,
+          objectType: resolvedObjectType,
+          debitLiters: debitL,
+          debitRp: debitR,
+          creditKm: creditK,
+          creditHm: creditH,
+          kmPerLiter: eff.uom === 'KM/L' ? eff.ratioVal : 0,
+          literPerHm: eff.uom === 'L/HM' ? eff.ratioVal : 0,
+          costPerUnit: creditK > 0 ? Math.round(debitR / creditK) : (creditH > 0 ? Math.round(debitR / creditH) : 0),
+          status: eff.status,
+          efficiency: eff,
           referencePrimary: refData.primary,
           referenceAll: refData.all,
           referenceCount: refData.count,
@@ -2402,21 +2840,79 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       });
     }
 
+    return result;
+  }, [fuelData, fuelYear, fuelMonths, fuelStartDate, fuelEndDate, fuelPlant, zestLogsByEquipment, slarcDailyByCostCenter, logs, costCenterToEquipmentMap, lookupMasterPM, isAdmin, currentUser, masterVehiclesByCode, zcoMapByCC]);
+
+  // Dynamic status counts for filter badges & dropdown
+  const fuelStatusCounts = useMemo(() => {
+    let optimal = 0;
+    let normal = 0;
+    let boros = 0;
+    let standby = 0;
+    let noFuel = 0;
+    let noActivity = 0;
+
+    rawFuelTableData.forEach(r => {
+      const s = r.efficiency?.status || r.status;
+      const isStb = r.efficiency?.isStandby || s === 'STANDBY';
+      const isNf = (r.efficiency?.isNoFuel || s === 'NO_FUEL') && !isStb;
+
+      if (isStb) standby++;
+      else if (isNf) noFuel++;
+      else if (s === 'OPTIMAL') optimal++;
+      else if (s === 'NORMAL') normal++;
+      else if (s === 'BOROS') boros++;
+      else if (s === 'NO_ACTIVITY') noActivity++;
+    });
+
+    return {
+      total: rawFuelTableData.length,
+      optimal,
+      normal,
+      boros,
+      standby,
+      noFuel,
+      noActivity
+    };
+  }, [rawFuelTableData]);
+
+  // Filtered Fuel Table Data (by Status & Search query)
+  const fuelTableData = useMemo(() => {
+    let list = rawFuelTableData;
+
+    if (fuelStatusFilter && fuelStatusFilter !== 'ALL') {
+      list = list.filter(r => {
+        const s = r.efficiency?.status || r.status;
+        const isStb = r.efficiency?.isStandby || s === 'STANDBY';
+        const isNf = (r.efficiency?.isNoFuel || s === 'NO_FUEL') && !isStb;
+
+        if (fuelStatusFilter === 'OPTIMAL' || fuelStatusFilter === 'EFISIEN') return s === 'OPTIMAL' && !isStb && !isNf;
+        if (fuelStatusFilter === 'NORMAL' || fuelStatusFilter === 'WASPADA') return s === 'NORMAL' && !isStb && !isNf;
+        if (fuelStatusFilter === 'BOROS') return s === 'BOROS' && !isStb && !isNf;
+        if (fuelStatusFilter === 'STANDBY') return isStb;
+        if (fuelStatusFilter === 'NO_FUEL') return isNf;
+        if (fuelStatusFilter === 'NO_ACTIVITY') return s === 'NO_ACTIVITY';
+        return s === fuelStatusFilter;
+      });
+    }
+
     if (searchFuel.trim()) {
       const q = searchFuel.toLowerCase();
-      result = result.filter(r =>
+      list = list.filter(r =>
         (r.equipment || '').toLowerCase().includes(q) ||
         (r.costCenter || '').toLowerCase().includes(q) ||
         (r.description || '').toLowerCase().includes(q) ||
         (r.plant || '').toLowerCase().includes(q) ||
         (r.plantDesc || '').toLowerCase().includes(q) ||
         (r.referencePrimary || '').toLowerCase().includes(q) ||
-        (r.referenceAll || '').toLowerCase().includes(q)
+        (r.referenceAll || '').toLowerCase().includes(q) ||
+        (r.efficiency?.badgeLabel || '').toLowerCase().includes(q) ||
+        (r.efficiency?.status || '').toLowerCase().includes(q)
       );
     }
 
-    return result;
-  }, [fuelData, fuelYear, fuelMonth, fuelDate, fuelPlant, searchFuel, zestLogsByEquipment, slarcDailyByCostCenter, logs, costCenterToEquipmentMap, isAdmin, currentUser, masterVehiclesByCode, zcoMapByCC]);
+    return list;
+  }, [rawFuelTableData, fuelStatusFilter, searchFuel]);
 
   const fuelKPIs = useMemo(() => {
     let totalLiters = 0;
@@ -2429,24 +2925,29 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     let hmVal = 0;
 
     fuelTableData.forEach(r => {
-      totalLiters += Math.abs(r.debitLiters || 0);
-      totalCost += Math.abs(r.debitRp || 0);
-      totalKm += Math.abs(r.creditKm || 0);
-      totalHm += Math.abs(r.creditHm || 0);
+      const debitL = Math.abs(r.debitLiters || 0);
+      const creditK = Math.abs(r.creditKm || 0);
+      const creditH = Math.abs(r.creditHm || 0);
+      const isStandby = r.efficiency?.isStandby;
 
-      if (Math.abs(r.creditKm || 0) > 0) {
-        kmLiters += Math.abs(r.debitLiters || 0);
-        kmVal += Math.abs(r.creditKm || 0);
+      totalLiters += debitL;
+      totalCost += Math.abs(r.debitRp || 0);
+      totalKm += creditK;
+      totalHm += creditH;
+
+      // Only count towards efficiency ratio if vehicle is actively operating with fuel (not standby/dummy)
+      if (!isStandby && debitL > 0 && creditK > 0) {
+        kmLiters += debitL;
+        kmVal += creditK;
       }
-      if (Math.abs(r.creditHm || 0) > 0) {
-        hmLiters += Math.abs(r.debitLiters || 0);
-        hmVal += Math.abs(r.creditHm || 0);
+      if (!isStandby && debitL > 0 && creditH > 0) {
+        hmLiters += debitL;
+        hmVal += creditH;
       }
     });
 
     const avgKmL = kmLiters > 0 && kmVal > 0 ? Number((kmVal / kmLiters).toFixed(2)) : 0;
     const avgLHm = hmVal > 0 && hmLiters > 0 ? Number((hmLiters / hmVal).toFixed(2)) : 0;
-
     return {
       totalLiters: Math.round(totalLiters * 100) / 100,
       totalCost: Math.round(totalCost),
@@ -2465,23 +2966,29 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       'Kebun / Unit': `${s.plant} - ${s.plantDesc}`,
       'No. Equipment': s.equipment || '-',
       'Cost Center': s.costCenter,
+      'Tipe Kendaraan': s.efficiency ? s.efficiency.code : (s.objectType || '-'),
       'Deskripsi Kendaraan': s.description || '-',
       'Reference': s.referenceAll || s.referencePrimary || '-',
       'Solar (Liter)': s.debitLiters || 0,
-      'KM / HM (SLARC)': s.creditKm > 0 ? `${s.creditKm} KM` : (s.creditHm > 0 ? `${s.creditHm} HM` : '-'),
-      'KM / HM (ZESTHLP16PA)': s.zestTotalKmHm > 0 ? s.zestTotalKmHm : '-',
+      'ACTIVITY (SLARC)': s.creditKm > 0 ? `${s.creditKm} KM` : (s.creditHm > 0 ? `${s.creditHm} HM` : '-'),
+      'ACTIVITY (ZESTHLP16PA)': s.zestTotalKmHm > 0 ? `${s.zestTotalKmHm} ${s.creditHm > 0 ? 'HM' : 'KM'}` : '-',
       'Selisih (Variance)': s.varianceKmHm !== 0 ? s.varianceKmHm : 0,
-      'Rasio / Efisiensi': s.kmPerLiter > 0 ? `${s.kmPerLiter} KM/L` : (s.literPerHm > 0 ? `${s.literPerHm} L/HM` : '-'),
+      'Rasio / Efisiensi': s.efficiency && s.efficiency.ratioVal > 0 ? `${s.efficiency.ratioVal} ${s.efficiency.uom}` : (s.kmPerLiter > 0 ? `${s.kmPerLiter} KM/L` : (s.literPerHm > 0 ? `${s.literPerHm} L/HM` : '-')),
+      'Keterangan Efisiensi': s.efficiency?.isStandby ? 'Standby / Rusak' : (s.efficiency?.isNoFuel ? 'Tanpa Solar' : (s.efficiency?.status === 'NO_ACTIVITY' ? 'Tanpa Aktivitas' : (s.efficiency ? s.efficiency.badgeLabel : (s.status || '-')))),
+      'Evaluasi BBM (Standar)': s.efficiency ? `${s.efficiency.badgeLabel} (${s.efficiency.targetText})` : s.status,
       'Biaya Solar (Rp)': s.debitRp || 0,
-      'Status': s.status
+      'Biaya Solar / L (Rp)': Math.abs(s.debitLiters || 0) > 0 ? Math.round(Math.abs(s.debitRp || 0) / Math.abs(s.debitLiters || 0)) : 0,
+      'Status': s.efficiency?.isStandby ? 'STANDBY' : s.status
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Evaluasi BBM');
 
-    const filePeriod = fuelDate ? fuelDate : (fuelMonth === 'ALL' ? fuelYear : `${fuelYear}-${fuelMonth}`);
+    const filePeriod = (fuelStartDate || fuelEndDate)
+      ? `${fuelStartDate || 'start'}_sd_${fuelEndDate || 'end'}`
+      : (fuelMonths.includes('ALL') ? fuelYear : `${fuelYear}-${fuelMonths.join('_')}`);
     XLSX.writeFile(wb, `Evaluasi_BBM_Regional5_${filePeriod}.xlsx`);
   };
 
-    const handleExportZCO = () => {
+  const handleExportZCO = () => {
     const wb = XLSX.utils.book_new();
     const rows = filteredZCOData.map(r => ({
       'Cost Center': r.rawCostCenter,
@@ -2506,7 +3013,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       'Waktu':            l.vehicle_time,
       'Job Code':         l.job_code,
       'Deskripsi Job':    JOB_CODE_DESC[l.job_code] || '-',
-      'HM/KM':            l.hm_km,
+      'ACTIVITY':         l.hm_km,
       'Unit':             l.unit_value,
       'UoM':              l.uom,
       'Lokasi':           l.location_code,
@@ -2534,7 +3041,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     XLSX.writeFile(wb, `Detail_Log_Kendaraan_${targetMonth}.xlsx`);
   };
 
-  // -- Sort handler --------------------------------------------------------------
+  // ── Sort handler ──────────────────────────────────────────────────────────────
   const handleSort = (col) => {
     if (sortBy === col) setSortAsc(!sortAsc);
     else { setSortBy(col); setSortAsc(true); }
@@ -2543,7 +3050,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     ? (sortAsc ? <ChevronUp size={12} className="inline ml-1" /> : <ChevronDown size={12} className="inline ml-1" />)
     : null;
 
-  // -- Paginated logs -------------------------------------------------------------
+  // ── Paginated logs ─────────────────────────────────────────────────────────────
   const paginatedLogs = useMemo(() => {
     const start = (logPage - 1) * LOG_PAGE_SIZE;
     return filteredLogs.slice(start, start + LOG_PAGE_SIZE);
@@ -2735,7 +3242,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         style={{ backgroundImage: "url('/sawit.jpg')" }}
       />
 
-      {/* -- Side Drawer ------------------------------------------- */}
+      {/* ── Side Drawer ─────────────────────────────────────────── */}
       {drawerItem && (
         <>
           {/* Backdrop */}
@@ -2748,7 +3255,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             {/* Drawer header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-900">
               <div>
-                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">{drawerItem.wilayah} • {drawerItem.plant}</p>
+                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">{drawerItem.wilayah} · {drawerItem.plant}</p>
                 <h3 className="text-sm font-bold text-white mt-0.5 uppercase">{drawerItem.desc}</h3>
               </div>
               <button onClick={() => setDrawerItem(null)} className="text-slate-400 hover:text-white transition p-1 rounded-2xl hover:bg-slate-700">
@@ -2809,7 +3316,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     drawerItem.plantLogs.forEach(l => { if (l.job_code) jcMap[l.job_code] = (jcMap[l.job_code] || 0) + 1; });
                     return Object.entries(jcMap).map(([jc, cnt]) => (
                       <span key={jc} className="bg-indigo-50 border border-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-mono text-[10px]">
-                        {jc}{JOB_CODE_DESC[jc] ? ` (${JOB_CODE_DESC[jc]})` : ''} • {cnt}x
+                        {jc}{JOB_CODE_DESC[jc] ? ` (${JOB_CODE_DESC[jc]})` : ''} · {cnt}x
                       </span>
                     ));
                   })()}
@@ -2840,7 +3347,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         </>
       )}
 
-      <div className="p-4 md:p-6 space-y-4">
+      <div className="p-3 md:p-4 lg:p-5 space-y-4">
         {/* Global style block for print layout and Excel cell borders */}
         <style>{`
           @media print {
@@ -2871,7 +3378,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           }
         `}</style>
 
-        {/* -- Header ----------------------------------------------- */}
+        {/* ── Header ─────────────────────────────────────────────── */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-sm no-print">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -2943,7 +3450,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         </div>
 
-        {/* -- Error / Upload Info ----------------------------------- */}
+        {/* ── Error / Upload Info ─────────────────────────────────── */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-start gap-3">
             <AlertCircle size={18} className="shrink-0 mt-0.5" />
@@ -2962,7 +3469,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             <div className="text-sm">
               <p className="font-bold text-xs">Upload berhasil: {uploadInfo.file}</p>
               <p className="text-emerald-700 mt-0.5 text-[11px]">
-                {uploadInfo.processed} transaksi diproses • {uploadInfo.cancelled} dibatalkan • {uploadInfo.skipped} baris dilewati • {uploadInfo.plants} plant • {uploadInfo.jobCodes} job code
+                {uploadInfo.processed} transaksi diproses · {uploadInfo.cancelled} dibatalkan · {uploadInfo.skipped} baris dilewati · {uploadInfo.plants} plant · {uploadInfo.jobCodes} job code
               </p>
             </div>
             <button onClick={() => { setUploadInfo(null); try { sessionStorage.removeItem('vehicle_upload_info'); } catch (e) {} }} className="ml-auto text-emerald-400 hover:text-emerald-600"><XCircle size={16} /></button>
@@ -2997,16 +3504,16 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         )}
 
-        {/* -- Tab Navigation ---------------------------------------- */}
+        {/* ── Tab Navigation ──────────────────────────────────────── */}
         {!screenshotMode && (
           <div className="flex gap-1 bg-slate-200/60 p-1.5 rounded-xl w-fit flex-wrap">
             {[
-              { key: 'unit-checklist', label: 'Checklist Kebun (Unit)', icon: Calendar,        show: true },
-              { key: 'summary-regional', label: 'Rekap Regional 5', icon: BarChart2,       show: true },
-              { key: 'detail-veh', label: 'Daftar Kendaraan', icon: Truck,           show: isAdmin },
-              { key: 'log-raw', label: 'Log Transaksi Asli', icon: FileSpreadsheet, show: true },
-              { key: 'zco-reconciliation', label: 'Verifikasi Biaya (ZCO)', icon: Coins,          show: true },
-              { key: 'fuel-evaluation', label: 'Evaluasi BBM (Solar)', icon: Fuel,           show: true },
+              { key: 'unit-checklist',    label: '📋 Checklist Kebun (Unit)', icon: Calendar,        show: true },
+              { key: 'summary-regional',  label: '📊 Rekap Regional 5',      icon: BarChart2,       show: true },
+              { key: 'detail-veh',        label: '🚚 Daftar Kendaraan',      icon: Truck,           show: isAdmin },
+              { key: 'log-raw',           label: '📄 Log Transaksi Asli',    icon: FileSpreadsheet, show: true },
+              { key: 'zco-reconciliation',label: '🔗 Verifikasi Biaya (ZCO)', icon: Coins,          show: true },
+              { key: 'fuel-evaluation',   label: '⛽ Evaluasi BBM (Solar)',    icon: Fuel,           show: true },
             ].filter(t => t.show).map(({ key, label, icon: Icon }) => (
               <button key={key} onClick={() => { setActiveTab(key); setError(null); }}
                 className={`flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold transition-colors duration-300 ${activeTab === key ? 'bg-gradient-to-tr from-[#064e3b] to-[#2dd4bf] text-white shadow-md shadow-emerald-900/20' : 'text-slate-500 hover:text-[#064e3b] hover:bg-emerald-50'}`}>
@@ -3016,7 +3523,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         )}
 
-        {/* -- Controls (Adapts based on active tab) ------------------ */}
+        {/* ── Controls (Adapts based on active tab) ────────────────── */}
         {!screenshotMode && activeTab !== 'fuel-evaluation' && (
           <div className={`${
             isLocalDev 
@@ -3051,7 +3558,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             </div>
           {activeTab === 'unit-checklist' ? (
             // Unit view controls: plant selection
-            // ADMIN/DEV -> full dropdown; USER -> locked read-only badge
+            // ADMIN/DEV → full dropdown; USER → locked read-only badge
             <div className="flex flex-col col-span-2">
               <label className="text-[10px] font-bold text-slate-400 uppercase mb-1">
                 {isAdmin ? 'Pilih Kebun / Unit' : 'Unit / Kebun Anda'}
@@ -3117,9 +3624,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         </div>
         )}
 
-        {/* ----------------------------------------------------------- */}
+        {/* ─────────────────────────────────────────────────────────── */}
         {/* TAB 1: Checklist Kebun (Unit) — VERY SIMPLE & DIRECT       */}
-        {/* ----------------------------------------------------------- */}
+        {/* ─────────────────────────────────────────────────────────── */}
         {activeTab === 'unit-checklist' && (
           <div className="space-y-4">
             
@@ -3224,7 +3731,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                               </span>
                               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 <span className="font-mono">{selectedPlant}</span>
-                                <span className="text-emerald-500">•</span>
+                                <span className="text-emerald-500">·</span>
                                 {PLANT_INFO[selectedPlant]?.desc || selectedPlant}
                               </span>
                               {PLANT_INFO[selectedPlant]?.wilayah && (
@@ -3331,7 +3838,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                                         <th className="text-center py-2 px-2">Tanggal</th>
                                         <th className="text-center py-2 px-2">Operator (Supir)</th>
                                         <th className="text-center py-2 px-2">Pekerjaan</th>
-                                        <th className="py-2 px-2 text-center">HM/KM</th>
+                                        <th className="py-2 px-2 text-center">ACTIVITY</th>
                                         <th className="py-2 px-2 text-center">Hasil Angkut</th>
                                         <th className="text-center py-2 px-2">SPBS No.</th>
                                         <th className="text-center py-2 px-2">Lokasi</th>
@@ -3411,9 +3918,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         )}
 
-        {/* ----------------------------------------------------------- */}
+        {/* ─────────────────────────────────────────────────────────── */}
         {/* TAB 2: Summary Regional (Semua Kebun)                      */}
-        {/* ----------------------------------------------------------- */}
+        {/* ─────────────────────────────────────────────────────────── */}
         {activeTab === 'summary-regional' && (
           <div className="space-y-4">
 
@@ -3637,9 +4144,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         )}
 
-        {/* ----------------------------------------------------------- */}
+        {/* ─────────────────────────────────────────────────────────── */}
         {/* TAB 3: Daftar Kendaraan — ADMIN & DEV only                 */}
-        {/* ----------------------------------------------------------- */}
+        {/* ─────────────────────────────────────────────────────────── */}
         {activeTab === 'detail-veh' && isAdmin && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3">
@@ -3661,7 +4168,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     <th className="px-3 py-3 text-center">Tx. Aktif</th>
                     <th className="px-3 py-3 text-center">Dibatalkan</th>
                     <th className="px-3 py-3 text-center">Total Unit</th>
-                    <th className="px-3 py-3 text-center">Total HM/KM</th>
+                    <th className="px-3 py-3 text-center">Total Activity</th>
                     <th className="px-3 py-3 text-center">Job Code</th>
                     <th className="px-3 py-3 text-center">Operator</th>
                     <th className="px-3 py-3 text-center">Last Input</th>
@@ -3747,9 +4254,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         )}
 
-        {/* ----------------------------------------------------------- */}
+        {/* ─────────────────────────────────────────────────────────── */}
         {/* TAB 4: Log Transaksi Asli                                 */}
-        {/* ----------------------------------------------------------- */}
+        {/* ─────────────────────────────────────────────────────────── */}
         {activeTab === 'log-raw' && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 flex-wrap bg-slate-50/50">
@@ -3800,7 +4307,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     <th className="px-3 py-3 text-center">Tanggal</th>
                     <th className="px-3 py-3 text-center">Waktu</th>
                     <th className="px-3 py-3 text-center">Job Code</th>
-                    <th className="px-3 py-3 text-center">HM/KM</th>
+                    <th className="px-3 py-3 text-center">ACTIVITY</th>
                     <th className="px-3 py-3 text-center">Unit</th>
                     <th className="px-3 py-3 text-center">UoM</th>
                     <th className="px-3 py-3 text-center">Reference</th>
@@ -3858,7 +4365,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             {totalPages > 1 && (
               <div className="p-3 border-t border-slate-100 flex items-center justify-between bg-slate-50">
                 <span className="text-xs text-slate-400">
-                  Halaman {logPage} dari {totalPages} • {filteredLogs.length} transaksi
+                  Halaman {logPage} dari {totalPages} · {filteredLogs.length} transaksi
                 </span>
                 <div className="flex gap-1">
                   <button onClick={() => setLogPage(1)} disabled={logPage === 1}
@@ -3914,7 +4421,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               className="px-3 py-2 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white font-semibold text-slate-700"
             >
               <option value="ALL">Semua Status</option>
-              <option value="Cek">⚠️ Cek</option>
+              <option value="Cek">⚠️ Cek</option>
               <option value="Oke">🟢 Oke</option>
             </select>
             {zcoFilterStatus === 'Cek' && totalCekRows > 0 && (
@@ -3942,7 +4449,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         </div>
 
-        {/* -- Summary Metric Cards ------------------------------- */}
+        {/* ── Summary Metric Cards ─────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 pb-0 bg-white no-print">
           <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex flex-col justify-between shadow-xs">
             <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Total Biaya SAP (Cost)</span>
@@ -4190,8 +4697,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
 
     {activeTab === 'fuel-evaluation' && (
-      <div className="relative z-10 bg-white/95 backdrop-blur-xs rounded-2xl border border-slate-300 shadow-sm overflow-hidden max-w-[1400px] mx-auto w-full font-sans">
-        {/* -- Single Unified Filter Bar (Tahun, Bulan, Tanggal, Kebun, Cari) -- */}
+      <div className="relative z-10 bg-white/95 backdrop-blur-xs rounded-2xl border border-slate-300 shadow-sm overflow-hidden w-full font-sans">
+        {/* ── Single Unified Filter Bar (Compact Row with Month Checkbox Dropdown) ── */}
         <div className="p-4 border-b border-slate-200 bg-slate-50/80 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px] flex flex-col md:flex-row md:items-center justify-between gap-3 flex-wrap no-print">
           <div className="flex items-center gap-2.5 flex-wrap flex-1">
             {/* 1. Pilih Tahun */}
@@ -4200,7 +4707,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <select
                 value={fuelYear}
                 onChange={e => { setFuelYear(e.target.value); setFuelPage(1); }}
-                className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30"
+                className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 cursor-pointer"
               >
                 {fuelAvailableYears.map(yr => (
                   <option key={yr} value={yr}>{yr}</option>
@@ -4208,51 +4715,168 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               </select>
             </div>
 
-            {/* 2. Pilih Bulan */}
-            <div className="flex flex-col">
-              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-0.5">Bulan</label>
-              <select
-                value={fuelMonth}
-                onChange={e => { setFuelMonth(e.target.value); setFuelPage(1); }}
-                className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30"
+            {/* 2. Pilih Bulan (Centang Dropdown / Multi-Select) */}
+            <div className="flex flex-col relative" ref={monthDropdownRef}>
+              <div className="flex items-center justify-between mb-0.5">
+                <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Bulan</label>
+                {fuelMonths.length > 1 && !fuelMonths.includes('ALL') && (
+                  <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-100 px-1 rounded ml-1">
+                    {fuelMonths.length} bln
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMonthDropdown(prev => !prev)}
+                className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 flex items-center justify-between gap-2 min-w-[170px] cursor-pointer text-left shadow-2xs"
+                title="Klik untuk memilih bulan (dapat memilih bulan 1-9, bulan 1-8, atau centang bebas)"
               >
-                <option value="ALL">Semua Bulan</option>
-                {MONTH_NAMES.map(m => (
-                  <option key={m.val} value={m.val}>{m.val} - {m.label}</option>
-                ))}
-              </select>
+                <span className="truncate">{monthDropdownLabel}</span>
+                <ChevronDown size={14} className={`text-slate-400 transition-transform ${showMonthDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Popover / Dropdown Menu dengan Centang (Checkboxes) */}
+              {showMonthDropdown && (() => {
+                const isAllSelected = fuelMonths.includes('ALL') || fuelMonths.length === 12;
+                return (
+                  <div className="absolute top-full left-0 mt-1.5 z-50 bg-white border border-slate-200/90 rounded-2xl shadow-2xl p-3.5 w-84 animate-in fade-in duration-150 ring-1 ring-black/5">
+                    {/* Header: Toggle Semua Bulan (Sekali klik tercentang semua, klik lagi batal semua) */}
+                    <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 mb-2.5">
+                      <label className="flex items-center gap-2 cursor-pointer select-none group">
+                        <input
+                          type="checkbox"
+                          checked={isAllSelected}
+                          onChange={() => {
+                            setFuelPage(1);
+                            if (isAllSelected) {
+                              // Klik sekali lagi -> tidak tercentang semua
+                              setFuelMonths([]);
+                            } else {
+                              // Klik sekali -> tercentang semua
+                              setFuelMonths(MONTH_NAMES.map(x => x.val));
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500 cursor-pointer accent-emerald-700"
+                        />
+                        <span className="text-xs font-black text-slate-800 tracking-wide group-hover:text-emerald-900 transition-colors">
+                          Pilih Semua Bulan
+                        </span>
+                      </label>
+
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                          {isAllSelected ? '12/12' : `${fuelMonths.length}/12`}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowMonthDropdown(false)}
+                          className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                          title="Tutup"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 12 Months Professional 2-Column Grid */}
+                    <div className="grid grid-cols-2 gap-1.5 max-h-64 overflow-y-auto pr-1">
+                      {MONTH_NAMES.map(m => {
+                        const isChecked = fuelMonths.includes('ALL') || fuelMonths.includes(m.val);
+                        return (
+                          <label
+                            key={m.val}
+                            className={`flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-medium cursor-pointer transition-all select-none border ${
+                              isChecked
+                                ? 'bg-emerald-50/90 text-emerald-950 font-bold border-emerald-300 shadow-2xs'
+                                : 'bg-white text-slate-700 border-slate-200/70 hover:bg-slate-50 hover:border-slate-300'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                setFuelPage(1);
+                                if (fuelMonths.includes('ALL')) {
+                                  const all12 = MONTH_NAMES.map(x => x.val);
+                                  const next = all12.filter(x => x !== m.val);
+                                  setFuelMonths(next);
+                                } else if (fuelMonths.includes(m.val)) {
+                                  const next = fuelMonths.filter(x => x !== m.val);
+                                  setFuelMonths(next);
+                                } else {
+                                  const next = [...fuelMonths, m.val].sort();
+                                  if (next.length === 12) setFuelMonths(['ALL']);
+                                  else setFuelMonths(next);
+                                }
+                              }}
+                              className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500 cursor-pointer accent-emerald-700 shrink-0"
+                            />
+                            <span className="font-mono text-[11px] font-bold text-slate-500 shrink-0">{m.val}</span>
+                            <span className="truncate">{m.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    {/* Dropdown Footer */}
+                    <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 mt-2.5 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFuelMonths([]);
+                          setFuelPage(1);
+                        }}
+                        className="text-[11px] font-bold text-slate-400 hover:text-red-600 transition cursor-pointer"
+                      >
+                        Batal Semua
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowMonthDropdown(false)}
+                        className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1 cursor-pointer"
+                      >
+                        <Check size={12} /> Terapkan
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
-            {/* 3. Pilih Tanggal (Optional / Drill-down) */}
+            {/* 3. Rentang Tanggal (Optional / Drill-down) */}
             <div className="flex flex-col">
               <div className="flex items-center justify-between mb-0.5">
                 <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Tanggal (Opsional)</label>
-                {fuelDate && (
+                {(fuelStartDate || fuelEndDate) && (
                   <button
                     type="button"
-                    onClick={() => { setFuelDate(''); setFuelPage(1); }}
+                    onClick={() => { setFuelStartDate(''); setFuelEndDate(''); setFuelPage(1); }}
                     className="text-[9px] font-bold text-red-600 hover:text-red-700 ml-1.5 cursor-pointer"
-                    title="Kembali ke rekap 1 bulan penuh"
+                    title="Reset rentang tanggal"
                   >
                     ✕ Reset
                   </button>
                 )}
               </div>
-              <input
-                type="date"
-                value={fuelDate}
-                onChange={e => {
-                  const val = e.target.value;
-                  setFuelDate(val);
-                  setFuelPage(1);
-                  if (val) {
-                    setFuelYear(val.substring(0, 4));
-                    setFuelMonth(val.substring(5, 7));
-                  }
-                }}
-                className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30"
-                title="Pilih tanggal untuk melihat detail per hari, atau klik Reset untuk melihat rekap bulanan"
-              />
+              <div className="flex items-center gap-1">
+                <input
+                  type="date"
+                  value={fuelStartDate}
+                  onChange={e => { setFuelStartDate(e.target.value); setFuelPage(1); }}
+                  placeholder="Mulai"
+                  className="px-2.5 py-1.5 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30"
+                  title="Tanggal Mulai"
+                />
+                <span className="text-slate-400 text-xs font-bold">s/d</span>
+                <input
+                  type="date"
+                  value={fuelEndDate}
+                  onChange={e => { setFuelEndDate(e.target.value); setFuelPage(1); }}
+                  placeholder="Akhir"
+                  className="px-2.5 py-1.5 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30"
+                  title="Tanggal Akhir"
+                />
+              </div>
             </div>
 
             {/* 4. Kebun / Unit Filter */}
@@ -4262,7 +4886,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 <select
                   value={fuelPlant}
                   onChange={e => { setFuelPlant(e.target.value); setFuelPage(1); }}
-                  className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 max-w-[190px]"
+                  className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 max-w-[190px] cursor-pointer"
                 >
                   <option value="ALL">Semua Kebun / Unit</option>
                   {allPlantsList.map(p => (
@@ -4276,7 +4900,27 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               )}
             </div>
 
-            {/* 5. Pencarian (Plat / Equipment / Cost Center / Reference) */}
+            {/* 5. Filter Keterangan Efisiensi */}
+            <div className="flex flex-col">
+              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-0.5">Status Efisiensi</label>
+              <select
+                value={fuelStatusFilter}
+                onChange={e => { setFuelStatusFilter(e.target.value); setFuelPage(1); }}
+                className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 cursor-pointer"
+              >
+                <option value="ALL">Semua Status ({fuelStatusCounts.total})</option>
+                <option value="OPTIMAL">Efisien ({fuelStatusCounts.optimal})</option>
+                <option value="NORMAL">Waspada 10% ({fuelStatusCounts.normal})</option>
+                <option value="BOROS">Boros ({fuelStatusCounts.boros})</option>
+                <option value="STANDBY">Standby / Rusak ({fuelStatusCounts.standby})</option>
+                <option value="NO_FUEL">Tanpa Solar ({fuelStatusCounts.noFuel})</option>
+                {fuelStatusCounts.noActivity > 0 && (
+                  <option value="NO_ACTIVITY">Tanpa Aktivitas ({fuelStatusCounts.noActivity})</option>
+                )}
+              </select>
+            </div>
+
+            {/* 6. Pencarian (Plat / Equipment / Cost Center / Reference) */}
             <div className="flex flex-col flex-1 min-w-[210px]">
               <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-0.5">Cari Kendaraan / Rute</label>
               <div className="relative">
@@ -4296,139 +4940,212 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           <div className="flex items-center gap-2 shrink-0 self-end">
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-xs transition"
+              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
             >
               <Printer size={13} /> Cetak
             </button>
             <button
               onClick={handleExportFuel}
-              className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-xs transition"
+              className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
             >
               <FileDown size={13} /> Ekspor Excel
             </button>
           </div>
         </div>
 
-        {/* -- 3 Essential Summary Cards (Solar First, Then KM/HM, Then Average Efficiency) -- */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 bg-white no-print">
+        {/* ── 3 Essential Summary Cards (Executive Redesign with Generous Padding & Polish) ── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-5 bg-white no-print">
           {/* Card 1: TOTAL PEMAKAIAN SOLAR */}
-          <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-4 flex flex-col justify-between shadow-xs">
+          <div className="bg-gradient-to-br from-amber-50/90 via-amber-50/40 to-white border border-amber-200 rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-sm transition">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">1. Total Pemakaian Solar</span>
-              <Droplet size={18} className="text-amber-600" />
-            </div>
-            <div className="mt-2">
-              <span className="text-2xl font-black text-amber-950 font-mono">
-                {fuelKPIs.totalLiters.toLocaleString('id-ID')} <span className="text-sm font-bold text-amber-800">Liter</span>
+              <span className="text-xs font-bold text-amber-950 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-2xs"></span>
+                1. Total Pemakaian Solar
               </span>
-              <div className="text-xs font-semibold text-amber-700 mt-0.5 truncate">
-                Biaya Solar: Rp {fuelKPIs.totalCost.toLocaleString('id-ID')}
+              <div className="w-8 h-8 rounded-xl bg-amber-100/90 flex items-center justify-center text-amber-700 shadow-2xs">
+                <Droplet size={18} />
+              </div>
+            </div>
+            <div className="mt-3.5">
+              <div className="text-2xl lg:text-3xl font-black text-amber-950 font-mono tracking-tight">
+                {fuelKPIs.totalLiters.toLocaleString('id-ID')} <span className="text-sm font-bold text-amber-800">Liter</span>
+              </div>
+              <div className="text-xs font-semibold text-amber-900 mt-1.5 flex items-center gap-1.5 flex-wrap">
+                <span className="text-slate-500">Biaya Solar:</span>
+                <span className="font-mono font-bold text-amber-950 bg-amber-100/80 px-2 py-0.5 rounded-md border border-amber-200">
+                  Rp {fuelKPIs.totalCost.toLocaleString('id-ID')}
+                </span>
               </div>
             </div>
           </div>
 
           {/* Card 2: TOTAL REALISASI KERJA */}
-          <div className="bg-blue-50/80 border border-blue-200/90 rounded-2xl p-4 flex flex-col justify-between shadow-xs">
+          <div className="bg-gradient-to-br from-blue-50/90 via-blue-50/40 to-white border border-blue-200 rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-sm transition">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider">2. Total Realisasi Kerja</span>
-              <Activity size={18} className="text-blue-600" />
-            </div>
-            <div className="mt-2">
-              <span className="text-2xl font-black text-blue-950 font-mono">
-                {fuelKPIs.totalKm.toLocaleString('id-ID')} <span className="text-sm font-bold text-blue-800">KM</span>
-                {fuelKPIs.totalHm > 0 && (
-                  <span className="text-slate-600 font-normal text-lg"> • {fuelKPIs.totalHm.toLocaleString('id-ID')} <span className="text-xs font-bold text-blue-800">HM</span></span>
-                )}
+              <span className="text-xs font-bold text-blue-950 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-2xs"></span>
+                2. Total Realisasi Aktivitas
               </span>
-              <div className="text-xs font-semibold text-blue-700 mt-0.5">
+              <div className="w-8 h-8 rounded-xl bg-blue-100/90 flex items-center justify-center text-blue-700 shadow-2xs">
+                <Activity size={18} />
+              </div>
+            </div>
+            <div className="mt-3.5">
+              <div className="text-2xl lg:text-3xl font-black text-blue-950 font-mono tracking-tight flex items-baseline gap-2 flex-wrap">
+                <span>{fuelKPIs.totalKm.toLocaleString('id-ID')} <span className="text-sm font-bold text-blue-800">KM</span></span>
+                {fuelKPIs.totalHm > 0 && (
+                  <span className="text-slate-600 font-bold text-xl"> · {fuelKPIs.totalHm.toLocaleString('id-ID')} <span className="text-xs font-bold text-blue-800">HM</span></span>
+                )}
+              </div>
+              <div className="text-xs font-semibold text-blue-800 mt-1.5">
                 Realisasi Operasional Kendaraan & Alat Berat
               </div>
             </div>
           </div>
 
           {/* Card 3: RATA-RATA EFISIENSI BBM */}
-          <div className="bg-emerald-50/80 border border-emerald-200/90 rounded-2xl p-4 flex flex-col justify-between shadow-xs">
+          <div className="bg-gradient-to-br from-emerald-50/90 via-emerald-50/40 to-white border border-emerald-200 rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-sm transition">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider">3. Rata-Rata Efisiensi BBM</span>
-              <Gauge size={18} className="text-emerald-600" />
+              <span className="text-xs font-bold text-emerald-950 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-2xs"></span>
+                3. Rata-Rata Efisiensi BBM
+              </span>
+              <div className="w-8 h-8 rounded-xl bg-emerald-100/90 flex items-center justify-center text-emerald-700 shadow-2xs">
+                <Gauge size={18} />
+              </div>
             </div>
-            <div className="mt-2">
+            <div className="mt-3.5">
               <div className="flex items-baseline gap-3 flex-wrap">
                 {fuelKPIs.avgKmL > 0 && (
-                  <span className="text-2xl font-black text-emerald-950 font-mono">
-                    {fuelKPIs.avgKmL} <span className="text-xs font-bold text-emerald-800">KM / L</span>
+                  <span className="text-2xl lg:text-3xl font-black text-emerald-950 font-mono tracking-tight">
+                    {fuelKPIs.avgKmL} <span className="text-sm font-bold text-emerald-800">KM / L</span>
                   </span>
                 )}
                 {fuelKPIs.avgLHm > 0 && (
-                  <span className="text-2xl font-black text-purple-950 font-mono">
-                    {fuelKPIs.avgLHm} <span className="text-xs font-bold text-purple-800">L / HM</span>
+                  <span className="text-2xl lg:text-3xl font-black text-purple-950 font-mono tracking-tight">
+                    {fuelKPIs.avgLHm} <span className="text-sm font-bold text-purple-800">L / HM</span>
                   </span>
                 )}
                 {fuelKPIs.avgKmL === 0 && fuelKPIs.avgLHm === 0 && (
-                  <span className="text-xl font-bold text-slate-400">-</span>
+                  <span className="text-2xl font-bold text-slate-400">-</span>
                 )}
               </div>
-              <div className="text-xs font-semibold text-emerald-700 mt-0.5">
-                Standar: Mobil ≥ 3.5 KM/L • Alat Berat ≤ 3.0 L/HM
+              <div className="text-xs font-semibold text-emerald-800 mt-1.5">
+                Standar: Mobil ≥ 7.0 KM/L · Truk ≥ 5.0 KM/L
               </div>
             </div>
           </div>
         </div>
 
-        {/* -- Active Filter Status Badge -- */}
-        <div className="sticky top-0 z-20 px-4 py-2.5 bg-slate-100/95 backdrop-blur-xs border-y border-slate-200 flex items-center justify-between text-xs text-slate-600 shadow-2xs">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-700">Filter Aktif:</span>
-            <span className="bg-white border border-slate-300 px-2 py-0.5 rounded-md font-semibold text-slate-800">
-              {fuelDate ? `Tanggal: ${fuelDate}` : `Periode: ${fuelYear} - ${fuelMonth === 'ALL' ? 'Semua Bulan' : MONTH_NAMES.find(m => m.val === fuelMonth)?.label || fuelMonth}`}
+        {/* ── Active Filter Status & Segmented Filter Pills Bar ── */}
+        <div className="sticky top-0 z-20 px-5 py-3 bg-white/95 backdrop-blur-md border-y border-slate-200/90 flex flex-col lg:flex-row lg:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold text-slate-500">Filter Aktif:</span>
+            <span className="bg-slate-100 border border-slate-200 px-3 py-1 rounded-lg text-xs font-bold text-slate-800 flex items-center gap-1.5 shadow-2xs">
+              <Calendar size={13} className="text-emerald-700" />
+              {(() => {
+                const isDateRange = fuelStartDate || fuelEndDate;
+                const dateRangeStr = fuelStartDate && fuelEndDate
+                  ? `${fuelStartDate} s/d ${fuelEndDate}`
+                  : fuelStartDate
+                  ? `Mulai ${fuelStartDate}`
+                  : `Sampai ${fuelEndDate}`;
+
+                const monthsStr = fuelMonths.includes('ALL')
+                  ? 'Semua Bulan'
+                  : fuelMonths.map(m => MONTH_NAMES.find(x => x.val === m)?.label || m).join(', ');
+
+                if (isDateRange) {
+                  return `${fuelYear} · ${monthsStr} (${dateRangeStr})`;
+                }
+                return `${fuelYear} · ${monthsStr}`;
+              })()}
             </span>
             {fuelPlant !== 'ALL' && (
-              <span className="bg-white border border-slate-300 px-2 py-0.5 rounded-md font-semibold text-slate-800">
+              <span className="bg-slate-100 border border-slate-200 px-3 py-1 rounded-lg text-xs font-bold text-slate-800">
                 Unit: {fuelPlant}
               </span>
             )}
-            {searchFuel && (
-              <span className="bg-white border border-slate-300 px-2 py-0.5 rounded-md font-semibold text-slate-800">
+            {searchFuel.trim() && (
+              <span className="bg-amber-50 border border-amber-200 px-3 py-1 rounded-lg text-xs font-bold text-amber-900">
                 Cari: "{searchFuel}"
               </span>
             )}
           </div>
-          <div className="font-bold text-slate-700">
-            {fuelTableData.length} Kendaraan Terdaftar
+
+          {/* Quick Status Filter Pills */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs font-bold text-slate-500 mr-1 hidden 2xl:inline">Status:</span>
+            {[
+              { key: 'ALL', label: 'Semua', count: fuelStatusCounts.total, activeClass: 'bg-slate-900 text-white border-slate-900' },
+              { key: 'OPTIMAL', label: 'Efisien', count: fuelStatusCounts.optimal, activeClass: 'bg-emerald-700 text-white border-emerald-700' },
+              { key: 'NORMAL', label: 'Waspada', count: fuelStatusCounts.normal, activeClass: 'bg-amber-600 text-white border-amber-600' },
+              { key: 'BOROS', label: 'Boros', count: fuelStatusCounts.boros, activeClass: 'bg-rose-700 text-white border-rose-700' },
+              { key: 'STANDBY', label: 'Standby / Rusak', count: fuelStatusCounts.standby, activeClass: 'bg-slate-700 text-white border-slate-700' },
+              { key: 'NO_FUEL', label: 'Tanpa Solar', count: fuelStatusCounts.noFuel, activeClass: 'bg-amber-700 text-white border-amber-700' },
+            ].map(tab => {
+              const isActive = fuelStatusFilter === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => { setFuelStatusFilter(tab.key); setFuelPage(1); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border shadow-2xs ${
+                    isActive
+                      ? `${tab.activeClass} shadow-xs`
+                      : 'bg-white text-slate-600 hover:bg-slate-50 border-slate-300'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span className={`text-xs px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                  }`}>
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+            <div className="h-5 w-px bg-slate-200 mx-1 hidden sm:block"></div>
+            <div className="text-xs font-bold text-slate-600 whitespace-nowrap pl-1">
+              <strong className="text-slate-900 font-mono text-sm">{fuelTableData.length}</strong> Unit
+            </div>
           </div>
         </div>
 
-        {/* -- Clean Table with Sticky/Freeze Header -- */}
-        <div className="p-4 bg-white">
-          <div className="overflow-auto max-h-[calc(100vh-270px)] min-h-[420px] excel-cell-border border border-slate-200 rounded-xl relative shadow-2xs">
+        {/* ── Clean Table with Sticky/Freeze Header ── */}
+        <div className="p-3 sm:p-4 bg-white">
+          <div className="overflow-x-auto max-h-[calc(100vh-250px)] min-h-[420px] excel-cell-border border border-slate-200 rounded-xl relative shadow-2xs">
             <table className="w-full text-xs border-separate border-spacing-0">
               <thead className="sticky top-0 z-30 shadow-xs">
-                <tr className="bg-slate-100 text-slate-800 text-[11px] font-black uppercase tracking-wider text-center whitespace-nowrap">
-                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center w-12 border-b border-slate-300">No</th>
-                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center w-36 border-b border-slate-300">Kebun / Unit</th>
-                  <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-x border-emerald-200 border-b border-slate-300 px-3 py-3 text-center w-36">
+                <tr className="bg-slate-100/95 text-slate-800 text-[11px] font-black uppercase tracking-tight text-center whitespace-nowrap">
+                  <th className="sticky top-0 z-30 bg-slate-100 px-1.5 py-2.5 text-center w-10 border-b border-slate-300">No</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 px-1.5 py-2.5 text-center w-20 border-b border-slate-300">Kebun / Unit</th>
+                  <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-x border-emerald-200 border-b border-slate-300 px-1.5 py-2.5 text-center w-28 whitespace-nowrap">
                     No. Equipment
                   </th>
-                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center w-32 font-mono border-b border-slate-300">Cost Center</th>
-                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center min-w-[200px] border-b border-slate-300">Deskripsi Kendaraan</th>
-                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-800 px-3 py-3 text-center min-w-[220px] border-b border-slate-300">Reference / Rute</th>
-                  <th className="sticky top-0 z-30 bg-[#fffbeb] text-amber-950 font-black border-x border-amber-200 border-b border-slate-300 px-3 py-3 text-center w-32">
+                  <th className="sticky top-0 z-30 bg-slate-100 px-1.5 py-2.5 text-center w-28 font-mono border-b border-slate-300 whitespace-nowrap">Cost Center</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 px-2.5 py-2.5 text-center min-w-[140px] border-b border-slate-300">Deskripsi Kendaraan</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-800 px-2.5 py-2.5 text-center min-w-[130px] border-b border-slate-300">Reference / Rute</th>
+                  <th className="sticky top-0 z-30 bg-[#fffbeb] text-amber-950 font-black border-x border-amber-200 border-b border-slate-300 px-1.5 py-2.5 text-center w-24 whitespace-nowrap">
                     Solar (Liter)
                   </th>
-                  <th className="sticky top-0 z-30 bg-[#eff6ff] text-blue-950 font-black border-r border-blue-200 border-b border-slate-300 px-3 py-3 text-center w-36">
-                    KM / HM
+                  <th className="sticky top-0 z-30 bg-[#eff6ff] text-blue-950 font-black border-r border-blue-200 border-b border-slate-300 px-1.5 py-2.5 text-center w-24 whitespace-nowrap">
+                    ACTIVITY
                   </th>
-                  <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-r border-emerald-200 border-b border-slate-300 px-3 py-3 text-center w-36">
+                  <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-r border-emerald-200 border-b border-slate-300 px-1.5 py-2.5 text-center w-24 whitespace-nowrap">
                     Rasio / Efisiensi
                   </th>
-                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-800 px-3 py-3 text-center border-b border-slate-300 w-36">Biaya Solar</th>
-                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center w-24 no-print border-b border-slate-300">Aksi</th>
+                  <th className="sticky top-0 z-30 bg-[#f0fdf4] text-emerald-950 font-black border-r border-emerald-200 border-b border-slate-300 px-1.5 py-2.5 text-center w-28 whitespace-nowrap">
+                    Keterangan Efisiensi
+                  </th>
+                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-800 px-1.5 py-2.5 text-center border-b border-slate-300 w-28 whitespace-nowrap">Biaya Solar</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 px-1.5 py-2.5 text-center w-20 no-print border-b border-slate-300 whitespace-nowrap">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-xs">
                 {fuelTableData.length === 0 ? (
                   <tr>
-                    <td colSpan="11" className="text-center py-12 text-slate-400">
+                    <td colSpan="12" className="text-center py-12 text-slate-400">
                       <Fuel size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
                       <p className="font-semibold text-slate-600 text-xs">Tidak ada data kendaraan untuk filter ini.</p>
                       <p className="text-[11px] text-slate-400 mt-1">
@@ -4450,18 +5167,18 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           className="hover:bg-emerald-50/40 even:bg-slate-50/50 transition-colors"
                         >
                           {/* 1. No */}
-                          <td className="px-3 py-2.5 text-center text-slate-500 font-mono font-bold text-xs">{rowNum}</td>
+                          <td className="px-1 py-2 text-center text-slate-500 font-mono font-bold text-xs">{rowNum}</td>
 
                           {/* 2. Kebun / Unit */}
-                          <td className="px-3 py-2.5 text-center">
+                          <td className="px-1.5 py-2 text-center">
                             <div className="font-extrabold text-slate-900 text-xs">{row.plant}</div>
-                            <div className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">{row.plantDesc || row.plant}</div>
+                            <div className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5 truncate max-w-[80px] mx-auto">{row.plantDesc || row.plant}</div>
                           </td>
 
-                          {/* 3. No. Equipment (First!) */}
-                          <td className="px-3 py-2.5 text-center bg-emerald-50/30 border-x border-emerald-100">
+                          {/* 3. No. Equipment */}
+                          <td className="px-1.5 py-2 text-center bg-emerald-50/30 border-x border-emerald-100 whitespace-nowrap">
                             {row.equipment && row.equipment !== '-' ? (
-                              <span className="font-mono font-black text-xs text-emerald-950 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-300 inline-block shadow-2xs tracking-wide">
+                              <span className="font-mono font-black text-xs text-emerald-950 bg-emerald-100/90 px-1.5 py-0.5 rounded-md border border-emerald-300 inline-block shadow-2xs tracking-wide">
                                 {row.equipment}
                               </span>
                             ) : (
@@ -4469,133 +5186,176 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             )}
                           </td>
 
-                          {/* 4. Cost Center (Second!) */}
-                          <td className="px-3 py-2.5 text-center font-mono font-bold text-slate-800 text-xs">
+                          {/* 4. Cost Center */}
+                          <td className="px-1.5 py-2 text-center font-mono font-bold text-slate-800 text-xs whitespace-nowrap">
                             {row.costCenter}
                           </td>
 
                           {/* 5. Deskripsi Kendaraan */}
-                          <td className="px-3.5 py-2.5 text-center">
-                            <div className="font-bold text-slate-900 text-xs leading-snug">{row.description || '-'}</div>
+                          <td className="px-2 py-2 text-center">
+                            <div className="font-bold text-slate-900 text-xs leading-tight">{row.description || '-'}</div>
                             <span className="inline-block mt-0.5 bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold">{row.objectType || 'VEH'}</span>
                           </td>
 
                           {/* 6. REFERENCE */}
-                          <td className="px-3.5 py-2.5 text-center bg-slate-50/30">
+                          <td className="px-2 py-2 text-center bg-slate-50/30">
                             <div
-                              className="text-xs font-semibold text-slate-800 leading-snug"
+                              className="text-xs font-semibold text-slate-800 leading-tight"
                               title={row.referenceAll || row.referencePrimary || '-'}
                             >
                               {row.referencePrimary || '-'}
                             </div>
                           </td>
 
-                          {/* 7. Solar (Liter) -- FIRST */}
-                          <td className="px-3 py-2.5 text-center font-mono font-black text-amber-950 bg-amber-50/40 border-x border-amber-100 text-xs whitespace-nowrap">
+                          {/* 7. Solar (Liter) */}
+                          <td className="px-1.5 py-2 text-center font-mono font-black text-amber-950 bg-amber-50/40 border-x border-amber-100 text-xs whitespace-nowrap">
                             {row.debitLiters > 0 ? (
-                              <span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap font-mono font-black text-xs">
+                              <span className="inline-flex items-center justify-center gap-1 font-mono font-black text-xs">
                                 <span>{row.debitLiters.toLocaleString('id-ID')}</span>
-                                <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-1.5 py-0.2 rounded border border-amber-200">L</span>
+                                <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-1 py-0.2 rounded border border-amber-200">L</span>
                               </span>
                             ) : (
-                              <span className="text-slate-300">-</span>
+                              <span className="text-slate-300 font-mono text-xs">-</span>
                             )}
                           </td>
 
-                          {/* 8. KM / HM -- SECOND (With verification variance against ZESTHLP16PA) */}
-                          <td className="px-3 py-2.5 text-center font-mono font-black text-blue-950 bg-blue-50/40 border-r border-blue-100 text-xs whitespace-nowrap">
+                          {/* 8. ACTIVITY */}
+                          <td className="px-1.5 py-2 text-center font-mono font-black text-blue-950 bg-blue-50/40 border-r border-blue-100 text-xs whitespace-nowrap">
                             {row.creditKm > 0 && (
-                              <div className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
+                              <div className="inline-flex items-center justify-center gap-1">
                                 <span>{row.creditKm.toLocaleString('id-ID')}</span>
-                                <span className="text-[10px] font-bold text-blue-800 bg-blue-100 border border-blue-200 px-1.5 py-0.2 rounded">KM</span>
-                                {row.reconcileStatus === 'MATCH' && (
-                                  <span className="text-emerald-600 inline-flex items-center" title="Sesuai 100% dengan logbook ZESTHLP16PA"><Check size={12} className="stroke-[3]" /></span>
-                                )}
-                                {row.reconcileStatus === 'DIFF' && (
-                                  <span className="text-amber-500 inline-flex items-center" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} KM`}><AlertTriangle size={12} className="stroke-[2.5]" /></span>
-                                )}
+                                <span className="text-[10px] font-bold text-blue-800 bg-blue-100 border border-blue-200 px-1 py-0.2 rounded">KM</span>
                               </div>
                             )}
                             {row.creditHm > 0 && (
-                              <div className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
+                              <div className="inline-flex items-center justify-center gap-1">
                                 <span>{row.creditHm.toLocaleString('id-ID')}</span>
-                                <span className="text-[10px] font-bold text-purple-800 bg-purple-100 border border-purple-200 px-1.5 py-0.2 rounded">HM</span>
-                                {row.reconcileStatus === 'MATCH' && (
-                                  <span className="text-emerald-600 inline-flex items-center" title="Sesuai 100% dengan logbook ZESTHLP16PA"><Check size={12} className="stroke-[3]" /></span>
-                                )}
-                                {row.reconcileStatus === 'DIFF' && (
-                                  <span className="text-amber-500 inline-flex items-center" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} HM`}><AlertTriangle size={12} className="stroke-[2.5]" /></span>
-                                )}
+                                <span className="text-[10px] font-bold text-purple-800 bg-purple-100 border border-purple-200 px-1 py-0.2 rounded">HM</span>
                               </div>
                             )}
                             {row.creditKm === 0 && row.creditHm === 0 && (
-                              <span className="text-slate-300">-</span>
+                              <span className="text-slate-300 font-mono text-xs">-</span>
                             )}
                           </td>
 
                           {/* 9. Rasio / Efisiensi */}
-                          <td className="px-3 py-2.5 text-center bg-emerald-50/30 border-r border-emerald-100 whitespace-nowrap">
-                            {row.kmPerLiter > 0 && (
-                              <span className={`font-mono font-black text-xs px-2.5 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap ${
-                                isOptimal ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' :
-                                isBoros ? 'bg-rose-100 text-rose-900 border border-rose-300' :
-                                'bg-amber-100 text-amber-900 border border-amber-300'
-                              }`}>
-                                <span>{row.kmPerLiter}</span>
-                                <span className="text-[9.5px] font-extrabold opacity-80">KM/L</span>
+                          <td className="px-1.5 py-2 text-center bg-emerald-50/30 border-r border-emerald-100 whitespace-nowrap">
+                            {row.efficiency && row.efficiency.ratioVal > 0 ? (
+                              <span
+                                className={`font-mono font-black text-xs px-2 py-1 rounded-md inline-flex items-center gap-1 shadow-2xs ${
+                                  row.efficiency.color === 'emerald'
+                                    ? 'bg-emerald-100 text-emerald-950 border border-emerald-300'
+                                    : row.efficiency.color === 'amber'
+                                    ? 'bg-amber-100 text-amber-950 border border-amber-300'
+                                    : 'bg-rose-100 text-rose-950 border border-rose-300'
+                                }`}
+                                title={`Standar ${row.efficiency.code}: ${row.efficiency.targetText}`}
+                              >
+                                <span>{row.efficiency.ratioVal}</span>
+                                <span className="text-[9.5px] font-extrabold opacity-80">{row.efficiency.uom}</span>
                               </span>
-                            )}
-                            {row.literPerHm > 0 && (
-                              <span className={`font-mono font-black text-xs px-2.5 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap ${
-                                isOptimal ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' :
-                                isBoros ? 'bg-rose-100 text-rose-900 border border-rose-300' :
-                                'bg-amber-100 text-amber-900 border border-amber-300'
-                              }`}>
-                                <span>{row.literPerHm}</span>
-                                <span className="text-[9.5px] font-extrabold opacity-80">L/HM</span>
-                              </span>
-                            )}
-                            {row.kmPerLiter === 0 && row.literPerHm === 0 && (
-                              <span className="text-slate-400 text-xs">-</span>
+                            ) : (
+                              <span className="text-slate-300 font-mono text-xs">-</span>
                             )}
                           </td>
 
-                          {/* 10. Biaya Solar (Rp) */}
-                          <td className="px-3 py-2.5 text-center font-mono font-bold text-xs text-slate-800 whitespace-nowrap">
+                          {/* 10. Keterangan Efisiensi */}
+                          <td className="px-1.5 py-2 text-center bg-slate-50/40 border-r border-slate-200 whitespace-nowrap">
+                            {row.efficiency?.isStandby ? (
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs tracking-wide"
+                                title="Kendaraan Standby / Rusak / Libur (Dummy 1 KM/HM SAP, tidak dihitung efisiensi)"
+                              >
+                                Standby / Rusak
+                              </span>
+                            ) : row.efficiency?.isNoFuel ? (
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs"
+                                title="Aktivitas operasional tercatat tanpa pemakaian BBM pada Cost Center ini (Unit Sewa / Pool BBM Luar)"
+                              >
+                                Tanpa Solar
+                              </span>
+                            ) : row.efficiency?.status === 'NO_ACTIVITY' ? (
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs"
+                                title="Ada pengisian solar tanpa aktivitas KM/HM pada Cost Center ini"
+                              >
+                                {row.efficiency.badgeLabel || 'Tanpa Aktivitas'}
+                              </span>
+                            ) : row.efficiency && row.efficiency.ratioVal > 0 ? (
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tight shadow-2xs ${
+                                  row.efficiency.color === 'emerald'
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : row.efficiency.color === 'amber'
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                    : 'bg-rose-100 text-rose-800 border border-rose-300'
+                                }`}
+                                title={`Standar ${row.efficiency.code}: ${row.efficiency.targetText}`}
+                              >
+                                {row.efficiency.badgeLabel}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-xs">-</span>
+                            )}
+                          </td>
+
+                          {/* 11. Biaya Solar (Rp) */}
+                          <td className="px-1.5 py-2 text-center font-mono font-bold text-xs text-slate-800 whitespace-nowrap">
                             {row.debitRp > 0 ? `Rp ${row.debitRp.toLocaleString('id-ID')}` : '-'}
                           </td>
 
-                          {/* 11. Aksi (Detail) */}
-                          <td className="px-3 py-2.5 text-center no-print">
+                          {/* 12. Aksi (Detail) */}
+                          <td className="px-1.5 py-2 text-center no-print whitespace-nowrap">
                             <button
                               type="button"
                               onClick={async () => {
                                 setSelectedFuelVeh(row);
                                 setFuelModalTab(isDevUser ? 'reconcile' : 'debit');
-                                // Lazy-load daily data for this vehicle's month if not yet loaded
-                                const targetMonth = row.month;
-                                if (targetMonth && !fuelLoadedMonthsRef.current.has(targetMonth)) {
-                                  fuelLoadedMonthsRef.current.add(targetMonth); // Mark as loaded
+                                const vehCC = String(row.costCenter || '').trim().toUpperCase();
+                                // Find which months have data for this vehicle across summaries
+                                const activeMonthsForVeh = (fuelData.summaries || [])
+                                  .filter(s => String(s.costCenter || '').trim().toUpperCase() === vehCC && s.month)
+                                  .map(s => s.month.substring(0, 7));
+
+                                let targetMonthsToFetch = [];
+                                if (row.month?.includes('Semua Bulan') || fuelMonths.includes('ALL')) {
+                                  targetMonthsToFetch = [...new Set(activeMonthsForVeh)];
+                                  if (targetMonthsToFetch.length === 0) {
+                                    targetMonthsToFetch = ['2026-01', '2026-02', '2026-09', '2026-10'];
+                                  }
+                                } else if (fuelMonths.length > 0 && !fuelMonths.includes('ALL')) {
+                                  targetMonthsToFetch = fuelMonths.map(m => m.length === 2 ? `${fuelYear}-${m}` : m);
+                                } else if (row.month && row.month.length === 7) {
+                                  targetMonthsToFetch = [row.month];
+                                }
+
+                                const missingMonths = targetMonthsToFetch.filter(m => !fuelLoadedMonthsRef.current.has(m));
+                                if (missingMonths.length > 0) {
+                                  for (const m of missingMonths) {
+                                    fuelLoadedMonthsRef.current.add(m);
+                                  }
                                   try {
-                                    const { data: monthlyDaily } = await fetchFuelDailyForMonth(targetMonth);
-                                    if (monthlyDaily && monthlyDaily.length > 0) {
+                                    const results = await Promise.all(missingMonths.map(m => fetchFuelDailyForMonth(m)));
+                                    const fetchedDaily = results.flatMap(res => (Array.isArray(res?.data) ? res.data : []));
+                                    if (fetchedDaily.length > 0) {
                                       setFuelData(prev => {
                                         const existing = new Map((prev.daily || []).map(d => [makeFuelTxKey(d), d]));
-                                        for (const d of monthlyDaily) {
+                                        for (const d of fetchedDaily) {
                                           const k = makeFuelTxKey(d);
                                           if (!existing.has(k)) existing.set(k, d);
                                         }
                                         return { ...prev, daily: Array.from(existing.values()) };
                                       });
                                     }
-                                  } catch(e) {
-                                    console.warn('Lazy-load month daily warning:', e);
+                                  } catch (e) {
+                                    console.warn('Lazy-load fuel daily warning:', e);
                                   }
                                 }
                               }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#064e3b] hover:bg-[#065f46] text-white shadow-xs transition hover:scale-[1.02] cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#064e3b] hover:bg-[#065f46] text-white shadow-xs transition hover:scale-[1.02] cursor-pointer"
                             >
-                              <Eye size={12} /> Detail
+                              <Eye size={13} /> Detail
                             </button>
                           </td>
                         </tr>
@@ -4634,15 +5394,32 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       </div>
     )}
 
-    {/* -- Impeccable Detail Modal with ZESTHLP16PA vs SLARC Reconciliation -- */}
+    {/* ── Impeccable Detail Modal with ZESTHLP16PA vs SLARC Reconciliation ── */}
     {selectedFuelVeh && (() => {
-      const isDateInMonth = (dStr, mStr) => {
-        if (!mStr) return true;
-        return (dStr && (dStr === mStr || dStr.startsWith(mStr)));
+      const vehCC = String(selectedFuelVeh.costCenter || '').trim().toUpperCase();
+
+      const isDateInSelectedPeriod = (dStr, dMonth) => {
+        if (!selectedFuelVeh.month) return true;
+        const mStr = String(selectedFuelVeh.month).trim();
+        // Case: "2026 (Semua Bulan)" or "ALL" or year-only "2026"
+        if (mStr.includes('Semua Bulan') || mStr === 'ALL' || mStr === fuelYear) {
+          return Boolean((dStr && dStr.startsWith(fuelYear)) || (dMonth && dMonth.startsWith(fuelYear)));
+        }
+        // Case: multi-month comma separated "08, 09" or "2026-08, 2026-09"
+        if (mStr.includes(',')) {
+          const parts = mStr.split(',').map(x => x.trim());
+          return parts.some(p => {
+            const ym = p.length === 2 ? `${fuelYear}-${p}` : p;
+            return (dStr && (dStr === ym || dStr.startsWith(ym))) || (dMonth && dMonth === ym);
+          });
+        }
+        // Case: single month "2026-09" or "09"
+        const ym = mStr.length === 2 ? `${fuelYear}-${mStr}` : (mStr.length === 7 ? mStr : mStr.substring(0, 7));
+        return Boolean((dStr && (dStr === ym || dStr.startsWith(ym))) || (dMonth && dMonth === ym));
       };
 
       const dailyDebitForVeh = (fuelData.daily || []).filter(d => 
-        d.c === selectedFuelVeh.costCenter && d.t === 'D' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month || isDateInMonth(d.d, selectedFuelVeh.month))
+        String(d.c || '').trim().toUpperCase() === vehCC && d.t === 'D' && isDateInSelectedPeriod(d.d, d.m)
       );
       const dailyDebitLiters = dailyDebitForVeh.reduce((acc, d) => acc + (d.q || 0), 0);
       const dailyDebitRp = dailyDebitForVeh.reduce((acc, d) => acc + (d.r || 0), 0);
@@ -4655,17 +5432,18 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         ? Math.round(dailyDebitRp)
         : (selectedFuelVeh.debitRp && selectedFuelVeh.debitRp > 0 ? selectedFuelVeh.debitRp : 0);
 
+      // Task 1: Weighted average fuel cost per liter (Biaya Solar per L)
+      const avgCostPerLiter = fuelLiters > 0 ? Math.round(fuelCostRp / fuelLiters) : 0;
+
+      // Task 2: Take KM/HM strictly from SALRC at the summary/aggregate level, NOT from detailed line-item transactions
+      const slarcTotal = ((selectedFuelVeh.creditKm || selectedFuelVeh.creditHm || 0) > 0)
+        ? (selectedFuelVeh.creditKm || selectedFuelVeh.creditHm)
+        : 0;
+
       const dailyCreditForVeh = (fuelData.daily || []).filter(d => 
-        d.c === selectedFuelVeh.costCenter && d.t === 'C' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month || isDateInMonth(d.d, selectedFuelVeh.month))
+        String(d.c || '').trim().toUpperCase() === vehCC && d.t === 'C' && isDateInSelectedPeriod(d.d, d.m)
       );
       const dailyCreditQty = dailyCreditForVeh.reduce((acc, d) => acc + (d.q || 0), 0);
-
-      const slarcTotal = dailyCreditForVeh.length > 0
-        ? Math.round(dailyCreditQty * 100) / 100
-        : ((selectedFuelVeh.creditKm || selectedFuelVeh.creditHm || 0) > 0
-          ? (selectedFuelVeh.creditKm || selectedFuelVeh.creditHm)
-          : 0);
-
       // Clean reference helper ensuring no blank '-' or placeholder '1'
       const cleanRefVal = (val) => {
         const s = String(val || '').trim();
@@ -4677,18 +5455,17 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       const rawZestLogs = (selectedFuelVeh.equipment && selectedFuelVeh.equipment !== '-') ? (zestLogsByEquipment.get(selectedFuelVeh.equipment) || []) : [];
       const zestDailyList = (selectedFuelVeh.matchedZestLogs && selectedFuelVeh.matchedZestLogs.length > 0)
         ? selectedFuelVeh.matchedZestLogs
-        : rawZestLogs.filter(l => !selectedFuelVeh.month || isDateInMonth(l.date, selectedFuelVeh.month));
+        : rawZestLogs.filter(l => isDateInSelectedPeriod(l.date, l.date?.substring(0, 7)));
 
       const zestTotal = zestDailyList.reduce((acc, l) => acc + (parseFloat(l.hm_km) || 0), 0) || selectedFuelVeh.zestTotalKmHm || 0;
       const variance = Math.round((slarcTotal - zestTotal) * 100) / 100;
-      const uomLabel = (selectedFuelVeh.creditKm > 0 || dailyCreditForVeh.some(d => d.u === 'KM'))
+      const uomLabel = (selectedFuelVeh.creditKm > 0)
         ? 'KM'
-        : (selectedFuelVeh.creditHm > 0 || dailyCreditForVeh.some(d => d.u === 'HM' || d.u === 'HR'))
+        : (selectedFuelVeh.creditHm > 0)
         ? 'HM'
         : (selectedFuelVeh.objectType && ['TRACTOR', 'EXCAVATOR', 'GRADER', 'WLOADER', 'HEAVY'].some(h => (selectedFuelVeh.objectType || '').toUpperCase().includes(h)))
         ? 'HM'
         : 'KM';
-
       // Build daily reconciliation list (SLARC + ZEST aligned by date)
       const slarcDailyList = dailyCreditForVeh.length > 0 ? dailyCreditForVeh : (selectedFuelVeh.matchedSlarcDaily || []);
 
@@ -4751,10 +5528,33 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 <h3 className="text-lg font-black text-white">{selectedFuelVeh.description || selectedFuelVeh.costCenter}</h3>
                 <p className="text-xs text-slate-300 mt-1 flex items-center gap-2 flex-wrap">
                   <span>No. Equipment: <strong className="font-mono text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-700">{selectedFuelVeh.equipment && selectedFuelVeh.equipment !== '-' ? selectedFuelVeh.equipment : 'Unmapped'}</strong></span>
-                  <span>•</span>
+                  <span>·</span>
                   <span>Cost Center: <strong className="font-mono text-amber-300">{selectedFuelVeh.costCenter}</strong></span>
-                  <span>•</span>
+                  <span>·</span>
                   <span>Unit: <strong className="text-white">{selectedFuelVeh.plant} ({selectedFuelVeh.plantDesc})</strong></span>
+                  {(() => {
+                    const eff = selectedFuelVeh.efficiency || evaluateFuelEfficiency(selectedFuelVeh.costCenter, fuelLiters, selectedFuelVeh.creditKm, selectedFuelVeh.creditHm, selectedFuelVeh.objectType);
+                    return (
+                      <>
+                        <span>·</span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="text-slate-400">Efisiensi:</span>
+                          <strong className={`font-mono px-2 py-0.5 rounded text-[11px] font-black ${
+                            eff.color === 'emerald'
+                              ? 'bg-emerald-800 text-emerald-200 border border-emerald-600'
+                              : eff.color === 'amber'
+                              ? 'bg-amber-800 text-amber-200 border border-amber-600'
+                              : eff.color === 'red'
+                              ? 'bg-rose-800 text-rose-200 border border-rose-600'
+                              : 'bg-slate-800 text-slate-300'
+                          }`}>
+                            {eff.ratioVal > 0 ? `${eff.ratioVal} ${eff.uom}` : '-'} ({eff.badgeLabel})
+                          </strong>
+                          <span className="text-[10px] text-slate-400 font-medium">({eff.code}: {eff.targetText})</span>
+                        </span>
+                      </>
+                    );
+                  })()}
                 </p>
               </div>
               <button
@@ -4820,26 +5620,26 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   <div className="text-lg font-black text-amber-950 font-mono mt-0.5">
                     {fuelLiters.toLocaleString('id-ID')} <span className="text-xs font-bold text-slate-500">L</span>
                   </div>
-                  <span className="text-[9.5px] text-slate-500 font-medium">
-                    {fuelCostRp > 0 ? `Rp ${fuelCostRp.toLocaleString('id-ID')} • Total Pemakaian Solar` : 'Total Pemakaian Solar'}
+                  <div className="text-[11px] font-bold text-amber-800 font-mono mt-0.5">
+                    {avgCostPerLiter > 0 ? `Rp ${avgCostPerLiter.toLocaleString('id-ID')} / L` : '-'}
+                  </div>
+                  <span className="text-[9.5px] text-slate-500 font-medium block mt-0.5">
+                    {fuelCostRp > 0 ? `Total: Rp ${fuelCostRp.toLocaleString('id-ID')}` : 'Total Pemakaian Solar'}
                   </span>
                 </div>
 
-                {/* 2. KM/HM */}
+                {/* 2. KM/HM (SLARC Summary Only) */}
                 <div 
-                  onClick={() => setFuelModalTab('credit')}
-                  className={`bg-white p-3 rounded-xl border transition shadow-2xs text-center cursor-pointer hover:scale-[1.01] ${
-                    effectiveModalTab === 'credit' ? 'border-blue-400 ring-2 ring-blue-100 bg-blue-50/20' : 'border-slate-200 hover:border-blue-200'
-                  }`}
+                  className="bg-white p-3 rounded-xl border transition shadow-2xs text-center border-slate-200"
                 >
                   <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-blue-900 uppercase">
                     <Activity size={11} className="text-blue-600" />
-                    <span>{isDevUser ? '2. KM/HM (SLARC)' : '2. KM/HM'}</span>
+                    <span>{isDevUser ? '2. ACTIVITY (SLARC Ringkasan)' : '2. ACTIVITY'}</span>
                   </div>
                   <div className="text-lg font-black text-blue-900 font-mono mt-0.5">
                     {slarcTotal.toLocaleString('id-ID')} <span className="text-xs font-bold text-slate-500">{uomLabel}</span>
                   </div>
-                  <span className="text-[9.5px] text-slate-400">Posting Output Aktivitas</span>
+                  <span className="text-[9.5px] text-slate-400">Ringkasan Output Aktivitas</span>
                 </div>
 
                 {isDevUser && (
@@ -4911,7 +5711,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Activity size={13} className="text-indigo-600" /> Verifikasi KM/HM ({reconciliationRows.length})
+                <Activity size={13} className="text-indigo-600" /> Verifikasi Activity ({reconciliationRows.length})
               </button>
               <button
                 onClick={() => setFuelModalTab('zest')}
@@ -4935,16 +5735,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               >
                 <Droplet size={13} className="text-amber-600" /> Pengisian Solar ({dailyDebitForVeh.length})
               </button>
-              <button
-                onClick={() => setFuelModalTab('credit')}
-                className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
-                  effectiveModalTab === 'credit'
-                    ? 'border-blue-600 text-blue-900 bg-blue-50/50 rounded-t-lg'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <FileSpreadsheet size={13} className="text-blue-600" /> Transaksi SLARC ({dailyCreditForVeh.length})
-              </button>
+              {/* Transaksi SLARC tab button removed per Task 2 (KM/HM summary only) */}
             </div>
 
             {/* Modal Body Table Content */}
@@ -5073,7 +5864,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           <th className="px-3 py-1.5 text-center w-24">Tanggal</th>
                           <th className="px-3 py-1.5 text-center w-48">Reference (Rute / Pemakaian)</th>
                           <th className="px-3 py-1.5 text-center">Remarks (Catatan)</th>
-                          <th className="px-3 py-1.5 text-center w-20">HM/KM</th>
+                          <th className="px-3 py-1.5 text-center w-20">ACTIVITY</th>
                           <th className="px-3 py-1.5 text-center w-24">Operator</th>
                           <th className="px-3 py-1.5 text-center w-24">Lokasi</th>
                         </tr>
@@ -5131,24 +5922,34 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                         <th className="px-3 py-1.5 text-center w-28">No. Dokumen</th>
                         <th className="px-3 py-1.5 text-center w-24">Jumlah</th>
                         <th className="px-3 py-1.5 text-center w-28">Nilai (Rp)</th>
+                        <th className="px-3 py-1.5 text-center w-28 text-amber-900 bg-amber-50/60 font-black">Biaya Solar / L</th>
                         <th className="px-3 py-1.5 text-center">Uraian / SPBU</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
-                      {matchedDaily.map((d, i) => (
-                        <tr key={i} className="hover:bg-slate-50 text-center">
-                          <td className="px-2.5 py-1.5 text-center font-mono text-slate-400">{i + 1}</td>
-                          <td className="px-3 py-1.5 text-center font-mono font-medium text-slate-800">{d.d}</td>
-                          <td className="px-3 py-1.5 text-center font-mono text-[10px] text-slate-600">{d.doc || '-'}</td>
-                          <td className={`px-3 py-1.5 text-center font-mono font-black ${d.q < 0 ? 'text-red-600' : 'text-amber-950'}`}>
-                            {d.q < 0 ? `- ${Math.abs(d.q).toLocaleString('id-ID')}` : d.q.toLocaleString('id-ID')} <span className="text-[10px] text-slate-500 font-normal">L</span>
-                          </td>
-                          <td className={`px-3 py-1.5 text-center font-mono ${d.r < 0 ? 'text-red-600 font-bold' : 'text-slate-700'}`}>
-                            {d.r !== 0 ? `${d.r < 0 ? '- Rp ' : 'Rp '}${Math.abs(d.r).toLocaleString('id-ID')}` : '-'}
-                          </td>
-                          <td className="px-3 py-1.5 text-center text-slate-600 text-[10.5px] truncate max-w-xs">{d.n || '-'}</td>
-                        </tr>
-                      ))}
+                      {matchedDaily.map((d, i) => {
+                        const absLiters = Math.abs(d.q || 0);
+                        const absRp = Math.abs(d.r || 0);
+                        const costPerL = absLiters > 0 ? Math.round(absRp / absLiters) : 0;
+
+                        return (
+                          <tr key={i} className="hover:bg-slate-50 text-center">
+                            <td className="px-2.5 py-1.5 text-center font-mono text-slate-400">{i + 1}</td>
+                            <td className="px-3 py-1.5 text-center font-mono font-medium text-slate-800">{d.d}</td>
+                            <td className="px-3 py-1.5 text-center font-mono text-[10px] text-slate-600">{d.doc || '-'}</td>
+                            <td className={`px-3 py-1.5 text-center font-mono font-black ${d.q < 0 ? 'text-red-600' : 'text-amber-950'}`}>
+                              {d.q < 0 ? `- ${Math.abs(d.q).toLocaleString('id-ID')}` : d.q.toLocaleString('id-ID')} <span className="text-[10px] text-slate-500 font-normal">L</span>
+                            </td>
+                            <td className={`px-3 py-1.5 text-center font-mono ${d.r < 0 ? 'text-red-600 font-bold' : 'text-slate-700'}`}>
+                              {d.r !== 0 ? `${d.r < 0 ? '- Rp ' : 'Rp '}${Math.abs(d.r).toLocaleString('id-ID')}` : '-'}
+                            </td>
+                            <td className="px-3 py-1.5 text-center font-mono font-bold text-amber-900 bg-amber-50/30">
+                              {costPerL > 0 ? `Rp ${costPerL.toLocaleString('id-ID')}` : '-'}
+                            </td>
+                            <td className="px-3 py-1.5 text-center text-slate-600 text-[10.5px] truncate max-w-xs">{d.n || '-'}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                     <tfoot>
                       <tr className="bg-amber-50/80 font-extrabold text-[11px] text-slate-800 border-t-2 border-amber-200">
@@ -5161,68 +5962,18 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                         <td className="px-3 py-2 text-center font-mono font-bold text-slate-800">
                           Rp {Math.round(matchedDaily.reduce((acc, d) => acc + (d.r || 0), 0)).toLocaleString('id-ID')}
                         </td>
+                        <td className="px-3 py-2 text-center font-mono font-black text-amber-950 bg-amber-100/70">
+                          {avgCostPerLiter > 0 ? `Rp ${avgCostPerLiter.toLocaleString('id-ID')} / L` : '-'}
+                        </td>
                         <td className="px-3 py-2 text-center text-[10px] text-amber-900 font-medium">
-                          Total Pemakaian Debit SAP
+                          Rata-rata Tertimbang Biaya Solar
                         </td>
                       </tr>
                     </tfoot>
                   </table>
                 );
               })()}
-
-              {/* TAB 4: SLARC DAILY CREDIT */}
-              {effectiveModalTab === 'credit' && (() => {
-                const matchedDaily = dailyCreditForVeh;
-
-                if (matchedDaily.length === 0) {
-                  return (
-                    <div className="text-center py-10 text-slate-400">
-                      <FileSpreadsheet size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
-                      <p className="font-semibold text-slate-600 text-xs">Tidak ada detail transaksi aktivitas SLARC tercatat untuk kendaraan ini pada periode {selectedFuelVeh.month || 'ini'}.</p>
-                    </div>
-                  );
-                }
-
-                return (
-                  <table className="w-full text-[11px] border-collapse excel-cell-border text-center">
-                    <thead>
-                      <tr className="bg-slate-100 text-slate-700 font-extrabold uppercase text-[10px]">
-                        <th className="px-2.5 py-1.5 text-center w-10">No</th>
-                        <th className="px-3 py-1.5 text-center w-24">Tanggal</th>
-                        <th className="px-3 py-1.5 text-center w-28">No. Dokumen</th>
-                        <th className="px-3 py-1.5 text-center w-24">Jumlah</th>
-                        <th className="px-3 py-1.5 text-center">Uraian SAP</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {matchedDaily.map((d, i) => (
-                        <tr key={i} className="hover:bg-slate-50 text-center">
-                          <td className="px-2.5 py-1.5 text-center font-mono text-slate-400">{i + 1}</td>
-                          <td className="px-3 py-1.5 text-center font-mono font-medium text-slate-800">{d.d}</td>
-                          <td className="px-3 py-1.5 text-center font-mono text-[10px] text-slate-600">{d.doc || '-'}</td>
-                          <td className="px-3 py-1.5 text-center font-mono font-black text-blue-950">
-                            {d.q.toLocaleString('id-ID')} <span className="text-[10px] text-slate-500 font-normal">{d.u}</span>
-                          </td>
-                          <td className="px-3 py-1.5 text-center text-slate-600 text-[10.5px] truncate max-w-xs">{d.n || '-'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-blue-50/80 font-extrabold text-[11px] text-slate-800 border-t-2 border-blue-200">
-                        <td colSpan={3} className="px-3 py-2 text-center uppercase tracking-wide text-blue-950">
-                          Total SLARC ({matchedDaily.length} Transaksi)
-                        </td>
-                        <td className="px-3 py-2 text-center font-mono font-black text-blue-950">
-                          {Math.round(matchedDaily.reduce((acc, d) => acc + (d.q || 0), 0) * 100) / 100} <span className="text-[10px] text-slate-600 font-normal">{matchedDaily[0]?.u || uomLabel}</span>
-                        </td>
-                        <td className="px-3 py-2 text-center text-[10px] text-blue-900 font-medium">
-                          Sesuai Ringkasan Aktivitas SAP
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                );
-              })()}
+              {/* Transaksi SLARC detailed breakdown table removed per Task 2 (KM/HM summary only) */}
             </div>
 
             {/* Modal Footer */}
