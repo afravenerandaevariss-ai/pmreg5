@@ -5115,31 +5115,45 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         {/* ── Clean Table with Sticky/Freeze Header ── */}
         <div className="p-3 sm:p-4 bg-white">
           <div className="overflow-x-auto max-h-[calc(100vh-250px)] min-h-[420px] excel-cell-border border border-slate-200 rounded-xl relative shadow-2xs">
-            <table className="w-full text-xs border-separate border-spacing-0">
+            <table className="w-full text-xs border-separate border-spacing-0 table-fixed">
+              <colgroup>
+                <col style={{ width: '3.5%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '8.5%' }} />
+                <col style={{ width: '8.5%' }} />
+                <col style={{ width: '19%' }} />
+                <col style={{ width: '17%' }} />
+                <col style={{ width: '7.5%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '6%' }} />
+              </colgroup>
               <thead className="sticky top-0 z-30 shadow-xs">
                 <tr className="bg-slate-100/95 text-slate-800 text-[11px] font-black uppercase tracking-tight text-center whitespace-nowrap">
-                  <th className="sticky top-0 z-30 bg-slate-100 px-1.5 py-2.5 text-center w-10 border-b border-slate-300">No</th>
-                  <th className="sticky top-0 z-30 bg-slate-100 px-1.5 py-2.5 text-center w-20 border-b border-slate-300">Kebun / Unit</th>
-                  <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-x border-emerald-200 border-b border-slate-300 px-1.5 py-2.5 text-center w-28 whitespace-nowrap">
+                  <th className="sticky top-0 z-30 bg-slate-100 px-1.5 py-2.5 text-center border-b border-slate-300">No</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 px-1.5 py-2.5 text-center border-b border-slate-300">Kebun / Unit</th>
+                  <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-x border-emerald-200 border-b border-slate-300 px-1.5 py-2.5 text-center whitespace-nowrap">
                     No. Equipment
                   </th>
-                  <th className="sticky top-0 z-30 bg-slate-100 px-1.5 py-2.5 text-center w-28 font-mono border-b border-slate-300 whitespace-nowrap">Cost Center</th>
-                  <th className="sticky top-0 z-30 bg-slate-100 px-2.5 py-2.5 text-center min-w-[140px] border-b border-slate-300">Deskripsi Kendaraan</th>
-                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-800 px-2.5 py-2.5 text-center min-w-[130px] border-b border-slate-300">Reference / Rute</th>
-                  <th className="sticky top-0 z-30 bg-[#fffbeb] text-amber-950 font-black border-x border-amber-200 border-b border-slate-300 px-1.5 py-2.5 text-center w-24 whitespace-nowrap">
+                  <th className="sticky top-0 z-30 bg-slate-100 px-1.5 py-2.5 text-center font-mono border-b border-slate-300 whitespace-nowrap">Cost Center</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 px-3 py-2.5 text-left border-b border-slate-300">Deskripsi Kendaraan</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-800 px-3 py-2.5 text-left border-b border-slate-300">Reference / Rute</th>
+                  <th className="sticky top-0 z-30 bg-[#fffbeb] text-amber-950 font-black border-x border-amber-200 border-b border-slate-300 px-1.5 py-2.5 text-center whitespace-nowrap">
                     Solar (Liter)
                   </th>
-                  <th className="sticky top-0 z-30 bg-[#eff6ff] text-blue-950 font-black border-r border-blue-200 border-b border-slate-300 px-1.5 py-2.5 text-center w-24 whitespace-nowrap">
+                  <th className="sticky top-0 z-30 bg-[#eff6ff] text-blue-950 font-black border-r border-blue-200 border-b border-slate-300 px-1.5 py-2.5 text-center whitespace-nowrap">
                     ACTIVITY
                   </th>
-                  <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-r border-emerald-200 border-b border-slate-300 px-1.5 py-2.5 text-center w-24 whitespace-nowrap">
+                  <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-r border-emerald-200 border-b border-slate-300 px-1.5 py-2.5 text-center whitespace-nowrap">
                     Rasio / Efisiensi
                   </th>
-                  <th className="sticky top-0 z-30 bg-[#f0fdf4] text-emerald-950 font-black border-r border-emerald-200 border-b border-slate-300 px-1.5 py-2.5 text-center w-28 whitespace-nowrap">
+                  <th className="sticky top-0 z-30 bg-[#f0fdf4] text-emerald-950 font-black border-r border-emerald-200 border-b border-slate-300 px-1.5 py-2.5 text-center whitespace-nowrap">
                     Keterangan Efisiensi
                   </th>
-                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-800 px-1.5 py-2.5 text-center border-b border-slate-300 w-28 whitespace-nowrap">Biaya Solar</th>
-                  <th className="sticky top-0 z-30 bg-slate-100 px-1.5 py-2.5 text-center w-20 no-print border-b border-slate-300 whitespace-nowrap">Aksi</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 text-slate-800 px-1.5 py-2.5 text-center border-b border-slate-300 whitespace-nowrap">Biaya Solar</th>
+                  <th className="sticky top-0 z-30 bg-slate-100 px-1.5 py-2.5 text-center no-print border-b border-slate-300 whitespace-nowrap">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-xs">
@@ -5192,15 +5206,15 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           </td>
 
                           {/* 5. Deskripsi Kendaraan */}
-                          <td className="px-2 py-2 text-center">
-                            <div className="font-bold text-slate-900 text-xs leading-tight">{row.description || '-'}</div>
+                          <td className="px-3 py-2 text-left">
+                            <div className="font-bold text-slate-900 text-xs leading-tight truncate" title={row.description || '-'}>{row.description || '-'}</div>
                             <span className="inline-block mt-0.5 bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold">{row.objectType || 'VEH'}</span>
                           </td>
 
                           {/* 6. REFERENCE */}
-                          <td className="px-2 py-2 text-center bg-slate-50/30">
+                          <td className="px-3 py-2 text-left bg-slate-50/30">
                             <div
-                              className="text-xs font-semibold text-slate-800 leading-tight"
+                              className="text-xs font-semibold text-slate-800 leading-tight truncate"
                               title={row.referenceAll || row.referencePrimary || '-'}
                             >
                               {row.referencePrimary || '-'}
