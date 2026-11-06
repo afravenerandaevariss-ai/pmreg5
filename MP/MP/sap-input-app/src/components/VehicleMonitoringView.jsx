@@ -52,6 +52,21 @@ const PLANT_INFO = {
   "5E19": { desc: "KEBUN LONGKALI",         wilayah: "Kal-Tim" },
 };
 
+export const MONTH_NAMES = [
+  { val: '01', label: 'Januari' },
+  { val: '02', label: 'Februari' },
+  { val: '03', label: 'Maret' },
+  { val: '04', label: 'April' },
+  { val: '05', label: 'Mei' },
+  { val: '06', label: 'Juni' },
+  { val: '07', label: 'Juli' },
+  { val: '08', label: 'Agustus' },
+  { val: '09', label: 'September' },
+  { val: '10', label: 'Oktober' },
+  { val: '11', label: 'November' },
+  { val: '12', label: 'Desember' },
+];
+
 // ─── Job Code Master ──────────────────────────────────────────────────────────
 const JOB_CODE_DESC = {
   "11210": "Angkut Hasil Panen (Lain)",
@@ -495,8 +510,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const fuelMonth = fuelMonths.length === 1 ? fuelMonths[0] : (fuelMonths.includes('ALL') ? 'ALL' : fuelMonths.join(', '));
   const fuelDate = (fuelStartDate && fuelEndDate && fuelStartDate === fuelEndDate) ? fuelStartDate : (fuelStartDate || fuelEndDate || '');
   const [fuelPlant, setFuelPlant] = useState('ALL');
+  const [fuelStatusFilter, setFuelStatusFilter] = useState('ALL');
   const [searchFuel, setSearchFuel] = useState('');
-  // Track which months have been lazy-loaded from per-month storage (IDs 230101-230112)
   const fuelLoadedMonthsRef = React.useRef(new Set());
   const [fuelPage, setFuelPage] = useState(1);
   const [selectedFuelVeh, setSelectedFuelVeh] = useState(null);
@@ -1096,8 +1111,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           }
           const s = String(raw).trim();
           if (s.match(/^\d{4}-\d{2}-\d{2}/)) return s.substring(0, 10);
-          if (s.match(/^\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4}/)) {
-            const parts = s.split(/[-/\.]/);
+          if (s.match(/^\d{1,2}[-/. ]\d{1,2}[-/. ]\d{4}/)) {
+            const parts = s.split(/[-/. ]/);
             const day = parts[0].padStart(2, '0');
             const month = parts[1].padStart(2, '0');
             const year = parts[2];
@@ -2207,21 +2222,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   };
 
   // ── Fuel Evaluation Computed Data & ZESTHLP16PA Mapping ───────────────────
-  const MONTH_NAMES = [
-    { val: '01', label: 'Januari' },
-    { val: '02', label: 'Februari' },
-    { val: '03', label: 'Maret' },
-    { val: '04', label: 'April' },
-    { val: '05', label: 'Mei' },
-    { val: '06', label: 'Juni' },
-    { val: '07', label: 'Juli' },
-    { val: '08', label: 'Agustus' },
-    { val: '09', label: 'September' },
-    { val: '10', label: 'Oktober' },
-    { val: '11', label: 'November' },
-    { val: '12', label: 'Desember' },
-  ];
-
   const fuelAvailableYears = useMemo(() => {
     const set = new Set((fuelData?.summaries || []).map(s => s.month?.substring(0, 4)).filter(Boolean));
     if (set.size === 0) set.add('2026');
@@ -2411,7 +2411,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   }, [fuelData?.daily]);
 
   // Main Fuel Table Data with Deep Reference, Reconciliation, Multi-Month & Date Range Aggregation
-  const fuelTableData = useMemo(() => {
+  const rawFuelTableData = useMemo(() => {
     const isDateRange = Boolean(fuelStartDate || fuelEndDate);
     const activePlant = (!isAdmin && currentUser?.plant && currentUser.plant !== 'ALL')
       ? currentUser.plant
@@ -2422,8 +2422,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       const eqLogs = (equipment && equipment !== '-') ? (zestLogsByEquipment.get(equipment) || []) : [];
       const ccLogs = (costCenter && costCenter !== '-') ? (slarcDailyByCostCenter.get(String(costCenter || '').trim().toUpperCase()) || []) : [];
 
-      let matchedZest = [];
-      let matchedSlarc = [];
+      let matchedZest;
+      let matchedSlarc;
 
       if (isDate) {
         matchedZest = eqLogs.filter(l => l.date === ymOrDate);
@@ -2595,7 +2595,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       };
     };
 
-    let result = [];
+    let result;
 
     if (isDateRange) {
       // Date Range Filter
@@ -2845,21 +2845,79 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       });
     }
 
+    return result;
+  }, [fuelData, fuelYear, fuelMonths, fuelStartDate, fuelEndDate, fuelPlant, zestLogsByEquipment, slarcDailyByCostCenter, logs, costCenterToEquipmentMap, lookupMasterPM, isAdmin, currentUser, masterVehiclesByCode, zcoMapByCC]);
+
+  // Dynamic status counts for filter badges & dropdown
+  const fuelStatusCounts = useMemo(() => {
+    let optimal = 0;
+    let normal = 0;
+    let boros = 0;
+    let standby = 0;
+    let noFuel = 0;
+    let noActivity = 0;
+
+    rawFuelTableData.forEach(r => {
+      const s = r.efficiency?.status || r.status;
+      const isStb = r.efficiency?.isStandby || s === 'STANDBY';
+      const isNf = (r.efficiency?.isNoFuel || s === 'NO_FUEL') && !isStb;
+
+      if (isStb) standby++;
+      else if (isNf) noFuel++;
+      else if (s === 'OPTIMAL') optimal++;
+      else if (s === 'NORMAL') normal++;
+      else if (s === 'BOROS') boros++;
+      else if (s === 'NO_ACTIVITY') noActivity++;
+    });
+
+    return {
+      total: rawFuelTableData.length,
+      optimal,
+      normal,
+      boros,
+      standby,
+      noFuel,
+      noActivity
+    };
+  }, [rawFuelTableData]);
+
+  // Filtered Fuel Table Data (by Status & Search query)
+  const fuelTableData = useMemo(() => {
+    let list = rawFuelTableData;
+
+    if (fuelStatusFilter && fuelStatusFilter !== 'ALL') {
+      list = list.filter(r => {
+        const s = r.efficiency?.status || r.status;
+        const isStb = r.efficiency?.isStandby || s === 'STANDBY';
+        const isNf = (r.efficiency?.isNoFuel || s === 'NO_FUEL') && !isStb;
+
+        if (fuelStatusFilter === 'OPTIMAL' || fuelStatusFilter === 'EFISIEN') return s === 'OPTIMAL' && !isStb && !isNf;
+        if (fuelStatusFilter === 'NORMAL' || fuelStatusFilter === 'WASPADA') return s === 'NORMAL' && !isStb && !isNf;
+        if (fuelStatusFilter === 'BOROS') return s === 'BOROS' && !isStb && !isNf;
+        if (fuelStatusFilter === 'STANDBY') return isStb;
+        if (fuelStatusFilter === 'NO_FUEL') return isNf;
+        if (fuelStatusFilter === 'NO_ACTIVITY') return s === 'NO_ACTIVITY';
+        return s === fuelStatusFilter;
+      });
+    }
+
     if (searchFuel.trim()) {
       const q = searchFuel.toLowerCase();
-      result = result.filter(r =>
+      list = list.filter(r =>
         (r.equipment || '').toLowerCase().includes(q) ||
         (r.costCenter || '').toLowerCase().includes(q) ||
         (r.description || '').toLowerCase().includes(q) ||
         (r.plant || '').toLowerCase().includes(q) ||
         (r.plantDesc || '').toLowerCase().includes(q) ||
         (r.referencePrimary || '').toLowerCase().includes(q) ||
-        (r.referenceAll || '').toLowerCase().includes(q)
+        (r.referenceAll || '').toLowerCase().includes(q) ||
+        (r.efficiency?.badgeLabel || '').toLowerCase().includes(q) ||
+        (r.efficiency?.status || '').toLowerCase().includes(q)
       );
     }
 
-    return result;
-  }, [fuelData, fuelYear, fuelMonths, fuelStartDate, fuelEndDate, fuelPlant, searchFuel, zestLogsByEquipment, slarcDailyByCostCenter, logs, costCenterToEquipmentMap, lookupMasterPM, isAdmin, currentUser, masterVehiclesByCode, zcoMapByCC]);
+    return list;
+  }, [rawFuelTableData, fuelStatusFilter, searchFuel]);
 
   const fuelKPIs = useMemo(() => {
     let totalLiters = 0;
@@ -2920,8 +2978,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       'ACTIVITY (SLARC)': s.creditKm > 0 ? `${s.creditKm} KM` : (s.creditHm > 0 ? `${s.creditHm} HM` : '-'),
       'ACTIVITY (ZESTHLP16PA)': s.zestTotalKmHm > 0 ? `${s.zestTotalKmHm} ${s.creditHm > 0 ? 'HM' : 'KM'}` : '-',
       'Selisih (Variance)': s.varianceKmHm !== 0 ? s.varianceKmHm : 0,
-      'Rasio / Efisiensi': s.efficiency?.isStandby ? 'Standby / Rusak' : (s.efficiency?.isNoFuel ? 'Tanpa Solar' : (s.efficiency && s.efficiency.ratioVal > 0 ? `${s.efficiency.ratioVal} ${s.efficiency.uom}` : (s.kmPerLiter > 0 ? `${s.kmPerLiter} KM/L` : (s.literPerHm > 0 ? `${s.literPerHm} L/HM` : '-')))),
-      'Evaluasi BBM': s.efficiency ? `${s.efficiency.badgeLabel} (${s.efficiency.targetText})` : s.status,
+      'Rasio / Efisiensi': s.efficiency && s.efficiency.ratioVal > 0 ? `${s.efficiency.ratioVal} ${s.efficiency.uom}` : (s.kmPerLiter > 0 ? `${s.kmPerLiter} KM/L` : (s.literPerHm > 0 ? `${s.literPerHm} L/HM` : '-')),
+      'Keterangan Efisiensi': s.efficiency?.isStandby ? 'Standby / Rusak' : (s.efficiency?.isNoFuel ? 'Tanpa Solar' : (s.efficiency?.status === 'NO_ACTIVITY' ? 'Tanpa Aktivitas' : (s.efficiency ? s.efficiency.badgeLabel : (s.status || '-')))),
+      'Evaluasi BBM (Standar)': s.efficiency ? `${s.efficiency.badgeLabel} (${s.efficiency.targetText})` : s.status,
       'Biaya Solar (Rp)': s.debitRp || 0,
       'Biaya Solar / L (Rp)': Math.abs(s.debitLiters || 0) > 0 ? Math.round(Math.abs(s.debitRp || 0) / Math.abs(s.debitLiters || 0)) : 0,
       'Status': s.efficiency?.isStandby ? 'STANDBY' : s.status
@@ -4852,7 +4911,27 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               )}
             </div>
 
-            {/* 5. Pencarian (Plat / Equipment / Cost Center / Reference) */}
+            {/* 5. Filter Keterangan Efisiensi */}
+            <div className="flex flex-col">
+              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-0.5">Status Efisiensi</label>
+              <select
+                value={fuelStatusFilter}
+                onChange={e => { setFuelStatusFilter(e.target.value); setFuelPage(1); }}
+                className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 cursor-pointer"
+              >
+                <option value="ALL">Semua Status ({fuelStatusCounts.total})</option>
+                <option value="OPTIMAL">Efisien ({fuelStatusCounts.optimal})</option>
+                <option value="NORMAL">Waspada 10% ({fuelStatusCounts.normal})</option>
+                <option value="BOROS">Boros ({fuelStatusCounts.boros})</option>
+                <option value="STANDBY">Standby / Rusak ({fuelStatusCounts.standby})</option>
+                <option value="NO_FUEL">Tanpa Solar ({fuelStatusCounts.noFuel})</option>
+                {fuelStatusCounts.noActivity > 0 && (
+                  <option value="NO_ACTIVITY">Tanpa Aktivitas ({fuelStatusCounts.noActivity})</option>
+                )}
+              </select>
+            </div>
+
+            {/* 6. Pencarian (Plat / Equipment / Cost Center / Reference) */}
             <div className="flex flex-col flex-1 min-w-[210px]">
               <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-0.5">Cari Kendaraan / Rute</label>
               <div className="relative">
@@ -4985,7 +5064,40 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               </span>
             )}
           </div>
-          <div className="font-bold text-slate-700">
+          {/* Quick Status Filter Pills */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] font-bold text-slate-500 mr-1 hidden xl:inline">Status:</span>
+            {[
+              { key: 'ALL', label: 'Semua', count: fuelStatusCounts.total, activeClass: 'bg-slate-900 text-white border-slate-900' },
+              { key: 'OPTIMAL', label: 'Efisien', count: fuelStatusCounts.optimal, activeClass: 'bg-emerald-700 text-white border-emerald-700' },
+              { key: 'NORMAL', label: 'Waspada', count: fuelStatusCounts.normal, activeClass: 'bg-amber-600 text-white border-amber-600' },
+              { key: 'BOROS', label: 'Boros', count: fuelStatusCounts.boros, activeClass: 'bg-rose-700 text-white border-rose-700' },
+              { key: 'STANDBY', label: 'Standby / Rusak', count: fuelStatusCounts.standby, activeClass: 'bg-slate-700 text-white border-slate-700' },
+              { key: 'NO_FUEL', label: 'Tanpa Solar', count: fuelStatusCounts.noFuel, activeClass: 'bg-amber-700 text-white border-amber-700' },
+            ].map(tab => {
+              const isActive = fuelStatusFilter === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => { setFuelStatusFilter(tab.key); setFuelPage(1); }}
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition cursor-pointer flex items-center gap-1 border shadow-2xs ${
+                    isActive
+                      ? `${tab.activeClass} shadow-xs`
+                      : 'bg-white text-slate-600 hover:bg-slate-50 border-slate-300'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span className={`text-[10px] px-1 py-0.2 rounded-full font-mono ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                  }`}>
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="font-bold text-slate-700 whitespace-nowrap">
             {fuelTableData.length} Kendaraan Terdaftar
           </div>
         </div>
@@ -5010,8 +5122,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   <th className="sticky top-0 z-30 bg-[#eff6ff] text-blue-950 font-black border-r border-blue-200 border-b border-slate-300 px-3 py-3 text-center w-36">
                     ACTIVITY
                   </th>
-                  <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-r border-emerald-200 border-b border-slate-300 px-3 py-3 text-center w-36">
+                  <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-r border-emerald-200 border-b border-slate-300 px-3 py-3 text-center w-32">
                     Rasio / Efisiensi
+                  </th>
+                  <th className="sticky top-0 z-30 bg-[#f0fdf4] text-emerald-950 font-black border-r border-emerald-200 border-b border-slate-300 px-3 py-3 text-center w-36">
+                    Keterangan Efisiensi
                   </th>
                   <th className="sticky top-0 z-30 bg-slate-100 text-slate-800 px-3 py-3 text-center border-b border-slate-300 w-36">Biaya Solar</th>
                   <th className="sticky top-0 z-30 bg-slate-100 px-3 py-3 text-center w-24 no-print border-b border-slate-300">Aksi</th>
@@ -5020,7 +5135,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <tbody className="divide-y divide-slate-200 text-xs">
                 {fuelTableData.length === 0 ? (
                   <tr>
-                    <td colSpan="11" className="text-center py-12 text-slate-400">
+                    <td colSpan="12" className="text-center py-12 text-slate-400">
                       <Fuel size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
                       <p className="font-semibold text-slate-600 text-xs">Tidak ada data kendaraan untuk filter ini.</p>
                       <p className="text-[11px] text-slate-400 mt-1">
@@ -5125,52 +5240,65 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             )}
                           </td>
 
-                          {/* 9. Rasio / Efisiensi */}
-                          <td className="px-3 py-2.5 text-center bg-emerald-50/30 border-r border-emerald-100 whitespace-nowrap">
+                          {/* 9. Rasio / Efisiensi (Nilai Rasio Saja) */}
+                          <td className="px-3 py-2.5 text-center bg-emerald-50/20 border-r border-emerald-100 whitespace-nowrap">
+                            {row.efficiency && row.efficiency.ratioVal > 0 ? (
+                              <span
+                                className={`font-mono font-black text-xs px-2.5 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap shadow-2xs ${
+                                  row.efficiency.color === 'emerald'
+                                    ? 'bg-emerald-100 text-emerald-950 border border-emerald-300'
+                                    : row.efficiency.color === 'amber'
+                                    ? 'bg-amber-100 text-amber-950 border border-amber-300'
+                                    : 'bg-rose-100 text-rose-950 border border-rose-300'
+                                }`}
+                                title={`Standar ${row.efficiency.code}: ${row.efficiency.targetText}`}
+                              >
+                                <span>{row.efficiency.ratioVal}</span>
+                                <span className="text-[9.5px] font-extrabold opacity-80">{row.efficiency.uom}</span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 font-mono text-xs">-</span>
+                            )}
+                          </td>
+
+                          {/* 10. Keterangan Efisiensi (Badge Status Terpisah) */}
+                          <td className="px-3 py-2.5 text-center bg-slate-50/40 border-r border-slate-200 whitespace-nowrap">
                             {row.efficiency?.isStandby ? (
                               <span
-                                className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs tracking-wide"
+                                className="inline-flex items-center px-2.5 py-1 rounded-md text-[10.5px] font-bold bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs tracking-wide"
                                 title="Kendaraan Standby / Rusak / Libur (Dummy 1 KM/HM SAP, tidak dihitung efisiensi)"
                               >
                                 Standby / Rusak
                               </span>
                             ) : row.efficiency?.isNoFuel ? (
                               <span
-                                className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs"
+                                className="inline-flex items-center px-2.5 py-1 rounded-md text-[10.5px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs"
                                 title="Aktivitas operasional tercatat tanpa pemakaian BBM pada Cost Center ini (Unit Sewa / Pool BBM Luar)"
                               >
                                 Tanpa Solar
                               </span>
+                            ) : row.efficiency?.status === 'NO_ACTIVITY' ? (
+                              <span
+                                className="inline-flex items-center px-2.5 py-1 rounded-md text-[10.5px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs"
+                                title="Ada pengisian solar tanpa aktivitas KM/HM pada Cost Center ini"
+                              >
+                                {row.efficiency.badgeLabel || 'Tanpa Aktivitas'}
+                              </span>
                             ) : row.efficiency && row.efficiency.ratioVal > 0 ? (
-                              <div className="flex flex-col items-center justify-center">
-                                <span
-                                  className={`font-mono font-black text-xs px-2.5 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap shadow-2xs ${
-                                    row.efficiency.color === 'emerald'
-                                      ? 'bg-emerald-100 text-emerald-950 border border-emerald-300'
-                                      : row.efficiency.color === 'amber'
-                                      ? 'bg-amber-100 text-amber-950 border border-amber-300'
-                                      : 'bg-rose-100 text-rose-950 border border-rose-300'
-                                  }`}
-                                  title={`Standar ${row.efficiency.code}: ${row.efficiency.targetText} | Status: ${row.efficiency.badgeLabel}`}
-                                >
-                                  <span>{row.efficiency.ratioVal}</span>
-                                  <span className="text-[9.5px] font-extrabold opacity-80">{row.efficiency.uom}</span>
-                                </span>
-                                <span
-                                  className={`text-[9px] font-extrabold uppercase mt-0.5 tracking-tight ${
-                                    row.efficiency.color === 'emerald'
-                                      ? 'text-emerald-700'
-                                      : row.efficiency.color === 'amber'
-                                      ? 'text-amber-700'
-                                      : 'text-rose-700'
-                                  }`}
-                                  title={row.efficiency.targetText}
-                                >
-                                  {row.efficiency.badgeLabel}
-                                </span>
-                              </div>
+                              <span
+                                className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10.5px] font-black uppercase tracking-tight shadow-2xs ${
+                                  row.efficiency.color === 'emerald'
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : row.efficiency.color === 'amber'
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                    : 'bg-rose-100 text-rose-800 border border-rose-300'
+                                }`}
+                                title={`Standar ${row.efficiency.code}: ${row.efficiency.targetText}`}
+                              >
+                                {row.efficiency.badgeLabel}
+                              </span>
                             ) : (
-                              <span className="text-slate-300">-</span>
+                              <span className="text-slate-300 text-xs">-</span>
                             )}
                           </td>
 
