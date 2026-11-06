@@ -5303,24 +5303,44 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                               onClick={async () => {
                                 setSelectedFuelVeh(row);
                                 setFuelModalTab(isDevUser ? 'reconcile' : 'debit');
-                                // Lazy-load daily data for this vehicle's month if not yet loaded
-                                const targetMonth = row.month;
-                                if (targetMonth && !fuelLoadedMonthsRef.current.has(targetMonth)) {
-                                  fuelLoadedMonthsRef.current.add(targetMonth); // Mark as loaded
+                                const vehCC = String(row.costCenter || '').trim().toUpperCase();
+                                // Find which months have data for this vehicle across summaries
+                                const activeMonthsForVeh = (fuelData.summaries || [])
+                                  .filter(s => String(s.costCenter || '').trim().toUpperCase() === vehCC && s.month)
+                                  .map(s => s.month.substring(0, 7));
+
+                                let targetMonthsToFetch = [];
+                                if (row.month?.includes('Semua Bulan') || fuelMonths.includes('ALL')) {
+                                  targetMonthsToFetch = [...new Set(activeMonthsForVeh)];
+                                  if (targetMonthsToFetch.length === 0) {
+                                    targetMonthsToFetch = ['2026-01', '2026-02', '2026-09', '2026-10'];
+                                  }
+                                } else if (fuelMonths.length > 0 && !fuelMonths.includes('ALL')) {
+                                  targetMonthsToFetch = fuelMonths.map(m => m.length === 2 ? `${fuelYear}-${m}` : m);
+                                } else if (row.month && row.month.length === 7) {
+                                  targetMonthsToFetch = [row.month];
+                                }
+
+                                const missingMonths = targetMonthsToFetch.filter(m => !fuelLoadedMonthsRef.current.has(m));
+                                if (missingMonths.length > 0) {
+                                  for (const m of missingMonths) {
+                                    fuelLoadedMonthsRef.current.add(m);
+                                  }
                                   try {
-                                    const { data: monthlyDaily } = await fetchFuelDailyForMonth(targetMonth);
-                                    if (monthlyDaily && monthlyDaily.length > 0) {
+                                    const results = await Promise.all(missingMonths.map(m => fetchFuelDailyForMonth(m)));
+                                    const fetchedDaily = results.flatMap(res => (Array.isArray(res?.data) ? res.data : []));
+                                    if (fetchedDaily.length > 0) {
                                       setFuelData(prev => {
                                         const existing = new Map((prev.daily || []).map(d => [makeFuelTxKey(d), d]));
-                                        for (const d of monthlyDaily) {
+                                        for (const d of fetchedDaily) {
                                           const k = makeFuelTxKey(d);
                                           if (!existing.has(k)) existing.set(k, d);
                                         }
                                         return { ...prev, daily: Array.from(existing.values()) };
                                       });
                                     }
-                                  } catch(e) {
-                                    console.warn('Lazy-load month daily warning:', e);
+                                  } catch (e) {
+                                    console.warn('Lazy-load fuel daily warning:', e);
                                   }
                                 }
                               }}
@@ -5367,13 +5387,30 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
     {/* ── Impeccable Detail Modal with ZESTHLP16PA vs SLARC Reconciliation ── */}
     {selectedFuelVeh && (() => {
-      const isDateInMonth = (dStr, mStr) => {
-        if (!mStr) return true;
-        return (dStr && (dStr === mStr || dStr.startsWith(mStr)));
+      const vehCC = String(selectedFuelVeh.costCenter || '').trim().toUpperCase();
+
+      const isDateInSelectedPeriod = (dStr, dMonth) => {
+        if (!selectedFuelVeh.month) return true;
+        const mStr = String(selectedFuelVeh.month).trim();
+        // Case: "2026 (Semua Bulan)" or "ALL" or year-only "2026"
+        if (mStr.includes('Semua Bulan') || mStr === 'ALL' || mStr === fuelYear) {
+          return Boolean((dStr && dStr.startsWith(fuelYear)) || (dMonth && dMonth.startsWith(fuelYear)));
+        }
+        // Case: multi-month comma separated "08, 09" or "2026-08, 2026-09"
+        if (mStr.includes(',')) {
+          const parts = mStr.split(',').map(x => x.trim());
+          return parts.some(p => {
+            const ym = p.length === 2 ? `${fuelYear}-${p}` : p;
+            return (dStr && (dStr === ym || dStr.startsWith(ym))) || (dMonth && dMonth === ym);
+          });
+        }
+        // Case: single month "2026-09" or "09"
+        const ym = mStr.length === 2 ? `${fuelYear}-${mStr}` : (mStr.length === 7 ? mStr : mStr.substring(0, 7));
+        return Boolean((dStr && (dStr === ym || dStr.startsWith(ym))) || (dMonth && dMonth === ym));
       };
 
       const dailyDebitForVeh = (fuelData.daily || []).filter(d => 
-        d.c === selectedFuelVeh.costCenter && d.t === 'D' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month || isDateInMonth(d.d, selectedFuelVeh.month))
+        String(d.c || '').trim().toUpperCase() === vehCC && d.t === 'D' && isDateInSelectedPeriod(d.d, d.m)
       );
       const dailyDebitLiters = dailyDebitForVeh.reduce((acc, d) => acc + (d.q || 0), 0);
       const dailyDebitRp = dailyDebitForVeh.reduce((acc, d) => acc + (d.r || 0), 0);
@@ -5395,7 +5432,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         : 0;
 
       const dailyCreditForVeh = (fuelData.daily || []).filter(d => 
-        d.c === selectedFuelVeh.costCenter && d.t === 'C' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month || isDateInMonth(d.d, selectedFuelVeh.month))
+        String(d.c || '').trim().toUpperCase() === vehCC && d.t === 'C' && isDateInSelectedPeriod(d.d, d.m)
       );
       const dailyCreditQty = dailyCreditForVeh.reduce((acc, d) => acc + (d.q || 0), 0);
       // Clean reference helper ensuring no blank '-' or placeholder '1'
@@ -5409,7 +5446,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       const rawZestLogs = (selectedFuelVeh.equipment && selectedFuelVeh.equipment !== '-') ? (zestLogsByEquipment.get(selectedFuelVeh.equipment) || []) : [];
       const zestDailyList = (selectedFuelVeh.matchedZestLogs && selectedFuelVeh.matchedZestLogs.length > 0)
         ? selectedFuelVeh.matchedZestLogs
-        : rawZestLogs.filter(l => !selectedFuelVeh.month || isDateInMonth(l.date, selectedFuelVeh.month));
+        : rawZestLogs.filter(l => isDateInSelectedPeriod(l.date, l.date?.substring(0, 7)));
 
       const zestTotal = zestDailyList.reduce((acc, l) => acc + (parseFloat(l.hm_km) || 0), 0) || selectedFuelVeh.zestTotalKmHm || 0;
       const variance = Math.round((slarcTotal - zestTotal) * 100) / 100;
@@ -5504,7 +5541,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           }`}>
                             {eff.ratioVal > 0 ? `${eff.ratioVal} ${eff.uom}` : '-'} ({eff.badgeLabel})
                           </strong>
-                          <span className="text-[10px] text-slate-400 font-medium">(${eff.code}: ${eff.targetText})</span>
+                          <span className="text-[10px] text-slate-400 font-medium">({eff.code}: {eff.targetText})</span>
                         </span>
                       </>
                     );

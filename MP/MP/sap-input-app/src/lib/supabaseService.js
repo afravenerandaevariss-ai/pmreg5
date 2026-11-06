@@ -867,7 +867,17 @@ export async function fetchFuelData(forceRefresh = false) {
 // Key pattern: 'fuel_m_2026-01' → ID 230101, 'fuel_m_2026-07' → 230107, etc.
 export async function fetchFuelDailyForMonth(yearMonth) {
   if (!yearMonth || typeof yearMonth !== 'string') return { data: [], error: 'Invalid month' };
-  const numericId = 230100 + parseInt(yearMonth.substring(5, 7)); // e.g. '2026-01' -> 230101, '2026-07' -> 230107
+  
+  // Extract 2-digit month number
+  const cleanM = yearMonth.includes('-')
+    ? yearMonth.split('-')[1].substring(0, 2)
+    : yearMonth.replace(/[^0-9]/g, '').slice(-2);
+  const monthNum = parseInt(cleanM, 10);
+  if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+    return { data: [], error: 'Invalid month format' };
+  }
+
+  const numericId = 230100 + monthNum; // e.g. 230101 for Jan, 230109 for Sep
   if (!supabase) return { data: [], error: 'Supabase not configured' };
   try {
     const { data: row, error } = await supabase
@@ -885,7 +895,8 @@ export async function fetchFuelDailyForMonth(yearMonth) {
       .eq('id', 21)
       .single();
     if (mainRow?.data?.daily && Array.isArray(mainRow.data.daily)) {
-      const filtered = mainRow.data.daily.filter(d => d.m === yearMonth || (d.d && d.d.startsWith(yearMonth)));
+      const ymStr = `2026-${String(monthNum).padStart(2, '0')}`;
+      const filtered = mainRow.data.daily.filter(d => d.m === ymStr || (d.d && d.d.startsWith(ymStr)));
       return { data: filtered, error: null };
     }
     return { data: [], error: null };
