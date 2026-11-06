@@ -151,8 +151,13 @@ export function getVehicleTypeCode(costCenter, fallbackType = '') {
   }
   return 'CAR';
 }
+export function extractLitersFromText(text) {
+  if (!text) return 0;
+  const m = String(text).match(/(\d+(?:[.,]\d+)?)\s*(?:ltr|liter|l\b)/i);
+  return m ? parseFloat(m[1].replace(',', '.')) : 0;
+}
 
-export function evaluateFuelEfficiency(costCenter, debitLiters, creditKm, creditHm, fallbackType = '') {
+export function evaluateFuelEfficiency(costCenter, debitLiters, creditKm, creditHm, fallbackType = '', refText = '') {
   const code = getVehicleTypeCode(costCenter, fallbackType);
   const rule = VEHICLE_EFFICIENCY_RULES[code] || VEHICLE_EFFICIENCY_RULES.CAR;
   const isKmL = rule.type === 'KM/L';
@@ -160,11 +165,29 @@ export function evaluateFuelEfficiency(costCenter, debitLiters, creditKm, credit
   const creditK = Math.max(0, parseFloat(creditKm) || 0);
   const creditH = Math.max(0, parseFloat(creditHm) || 0);
 
+  // Check dummy standby/rusak/libur (SAP operators post dummy 1 KM/HM when idle or broken)
+  const isStandby = (debitL === 0 && ((creditK > 0 && creditK <= 2) || (creditH > 0 && creditH <= 2)) &&
+    /standby|standbaye|rusak|libur|perbaikan|servis|breakdown/i.test(refText));
+
+  if (isStandby) {
+    return {
+      status: 'STANDBY',
+      ratioVal: 0,
+      uom: rule.type,
+      color: 'slate',
+      isStandby: true,
+      badgeLabel: 'Standby / Rusak',
+      targetText: 'Unit Standby / Rusak / Libur (Dummy 1 KM/HM SAP)',
+      rule,
+      code
+    };
+  }
+
   if (debitL === 0 && creditK === 0 && creditH === 0) {
     return { status: 'NO_DATA', ratioVal: 0, uom: rule.type, color: 'slate', badgeLabel: 'Tanpa Data', targetText: rule.desc, rule, code };
   }
   if (debitL === 0) {
-    return { status: 'NO_FUEL', ratioVal: 0, uom: rule.type, color: 'slate', badgeLabel: 'Tanpa Solar', targetText: rule.desc, rule, code };
+    return { status: 'NO_FUEL', ratioVal: 0, uom: rule.type, color: 'amber', isNoFuel: true, badgeLabel: 'Tanpa Solar', targetText: 'Aktivitas Tercatat Tanpa Pengisian Solar (Sewa/Pool)', rule, code };
   }
   if ((isKmL && creditK === 0) || (!isKmL && creditH === 0)) {
     return { status: 'NO_ACTIVITY', ratioVal: 0, uom: rule.type, color: 'amber', badgeLabel: isKmL ? 'Tanpa KM' : 'Tanpa HM', targetText: rule.desc, rule, code };
@@ -433,8 +456,40 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [fuelUploadInfo, setFuelUploadInfo] = useState(null);
   const [fuelYear, setFuelYear] = useState('2026');
   const [fuelMonths, setFuelMonths] = useState(['09']); // multi-month array: e.g. ['09'], ['09', '10'], or ['ALL']
+  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
+  const monthDropdownRef = React.useRef(null);
   const [fuelStartDate, setFuelStartDate] = useState(''); // YYYY-MM-DD
   const [fuelEndDate, setFuelEndDate]     = useState(''); // YYYY-MM-DD
+
+  // Close month dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (monthDropdownRef.current && !monthDropdownRef.current.contains(event.target)) {
+        setShowMonthDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const monthDropdownLabel = useMemo(() => {
+    const isAll = fuelMonths.includes('ALL') || fuelMonths.length === 12;
+    if (isAll) return 'Semua Bulan (01 - 12)';
+    if (fuelMonths.length === 0) return 'Pilih Bulan';
+
+    const sorted = [...fuelMonths].sort();
+    const isSequentialFrom1 = sorted.every((m, idx) => parseInt(m) === idx + 1);
+    if (isSequentialFrom1 && sorted.length > 1) {
+      return `Bulan 1 - ${sorted.length} (${sorted.length} Bulan)`;
+    }
+
+    if (sorted.length === 1) {
+      const found = MONTH_NAMES.find(m => m.val === sorted[0]);
+      return found ? `${found.val} - ${found.label}` : sorted[0];
+    }
+
+    return `${sorted.length} Bulan (${sorted.join(', ')})`;
+  }, [fuelMonths]);
 
   // Backward-compatible computed helpers
   const fuelMonth = fuelMonths.length === 1 ? fuelMonths[0] : (fuelMonths.includes('ALL') ? 'ALL' : fuelMonths.join(', '));
@@ -1032,19 +1087,21 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
         const parseDateVal = (raw) => {
           if (!raw) return null;
+          if (raw instanceof Date && !isNaN(raw)) {
+            return format(raw, 'yyyy-MM-dd');
+          }
           if (typeof raw === 'number' || (!isNaN(raw) && Number(raw) > 30000 && Number(raw) < 60000)) {
             const d = excelSerialToDate(Number(raw));
             return format(d, 'yyyy-MM-dd');
           }
           const s = String(raw).trim();
           if (s.match(/^\d{4}-\d{2}-\d{2}/)) return s.substring(0, 10);
-          if (s.match(/^\d{2}\.\d{2}\.\d{4}/)) {
-            const parts = s.split('.');
-            return `${parts[2]}-${parts[1]}-${parts[0]}`;
-          }
-          if (s.match(/^\d{2}\/\d{2}\/\d{4}/)) {
-            const parts = s.split('/');
-            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+          if (s.match(/^\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4}/)) {
+            const parts = s.split(/[-/\.]/);
+            const day = parts[0].padStart(2, '0');
+            const month = parts[1].padStart(2, '0');
+            const year = parts[2];
+            return `${year}-${month}-${day}`;
           }
           return null;
         };
@@ -1070,32 +1127,60 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             let debitReversals = 0;
 
             for (const r of rows) {
-              const ce = String(r['Cost Element'] || r['CostElement'] || '').trim();
-              const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
-              
-              // STRICT FILTER: Cost Element must strictly be '51100057' (Bi Kons. Pers. Bahan) AND unit strictly 'L'
-              // Explicitly exclude 51100065 (Pelumas/Oil), 51100064 (Kebut Op/Brake fluid), 51100104 (Pemel Kendaraan)
-              if (ce !== '51100057' || uom !== 'L') {
-                if (uom === 'L' || ce === '51100065' || ce === '51100064' || ce === '51100104') {
+              const rawCe = String(r['Cost Element'] || r['CostElement'] || '').trim();
+              const ce = rawCe.replace(/^0+/, '');
+              const rawUom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
+              const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
+              const matDesc = String(r['Material Description'] || '').trim();
+              const fullText = `${name} ${matDesc}`;
+
+              const isStandardFuelUom = ['L', 'LTR', 'LITER'].includes(rawUom);
+              let parsedLitersFromText = 0;
+              const isFuelCostElement = ce === '51100057';
+
+              if (!isFuelCostElement) {
+                if (isStandardFuelUom || ce === '51100065' || ce === '51100064' || ce === '51100104') {
                   excludedNonFuel++;
                 }
                 continue;
               }
 
-              const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim();
+              let isAcceptedUom = isStandardFuelUom;
+              if (!isAcceptedUom) {
+                parsedLitersFromText = extractLitersFromText(fullText);
+                const isFuelText = /solar|dexlite|biodiesel|gasoline|bbm|bahan bakar/i.test(fullText);
+                if (parsedLitersFromText > 0 || isFuelText || !rawUom) {
+                  isAcceptedUom = true;
+                }
+              }
+
+              if (!isAcceptedUom) {
+                excludedNonFuel++;
+                continue;
+              }
+
+              const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim().toUpperCase();
               if (!cc) continue;
 
               const rawDate = r['Posting Date'] || r['Document Date'] || r['Date'];
               const dateStr = parseDateVal(rawDate);
               const period = String(r['Period'] || '').trim();
               const year = dateStr ? dateStr.substring(0, 4) : '2026';
-              const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : (targetMonth || '2026-08'));
+              const periodNum = parseInt(period, 10);
+              const hasValidPeriod = !isNaN(periodNum) && periodNum >= 1 && periodNum <= 12;
+              const monthStr = hasValidPeriod
+                ? `${year}-${String(periodNum).padStart(2, '0')}`
+                : (dateStr ? dateStr.substring(0, 7) : (targetMonth || '2026-09'));
 
               const drCr = String(r['Dr/Cr indicator'] || r['Dr/Cr'] || r['Dr/C'] || '').trim().toUpperCase();
               const isReversal = drCr === 'C' || drCr === 'H';
 
               let liters = parseSapNumber(r['Total quantity'] || r['Qty'] || 0);
               let rupiah = parseSapNumber(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0);
+
+              if (liters === 0 && parsedLitersFromText > 0) {
+                liters = parsedLitersFromText;
+              }
 
               if (isReversal) {
                 debitReversals++;
@@ -1107,8 +1192,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               }
 
               const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
-              const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
-              const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
+              const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim().toUpperCase();
 
               debitRowsCount++;
               newDaily.push({
@@ -1124,7 +1208,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 p: plant
               });
             }
-            console.log(`[SALRD Ingestion] Accepted strictly 51100057+L: ${debitRowsCount} rows (Reversals: ${debitReversals}), Excluded non-fuel rows: ${excludedNonFuel}`);
+            console.log(`[SALRD Ingestion] Accepted normalized 51100057+L/Text: ${debitRowsCount} rows (Reversals: ${debitReversals}), Excluded non-fuel rows: ${excludedNonFuel}`);
           }
         }
 
@@ -1142,27 +1226,31 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             let creditDupsSkipped = 0;
 
             for (const r of rows) {
-              const ce = String(r['Cost Element'] || r['CostElement'] || '').trim();
+              const rawCe = String(r['Cost Element'] || r['CostElement'] || '').trim();
+              const ce = rawCe.replace(/^0+/, '');
               const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
               const isKm = ce === '90043002' || uom === 'KM';
               const isHm = ce === '90043003' || uom === 'HR' || uom === 'HM';
               if (!isKm && !isHm) continue;
 
-              const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim();
+              const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim().toUpperCase();
               if (!cc) continue;
 
               const rawDate = r['Posting Date'] || r['Document Date'] || r['Date'];
               const dateStr = parseDateVal(rawDate);
               const period = String(r['Period'] || '').trim();
               const year = dateStr ? dateStr.substring(0, 4) : '2026';
-              const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : (targetMonth || '2026-08'));
+              const periodNum = parseInt(period, 10);
+              const hasValidPeriod = !isNaN(periodNum) && periodNum >= 1 && periodNum <= 12;
+              const monthStr = hasValidPeriod
+                ? `${year}-${String(periodNum).padStart(2, '0')}`
+                : (dateStr ? dateStr.substring(0, 7) : (targetMonth || '2026-09'));
 
               const qty = Math.abs(parseSapNumber(r['Total quantity'] || r['Qty'] || 0) || 0);
               const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
               const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
               const cleanName = name.split('|')[0].trim().toLowerCase();
-              const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
-
+              const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim().toUpperCase();
               // Deduplicate double-posted or paired SAP allocation documents (same cc, date, uom, qty, activity)
               const dedupKey = `${cc}_${dateStr || monthStr}_${isKm ? 'KM' : 'HM'}_${qty}_${cleanName}`;
               if (seenCreditUploadKeys.has(dedupKey)) {
@@ -1196,15 +1284,20 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
             const seenCreditFallbackKeys = new Set();
             for (const r of rows) {
-              const cc = String(r['Cost Center'] || r['CostCenter'] || '').trim();
-              if (!cc) continue;
-              const ce = String(r['Cost Element'] || '').trim();
-              const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
+              const rawCc = String(r['Cost Center'] || r['CostCenter'] || '').trim().toUpperCase();
+              if (!rawCc) continue;
+              const rawCe = String(r['Cost Element'] || '').trim();
+              const ce = rawCe.replace(/^0+/, '');
+              const rawUom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
               const rawDate = r['Posting Date'] || r['Document Date'] || r['Date'];
               const dateStr = parseDateVal(rawDate);
               const period = String(r['Period'] || '').trim();
               const year = dateStr ? dateStr.substring(0, 4) : '2026';
-              const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : (targetMonth || '2026-08'));
+              const periodNum = parseInt(period, 10);
+              const hasValidPeriod = !isNaN(periodNum) && periodNum >= 1 && periodNum <= 12;
+              const monthStr = hasValidPeriod
+                ? `${year}-${String(periodNum).padStart(2, '0')}`
+                : (dateStr ? dateStr.substring(0, 7) : (targetMonth || '2026-09'));
 
               const drCr = String(r['Dr/Cr indicator'] || r['Dr/Cr'] || r['Dr/C'] || '').trim().toUpperCase();
               const isReversal = drCr === 'C' || drCr === 'H';
@@ -1212,28 +1305,41 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               let rupiah = parseSapNumber(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0);
               const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
               const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
-              const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
+              const matDesc = String(r['Material Description'] || '').trim();
+              const fullText = `${name} ${matDesc}`;
+              const plant = String(r['Plant'] || rawCc.substring(0, 4) || '').trim().toUpperCase();
 
-              // Strict SALRD filter: 51100057 + L (exclude lubricants and brake fluids)
-              if (ce === '51100057' && uom === 'L') {
-                if (isReversal) {
-                  qty = -Math.abs(qty);
-                  rupiah = -Math.abs(rupiah);
-                } else {
-                  qty = Math.abs(qty);
-                  rupiah = Math.abs(rupiah);
+              const isStandardFuelUom = ['L', 'LTR', 'LITER'].includes(rawUom);
+              let parsedLiters = 0;
+              if (ce === '51100057') {
+                let isAcc = isStandardFuelUom;
+                if (!isAcc) {
+                  parsedLiters = extractLitersFromText(fullText);
+                  if (parsedLiters > 0 || /solar|dexlite|biodiesel|gasoline|bbm|bahan bakar/i.test(fullText) || !rawUom) {
+                    isAcc = true;
+                  }
                 }
-                debitRowsCount++;
-                newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'D', q: qty, u: 'L', r: rupiah, doc, n: name, p: plant });
-              } else if (ce === '90043002' || uom === 'KM' || ce === '90043003' || uom === 'HR' || uom === 'HM') {
-                const isKm = ce === '90043002' || uom === 'KM';
+                if (isAcc) {
+                  if (qty === 0 && parsedLiters > 0) qty = parsedLiters;
+                  if (isReversal) {
+                    qty = -Math.abs(qty);
+                    rupiah = -Math.abs(rupiah);
+                  } else {
+                    qty = Math.abs(qty);
+                    rupiah = Math.abs(rupiah);
+                  }
+                  debitRowsCount++;
+                  newDaily.push({ c: rawCc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'D', q: qty, u: 'L', r: rupiah, doc, n: name, p: plant });
+                }
+              } else if (ce === '90043002' || rawUom === 'KM' || ce === '90043003' || rawUom === 'HR' || rawUom === 'HM') {
+                const isKm = ce === '90043002' || rawUom === 'KM';
                 const cleanQty = Math.abs(qty);
                 const cleanName = name.split('|')[0].trim().toLowerCase();
-                const dedupKey = `${cc}_${dateStr || monthStr}_${isKm ? 'KM' : 'HM'}_${cleanQty}_${cleanName}`;
+                const dedupKey = `${rawCc}_${dateStr || monthStr}_${isKm ? 'KM' : 'HM'}_${cleanQty}_${cleanName}`;
                 if (!seenCreditFallbackKeys.has(dedupKey)) {
                   seenCreditFallbackKeys.add(dedupKey);
                   creditRowsCount++;
-                  newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'C', q: cleanQty, u: isKm ? 'KM' : 'HM', r: 0, doc, n: name, p: plant });
+                  newDaily.push({ c: rawCc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'C', q: cleanQty, u: isKm ? 'KM' : 'HM', r: 0, doc, n: name, p: plant });
                 }
               }
             }
@@ -2584,9 +2690,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         const creditK = Math.round(v.creditKm * 100) / 100;
         const creditH = Math.round(v.creditHm * 100) / 100;
 
-        // Apply Task 1 BBM Efficiency Evaluation Matrix (MID(5,3) with 10% tolerance)
-        const eff = evaluateFuelEfficiency(ccKey, debitL, creditK, creditH, resolvedObjectType);
-
+        // Apply Task 1 BBM Efficiency Evaluation Matrix (MID(5,3) with 10% tolerance & Standby handling)
+        const refText = `${refData.primary || ''} ${refData.all || ''} ${v.slarcRefPrimary || ''} ${v.description || ''}`;
+        const eff = evaluateFuelEfficiency(ccKey, debitL, creditK, creditH, resolvedObjectType, refText);
         const slarcTotal = creditK || creditH || 0;
         const zestTotal = refData.zestKmHmTotal;
         const diff = Math.round((slarcTotal - zestTotal) * 100) / 100;
@@ -2691,9 +2797,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         const creditK = Math.round((s.creditKm || 0) * 100) / 100;
         const creditH = Math.round((s.creditHm || 0) * 100) / 100;
 
-        // Apply Task 1 BBM Efficiency Evaluation Matrix (MID(5,3) with 10% tolerance)
-        const eff = evaluateFuelEfficiency(ccKey, debitL, creditK, creditH, resolvedObjectType);
-
+        // Apply Task 1 BBM Efficiency Evaluation Matrix (MID(5,3) with 10% tolerance & Standby handling)
+        const refText = `${refData.primary || ''} ${refData.all || ''} ${s.slarcRefPrimary || ''} ${s.description || ''}`;
+        const eff = evaluateFuelEfficiency(ccKey, debitL, creditK, creditH, resolvedObjectType, refText);
         const slarcTotal = creditK || creditH || 0;
         const zestTotal = refData.zestKmHmTotal;
         const diff = Math.round((slarcTotal - zestTotal) * 100) / 100;
@@ -2766,24 +2872,29 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     let hmVal = 0;
 
     fuelTableData.forEach(r => {
-      totalLiters += Math.abs(r.debitLiters || 0);
-      totalCost += Math.abs(r.debitRp || 0);
-      totalKm += Math.abs(r.creditKm || 0);
-      totalHm += Math.abs(r.creditHm || 0);
+      const debitL = Math.abs(r.debitLiters || 0);
+      const creditK = Math.abs(r.creditKm || 0);
+      const creditH = Math.abs(r.creditHm || 0);
+      const isStandby = r.efficiency?.isStandby;
 
-      if (Math.abs(r.creditKm || 0) > 0) {
-        kmLiters += Math.abs(r.debitLiters || 0);
-        kmVal += Math.abs(r.creditKm || 0);
+      totalLiters += debitL;
+      totalCost += Math.abs(r.debitRp || 0);
+      totalKm += creditK;
+      totalHm += creditH;
+
+      // Only count towards efficiency ratio if vehicle is actively operating with fuel (not standby/dummy)
+      if (!isStandby && debitL > 0 && creditK > 0) {
+        kmLiters += debitL;
+        kmVal += creditK;
       }
-      if (Math.abs(r.creditHm || 0) > 0) {
-        hmLiters += Math.abs(r.debitLiters || 0);
-        hmVal += Math.abs(r.creditHm || 0);
+      if (!isStandby && debitL > 0 && creditH > 0) {
+        hmLiters += debitL;
+        hmVal += creditH;
       }
     });
 
     const avgKmL = kmLiters > 0 && kmVal > 0 ? Number((kmVal / kmLiters).toFixed(2)) : 0;
     const avgLHm = hmVal > 0 && hmLiters > 0 ? Number((hmLiters / hmVal).toFixed(2)) : 0;
-
     return {
       totalLiters: Math.round(totalLiters * 100) / 100,
       totalCost: Math.round(totalCost),
@@ -2806,13 +2917,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       'Deskripsi Kendaraan': s.description || '-',
       'Reference': s.referenceAll || s.referencePrimary || '-',
       'Solar (Liter)': s.debitLiters || 0,
-      'KM / HM (SLARC)': s.creditKm > 0 ? `${s.creditKm} KM` : (s.creditHm > 0 ? `${s.creditHm} HM` : '-'),
-      'KM / HM (ZESTHLP16PA)': s.zestTotalKmHm > 0 ? s.zestTotalKmHm : '-',
+      'ACTIVITY (SLARC)': s.creditKm > 0 ? `${s.creditKm} KM` : (s.creditHm > 0 ? `${s.creditHm} HM` : '-'),
+      'ACTIVITY (ZESTHLP16PA)': s.zestTotalKmHm > 0 ? `${s.zestTotalKmHm} ${s.creditHm > 0 ? 'HM' : 'KM'}` : '-',
       'Selisih (Variance)': s.varianceKmHm !== 0 ? s.varianceKmHm : 0,
-      'Rasio / Efisiensi': s.efficiency && s.efficiency.ratioVal > 0 ? `${s.efficiency.ratioVal} ${s.efficiency.uom}` : (s.kmPerLiter > 0 ? `${s.kmPerLiter} KM/L` : (s.literPerHm > 0 ? `${s.literPerHm} L/HM` : '-')),
+      'Rasio / Efisiensi': s.efficiency?.isStandby ? 'Standby / Rusak' : (s.efficiency?.isNoFuel ? 'Tanpa Solar' : (s.efficiency && s.efficiency.ratioVal > 0 ? `${s.efficiency.ratioVal} ${s.efficiency.uom}` : (s.kmPerLiter > 0 ? `${s.kmPerLiter} KM/L` : (s.literPerHm > 0 ? `${s.literPerHm} L/HM` : '-')))),
       'Evaluasi BBM': s.efficiency ? `${s.efficiency.badgeLabel} (${s.efficiency.targetText})` : s.status,
       'Biaya Solar (Rp)': s.debitRp || 0,
-      'Biaya Solar / L (Rp)': Math.abs(s.debitLiters || 0) > 0 ? Math.round(Math.abs(s.debitRp || 0) / Math.abs(s.debitLiters || 0)) : 0
+      'Biaya Solar / L (Rp)': Math.abs(s.debitLiters || 0) > 0 ? Math.round(Math.abs(s.debitRp || 0) / Math.abs(s.debitLiters || 0)) : 0,
+      'Status': s.efficiency?.isStandby ? 'STANDBY' : s.status
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Evaluasi BBM');
 
@@ -2847,7 +2959,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       'Waktu':            l.vehicle_time,
       'Job Code':         l.job_code,
       'Deskripsi Job':    JOB_CODE_DESC[l.job_code] || '-',
-      'HM/KM':            l.hm_km,
+      'ACTIVITY':         l.hm_km,
       'Unit':             l.unit_value,
       'UoM':              l.uom,
       'Lokasi':           l.location_code,
@@ -3672,7 +3784,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                                         <th className="text-center py-2 px-2">Tanggal</th>
                                         <th className="text-center py-2 px-2">Operator (Supir)</th>
                                         <th className="text-center py-2 px-2">Pekerjaan</th>
-                                        <th className="py-2 px-2 text-center">HM/KM</th>
+                                        <th className="py-2 px-2 text-center">ACTIVITY</th>
                                         <th className="py-2 px-2 text-center">Hasil Angkut</th>
                                         <th className="text-center py-2 px-2">SPBS No.</th>
                                         <th className="text-center py-2 px-2">Lokasi</th>
@@ -4002,7 +4114,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     <th className="px-3 py-3 text-center">Tx. Aktif</th>
                     <th className="px-3 py-3 text-center">Dibatalkan</th>
                     <th className="px-3 py-3 text-center">Total Unit</th>
-                    <th className="px-3 py-3 text-center">Total HM/KM</th>
+                    <th className="px-3 py-3 text-center">Total Activity</th>
                     <th className="px-3 py-3 text-center">Job Code</th>
                     <th className="px-3 py-3 text-center">Operator</th>
                     <th className="px-3 py-3 text-center">Last Input</th>
@@ -4141,7 +4253,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     <th className="px-3 py-3 text-center">Tanggal</th>
                     <th className="px-3 py-3 text-center">Waktu</th>
                     <th className="px-3 py-3 text-center">Job Code</th>
-                    <th className="px-3 py-3 text-center">HM/KM</th>
+                    <th className="px-3 py-3 text-center">ACTIVITY</th>
                     <th className="px-3 py-3 text-center">Unit</th>
                     <th className="px-3 py-3 text-center">UoM</th>
                     <th className="px-3 py-3 text-center">Reference</th>
@@ -4532,155 +4644,218 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
     {activeTab === 'fuel-evaluation' && (
       <div className="relative z-10 bg-white/95 backdrop-blur-xs rounded-2xl border border-slate-300 shadow-sm overflow-hidden max-w-[1400px] mx-auto w-full font-sans">
-        {/* ── Single Unified Filter Bar with Fieldset for Multi-Month & Date Range ── */}
-        <div className="p-4 border-b border-slate-200 bg-slate-50/80 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px] flex flex-col gap-3.5 no-print">
-          {/* Fieldset: Filter Periode (Multi-Bulan & Rentang Tanggal) */}
-          <fieldset className="border border-slate-300 rounded-2xl p-3 sm:p-4 bg-white/80 shadow-2xs">
-            <legend className="px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider text-emerald-950 bg-emerald-100/90 rounded-md border border-emerald-300 flex items-center gap-1.5 shadow-2xs">
-              <Calendar size={13} className="text-emerald-700" />
-              Filter Periode (Multi-Bulan & Rentang Tanggal)
-            </legend>
-
-            <div className="flex flex-col gap-3">
-              {/* Row 1: Tahun & Clickable Multi-Month Selection Pills */}
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                {/* Tahun Selection */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Tahun:</span>
-                  <select
-                    value={fuelYear}
-                    onChange={e => { setFuelYear(e.target.value); setFuelPage(1); }}
-                    className="px-2.5 py-1 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 cursor-pointer"
-                  >
-                    {fuelAvailableYears.map(yr => (
-                      <option key={yr} value={yr}>{yr}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="h-4 w-px bg-slate-300 hidden sm:block" />
-
-                {/* Multi-Month Clickable Pills */}
-                <div className="flex flex-wrap items-center gap-1 flex-1">
-                  <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mr-1">Bulan:</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (fuelMonths.includes('ALL')) {
-                        setFuelMonths(['09']);
-                      } else {
-                        setFuelMonths(['ALL']);
-                      }
-                      setFuelPage(1);
-                    }}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer border ${
-                      fuelMonths.includes('ALL')
-                        ? 'bg-emerald-700 text-white border-emerald-800 shadow-2xs'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    Semua Bulan
-                  </button>
-                  {MONTH_NAMES.map(m => {
-                    const isSelected = fuelMonths.includes('ALL') || fuelMonths.includes(m.val);
-                    return (
-                      <button
-                        key={m.val}
-                        type="button"
-                        onClick={() => {
-                          setFuelPage(1);
-                          if (fuelMonths.includes('ALL')) {
-                            setFuelMonths([m.val]);
-                          } else if (fuelMonths.includes(m.val)) {
-                            const next = fuelMonths.filter(x => x !== m.val);
-                            setFuelMonths(next.length === 0 ? ['ALL'] : next);
-                          } else {
-                            const next = [...fuelMonths, m.val].sort();
-                            if (next.length === 12) setFuelMonths(['ALL']);
-                            else setFuelMonths(next);
-                          }
-                        }}
-                        className={`px-2 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer border ${
-                          isSelected && !fuelMonths.includes('ALL')
-                            ? 'bg-emerald-700 text-white border-emerald-800 shadow-2xs'
-                            : isSelected && fuelMonths.includes('ALL')
-                            ? 'bg-emerald-100 text-emerald-900 border-emerald-300 font-extrabold'
-                            : 'bg-white text-slate-600 border-slate-200 hover:bg-emerald-50 hover:text-emerald-900'
-                        }`}
-                        title={`Pilih bulan ${m.label}`}
-                      >
-                        {m.val} {m.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Row 2: Date Range Picker (Tanggal Mulai s/d Tanggal Akhir) */}
-              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/80">
-                <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1">
-                  <Calendar size={11} className="text-slate-400" /> Rentang Tanggal (Opsional):
-                </span>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-slate-400 font-bold">Mulai:</span>
-                    <input
-                      type="date"
-                      value={fuelStartDate}
-                      onChange={e => { setFuelStartDate(e.target.value); setFuelPage(1); }}
-                      className="px-2.5 py-1 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 cursor-pointer"
-                    />
-                  </div>
-                  <span className="text-slate-400 text-xs font-bold">s/d</span>
-                  <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-slate-400 font-bold">Akhir:</span>
-                    <input
-                      type="date"
-                      value={fuelEndDate}
-                      onChange={e => { setFuelEndDate(e.target.value); setFuelPage(1); }}
-                      className="px-2.5 py-1 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 cursor-pointer"
-                    />
-                  </div>
-                  {(fuelStartDate || fuelEndDate) && (
-                    <button
-                      type="button"
-                      onClick={() => { setFuelStartDate(''); setFuelEndDate(''); setFuelPage(1); }}
-                      className="text-[10px] font-bold text-red-600 hover:text-red-700 px-2 py-0.5 rounded-md hover:bg-red-50 border border-red-200 transition cursor-pointer flex items-center gap-1"
-                    >
-                      ✕ Reset Rentang Tanggal
-                    </button>
-                  )}
-                </div>
-              </div>
+        {/* ── Single Unified Filter Bar (Compact Row with Month Checkbox Dropdown) ── */}
+        <div className="p-4 border-b border-slate-200 bg-slate-50/80 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px] flex flex-col md:flex-row md:items-center justify-between gap-3 flex-wrap no-print">
+          <div className="flex items-center gap-2.5 flex-wrap flex-1">
+            {/* 1. Pilih Tahun */}
+            <div className="flex flex-col">
+              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-0.5">Tahun</label>
+              <select
+                value={fuelYear}
+                onChange={e => { setFuelYear(e.target.value); setFuelPage(1); }}
+                className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 cursor-pointer"
+              >
+                {fuelAvailableYears.map(yr => (
+                  <option key={yr} value={yr}>{yr}</option>
+                ))}
+              </select>
             </div>
-          </fieldset>
 
-          {/* Row below fieldset: Kebun / Unit, Search, Action buttons */}
-          <div className="flex flex-wrap items-center gap-3 justify-between">
-            <div className="flex flex-wrap items-center gap-3 flex-1">
-              {/* 4. Kebun / Unit Filter */}
-              <div className="flex items-center gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Kebun / Unit:</label>
-                {isAdmin ? (
-                  <select
-                    value={fuelPlant}
-                    onChange={e => { setFuelPlant(e.target.value); setFuelPage(1); }}
-                    className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 max-w-[200px] cursor-pointer"
-                  >
-                    <option value="ALL">Semua Kebun / Unit</option>
-                    {allPlantsList.map(p => (
-                      <option key={p.code} value={p.code}>{p.code} - {p.desc}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800">
-                    {currentUser?.plant || selectedPlant}
-                  </div>
+            {/* 2. Pilih Bulan (Centang Dropdown / Multi-Select) */}
+            <div className="flex flex-col relative" ref={monthDropdownRef}>
+              <div className="flex items-center justify-between mb-0.5">
+                <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Bulan</label>
+                {fuelMonths.length > 1 && !fuelMonths.includes('ALL') && (
+                  <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-100 px-1 rounded ml-1">
+                    {fuelMonths.length} bln
+                  </span>
                 )}
               </div>
+              <button
+                type="button"
+                onClick={() => setShowMonthDropdown(prev => !prev)}
+                className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 flex items-center justify-between gap-2 min-w-[170px] cursor-pointer text-left shadow-2xs"
+                title="Klik untuk memilih bulan (dapat memilih bulan 1-9, bulan 1-8, atau centang bebas)"
+              >
+                <span className="truncate">{monthDropdownLabel}</span>
+                <ChevronDown size={14} className={`text-slate-400 transition-transform ${showMonthDropdown ? 'rotate-180' : ''}`} />
+              </button>
 
-              {/* 5. Pencarian (Plat / Equipment / Cost Center / Reference) */}
-              <div className="relative flex-1 min-w-[220px]">
+              {/* Popover / Dropdown Menu dengan Centang (Checkboxes) */}
+              {showMonthDropdown && (
+                <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 w-80 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-700">Pilih Bulan (Centang)</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowMonthDropdown(false)}
+                      className="text-slate-400 hover:text-slate-600 p-0.5"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+
+                  {/* Preset Shortcuts: Bulan 1-9, Bulan 1-8, Semua Bulan */}
+                  <div className="flex flex-wrap gap-1 mb-2.5 pb-2 border-b border-slate-100 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFuelMonths(['01', '02', '03', '04', '05', '06', '07', '08', '09']);
+                        setFuelPage(1);
+                      }}
+                      className="px-2 py-0.5 rounded-md font-bold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 cursor-pointer"
+                      title="Pilih Bulan 1 sampai 9 (Januari - September)"
+                    >
+                      Bulan 1 - 9
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFuelMonths(['01', '02', '03', '04', '05', '06', '07', '08']);
+                        setFuelPage(1);
+                      }}
+                      className="px-2 py-0.5 rounded-md font-bold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 cursor-pointer"
+                      title="Pilih Bulan 1 sampai 8 (Januari - Agustus)"
+                    >
+                      Bulan 1 - 8
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFuelMonths(['ALL']);
+                        setFuelPage(1);
+                      }}
+                      className="px-2 py-0.5 rounded-md font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300 cursor-pointer"
+                    >
+                      Semua
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFuelMonths(['09']);
+                        setFuelPage(1);
+                      }}
+                      className="px-2 py-0.5 rounded-md font-bold text-slate-500 hover:text-slate-700 border border-slate-200 cursor-pointer ml-auto"
+                    >
+                      Bulan 09
+                    </button>
+                  </div>
+
+                  {/* 12 Months Checkbox Grid */}
+                  <div className="grid grid-cols-2 gap-1 max-h-56 overflow-y-auto pr-1">
+                    {MONTH_NAMES.map(m => {
+                      const isChecked = fuelMonths.includes('ALL') || fuelMonths.includes(m.val);
+                      return (
+                        <label
+                          key={m.val}
+                          className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition select-none ${
+                            isChecked ? 'bg-emerald-50/80 text-emerald-950 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              setFuelPage(1);
+                              if (fuelMonths.includes('ALL')) {
+                                const all12 = MONTH_NAMES.map(x => x.val);
+                                const next = all12.filter(x => x !== m.val);
+                                setFuelMonths(next);
+                              } else if (fuelMonths.includes(m.val)) {
+                                const next = fuelMonths.filter(x => x !== m.val);
+                                setFuelMonths(next.length === 0 ? ['09'] : next);
+                              } else {
+                                const next = [...fuelMonths, m.val].sort();
+                                if (next.length === 12) setFuelMonths(['ALL']);
+                                else setFuelMonths(next);
+                              }
+                            }}
+                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer w-3.5 h-3.5"
+                          />
+                          <span>{m.val} - {m.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  {/* Dropdown Footer */}
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-2 text-[10px]">
+                    <span className="text-slate-400 font-medium">
+                      {fuelMonths.includes('ALL') ? '12 bulan dipilih' : `${fuelMonths.length} bulan dipilih`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowMonthDropdown(false)}
+                      className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold transition shadow-xs cursor-pointer"
+                    >
+                      Terapkan
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 3. Rentang Tanggal (Optional / Drill-down) */}
+            <div className="flex flex-col">
+              <div className="flex items-center justify-between mb-0.5">
+                <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Tanggal (Opsional)</label>
+                {(fuelStartDate || fuelEndDate) && (
+                  <button
+                    type="button"
+                    onClick={() => { setFuelStartDate(''); setFuelEndDate(''); setFuelPage(1); }}
+                    className="text-[9px] font-bold text-red-600 hover:text-red-700 ml-1.5 cursor-pointer"
+                    title="Reset rentang tanggal"
+                  >
+                    ✕ Reset
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                <input
+                  type="date"
+                  value={fuelStartDate}
+                  onChange={e => { setFuelStartDate(e.target.value); setFuelPage(1); }}
+                  placeholder="Mulai"
+                  className="px-2.5 py-1.5 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30"
+                  title="Tanggal Mulai"
+                />
+                <span className="text-slate-400 text-xs font-bold">s/d</span>
+                <input
+                  type="date"
+                  value={fuelEndDate}
+                  onChange={e => { setFuelEndDate(e.target.value); setFuelPage(1); }}
+                  placeholder="Akhir"
+                  className="px-2.5 py-1.5 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30"
+                  title="Tanggal Akhir"
+                />
+              </div>
+            </div>
+
+            {/* 4. Kebun / Unit Filter */}
+            <div className="flex flex-col">
+              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-0.5">Kebun / Unit</label>
+              {isAdmin ? (
+                <select
+                  value={fuelPlant}
+                  onChange={e => { setFuelPlant(e.target.value); setFuelPage(1); }}
+                  className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 max-w-[190px] cursor-pointer"
+                >
+                  <option value="ALL">Semua Kebun / Unit</option>
+                  {allPlantsList.map(p => (
+                    <option key={p.code} value={p.code}>{p.code} - {p.desc}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800">
+                  {currentUser?.plant || selectedPlant}
+                </div>
+              )}
+            </div>
+
+            {/* 5. Pencarian (Plat / Equipment / Cost Center / Reference) */}
+            <div className="flex flex-col flex-1 min-w-[210px]">
+              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-0.5">Cari Kendaraan / Rute</label>
+              <div className="relative">
                 <Search className="absolute left-3 top-2 text-slate-400" size={14} />
                 <input
                   type="text"
@@ -4691,22 +4866,22 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 />
               </div>
             </div>
+          </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={handlePrint}
-                className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
-              >
-                <Printer size={13} /> Cetak
-              </button>
-              <button
-                onClick={handleExportFuel}
-                className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
-              >
-                <FileDown size={13} /> Ekspor Excel
-              </button>
-            </div>
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 shrink-0 self-end">
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
+            >
+              <Printer size={13} /> Cetak
+            </button>
+            <button
+              onClick={handleExportFuel}
+              className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
+            >
+              <FileDown size={13} /> Ekspor Excel
+            </button>
           </div>
         </div>
 
@@ -4833,7 +5008,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     Solar (Liter)
                   </th>
                   <th className="sticky top-0 z-30 bg-[#eff6ff] text-blue-950 font-black border-r border-blue-200 border-b border-slate-300 px-3 py-3 text-center w-36">
-                    KM / HM
+                    ACTIVITY
                   </th>
                   <th className="sticky top-0 z-30 bg-[#ecfdf5] text-emerald-950 font-black border-r border-emerald-200 border-b border-slate-300 px-3 py-3 text-center w-36">
                     Rasio / Efisiensi
@@ -4952,7 +5127,21 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
                           {/* 9. Rasio / Efisiensi */}
                           <td className="px-3 py-2.5 text-center bg-emerald-50/30 border-r border-emerald-100 whitespace-nowrap">
-                            {row.efficiency && row.efficiency.ratioVal > 0 ? (
+                            {row.efficiency?.isStandby ? (
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs tracking-wide"
+                                title="Kendaraan Standby / Rusak / Libur (Dummy 1 KM/HM SAP, tidak dihitung efisiensi)"
+                              >
+                                Standby / Rusak
+                              </span>
+                            ) : row.efficiency?.isNoFuel ? (
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs"
+                                title="Aktivitas operasional tercatat tanpa pemakaian BBM pada Cost Center ini (Unit Sewa / Pool BBM Luar)"
+                              >
+                                Tanpa Solar
+                              </span>
+                            ) : row.efficiency && row.efficiency.ratioVal > 0 ? (
                               <div className="flex flex-col items-center justify-center">
                                 <span
                                   className={`font-mono font-black text-xs px-2.5 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap shadow-2xs ${
@@ -5282,7 +5471,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 >
                   <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-blue-900 uppercase">
                     <Activity size={11} className="text-blue-600" />
-                    <span>{isDevUser ? '2. KM/HM (SLARC Ringkasan)' : '2. KM/HM'}</span>
+                    <span>{isDevUser ? '2. ACTIVITY (SLARC Ringkasan)' : '2. ACTIVITY'}</span>
                   </div>
                   <div className="text-lg font-black text-blue-900 font-mono mt-0.5">
                     {slarcTotal.toLocaleString('id-ID')} <span className="text-xs font-bold text-slate-500">{uomLabel}</span>
@@ -5359,7 +5548,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Activity size={13} className="text-indigo-600" /> Verifikasi KM/HM ({reconciliationRows.length})
+                <Activity size={13} className="text-indigo-600" /> Verifikasi Activity ({reconciliationRows.length})
               </button>
               <button
                 onClick={() => setFuelModalTab('zest')}
@@ -5512,7 +5701,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           <th className="px-3 py-1.5 text-center w-24">Tanggal</th>
                           <th className="px-3 py-1.5 text-center w-48">Reference (Rute / Pemakaian)</th>
                           <th className="px-3 py-1.5 text-center">Remarks (Catatan)</th>
-                          <th className="px-3 py-1.5 text-center w-20">HM/KM</th>
+                          <th className="px-3 py-1.5 text-center w-20">ACTIVITY</th>
                           <th className="px-3 py-1.5 text-center w-24">Operator</th>
                           <th className="px-3 py-1.5 text-center w-24">Lokasi</th>
                         </tr>
