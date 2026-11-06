@@ -190,9 +190,9 @@ const memoryCache = new Map();
 // ============================================================
 // DAILY LOGS IN-MEMORY CACHE
 // Hanya di memori (tidak localStorage/sessionStorage), sehingga:
-// - Refresh halaman â†’ cache kosong â†’ data selalu fresh dari Supabase âœ…
-// - Ganti filter plant/bulan dalam sesi yg sama â†’ pakai cache (cepat) âœ…
-// - Setelah save/upload data baru â†’ cache di-invalidate â†’ fetch ulang âœ…
+// - Refresh halaman -> cache kosong -> data selalu fresh dari Supabase
+// - Ganti filter plant/bulan dalam sesi yg sama -> pakai cache (cepat)
+// - Setelah save/upload data baru -> cache di-invalidate -> fetch ulang
 // ============================================================
 const dailyLogsCache = new Map(); // key: "plant__yearMonth"
 
@@ -662,7 +662,7 @@ export async function getGSheetHistory() {
 // VEHICLES (ZESTHLP16PA)
 // ============================================================
 
-// â”€â”€ Vehicle Master & Logs (stored in hierarchy_data id=8 & id=9) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Vehicle Master & Logs (stored in hierarchy_data id=8 & id=9) ────────────────────
 
 const VEHICLE_CACHE_KEY_MASTER = 'veh_master_cache_v1';
 const VEHICLE_CACHE_KEY_LOGS   = 'veh_logs_cache_v1';
@@ -702,7 +702,7 @@ export async function fetchVehicleMaster(forceRefresh = false) {
   return { data: result, error: null };
 }
 
-// â”€â”€ Vehicle Logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Vehicle Logs ───────────────────────────────────────────────────────────────────
 
 export async function fetchVehicleLogs(forceRefresh = false) {
   if (!supabase) return { data: [], error: 'Supabase not configured' };
@@ -739,7 +739,7 @@ export async function fetchVehicleLogs(forceRefresh = false) {
   return { data: result, error: null };
 }
 
-// â”€â”€ Invalidate vehicle caches â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Invalidate vehicle caches ─────────────────────────────────────────────────────
 export function invalidateVehicleCache() {
   memoryCache.delete(VEHICLE_CACHE_KEY_MASTER);
   memoryCache.delete(VEHICLE_CACHE_KEY_LOGS);
@@ -755,7 +755,7 @@ export function invalidateVehicleCache() {
   try { localStorage.removeItem(cacheKeyLogs); } catch (e) {}
 }
 
-// â”€â”€ Save Vehicle Data (stored in hierarchy_data id=8 & id=9) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Save Vehicle Data (stored in hierarchy_data id=8 & id=9) ──────────────────────
 
 export async function saveVehicleData(vehicles, logs) {
   if (!supabase) return { error: 'Supabase not configured' };

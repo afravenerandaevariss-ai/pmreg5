@@ -14,7 +14,7 @@ import { toPng } from 'html-to-image';
 import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, invalidateVehicleCache, fetchMasterEquipment, fetchZCOData, saveZCOData, getSystemConfig, fetchDailyLogs, fetchFuelData, saveFuelData, fetchFuelDailyForMonth, saveFuelDailyForMonth, makeFuelTxKey } from '../lib/supabaseService';
 import WhatsAppSenderModal from './WhatsAppSenderModal';
 
-// â”€â”€â”€ Plant Master Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Plant Master Data ────────────────────────────────────────────────────────
 const PLANT_INFO = {
   // Kal-Bar
   "5E01": { desc: "KEBUN GUNUNG MELIAU",    wilayah: "Kal-Bar" },
@@ -52,7 +52,7 @@ const PLANT_INFO = {
   "5E19": { desc: "KEBUN LONGKALI",         wilayah: "Kal-Tim" },
 };
 
-// â”€â”€â”€ Job Code Master â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Job Code Master ──────────────────────────────────────────────────────────
 const JOB_CODE_DESC = {
   "11210": "Angkut Hasil Panen (Lain)",
   "11602": "Angkut Bahan (Kebun)",
@@ -83,10 +83,10 @@ const JOB_CODE_DESC = {
   "EQ002": "Equipment Maintenance",
 };
 
-// â”€â”€â”€ UoM Labels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── UoM Labels ───────────────────────────────────────────────────────────────
 const UOM_LABEL = { KG: "Kilogram", KM: "Kilometer", HM: "Jam Operasi", M: "Meter", HA: "Hektar", M3: "Meter Kubik", HK: "Hari Kerja" };
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function excelSerialToDate(serial) {
   const utcDays = Math.floor(serial - 25569);
   const dateInfo = new Date(utcDays * 86400 * 1000);
@@ -122,6 +122,80 @@ export function parseSapNumber(raw) {
   return isNeg ? -num : num;
 }
 
+
+// ─── Fuel Efficiency Evaluation Rules Matrix (MID(5,3) with 10% Tolerance) ────
+export const VEHICLE_EFFICIENCY_RULES = {
+  CAR: { name: 'Mobil Penumpang', type: 'KM/L', target: 7.0, tolerance: 0.10, desc: 'Min 7.0 KM/L' },
+  DTR: { name: 'Dump Truck',      type: 'KM/L', target: 5.0, tolerance: 0.10, desc: 'Min 5.0 KM/L' },
+  MOT: { name: 'Sepeda Motor',    type: 'KM/L', target: 30.0, tolerance: 0.10, desc: 'Min 30.0 KM/L' },
+  QUT: { name: 'Quick Truck',     type: 'L/HM', target: 1.5, tolerance: 0.10, desc: 'Maks 1.5 L/HM' },
+  WLD: { name: 'Mini Wheel Dump', type: 'L/HM', target: 5.5, tolerance: 0.10, desc: 'Maks 5.5 L/HM' },
+  TRA: { name: 'Wheel Tractor',   type: 'L/HM', target: 7.0, tolerance: 0.10, desc: 'Maks 7.0 L/HM' },
+  COM: { name: 'Compactor',       type: 'L/HM', target: 8.0, tolerance: 0.10, desc: 'Maks 8.0 L/HM' },
+  TRB: { name: 'Traktor Besar',   type: 'L/HM', target: 9.0, tolerance: 0.10, desc: 'Maks 9.0 L/HM' },
+  GRA: { name: 'Motor Grader',    type: 'L/HM', target: 12.0, tolerance: 0.10, desc: 'Maks 12.0 L/HM' },
+  WLO: { name: 'Wheel Loader',    type: 'L/HM', target: 12.0, tolerance: 0.10, desc: 'Maks 12.0 L/HM' },
+  EXC: { name: 'Excavator',       type: 'L/HM', target: 18.0, tolerance: 0.10, desc: 'Maks 18.0 L/HM' },
+};
+
+export function getVehicleTypeCode(costCenter, fallbackType = '') {
+  const cc = String(costCenter || '').trim().toUpperCase();
+  if (cc.length >= 7) {
+    const code = cc.substring(4, 7);
+    if (VEHICLE_EFFICIENCY_RULES[code]) return code;
+  }
+  const fb = String(fallbackType || '').trim().toUpperCase();
+  if (VEHICLE_EFFICIENCY_RULES[fb]) return fb;
+  for (const k of Object.keys(VEHICLE_EFFICIENCY_RULES)) {
+    if (cc.includes(k) || fb.includes(k)) return k;
+  }
+  return 'CAR';
+}
+
+export function evaluateFuelEfficiency(costCenter, debitLiters, creditKm, creditHm, fallbackType = '') {
+  const code = getVehicleTypeCode(costCenter, fallbackType);
+  const rule = VEHICLE_EFFICIENCY_RULES[code] || VEHICLE_EFFICIENCY_RULES.CAR;
+  const isKmL = rule.type === 'KM/L';
+  const debitL = Math.max(0, parseFloat(debitLiters) || 0);
+  const creditK = Math.max(0, parseFloat(creditKm) || 0);
+  const creditH = Math.max(0, parseFloat(creditHm) || 0);
+
+  if (debitL === 0 && creditK === 0 && creditH === 0) {
+    return { status: 'NO_DATA', ratioVal: 0, uom: rule.type, color: 'slate', badgeLabel: 'Tanpa Data', targetText: rule.desc, rule, code };
+  }
+  if (debitL === 0) {
+    return { status: 'NO_FUEL', ratioVal: 0, uom: rule.type, color: 'slate', badgeLabel: 'Tanpa Solar', targetText: rule.desc, rule, code };
+  }
+  if ((isKmL && creditK === 0) || (!isKmL && creditH === 0)) {
+    return { status: 'NO_ACTIVITY', ratioVal: 0, uom: rule.type, color: 'amber', badgeLabel: isKmL ? 'Tanpa KM' : 'Tanpa HM', targetText: rule.desc, rule, code };
+  }
+
+  if (isKmL) {
+    const ratio = Number((creditK / debitL).toFixed(2));
+    const targetMin = rule.target;
+    const warningMin = Number((targetMin * (1 - rule.tolerance)).toFixed(2)); // 10% tolerance
+
+    if (ratio >= targetMin) {
+      return { status: 'OPTIMAL', ratioVal: ratio, uom: 'KM/L', color: 'emerald', badgeLabel: 'Efisien', targetText: rule.desc, rule, code };
+    } else if (ratio >= warningMin) {
+      return { status: 'NORMAL', ratioVal: ratio, uom: 'KM/L', color: 'amber', badgeLabel: 'Waspada (10%)', targetText: rule.desc, rule, code };
+    } else {
+      return { status: 'BOROS', ratioVal: ratio, uom: 'KM/L', color: 'red', badgeLabel: 'Boros', targetText: rule.desc, rule, code };
+    }
+  } else {
+    const ratio = Number((debitL / creditH).toFixed(2));
+    const targetMax = rule.target;
+    const warningMax = Number((targetMax * (1 + rule.tolerance)).toFixed(2)); // 10% tolerance
+
+    if (ratio <= targetMax) {
+      return { status: 'OPTIMAL', ratioVal: ratio, uom: 'L/HM', color: 'emerald', badgeLabel: 'Efisien', targetText: rule.desc, rule, code };
+    } else if (ratio <= warningMax) {
+      return { status: 'NORMAL', ratioVal: ratio, uom: 'L/HM', color: 'amber', badgeLabel: 'Waspada (10%)', targetText: rule.desc, rule, code };
+    } else {
+      return { status: 'BOROS', ratioVal: ratio, uom: 'L/HM', color: 'red', badgeLabel: 'Boros', targetText: rule.desc, rule, code };
+    }
+  }
+}
 
 function formatDateStr(rawDate) {
   if (rawDate === undefined || rawDate === null || rawDate === '') return null;
@@ -180,7 +254,7 @@ const StatusBadge = ({ status, text }) => {
   );
 };
 
-// â”€â”€â”€ WA Schedule Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── WA Schedule Badge ────────────────────────────────────────────────────────
 function WAScheduleBadge({ onOpen }) {
   const [countdown, setCountdown] = React.useState('');
   const [nextLabel, setNextLabel] = React.useState('');
@@ -255,14 +329,14 @@ function WAScheduleBadge({ onOpen }) {
       <span className={`font-mono text-[11px] px-1.5 py-0.5 rounded-lg ${
         isActive ? 'bg-emerald-200 text-emerald-900' : 'bg-slate-200 text-slate-600'
       }`}>
-        {isActive ? 'ðŸŸ¢ Segera!' : countdown}
+        {isActive ? '🟢 Segera!' : countdown}
       </span>
       <Clock size={11} className="text-slate-400" />
     </button>
   );
 }
 
-// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   // Dev-only check: strictly true in local dev / localhost only
   const isLocalDev = Boolean(
@@ -270,14 +344,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname))
   );
 
-  // â”€â”€â”€ Role Detection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Normalize role string â€” handles all DB variants: 'USER','Unit','unit','UNIT'
+  // ─── Role Detection ────────────────────────────────────────────────────────
+  // Normalize role string — handles all DB variants: 'USER','Unit','unit','UNIT'
   const roleUpper = currentUser?.role?.toUpperCase() || '';
 
   // Strictly role DEV only (ADMIN and USER are both hidden)
   const isDevUser = roleUpper === 'DEV';
 
-  // Explicit USER/UNIT check â€” blocks regardless of plant value
+  // Explicit USER/UNIT check — blocks regardless of plant value
   const isUserRole = roleUpper === 'USER' || roleUpper === 'UNIT';
 
   // ADMIN if: role is Admin/ADMIN/REGIONAL/DEV OR plant is ALL/5R00
@@ -354,12 +428,17 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [lastRefreshed, setLastRefreshed] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(''); // granular status during upload
 
-  // â”€â”€ Fuel Evaluation State (Simplified & Unified) â”€â”€
+  // ── Fuel Evaluation State (Simplified & Unified) ──
   const [fuelData, setFuelData] = useState({ summaries: [], daily: [] });
   const [fuelUploadInfo, setFuelUploadInfo] = useState(null);
   const [fuelYear, setFuelYear] = useState('2026');
-  const [fuelMonth, setFuelMonth] = useState('09');
-  const [fuelDate, setFuelDate] = useState('');
+  const [fuelMonths, setFuelMonths] = useState(['09']); // multi-month array: e.g. ['09'], ['09', '10'], or ['ALL']
+  const [fuelStartDate, setFuelStartDate] = useState(''); // YYYY-MM-DD
+  const [fuelEndDate, setFuelEndDate]     = useState(''); // YYYY-MM-DD
+
+  // Backward-compatible computed helpers
+  const fuelMonth = fuelMonths.length === 1 ? fuelMonths[0] : (fuelMonths.includes('ALL') ? 'ALL' : fuelMonths.join(', '));
+  const fuelDate = (fuelStartDate && fuelEndDate && fuelStartDate === fuelEndDate) ? fuelStartDate : (fuelStartDate || fuelEndDate || '');
   const [fuelPlant, setFuelPlant] = useState('ALL');
   const [searchFuel, setSearchFuel] = useState('');
   // Track which months have been lazy-loaded from per-month storage (IDs 230101-230112)
@@ -369,15 +448,15 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [fuelModalTab, setFuelModalTab] = useState('zest'); // 'zest' | 'debit' | 'credit'
   const FUEL_PAGE_SIZE = 25;
 
-  // â”€â”€ Load Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // isManualRefresh: true  â†’ tombol Refresh diklik, force-fetch vehicle_logs & master_map dari server
-  //                  false â†’ initial load, prioritaskan cache dulu agar cepat
+  // ── Load Data ────────────────────────────────────────────────────────────────
+  // isManualRefresh: true  → tombol Refresh diklik, force-fetch vehicle_logs & master_map dari server
+  //                  false → initial load, prioritaskan cache dulu agar cepat
   const loadData = useCallback(async (isManualRefresh = false) => {
     setLoading(true);
     setError(null);
     try {
       // vehicle_logs (2.2k+ rows, 2 halaman PostgREST) butuh ~19s di PROD.
-      // Timeout 15s membuat fallback {data:[]} menang balapan â†’ seluruh transaksi tampil 0.
+      // Timeout 15s membuat fallback {data:[]} menang balapan → seluruh transaksi tampil 0.
       const TIMEOUT_MS = 90000;
       const withTimeout = (promise, fallback = { data: [], error: null }) =>
         Promise.race([
@@ -385,9 +464,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           new Promise(resolve => setTimeout(() => resolve(fallback), TIMEOUT_MS))
         ]);
 
-      // vehicle_logs â†’ selalu force-fetch saat manual refresh (transaksi aktif berubah sering)
-      // vehicle_master, zco â†’ force saat manual refresh
-      // masterEquipment â†’ cukup cache (jarang berubah, data besar)
+      // vehicle_logs → selalu force-fetch saat manual refresh (transaksi aktif berubah sering)
+      // vehicle_master, zco → force saat manual refresh
+      // masterEquipment → cukup cache (jarang berubah, data besar)
       const [vRes, lRes, eqRes, zRes, mapRes, fRes] = await Promise.all([
         withTimeout(fetchVehicleMaster(isManualRefresh),            { data: [], error: null }),
         withTimeout(fetchVehicleLogs(isManualRefresh),              { data: [], error: null }),
@@ -448,6 +527,47 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
   useEffect(() => { loadData(false); }, [loadData]);
 
+  // Automatically lazy-load monthly daily records when a date range is active
+  useEffect(() => {
+    if (!fuelStartDate && !fuelEndDate) return;
+    const sMonth = fuelStartDate ? fuelStartDate.substring(0, 7) : `${fuelYear}-09`;
+    const eMonth = fuelEndDate ? fuelEndDate.substring(0, 7) : sMonth;
+
+    const monthsToLoad = new Set();
+    const sYr = parseInt(sMonth.substring(0, 4));
+    const sM = parseInt(sMonth.substring(5, 7));
+    const eYr = parseInt(eMonth.substring(0, 4));
+    const eM = parseInt(eMonth.substring(5, 7));
+
+    for (let y = sYr; y <= eYr; y++) {
+      const startMo = y === sYr ? sM : 1;
+      const endMo = y === eYr ? eM : 12;
+      for (let m = startMo; m <= endMo; m++) {
+        monthsToLoad.add(`${y}-${String(m).padStart(2, '0')}`);
+      }
+    }
+
+    monthsToLoad.forEach(async (ym) => {
+      if (!fuelLoadedMonthsRef.current.has(ym)) {
+        fuelLoadedMonthsRef.current.add(ym);
+        try {
+          const { data: mDaily } = await fetchFuelDailyForMonth(ym);
+          if (mDaily && mDaily.length > 0) {
+            setFuelData(prev => {
+              const map = new Map((prev.daily || []).map(d => [`${d.doc}_${d.c}_${d.d}_${d.t}`, d]));
+              for (const d of mDaily) {
+                map.set(`${d.doc}_${d.c}_${d.d}_${d.t}`, d);
+              }
+              return { ...prev, daily: Array.from(map.values()) };
+            });
+          }
+        } catch(e) {
+          console.warn(`Lazy-load monthly daily for ${ym} warning:`, e);
+        }
+      }
+    });
+  }, [fuelStartDate, fuelEndDate, fuelYear]);
+
 
   // Strictly lock selectedPlant to user's plant for non-admins
   useEffect(() => {
@@ -475,7 +595,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   }, [isAdmin, activeTab]);
 
 
-  // â”€â”€ Excel Upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Excel Upload ─────────────────────────────────────────────────────────────
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -680,7 +800,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         setVehicles(finalVehicles);
         setLogs(finalLogs);
 
-        // Save to DB in background â€” UI already shows data
+        // Save to DB in background — UI already shows data
         setUploadProgress(`Menyimpan ${finalLogs.length} transaksi ke server...`);
         const { data: saveRes, error: saveErr } = await saveVehicleData(finalVehicles, finalLogs);
         if (saveErr) {
@@ -723,7 +843,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     reader.readAsArrayBuffer(file);
   };
 
-  // â”€â”€ Clear Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Clear Data ───────────────────────────────────────────────────────────────
   const handleClearData = async () => {
     setLoading(true);
     try {
@@ -734,7 +854,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     finally { setLoading(false); }
   };
 
-  // â”€â”€ ZCO Upload & Clear â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── ZCO Upload & Clear ───────────────────────────────────────────────────────
   const handleZCOFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -842,7 +962,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     finally { setLoading(false); }
   };
 
-  // â”€â”€ Fuel Evaluation (SALRD & SLARC) Upload & Clear â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Fuel Evaluation (SALRD & SLARC) Upload & Clear ────────────────────────────
   // ── Fuel Evaluation (SALRD & SLARC) Upload & Clear ────────────────────────────
   const handleFuelUploadByMode = (e, uploadType = 'all') => {
     const file = e.target.files[0];
@@ -1390,7 +1510,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     finally { setLoading(false); }
   };
 
-  // â”€â”€ Filter month logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Filter month logs ────────────────────────────────────────────────────────
   const monthLogs = useMemo(() => {
     const start = `${targetMonth}-01`;
     const end   = `${targetMonth}-31`;
@@ -1435,7 +1555,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
   }, [targetMonth, targetInputDate]);
 
-  // â”€â”€ Summary per Plant â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Summary per Plant ────────────────────────────────────────────────────────
   const summaryData = useMemo(() => {
     const targetDate = new Date(targetInputDate);
     const list = [];
@@ -1583,7 +1703,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return result;
   }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetMonth, targetInputDate, autoWorkingDays, selectedWilayah, searchPlant, filterStatus, sortBy, sortAsc, masterEquipments, masterMap, isAdmin, currentUser]);
 
-  // â”€â”€ Unit Focused Mode calculations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Unit Focused Mode calculations ──────────────────────────────────────────
   const unitFocusedData = useMemo(() => {
     if (!effectivePlant) return { vehiclesList: [], kpis: { total: 0, active: 0, avgDays: 0, lastUpdate: '-', statusColor: 'grey', statusText: 'Belum Ada Data' } };
 
@@ -1715,7 +1835,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     };
   }, [vehicles, activeMonthLogs, selectedPlant, targetMonth, targetInputDate, masterEquipments]);
 
-  // â”€â”€ Per-Vehicle Detail (all plants, original tab) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Per-Vehicle Detail (all plants, original tab) ───────────────────────────
   const vehicleDetailData = useMemo(() => {
     const tDate = new Date(targetInputDate);
     
@@ -1785,7 +1905,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return result;
   }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetInputDate, selectedWilayah, searchVehicle, filterStatus, currentUser, isAdmin]);
 
-  // â”€â”€ Filtered Log Records (Original Logs tab) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Filtered Log Records (Original Logs tab) ─────────────────────────────────
   const filteredLogs = useMemo(() => {
     let result = showCancelled ? monthLogs : activeMonthLogs;
     
@@ -1810,7 +1930,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return result;
   }, [monthLogs, activeMonthLogs, showCancelled, selectedWilayah, searchVehicle, filterUoM, filterJobCode, currentUser, isAdmin]);
 
-  // â”€â”€ Aggregate Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Aggregate Stats ───────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const active = summaryData.filter(r => r.totalTx > 0).length;
     const totalTx = monthLogs.length;
@@ -1823,7 +1943,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return { active, totalTx, totalCancelled, totalVeh, upToDate, late, notUpToDate, avgPct };
   }, [summaryData, monthLogs, cancelledMonthLogs, vehicles]);
 
-  // â”€â”€ Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Export ────────────────────────────────────────────────────────────────────
   const handleExportSummary = () => {
     const wb = XLSX.utils.book_new();
     const rows = summaryData.map(r => ({
@@ -1853,22 +1973,22 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       const reportDateStr = format(reportDateObj, 'dd MMM yyyy', { locale: id });
       const targetDateStrFormatted = format(targetDateObj, 'dd/MM/yyyy');
       
-      let text = `*ðŸ“Š MONITORING TRANSAKSI LOGBOOK REGIONAL 5*\n`;
+      let text = `*📊 MONITORING TRANSAKSI LOGBOOK REGIONAL 5*\n`;
       text += `*Periode:* 1 s.d ${reportDateStr}\n`;
       text += `*Target Input:* ${targetDateStrFormatted} (H-1)\n\n`;
       
       const sorted = [...summaryData].sort((a, b) => a.rank - b.rank);
       
-      text += `*ðŸ† PERINGKAT UNIT (Berdasarkan Kepatuhan UTD):*\n`;
+      text += `*🏆 PERINGKAT UNIT (Berdasarkan Kepatuhan UTD):*\n`;
       sorted.forEach(item => {
         if (item.totalTx === 0) return;
-        const statusEmoji = item.statusColor === 'green' ? 'ðŸŸ¢' : item.statusColor === 'yellow' ? 'ðŸŸ¡' : 'ðŸ”´';
+        const statusEmoji = item.statusColor === 'green' ? '🟢' : item.statusColor === 'yellow' ? '🟡' : '🔴';
         text += `${item.rank}. *${item.plant}* - ${item.desc}: *${item.pctUtd.toFixed(1)}%* UTD (${item.utdCount}/${item.totalTx} tx) ${statusEmoji} (Last: ${item.lastLogDate ? format(new Date(item.lastLogDate + 'T00:00:00'), 'dd/MM') : '-'})\n`;
       });
       
       const zeroTx = sorted.filter(item => item.totalTx === 0);
       if (zeroTx.length > 0) {
-        text += `\n*âš ï¸ Unit Tanpa Transaksi:* \n`;
+        text += `\n*⚠️ Unit Tanpa Transaksi:* \n`;
         text += zeroTx.map(item => `${item.plant} (${item.desc})`).join(', ') + '\n';
       }
       
@@ -1980,7 +2100,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
   };
 
-  // â”€â”€ Fuel Evaluation Computed Data & ZESTHLP16PA Mapping â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Fuel Evaluation Computed Data & ZESTHLP16PA Mapping ───────────────────
   const MONTH_NAMES = [
     { val: '01', label: 'Januari' },
     { val: '02', label: 'Februari' },
@@ -2153,7 +2273,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return map;
   }, [zcoData]);
 
-  // â”€â”€ Pre-Index ZESTHLP16PA Logs by No. Equipment & Date â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Pre-Index ZESTHLP16PA Logs by No. Equipment & Date ─────────────────────
   const zestLogsByEquipment = useMemo(() => {
     const map = new Map();
     (logs || []).forEach(l => {
@@ -2184,9 +2304,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return map;
   }, [fuelData?.daily]);
 
-  // Main Fuel Table Data with Deep Reference & Reconciliation Mapping
+  // Main Fuel Table Data with Deep Reference, Reconciliation, Multi-Month & Date Range Aggregation
   const fuelTableData = useMemo(() => {
-    const targetPeriod = fuelMonth === 'ALL' ? fuelYear : `${fuelYear}-${fuelMonth}`;
+    const isDateRange = Boolean(fuelStartDate || fuelEndDate);
     const activePlant = (!isAdmin && currentUser?.plant && currentUser.plant !== 'ALL')
       ? currentUser.plant
       : fuelPlant;
@@ -2203,24 +2323,22 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         matchedZest = eqLogs.filter(l => l.date === ymOrDate);
         matchedSlarc = ccLogs.filter(d => d.d === ymOrDate);
       } else {
-        if (fuelMonth !== 'ALL') {
-          matchedZest = eqLogs.filter(l => l.date && l.date.startsWith(ymOrDate));
-          matchedSlarc = ccLogs.filter(d => d.m === ymOrDate);
+        if (fuelMonths.length === 1 && !fuelMonths.includes('ALL')) {
+          const mKey = `${fuelYear}-${fuelMonths[0]}`;
+          matchedZest = eqLogs.filter(l => l.date && l.date.startsWith(mKey));
+          matchedSlarc = ccLogs.filter(d => d.m === mKey);
         } else {
           matchedZest = eqLogs.filter(l => l.date && l.date.startsWith(fuelYear));
           matchedSlarc = ccLogs.filter(d => d.m && d.m.startsWith(fuelYear));
         }
       }
 
-      // Sum ZEST KM/HM for reconciliation comparison
       let zestKmHmTotal = 0;
       matchedZest.forEach(l => {
         zestKmHmTotal += parseFloat(l.hm_km) || 0;
       });
 
-      // ============================================================
-      // PRIORITY 1: REFERENCE from ZESTHLP16PA matching No. Equipment + period
-      // ============================================================
+      // Priority 1
       const p1List = [];
       matchedZest.forEach(l => {
         const ref = (l.reference || '').trim();
@@ -2244,9 +2362,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         };
       }
 
-      // ============================================================
-      // PRIORITY 2: JOB CODE / Pekerjaan Utama / Remarks / Lokasi from ZESTHLP16PA in period
-      // ============================================================
+      // Priority 2
       const p2List = [];
       matchedZest.forEach(l => {
         const rem = (l.remarks || '').trim();
@@ -2263,22 +2379,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         }
       });
 
-      // Also check vehicle master main job for this equipment
-      if (p2List.length === 0 && equipment && equipment !== '-') {
-        const masterObj = masterVehiclesByCode.get(equipment);
-        if (masterObj?.pekerjaan_utama) {
-          p2List.push(masterObj.pekerjaan_utama);
-        }
-      }
-
       if (p2List.length > 0) {
         return {
           primary: p2List[0],
           all: p2List.join('; '),
           count: p2List.length,
           priority: 2,
-          source: 'ZEST_JOB',
-          badge: null,
+          source: 'ZESTHLP16PA',
+          badge: 'ZEST-JOB',
           zestLogs: eqLogs,
           matchedZest,
           matchedSlarc,
@@ -2286,25 +2394,23 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         };
       }
 
-      // ============================================================
-      // PRIORITY 3: Latest known REFERENCE / Pekerjaan Utama from ZESTHLP16PA (other months)
-      // ============================================================
+      // Priority 3
       if (eqLogs.length > 0) {
+        const sortedLogs = [...eqLogs].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
         const p3List = [];
-        let latestPeriod = '';
-        eqLogs.forEach(l => {
+        let latestPeriod = null;
+
+        for (const l of sortedLogs) {
           const ref = (l.reference || '').trim();
           const rem = (l.remarks || '').trim();
           const job = (JOB_CODE_DESC[l.job_code] || l.job_code || '').trim();
-          let text = '';
-          if (ref && ref !== '1' && ref !== '-') text = rem && rem !== ref ? `${ref} (${rem})` : ref;
-          else if (rem && rem !== '1' && rem !== '-') text = rem;
-          else if (job) text = job;
+          const text = (ref && ref !== '1' && ref !== '-') ? ref : (rem && rem !== '1' && rem !== '-') ? rem : job;
           if (text && !p3List.includes(text)) {
             p3List.push(text);
             if (!latestPeriod && l.date) latestPeriod = l.date.substring(0, 7);
           }
-        });
+          if (p3List.length >= 3) break;
+        }
 
         if (p3List.length > 0) {
           return {
@@ -2312,8 +2418,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             all: p3List.join('; '),
             count: p3List.length,
             priority: 3,
-            source: 'ZEST_LATEST',
-            badge: 'Ref. Terakhir',
+            source: 'ZESTHLP16PA_HISTORICAL',
+            badge: `ZEST ${latestPeriod || 'HIST'}`,
             latestPeriod,
             zestLogs: eqLogs,
             matchedZest,
@@ -2323,11 +2429,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         }
       }
 
-      // ============================================================
-      // PRIORITY 4: Transaction description / text from SLARC (Credit) / ZCO
-      // ============================================================
+      // Priority 4
       const p4List = [];
-      // 4a. Check enriched summary fields
       if (summaryObj?.slarcNarrations && Array.isArray(summaryObj.slarcNarrations) && summaryObj.slarcNarrations.length > 0) {
         summaryObj.slarcNarrations.forEach(n => {
           if (n && !p4List.includes(n)) p4List.push(n);
@@ -2336,7 +2439,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         p4List.push(summaryObj.slarcRefPrimary);
       }
 
-      // 4b. Check daily SLARC records
       const slarcPool = matchedSlarc.length > 0 ? matchedSlarc : ccLogs;
       slarcPool.forEach(d => {
         const text = String(d.n || '').split('|')[0].trim();
@@ -2345,14 +2447,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         }
       });
 
-      // 4c. Check partner object categories (e.g. TM - PENGANGKUTAN BUAH)
       if (p4List.length === 0 && summaryObj?.partnerObjects && Array.isArray(summaryObj.partnerObjects)) {
         summaryObj.partnerObjects.forEach(p => {
           if (p && !p4List.includes(p)) p4List.push(p);
         });
       }
 
-      // 4d. Check ZCO activity if available
       if (p4List.length === 0 && costCenter) {
         const zcoMatch = zcoMapByCC.get(String(costCenter).trim().toUpperCase());
         if (zcoMatch?.activity) {
@@ -2375,9 +2475,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         };
       }
 
-      // ============================================================
-      // FALLBACK: Absolutely no activity record found
-      // ============================================================
       return {
         primary: '-',
         all: '-',
@@ -2394,73 +2491,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
     let result = [];
 
-    if (!fuelDate) {
-      // â”€â”€ Rekap Bulanan â”€â”€
-      let list = fuelData?.summaries || [];
-      if (fuelMonth === 'ALL') {
-        list = list.filter(s => s.month?.startsWith(fuelYear));
-      } else {
-        list = list.filter(s => s.month === targetPeriod);
-      }
-
-      if (activePlant !== 'ALL') {
-        list = list.filter(s => s.plant === activePlant);
-      }
-
-      result = list.map(s => {
-        const ccKey = String(s.costCenter || '').trim().toUpperCase();
-        const rawEq = (s.equipment && s.equipment !== '-') ? String(s.equipment).trim() : '';
-        const masterMatch = lookupMasterPM(rawEq, ccKey);
-
-        const resolvedEquipment = masterMatch?.equipment || rawEq || '-';
-        const resolvedDescription = masterMatch?.description || (
-          s.description && !s.description.includes('Sedang Perbaikan') && !s.description.includes('Au58:') && !s.description.includes('Solar =') && !s.description.toLowerCase().startsWith('dinas ke')
-            ? s.description
-            : `Kendaraan ${ccKey}`
-        );
-        const resolvedPlant = masterMatch?.plant || s.plant || (ccKey ? ccKey.substring(0, 4) : '');
-        const resolvedObjectType = masterMatch?.objectType || s.objectType || (ccKey.includes('CAR') ? 'CAR' : ccKey.includes('TRU') ? 'DTRUCK' : 'VEH');
-        const refData = resolveSmartReference(resolvedEquipment, s.costCenter, s.month, false, s);
-
-        // Verification between SLARC (Credit) and ZESTHLP16PA
-        const slarcTotal = s.creditKm || s.creditHm || 0;
-        const zestTotal = refData.zestKmHmTotal;
-        const diff = Math.round((slarcTotal - zestTotal) * 100) / 100;
-        let reconcileStatus = 'NONE';
-        if (slarcTotal > 0 && zestTotal > 0) {
-          reconcileStatus = Math.abs(diff) < 0.01 ? 'MATCH' : 'DIFF';
-        } else if (slarcTotal > 0) {
-          reconcileStatus = 'SLARC_ONLY';
-        } else if (zestTotal > 0) {
-          reconcileStatus = 'ZEST_ONLY';
-        }
-
-        return {
-          ...s,
-          equipment: resolvedEquipment,
-          description: resolvedDescription,
-          plant: resolvedPlant,
-          plantDesc: s.plantDesc || PLANT_INFO[resolvedPlant]?.desc || resolvedPlant,
-          objectType: resolvedObjectType,
-          referencePrimary: refData.primary,
-          referenceAll: refData.all,
-          referenceCount: refData.count,
-          referencePriority: refData.priority,
-          referenceBadge: refData.badge,
-          referenceSource: refData.source,
-          referenceLatestPeriod: refData.latestPeriod,
-          allZestLogs: refData.zestLogs,
-          matchedZestLogs: refData.matchedZest,
-          matchedSlarcDaily: refData.matchedSlarc,
-          zestTotalKmHm: zestTotal,
-          varianceKmHm: diff,
-          reconcileStatus
-        };
+    if (isDateRange) {
+      // Date Range Filter
+      const inRangeDaily = (fuelData?.daily || []).filter(d => {
+        if (!d.d) return false;
+        if (fuelStartDate && d.d < fuelStartDate) return false;
+        if (fuelEndDate && d.d > fuelEndDate) return false;
+        return true;
       });
-    } else {
-      // â”€â”€ Filter Tanggal Spesifik (Harian Drill-Down) â”€â”€
-      const dayDaily = (fuelData?.daily || []).filter(d => d.d === fuelDate);
-      const dayLogs = (logs || []).filter(l => l.date === fuelDate);
 
       const vehMap = new Map();
 
@@ -2474,7 +2512,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             plantDesc: s.plantDesc,
             wilayah: s.wilayah,
             objectType: s.objectType,
-            month: s.month,
+            month: `${fuelStartDate || ''} s/d ${fuelEndDate || ''}`,
             debitLiters: 0,
             debitRp: 0,
             creditKm: 0,
@@ -2488,20 +2526,20 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         }
       });
 
-      dayDaily.forEach(d => {
+      inRangeDaily.forEach(d => {
         const cc = String(d.c || '').trim().toUpperCase();
         if (!vehMap.has(cc)) {
-          const eqLookup = costCenterToEquipmentMap.get(cc);
+          const master = lookupMasterPM('', cc);
           const p = d.p || cc.substring(0, 4);
           vehMap.set(cc, {
             costCenter: cc,
-            equipment: eqLookup?.equipment || '-',
-            description: eqLookup?.description || `Kendaraan ${cc}`,
+            equipment: master?.equipment || '-',
+            description: master?.description || `Kendaraan ${cc}`,
             plant: p,
             plantDesc: PLANT_INFO[p]?.desc || p,
             wilayah: PLANT_INFO[p]?.wilayah || 'Regional 5',
-            objectType: eqLookup?.objectType || 'VEH',
-            month: fuelDate.substring(0, 7),
+            objectType: master?.objectType || 'VEH',
+            month: `${fuelStartDate || ''} s/d ${fuelEndDate || ''}`,
             debitLiters: 0,
             debitRp: 0,
             creditKm: 0,
@@ -2539,22 +2577,17 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         );
         const resolvedPlant = masterMatch?.plant || v.plant || (ccKey ? ccKey.substring(0, 4) : '');
         const resolvedObjectType = masterMatch?.objectType || v.objectType || (ccKey.includes('CAR') ? 'CAR' : ccKey.includes('TRU') ? 'DTRUCK' : 'VEH');
-        const refData = resolveSmartReference(resolvedEquipment, v.costCenter, fuelDate, true, v);
+        const refData = resolveSmartReference(resolvedEquipment, v.costCenter, fuelStartDate || v.month, true, v);
 
-        const kmPerL = v.debitLiters > 0 && v.creditKm > 0 ? Number((v.creditKm / v.debitLiters).toFixed(2)) : 0;
-        const literPerH = v.debitLiters > 0 && v.creditHm > 0 ? Number((v.debitLiters / v.creditHm).toFixed(2)) : 0;
-        const isHeavy = ['TRACTOR', 'EXCAVATOR', 'GRADER', 'WLOADER'].some(h => (v.objectType || '').toUpperCase().includes(h)) || v.creditHm > 0;
-        let status = 'NORMAL';
-        if (v.debitLiters === 0 && v.creditKm === 0 && v.creditHm === 0) status = 'NO_DATA';
-        else if (isHeavy) {
-          if (literPerH > 0 && literPerH <= 3.0) status = 'OPTIMAL';
-          else if (literPerH > 5.0) status = 'BOROS';
-        } else {
-          if (kmPerL >= 3.5) status = 'OPTIMAL';
-          else if (kmPerL > 0 && kmPerL < 2.0) status = 'BOROS';
-        }
+        const debitL = Math.round(v.debitLiters * 100) / 100;
+        const debitR = Math.round(v.debitRp);
+        const creditK = Math.round(v.creditKm * 100) / 100;
+        const creditH = Math.round(v.creditHm * 100) / 100;
 
-        const slarcTotal = v.creditKm || v.creditHm || 0;
+        // Apply Task 1 BBM Efficiency Evaluation Matrix (MID(5,3) with 10% tolerance)
+        const eff = evaluateFuelEfficiency(ccKey, debitL, creditK, creditH, resolvedObjectType);
+
+        const slarcTotal = creditK || creditH || 0;
         const zestTotal = refData.zestKmHmTotal;
         const diff = Math.round((slarcTotal - zestTotal) * 100) / 100;
         let reconcileStatus = 'NONE';
@@ -2573,10 +2606,122 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           plant: resolvedPlant,
           plantDesc: v.plantDesc || PLANT_INFO[resolvedPlant]?.desc || resolvedPlant,
           objectType: resolvedObjectType,
-          kmPerLiter: kmPerL,
-          literPerHm: literPerH,
-          costPerUnit: v.creditKm > 0 ? Math.round(v.debitRp / v.creditKm) : (v.creditHm > 0 ? Math.round(v.debitRp / v.creditHm) : 0),
-          status,
+          debitLiters: debitL,
+          debitRp: debitR,
+          creditKm: creditK,
+          creditHm: creditH,
+          kmPerLiter: eff.uom === 'KM/L' ? eff.ratioVal : 0,
+          literPerHm: eff.uom === 'L/HM' ? eff.ratioVal : 0,
+          costPerUnit: creditK > 0 ? Math.round(debitR / creditK) : (creditH > 0 ? Math.round(debitR / creditH) : 0),
+          status: eff.status,
+          efficiency: eff,
+          referencePrimary: refData.primary,
+          referenceAll: refData.all,
+          referenceCount: refData.count,
+          referencePriority: refData.priority,
+          referenceBadge: refData.badge,
+          referenceSource: refData.source,
+          referenceLatestPeriod: refData.latestPeriod,
+          allZestLogs: refData.zestLogs,
+          matchedZestLogs: refData.matchedZest,
+          matchedSlarcDaily: refData.matchedSlarc,
+          zestTotalKmHm: zestTotal,
+          varianceKmHm: diff,
+          reconcileStatus
+        };
+      });
+    } else {
+      // Multi-Month Filter
+      const isAllMonths = fuelMonths.includes('ALL') || fuelMonths.length === 0;
+      const targetMonths = isAllMonths ? [] : fuelMonths.map(m => `${fuelYear}-${m}`);
+
+      let list = fuelData?.summaries || [];
+      if (isAllMonths) {
+        list = list.filter(s => s.month?.startsWith(fuelYear));
+      } else {
+        list = list.filter(s => targetMonths.includes(s.month));
+      }
+
+      if (activePlant !== 'ALL') {
+        list = list.filter(s => s.plant === activePlant);
+      }
+
+      if (isAllMonths || fuelMonths.length > 1) {
+        const aggregatedMap = new Map();
+        list.forEach(s => {
+          const cc = s.costCenter;
+          if (!aggregatedMap.has(cc)) {
+            aggregatedMap.set(cc, {
+              ...s,
+              month: isAllMonths ? `${fuelYear} (Semua Bulan)` : fuelMonths.join(', '),
+              debitLiters: 0,
+              debitRp: 0,
+              creditKm: 0,
+              creditHm: 0,
+              txCount: 0
+            });
+          }
+          const cur = aggregatedMap.get(cc);
+          cur.debitLiters += (s.debitLiters || 0);
+          cur.debitRp += (s.debitRp || 0);
+          cur.creditKm += (s.creditKm || 0);
+          cur.creditHm += (s.creditHm || 0);
+          cur.txCount += (s.txCount || 0);
+        });
+        list = Array.from(aggregatedMap.values());
+      }
+
+      result = list.map(s => {
+        const ccKey = String(s.costCenter || '').trim().toUpperCase();
+        const rawEq = (s.equipment && s.equipment !== '-') ? String(s.equipment).trim() : '';
+        const masterMatch = lookupMasterPM(rawEq, ccKey);
+
+        const resolvedEquipment = masterMatch?.equipment || rawEq || '-';
+        const resolvedDescription = masterMatch?.description || (
+          s.description && !s.description.includes('Sedang Perbaikan') && !s.description.includes('Au58:') && !s.description.includes('Solar =') && !s.description.toLowerCase().startsWith('dinas ke')
+            ? s.description
+            : `Kendaraan ${ccKey}`
+        );
+        const resolvedPlant = masterMatch?.plant || s.plant || (ccKey ? ccKey.substring(0, 4) : '');
+        const resolvedObjectType = masterMatch?.objectType || s.objectType || (ccKey.includes('CAR') ? 'CAR' : ccKey.includes('TRU') ? 'DTRUCK' : 'VEH');
+        const refData = resolveSmartReference(resolvedEquipment, s.costCenter, s.month, false, s);
+
+        const debitL = Math.round((s.debitLiters || 0) * 100) / 100;
+        const debitR = Math.round(s.debitRp || 0);
+        const creditK = Math.round((s.creditKm || 0) * 100) / 100;
+        const creditH = Math.round((s.creditHm || 0) * 100) / 100;
+
+        // Apply Task 1 BBM Efficiency Evaluation Matrix (MID(5,3) with 10% tolerance)
+        const eff = evaluateFuelEfficiency(ccKey, debitL, creditK, creditH, resolvedObjectType);
+
+        const slarcTotal = creditK || creditH || 0;
+        const zestTotal = refData.zestKmHmTotal;
+        const diff = Math.round((slarcTotal - zestTotal) * 100) / 100;
+        let reconcileStatus = 'NONE';
+        if (slarcTotal > 0 && zestTotal > 0) {
+          reconcileStatus = Math.abs(diff) < 0.01 ? 'MATCH' : 'DIFF';
+        } else if (slarcTotal > 0) {
+          reconcileStatus = 'SLARC_ONLY';
+        } else if (zestTotal > 0) {
+          reconcileStatus = 'ZEST_ONLY';
+        }
+
+        return {
+          ...s,
+          equipment: resolvedEquipment,
+          description: resolvedDescription,
+          plant: resolvedPlant,
+          plantDesc: s.plantDesc || PLANT_INFO[resolvedPlant]?.desc || resolvedPlant,
+          objectType: resolvedObjectType,
+          debitLiters: debitL,
+          debitRp: debitR,
+          creditKm: creditK,
+          creditHm: creditH,
+          kmPerLiter: eff.uom === 'KM/L' ? eff.ratioVal : 0,
+          literPerHm: eff.uom === 'L/HM' ? eff.ratioVal : 0,
+          costPerUnit: creditK > 0 ? Math.round(debitR / creditK) : (creditH > 0 ? Math.round(debitR / creditH) : 0),
+          status: eff.status,
+          efficiency: eff,
           referencePrimary: refData.primary,
           referenceAll: refData.all,
           referenceCount: refData.count,
@@ -2608,7 +2753,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
 
     return result;
-  }, [fuelData, fuelYear, fuelMonth, fuelDate, fuelPlant, searchFuel, zestLogsByEquipment, slarcDailyByCostCenter, logs, costCenterToEquipmentMap, lookupMasterPM, isAdmin, currentUser, masterVehiclesByCode, zcoMapByCC]);
+  }, [fuelData, fuelYear, fuelMonths, fuelStartDate, fuelEndDate, fuelPlant, searchFuel, zestLogsByEquipment, slarcDailyByCostCenter, logs, costCenterToEquipmentMap, lookupMasterPM, isAdmin, currentUser, masterVehiclesByCode, zcoMapByCC]);
 
   const fuelKPIs = useMemo(() => {
     let totalLiters = 0;
@@ -2657,23 +2802,27 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       'Kebun / Unit': `${s.plant} - ${s.plantDesc}`,
       'No. Equipment': s.equipment || '-',
       'Cost Center': s.costCenter,
+      'Tipe Kendaraan': s.efficiency ? s.efficiency.code : (s.objectType || '-'),
       'Deskripsi Kendaraan': s.description || '-',
       'Reference': s.referenceAll || s.referencePrimary || '-',
       'Solar (Liter)': s.debitLiters || 0,
       'KM / HM (SLARC)': s.creditKm > 0 ? `${s.creditKm} KM` : (s.creditHm > 0 ? `${s.creditHm} HM` : '-'),
       'KM / HM (ZESTHLP16PA)': s.zestTotalKmHm > 0 ? s.zestTotalKmHm : '-',
       'Selisih (Variance)': s.varianceKmHm !== 0 ? s.varianceKmHm : 0,
-      'Rasio / Efisiensi': s.kmPerLiter > 0 ? `${s.kmPerLiter} KM/L` : (s.literPerHm > 0 ? `${s.literPerHm} L/HM` : '-'),
+      'Rasio / Efisiensi': s.efficiency && s.efficiency.ratioVal > 0 ? `${s.efficiency.ratioVal} ${s.efficiency.uom}` : (s.kmPerLiter > 0 ? `${s.kmPerLiter} KM/L` : (s.literPerHm > 0 ? `${s.literPerHm} L/HM` : '-')),
+      'Evaluasi BBM': s.efficiency ? `${s.efficiency.badgeLabel} (${s.efficiency.targetText})` : s.status,
       'Biaya Solar (Rp)': s.debitRp || 0,
-      'Status': s.status
+      'Biaya Solar / L (Rp)': Math.abs(s.debitLiters || 0) > 0 ? Math.round(Math.abs(s.debitRp || 0) / Math.abs(s.debitLiters || 0)) : 0
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Evaluasi BBM');
 
-    const filePeriod = fuelDate ? fuelDate : (fuelMonth === 'ALL' ? fuelYear : `${fuelYear}-${fuelMonth}`);
+    const filePeriod = (fuelStartDate || fuelEndDate)
+      ? `${fuelStartDate || 'start'}_sd_${fuelEndDate || 'end'}`
+      : (fuelMonths.includes('ALL') ? fuelYear : `${fuelYear}-${fuelMonths.join('_')}`);
     XLSX.writeFile(wb, `Evaluasi_BBM_Regional5_${filePeriod}.xlsx`);
   };
 
-    const handleExportZCO = () => {
+  const handleExportZCO = () => {
     const wb = XLSX.utils.book_new();
     const rows = filteredZCOData.map(r => ({
       'Cost Center': r.rawCostCenter,
@@ -2726,7 +2875,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     XLSX.writeFile(wb, `Detail_Log_Kendaraan_${targetMonth}.xlsx`);
   };
 
-  // â”€â”€ Sort handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Sort handler ──────────────────────────────────────────────────────────────
   const handleSort = (col) => {
     if (sortBy === col) setSortAsc(!sortAsc);
     else { setSortBy(col); setSortAsc(true); }
@@ -2735,7 +2884,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     ? (sortAsc ? <ChevronUp size={12} className="inline ml-1" /> : <ChevronDown size={12} className="inline ml-1" />)
     : null;
 
-  // â”€â”€ Paginated logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Paginated logs ─────────────────────────────────────────────────────────────
   const paginatedLogs = useMemo(() => {
     const start = (logPage - 1) * LOG_PAGE_SIZE;
     return filteredLogs.slice(start, start + LOG_PAGE_SIZE);
@@ -2927,7 +3076,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         style={{ backgroundImage: "url('/sawit.jpg')" }}
       />
 
-      {/* â”€â”€ Side Drawer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Side Drawer ─────────────────────────────────────────── */}
       {drawerItem && (
         <>
           {/* Backdrop */}
@@ -2940,7 +3089,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             {/* Drawer header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-900">
               <div>
-                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">{drawerItem.wilayah} Â· {drawerItem.plant}</p>
+                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">{drawerItem.wilayah} · {drawerItem.plant}</p>
                 <h3 className="text-sm font-bold text-white mt-0.5 uppercase">{drawerItem.desc}</h3>
               </div>
               <button onClick={() => setDrawerItem(null)} className="text-slate-400 hover:text-white transition p-1 rounded-2xl hover:bg-slate-700">
@@ -3001,7 +3150,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     drawerItem.plantLogs.forEach(l => { if (l.job_code) jcMap[l.job_code] = (jcMap[l.job_code] || 0) + 1; });
                     return Object.entries(jcMap).map(([jc, cnt]) => (
                       <span key={jc} className="bg-indigo-50 border border-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-mono text-[10px]">
-                        {jc}{JOB_CODE_DESC[jc] ? ` (${JOB_CODE_DESC[jc]})` : ''} Â· {cnt}x
+                        {jc}{JOB_CODE_DESC[jc] ? ` (${JOB_CODE_DESC[jc]})` : ''} · {cnt}x
                       </span>
                     ));
                   })()}
@@ -3063,7 +3212,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           }
         `}</style>
 
-        {/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Header ─────────────────────────────────────────────── */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-sm no-print">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -3072,7 +3221,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             </div>
             <h2 className="text-xl font-bold text-white">Monitoring Logbook Kendaraan</h2>
             <p className="text-slate-400 text-xs mt-0.5">
-              Dashboard monitoring operasional kendaraan Regional 5 â€” Bulan {targetMonth}
+              Dashboard monitoring operasional kendaraan Regional 5 — Bulan {targetMonth}
             </p>
           </div>
 
@@ -3135,7 +3284,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         </div>
 
-        {/* â”€â”€ Error / Upload Info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Error / Upload Info ─────────────────────────────────── */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-start gap-3">
             <AlertCircle size={18} className="shrink-0 mt-0.5" />
@@ -3154,7 +3303,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             <div className="text-sm">
               <p className="font-bold text-xs">Upload berhasil: {uploadInfo.file}</p>
               <p className="text-emerald-700 mt-0.5 text-[11px]">
-                {uploadInfo.processed} transaksi diproses Â· {uploadInfo.cancelled} dibatalkan Â· {uploadInfo.skipped} baris dilewati Â· {uploadInfo.plants} plant Â· {uploadInfo.jobCodes} job code
+                {uploadInfo.processed} transaksi diproses · {uploadInfo.cancelled} dibatalkan · {uploadInfo.skipped} baris dilewati · {uploadInfo.plants} plant · {uploadInfo.jobCodes} job code
               </p>
             </div>
             <button onClick={() => { setUploadInfo(null); try { sessionStorage.removeItem('vehicle_upload_info'); } catch (e) {} }} className="ml-auto text-emerald-400 hover:text-emerald-600"><XCircle size={16} /></button>
@@ -3189,16 +3338,16 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         )}
 
-        {/* â”€â”€ Tab Navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Tab Navigation ──────────────────────────────────────── */}
         {!screenshotMode && (
           <div className="flex gap-1 bg-slate-200/60 p-1.5 rounded-xl w-fit flex-wrap">
             {[
-              { key: 'unit-checklist',    label: 'ðŸ“‹ Checklist Kebun (Unit)', icon: Calendar,        show: true },
-              { key: 'summary-regional',  label: 'ðŸ¢ Rekap Regional 5',      icon: BarChart2,       show: true },
-              { key: 'detail-veh',        label: 'ðŸšš Daftar Kendaraan',      icon: Truck,           show: isAdmin },
-              { key: 'log-raw',           label: 'ðŸ“„ Log Transaksi Asli',    icon: FileSpreadsheet, show: true },
-              { key: 'zco-reconciliation',label: 'ðŸ’° Verifikasi Biaya (ZCO)', icon: Coins,          show: true },
-              { key: 'fuel-evaluation',   label: 'â›½ Evaluasi BBM (Solar)',    icon: Fuel,           show: true },
+              { key: 'unit-checklist',    label: '📋 Checklist Kebun (Unit)', icon: Calendar,        show: true },
+              { key: 'summary-regional',  label: '📊 Rekap Regional 5',      icon: BarChart2,       show: true },
+              { key: 'detail-veh',        label: '🚚 Daftar Kendaraan',      icon: Truck,           show: isAdmin },
+              { key: 'log-raw',           label: '📄 Log Transaksi Asli',    icon: FileSpreadsheet, show: true },
+              { key: 'zco-reconciliation',label: '🔗 Verifikasi Biaya (ZCO)', icon: Coins,          show: true },
+              { key: 'fuel-evaluation',   label: '⛽ Evaluasi BBM (Solar)',    icon: Fuel,           show: true },
             ].filter(t => t.show).map(({ key, label, icon: Icon }) => (
               <button key={key} onClick={() => { setActiveTab(key); setError(null); }}
                 className={`flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold transition-colors duration-300 ${activeTab === key ? 'bg-gradient-to-tr from-[#064e3b] to-[#2dd4bf] text-white shadow-md shadow-emerald-900/20' : 'text-slate-500 hover:text-[#064e3b] hover:bg-emerald-50'}`}>
@@ -3208,7 +3357,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         )}
 
-        {/* â”€â”€ Controls (Adapts based on active tab) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Controls (Adapts based on active tab) ────────────────── */}
         {!screenshotMode && activeTab !== 'fuel-evaluation' && (
           <div className={`${
             isLocalDev 
@@ -3222,7 +3371,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
                   MDS DATA-DENSE MODE (MORNINGSTAR X PTPN IV HYBRID)
                 </span>
-                <span className="font-mono text-slate-400 font-semibold">LOCAL DEV ONLY â€¢ COMPACT NUMERALS</span>
+                <span className="font-mono text-slate-400 font-semibold">LOCAL DEV ONLY • COMPACT NUMERALS</span>
               </div>
             )}
 
@@ -3243,7 +3392,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             </div>
           {activeTab === 'unit-checklist' ? (
             // Unit view controls: plant selection
-            // ADMIN/DEV â†’ full dropdown; USER â†’ locked read-only badge
+            // ADMIN/DEV → full dropdown; USER → locked read-only badge
             <div className="flex flex-col col-span-2">
               <label className="text-[10px] font-bold text-slate-400 uppercase mb-1">
                 {isAdmin ? 'Pilih Kebun / Unit' : 'Unit / Kebun Anda'}
@@ -3309,9 +3458,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         </div>
         )}
 
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-        {/* TAB 1: Checklist Kebun (Unit) â€” VERY SIMPLE & DIRECT       */}
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ─────────────────────────────────────────────────────────── */}
+        {/* TAB 1: Checklist Kebun (Unit) — VERY SIMPLE & DIRECT       */}
+        {/* ─────────────────────────────────────────────────────────── */}
         {activeTab === 'unit-checklist' && (
           <div className="space-y-4">
             
@@ -3416,7 +3565,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                               </span>
                               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 <span className="font-mono">{selectedPlant}</span>
-                                <span className="text-emerald-500">Â·</span>
+                                <span className="text-emerald-500">·</span>
                                 {PLANT_INFO[selectedPlant]?.desc || selectedPlant}
                               </span>
                               {PLANT_INFO[selectedPlant]?.wilayah && (
@@ -3513,7 +3662,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                               <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-inner max-w-4xl">
                                 <h5 className="font-bold text-slate-700 text-xs mb-3 flex items-center gap-1.5">
                                   <Truck size={14} className="text-[#064e3b]" /> 
-                                  Detail Transaksi Logbook Kendaraan {v.vehicle_code} â€” Bulan {targetMonth}
+                                  Detail Transaksi Logbook Kendaraan {v.vehicle_code} — Bulan {targetMonth}
                                 </h5>
                                 
                                 <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
@@ -3603,9 +3752,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         )}
 
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ─────────────────────────────────────────────────────────── */}
         {/* TAB 2: Summary Regional (Semua Kebun)                      */}
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ─────────────────────────────────────────────────────────── */}
         {activeTab === 'summary-regional' && (
           <div className="space-y-4">
 
@@ -3829,9 +3978,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         )}
 
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-        {/* TAB 3: Daftar Kendaraan â€” ADMIN & DEV only                 */}
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ─────────────────────────────────────────────────────────── */}
+        {/* TAB 3: Daftar Kendaraan — ADMIN & DEV only                 */}
+        {/* ─────────────────────────────────────────────────────────── */}
         {activeTab === 'detail-veh' && isAdmin && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3">
@@ -3876,7 +4025,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           className="text-[#064e3b] hover:underline hover:text-emerald-700 transition font-mono font-bold text-left"
                           title={`Lihat Log Transaksi Asli untuk ${v.vehicle_code}`}
                         >
-                          {v.vehicle_code} â†—
+                          {v.vehicle_code} ↗
                         </button>
                       </td>
                       <td className="px-3 py-2.5 text-center font-bold text-[#064e3b]">{v.plant}</td>
@@ -3939,9 +4088,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         )}
 
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ─────────────────────────────────────────────────────────── */}
         {/* TAB 4: Log Transaksi Asli                                 */}
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ─────────────────────────────────────────────────────────── */}
         {activeTab === 'log-raw' && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 flex-wrap bg-slate-50/50">
@@ -3966,7 +4115,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 </select>
                 <select value={filterJobCode} onChange={e => { setFilterJobCode(e.target.value); setLogPage(1); }}
                   className="px-3 py-2 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white">
-                  {jobCodeOptions.map(jc => <option key={jc} value={jc}>{jc === 'ALL' ? 'Semua Pekerjaan (Job Code)' : `${jc} â€“ ${JOB_CODE_DESC[jc] || jc}`}</option>)}
+                  {jobCodeOptions.map(jc => <option key={jc} value={jc}>{jc === 'ALL' ? 'Semua Pekerjaan (Job Code)' : `${jc} – ${JOB_CODE_DESC[jc] || jc}`}</option>)}
                 </select>
                 <button onClick={() => setShowCancelled(!showCancelled)}
                   className={`flex items-center gap-1.5 px-3 py-2 border rounded-2xl text-xs font-semibold transition ${showCancelled ? 'bg-red-50 border-red-200 text-red-600' : 'border-slate-200 text-slate-500 hover:bg-slate-50 bg-white'}`}>
@@ -4050,13 +4199,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             {totalPages > 1 && (
               <div className="p-3 border-t border-slate-100 flex items-center justify-between bg-slate-50">
                 <span className="text-xs text-slate-400">
-                  Halaman {logPage} dari {totalPages} Â· {filteredLogs.length} transaksi
+                  Halaman {logPage} dari {totalPages} · {filteredLogs.length} transaksi
                 </span>
                 <div className="flex gap-1">
                   <button onClick={() => setLogPage(1)} disabled={logPage === 1}
-                    className="px-3 py-1.5 rounded-2xl text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-200 bg-white">Â«</button>
+                    className="px-3 py-1.5 rounded-2xl text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-200 bg-white">«</button>
                   <button onClick={() => setLogPage(p => Math.max(1, p - 1))} disabled={logPage === 1}
-                    className="px-3 py-1.5 rounded-2xl text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-200 bg-white">â€¹</button>
+                    className="px-3 py-1.5 rounded-2xl text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-200 bg-white">‹</button>
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     const page = Math.max(1, Math.min(logPage - 2 + i, totalPages - 4 + i));
                     return (
@@ -4067,9 +4216,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     );
                   })}
                   <button onClick={() => setLogPage(p => Math.min(totalPages, p + 1))} disabled={logPage === totalPages}
-                    className="px-3 py-1.5 rounded-2xl text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-200 bg-white">â€º</button>
+                    className="px-3 py-1.5 rounded-2xl text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-200 bg-white">›</button>
                   <button onClick={() => setLogPage(totalPages)} disabled={logPage === totalPages}
-                    className="px-3 py-1.5 rounded-2xl text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-200 bg-white">Â»</button>
+                    className="px-3 py-1.5 rounded-2xl text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-200 bg-white">»</button>
                 </div>
               </div>
         )}
@@ -4106,8 +4255,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               className="px-3 py-2 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white font-semibold text-slate-700"
             >
               <option value="ALL">Semua Status</option>
-              <option value="Cek">âš ï¸ Cek</option>
-              <option value="Oke">ðŸŸ¢ Oke</option>
+              <option value="Cek">⚠️ Cek</option>
+              <option value="Oke">🟢 Oke</option>
             </select>
             {zcoFilterStatus === 'Cek' && totalCekRows > 0 && (
               <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 text-red-700 px-3 py-1.5 rounded-2xl text-[11px] font-bold shadow-sm">
@@ -4134,7 +4283,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         </div>
 
-        {/* â”€â”€ Summary Metric Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Summary Metric Cards ─────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 pb-0 bg-white no-print">
           <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex flex-col justify-between shadow-xs">
             <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Total Biaya SAP (Cost)</span>
@@ -4305,7 +4454,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       </div>
     )}
 
-      {/* ðŸ”¥ Danger Zone (Regional only) ðŸ”¥ */}
+      {/* 🔥 Danger Zone (Regional only) 🔥 */}
       {isAdmin && (
         <div className="no-print">
           <button
@@ -4320,7 +4469,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             <div className="border border-red-200 bg-red-50/50 rounded-2xl p-5 space-y-4 mt-2">
               <div className="flex items-center gap-2 mb-1">
                 <ShieldAlert size={16} className="text-red-600 shrink-0" />
-                <p className="text-xs font-bold text-red-700 uppercase tracking-wide">âš  Danger Zone â€” Tindakan Ini Tidak Dapat Dibatalkan</p>
+                <p className="text-xs font-bold text-red-700 uppercase tracking-wide">⚠️ Danger Zone — Tindakan Ini Tidak Dapat Dibatalkan</p>
               </div>
               <p className="text-[11px] text-red-600">Hapus data hanya jika Anda yakin. Ketikkan kata konfirmasi pada kolom di bawah untuk mengaktifkan tombol hapus.</p>
 
@@ -4383,95 +4532,155 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
     {activeTab === 'fuel-evaluation' && (
       <div className="relative z-10 bg-white/95 backdrop-blur-xs rounded-2xl border border-slate-300 shadow-sm overflow-hidden max-w-[1400px] mx-auto w-full font-sans">
-        {/* â”€â”€ Single Unified Filter Bar (Tahun, Bulan, Tanggal, Kebun, Cari) â”€â”€ */}
-        <div className="p-4 border-b border-slate-200 bg-slate-50/80 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px] flex flex-col md:flex-row md:items-center justify-between gap-3 flex-wrap no-print">
-          <div className="flex items-center gap-2.5 flex-wrap flex-1">
-            {/* 1. Pilih Tahun */}
-            <div className="flex flex-col">
-              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-0.5">Tahun</label>
-              <select
-                value={fuelYear}
-                onChange={e => { setFuelYear(e.target.value); setFuelPage(1); }}
-                className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30"
-              >
-                {fuelAvailableYears.map(yr => (
-                  <option key={yr} value={yr}>{yr}</option>
-                ))}
-              </select>
-            </div>
+        {/* ── Single Unified Filter Bar with Fieldset for Multi-Month & Date Range ── */}
+        <div className="p-4 border-b border-slate-200 bg-slate-50/80 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px] flex flex-col gap-3.5 no-print">
+          {/* Fieldset: Filter Periode (Multi-Bulan & Rentang Tanggal) */}
+          <fieldset className="border border-slate-300 rounded-2xl p-3 sm:p-4 bg-white/80 shadow-2xs">
+            <legend className="px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider text-emerald-950 bg-emerald-100/90 rounded-md border border-emerald-300 flex items-center gap-1.5 shadow-2xs">
+              <Calendar size={13} className="text-emerald-700" />
+              Filter Periode (Multi-Bulan & Rentang Tanggal)
+            </legend>
 
-            {/* 2. Pilih Bulan */}
-            <div className="flex flex-col">
-              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-0.5">Bulan</label>
-              <select
-                value={fuelMonth}
-                onChange={e => { setFuelMonth(e.target.value); setFuelPage(1); }}
-                className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30"
-              >
-                <option value="ALL">Semua Bulan</option>
-                {MONTH_NAMES.map(m => (
-                  <option key={m.val} value={m.val}>{m.val} - {m.label}</option>
-                ))}
-              </select>
-            </div>
+            <div className="flex flex-col gap-3">
+              {/* Row 1: Tahun & Clickable Multi-Month Selection Pills */}
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                {/* Tahun Selection */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Tahun:</span>
+                  <select
+                    value={fuelYear}
+                    onChange={e => { setFuelYear(e.target.value); setFuelPage(1); }}
+                    className="px-2.5 py-1 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 cursor-pointer"
+                  >
+                    {fuelAvailableYears.map(yr => (
+                      <option key={yr} value={yr}>{yr}</option>
+                    ))}
+                  </select>
+                </div>
 
-            {/* 3. Pilih Tanggal (Optional / Drill-down) */}
-            <div className="flex flex-col">
-              <div className="flex items-center justify-between mb-0.5">
-                <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Tanggal (Opsional)</label>
-                {fuelDate && (
+                <div className="h-4 w-px bg-slate-300 hidden sm:block" />
+
+                {/* Multi-Month Clickable Pills */}
+                <div className="flex flex-wrap items-center gap-1 flex-1">
+                  <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mr-1">Bulan:</span>
                   <button
                     type="button"
-                    onClick={() => { setFuelDate(''); setFuelPage(1); }}
-                    className="text-[9px] font-bold text-red-600 hover:text-red-700 ml-1.5 cursor-pointer"
-                    title="Kembali ke rekap 1 bulan penuh"
+                    onClick={() => {
+                      if (fuelMonths.includes('ALL')) {
+                        setFuelMonths(['09']);
+                      } else {
+                        setFuelMonths(['ALL']);
+                      }
+                      setFuelPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer border ${
+                      fuelMonths.includes('ALL')
+                        ? 'bg-emerald-700 text-white border-emerald-800 shadow-2xs'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
                   >
-                    âœ• Reset
+                    Semua Bulan
                   </button>
+                  {MONTH_NAMES.map(m => {
+                    const isSelected = fuelMonths.includes('ALL') || fuelMonths.includes(m.val);
+                    return (
+                      <button
+                        key={m.val}
+                        type="button"
+                        onClick={() => {
+                          setFuelPage(1);
+                          if (fuelMonths.includes('ALL')) {
+                            setFuelMonths([m.val]);
+                          } else if (fuelMonths.includes(m.val)) {
+                            const next = fuelMonths.filter(x => x !== m.val);
+                            setFuelMonths(next.length === 0 ? ['ALL'] : next);
+                          } else {
+                            const next = [...fuelMonths, m.val].sort();
+                            if (next.length === 12) setFuelMonths(['ALL']);
+                            else setFuelMonths(next);
+                          }
+                        }}
+                        className={`px-2 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer border ${
+                          isSelected && !fuelMonths.includes('ALL')
+                            ? 'bg-emerald-700 text-white border-emerald-800 shadow-2xs'
+                            : isSelected && fuelMonths.includes('ALL')
+                            ? 'bg-emerald-100 text-emerald-900 border-emerald-300 font-extrabold'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-emerald-50 hover:text-emerald-900'
+                        }`}
+                        title={`Pilih bulan ${m.label}`}
+                      >
+                        {m.val} {m.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Row 2: Date Range Picker (Tanggal Mulai s/d Tanggal Akhir) */}
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/80">
+                <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1">
+                  <Calendar size={11} className="text-slate-400" /> Rentang Tanggal (Opsional):
+                </span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-slate-400 font-bold">Mulai:</span>
+                    <input
+                      type="date"
+                      value={fuelStartDate}
+                      onChange={e => { setFuelStartDate(e.target.value); setFuelPage(1); }}
+                      className="px-2.5 py-1 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 cursor-pointer"
+                    />
+                  </div>
+                  <span className="text-slate-400 text-xs font-bold">s/d</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-slate-400 font-bold">Akhir:</span>
+                    <input
+                      type="date"
+                      value={fuelEndDate}
+                      onChange={e => { setFuelEndDate(e.target.value); setFuelPage(1); }}
+                      className="px-2.5 py-1 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 cursor-pointer"
+                    />
+                  </div>
+                  {(fuelStartDate || fuelEndDate) && (
+                    <button
+                      type="button"
+                      onClick={() => { setFuelStartDate(''); setFuelEndDate(''); setFuelPage(1); }}
+                      className="text-[10px] font-bold text-red-600 hover:text-red-700 px-2 py-0.5 rounded-md hover:bg-red-50 border border-red-200 transition cursor-pointer flex items-center gap-1"
+                    >
+                      ✕ Reset Rentang Tanggal
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </fieldset>
+
+          {/* Row below fieldset: Kebun / Unit, Search, Action buttons */}
+          <div className="flex flex-wrap items-center gap-3 justify-between">
+            <div className="flex flex-wrap items-center gap-3 flex-1">
+              {/* 4. Kebun / Unit Filter */}
+              <div className="flex items-center gap-1.5">
+                <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Kebun / Unit:</label>
+                {isAdmin ? (
+                  <select
+                    value={fuelPlant}
+                    onChange={e => { setFuelPlant(e.target.value); setFuelPage(1); }}
+                    className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 max-w-[200px] cursor-pointer"
+                  >
+                    <option value="ALL">Semua Kebun / Unit</option>
+                    {allPlantsList.map(p => (
+                      <option key={p.code} value={p.code}>{p.code} - {p.desc}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800">
+                    {currentUser?.plant || selectedPlant}
+                  </div>
                 )}
               </div>
-              <input
-                type="date"
-                value={fuelDate}
-                onChange={e => {
-                  const val = e.target.value;
-                  setFuelDate(val);
-                  setFuelPage(1);
-                  if (val) {
-                    setFuelYear(val.substring(0, 4));
-                    setFuelMonth(val.substring(5, 7));
-                  }
-                }}
-                className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30"
-                title="Pilih tanggal untuk melihat detail per hari, atau klik Reset untuk melihat rekap bulanan"
-              />
-            </div>
 
-            {/* 4. Kebun / Unit Filter */}
-            <div className="flex flex-col">
-              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-0.5">Kebun / Unit</label>
-              {isAdmin ? (
-                <select
-                  value={fuelPlant}
-                  onChange={e => { setFuelPlant(e.target.value); setFuelPage(1); }}
-                  className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 max-w-[190px]"
-                >
-                  <option value="ALL">Semua Kebun / Unit</option>
-                  {allPlantsList.map(p => (
-                    <option key={p.code} value={p.code}>{p.code} - {p.desc}</option>
-                  ))}
-                </select>
-              ) : (
-                <div className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800">
-                  {currentUser?.plant || selectedPlant}
-                </div>
-              )}
-            </div>
-
-            {/* 5. Pencarian (Plat / Equipment / Cost Center / Reference) */}
-            <div className="flex flex-col flex-1 min-w-[210px]">
-              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-0.5">Cari Kendaraan / Rute</label>
-              <div className="relative">
+              {/* 5. Pencarian (Plat / Equipment / Cost Center / Reference) */}
+              <div className="relative flex-1 min-w-[220px]">
                 <Search className="absolute left-3 top-2 text-slate-400" size={14} />
                 <input
                   type="text"
@@ -4482,26 +4691,26 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 />
               </div>
             </div>
-          </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 shrink-0 self-end">
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-xs transition"
-            >
-              <Printer size={13} /> Cetak
-            </button>
-            <button
-              onClick={handleExportFuel}
-              className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-xs transition"
-            >
-              <FileDown size={13} /> Ekspor Excel
-            </button>
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handlePrint}
+                className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
+              >
+                <Printer size={13} /> Cetak
+              </button>
+              <button
+                onClick={handleExportFuel}
+                className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
+              >
+                <FileDown size={13} /> Ekspor Excel
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* â”€â”€ 3 Essential Summary Cards (Solar First, Then KM/HM, Then Average Efficiency) â”€â”€ */}
+        {/* ── 3 Essential Summary Cards (Solar First, Then KM/HM, Then Average Efficiency) ── */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 bg-white no-print">
           {/* Card 1: TOTAL PEMAKAIAN SOLAR */}
           <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-4 flex flex-col justify-between shadow-xs">
@@ -4529,7 +4738,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <span className="text-2xl font-black text-blue-950 font-mono">
                 {fuelKPIs.totalKm.toLocaleString('id-ID')} <span className="text-sm font-bold text-blue-800">KM</span>
                 {fuelKPIs.totalHm > 0 && (
-                  <span className="text-slate-600 font-normal text-lg"> Â· {fuelKPIs.totalHm.toLocaleString('id-ID')} <span className="text-xs font-bold text-blue-800">HM</span></span>
+                  <span className="text-slate-600 font-normal text-lg"> · {fuelKPIs.totalHm.toLocaleString('id-ID')} <span className="text-xs font-bold text-blue-800">HM</span></span>
                 )}
               </span>
               <div className="text-xs font-semibold text-blue-700 mt-0.5">
@@ -4561,27 +4770,43 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 )}
               </div>
               <div className="text-xs font-semibold text-emerald-700 mt-0.5">
-                Standar: Mobil â‰¥ 3.5 KM/L Â· Alat Berat â‰¤ 3.0 L/HM
+                Standar: Mobil ≥ 7.0 KM/L · Dump Truck ≥ 5.0 KM/L · Alat Berat (L/HM) sesuai tipe MID(5,3)
               </div>
             </div>
           </div>
         </div>
 
-        {/* â”€â”€ Active Filter Status Badge â”€â”€ */}
+        {/* ── Active Filter Status Badge ── */}
         <div className="sticky top-0 z-20 px-4 py-2.5 bg-slate-100/95 backdrop-blur-xs border-y border-slate-200 flex items-center justify-between text-xs text-slate-600 shadow-2xs">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-bold text-slate-700">Filter Aktif:</span>
             <span className="bg-white border border-slate-300 px-2 py-0.5 rounded-md font-semibold text-slate-800">
-              {fuelDate ? `Tanggal: ${fuelDate}` : `Periode: ${fuelYear} - ${fuelMonth === 'ALL' ? 'Semua Bulan' : MONTH_NAMES.find(m => m.val === fuelMonth)?.label || fuelMonth}`}
+              {(() => {
+                const isDateRange = fuelStartDate || fuelEndDate;
+                const dateRangeStr = fuelStartDate && fuelEndDate
+                  ? `${fuelStartDate} s/d ${fuelEndDate}`
+                  : fuelStartDate
+                  ? `Mulai ${fuelStartDate}`
+                  : `Sampai ${fuelEndDate}`;
+
+                const monthsStr = fuelMonths.includes('ALL')
+                  ? 'Semua Bulan'
+                  : fuelMonths.map(m => MONTH_NAMES.find(x => x.val === m)?.label || m).join(', ');
+
+                if (isDateRange) {
+                  return `Periode: ${fuelYear} - ${monthsStr} (${dateRangeStr})`;
+                }
+                return `Periode: ${fuelYear} - ${monthsStr}`;
+              })()}
             </span>
             {fuelPlant !== 'ALL' && (
               <span className="bg-white border border-slate-300 px-2 py-0.5 rounded-md font-semibold text-slate-800">
                 Unit: {fuelPlant}
               </span>
             )}
-            {searchFuel && (
+            {searchFuel.trim() && (
               <span className="bg-white border border-slate-300 px-2 py-0.5 rounded-md font-semibold text-slate-800">
-                Cari: "{searchFuel}"
+                Pencarian: "{searchFuel}"
               </span>
             )}
           </div>
@@ -4590,7 +4815,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         </div>
 
-        {/* â”€â”€ Clean Table with Sticky/Freeze Header â”€â”€ */}
+        {/* ── Clean Table with Sticky/Freeze Header ── */}
         <div className="p-4 bg-white">
           <div className="overflow-auto max-h-[calc(100vh-270px)] min-h-[420px] excel-cell-border border border-slate-200 rounded-xl relative shadow-2xs">
             <table className="w-full text-xs border-separate border-spacing-0">
@@ -4682,7 +4907,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             </div>
                           </td>
 
-                          {/* 7. Solar (Liter) â”€â”€ FIRST */}
+                          {/* 7. Solar (Liter) ── FIRST */}
                           <td className="px-3 py-2.5 text-center font-mono font-black text-amber-950 bg-amber-50/40 border-x border-amber-100 text-xs whitespace-nowrap">
                             {row.debitLiters > 0 ? (
                               <span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap font-mono font-black text-xs">
@@ -4694,17 +4919,17 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             )}
                           </td>
 
-                          {/* 8. KM / HM â”€â”€ SECOND (With verification variance against ZESTHLP16PA) */}
+                          {/* 8. KM / HM ── SECOND (With verification variance against ZESTHLP16PA) */}
                           <td className="px-3 py-2.5 text-center font-mono font-black text-blue-950 bg-blue-50/40 border-r border-blue-100 text-xs whitespace-nowrap">
                             {row.creditKm > 0 && (
                               <div className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
                                 <span>{row.creditKm.toLocaleString('id-ID')}</span>
                                 <span className="text-[10px] font-bold text-blue-800 bg-blue-100 border border-blue-200 px-1.5 py-0.2 rounded">KM</span>
                                 {row.reconcileStatus === 'MATCH' && (
-                                  <span className="text-emerald-600 text-xs font-bold" title="Sesuai 100% dengan logbook ZESTHLP16PA">âœ“</span>
+                                  <span className="text-emerald-600 text-xs font-bold" title="Sesuai 100% dengan logbook ZESTHLP16PA">✓</span>
                                 )}
                                 {row.reconcileStatus === 'DIFF' && (
-                                  <span className="text-amber-600 text-xs font-bold" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} KM`}>âš ï¸</span>
+                                  <span className="text-amber-600 text-xs font-bold" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} KM`}>⚠️</span>
                                 )}
                               </div>
                             )}
@@ -4713,10 +4938,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                                 <span>{row.creditHm.toLocaleString('id-ID')}</span>
                                 <span className="text-[10px] font-bold text-purple-800 bg-purple-100 border border-purple-200 px-1.5 py-0.2 rounded">HM</span>
                                 {row.reconcileStatus === 'MATCH' && (
-                                  <span className="text-emerald-600 text-xs font-bold" title="Sesuai 100% dengan logbook ZESTHLP16PA">âœ“</span>
+                                  <span className="text-emerald-600 text-xs font-bold" title="Sesuai 100% dengan logbook ZESTHLP16PA">✓</span>
                                 )}
                                 {row.reconcileStatus === 'DIFF' && (
-                                  <span className="text-amber-600 text-xs font-bold" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} HM`}>âš ï¸</span>
+                                  <span className="text-amber-600 text-xs font-bold" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} HM`}>⚠️</span>
                                 )}
                               </div>
                             )}
@@ -4727,28 +4952,36 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
                           {/* 9. Rasio / Efisiensi */}
                           <td className="px-3 py-2.5 text-center bg-emerald-50/30 border-r border-emerald-100 whitespace-nowrap">
-                            {row.kmPerLiter > 0 && (
-                              <span className={`font-mono font-black text-xs px-2.5 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap ${
-                                isOptimal ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' :
-                                isBoros ? 'bg-rose-100 text-rose-900 border border-rose-300' :
-                                'bg-amber-100 text-amber-900 border border-amber-300'
-                              }`}>
-                                <span>{row.kmPerLiter}</span>
-                                <span className="text-[9.5px] font-extrabold opacity-80">KM/L</span>
-                              </span>
-                            )}
-                            {row.literPerHm > 0 && (
-                              <span className={`font-mono font-black text-xs px-2.5 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap ${
-                                isOptimal ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' :
-                                isBoros ? 'bg-rose-100 text-rose-900 border border-rose-300' :
-                                'bg-amber-100 text-amber-900 border border-amber-300'
-                              }`}>
-                                <span>{row.literPerHm}</span>
-                                <span className="text-[9.5px] font-extrabold opacity-80">L/HM</span>
-                              </span>
-                            )}
-                            {row.kmPerLiter === 0 && row.literPerHm === 0 && (
-                              <span className="text-slate-400 text-xs">-</span>
+                            {row.efficiency && row.efficiency.ratioVal > 0 ? (
+                              <div className="flex flex-col items-center justify-center">
+                                <span
+                                  className={`font-mono font-black text-xs px-2.5 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap shadow-2xs ${
+                                    row.efficiency.color === 'emerald'
+                                      ? 'bg-emerald-100 text-emerald-950 border border-emerald-300'
+                                      : row.efficiency.color === 'amber'
+                                      ? 'bg-amber-100 text-amber-950 border border-amber-300'
+                                      : 'bg-rose-100 text-rose-950 border border-rose-300'
+                                  }`}
+                                  title={`Standar ${row.efficiency.code}: ${row.efficiency.targetText} | Status: ${row.efficiency.badgeLabel}`}
+                                >
+                                  <span>{row.efficiency.ratioVal}</span>
+                                  <span className="text-[9.5px] font-extrabold opacity-80">{row.efficiency.uom}</span>
+                                </span>
+                                <span
+                                  className={`text-[9px] font-extrabold uppercase mt-0.5 tracking-tight ${
+                                    row.efficiency.color === 'emerald'
+                                      ? 'text-emerald-700'
+                                      : row.efficiency.color === 'amber'
+                                      ? 'text-amber-700'
+                                      : 'text-rose-700'
+                                  }`}
+                                  title={row.efficiency.targetText}
+                                >
+                                  {row.efficiency.badgeLabel}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-300">-</span>
                             )}
                           </td>
 
@@ -4826,7 +5059,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       </div>
     )}
 
-    {/* â”€â”€ Impeccable Detail Modal with ZESTHLP16PA vs SLARC Reconciliation â”€â”€ */}
+    {/* ── Impeccable Detail Modal with ZESTHLP16PA vs SLARC Reconciliation ── */}
     {selectedFuelVeh && (() => {
       const isDateInMonth = (dStr, mStr) => {
         if (!mStr) return true;
@@ -4943,10 +5176,33 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 <h3 className="text-lg font-black text-white">{selectedFuelVeh.description || selectedFuelVeh.costCenter}</h3>
                 <p className="text-xs text-slate-300 mt-1 flex items-center gap-2 flex-wrap">
                   <span>No. Equipment: <strong className="font-mono text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-700">{selectedFuelVeh.equipment && selectedFuelVeh.equipment !== '-' ? selectedFuelVeh.equipment : 'Unmapped'}</strong></span>
-                  <span>Â·</span>
+                  <span>·</span>
                   <span>Cost Center: <strong className="font-mono text-amber-300">{selectedFuelVeh.costCenter}</strong></span>
-                  <span>Â·</span>
+                  <span>·</span>
                   <span>Unit: <strong className="text-white">{selectedFuelVeh.plant} ({selectedFuelVeh.plantDesc})</strong></span>
+                  {(() => {
+                    const eff = selectedFuelVeh.efficiency || evaluateFuelEfficiency(selectedFuelVeh.costCenter, fuelLiters, selectedFuelVeh.creditKm, selectedFuelVeh.creditHm, selectedFuelVeh.objectType);
+                    return (
+                      <>
+                        <span>·</span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="text-slate-400">Efisiensi:</span>
+                          <strong className={`font-mono px-2 py-0.5 rounded text-[11px] font-black ${
+                            eff.color === 'emerald'
+                              ? 'bg-emerald-800 text-emerald-200 border border-emerald-600'
+                              : eff.color === 'amber'
+                              ? 'bg-amber-800 text-amber-200 border border-amber-600'
+                              : eff.color === 'red'
+                              ? 'bg-rose-800 text-rose-200 border border-rose-600'
+                              : 'bg-slate-800 text-slate-300'
+                          }`}>
+                            {eff.ratioVal > 0 ? `${eff.ratioVal} ${eff.uom}` : '-'} ({eff.badgeLabel})
+                          </strong>
+                          <span className="text-[10px] text-slate-400 font-medium">(${eff.code}: ${eff.targetText})</span>
+                        </span>
+                      </>
+                    );
+                  })()}
                 </p>
               </div>
               <button
