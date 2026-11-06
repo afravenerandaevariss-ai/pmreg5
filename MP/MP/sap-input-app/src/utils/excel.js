@@ -59,7 +59,8 @@ export function getEquipmentPlant(eq, masterMap, defaultPlant) {
     ? String(defaultPlant).trim().toUpperCase()
     : null;
 
-  if (!eq) return safeDefault || '5F01';
+  // FIX #4: Jangan hardcode '5F01' — kembalikan safeDefault atau null agar caller bisa handle [2026-11-06]
+  if (!eq) return safeDefault || null;
 
   let p = String(eq.plant || '').trim().toUpperCase();
   if (p && p !== 'UNCATEGORIZED' && p !== '-' && p !== 'UNKNOWN' && p.startsWith('5F')) {
@@ -82,8 +83,9 @@ export function getEquipmentPlant(eq, masterMap, defaultPlant) {
     }
   }
 
-  // Gunakan defaultPlant yang dikirim (misal '5F04'), bukan hardcode '5F01'
-  return safeDefault || '5F01';
+  // FIX #4: Gunakan defaultPlant dari caller — jangan hardcode '5F01' [2026-11-06]
+  // Caller (exportDailyToSAP, dll) harus mengirim defaultPlant yang benar (plant user)
+  return safeDefault || null;
 }
 
 /**
@@ -406,8 +408,9 @@ function buildParentChildMaps(equipments) {
       const normDesc = normalizeDesc(desc);
       if (plant) parentDescToEqNum[`${plant}_${normDesc}`] = eqKey;
       if (plant) parentDescToEqNum[`${plant}_${desc}`] = eqKey;
-      parentDescToEqNum[normDesc] = eqKey;
-      parentDescToEqNum[desc] = eqKey;
+      // FIX #3: Gunakan .has check agar tidak overwrite dari plant lain [2026-11-06]
+      if (!parentDescToEqNum[normDesc]) parentDescToEqNum[normDesc] = eqKey;
+      if (!parentDescToEqNum[desc]) parentDescToEqNum[desc] = eqKey;
       parentEqNumsSet.add(eqKey);
     }
   });
@@ -594,8 +597,8 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
       rowData[measuringPtIdx] = finalMp;
     }
 
-    const plantCodeStr = getEquipmentPlant(eq, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || '5F01');
-    const note = `HM Mesin ${plantCodeStr} tgl ${sapDate}`;
+    const plantCodeStr = getEquipmentPlant(eq, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null // FIX #4: Jangan hardcode '5F01' [2026-11-06]);
+    const note = `HM Mesin ${plantCodeStr || 'R5'} tgl ${sapDate}`; // FIX #4: null-safe plant code
     if (shortTextIdx !== -1) rowData[shortTextIdx] = note;
     for (let c = 0; c < rowData.length; c++) {
       if (typeof rowData[c] === 'string' && (rowData[c].toLowerCase().includes('import') || rowData[c].toLowerCase().includes('ik17') || rowData[c].toLowerCase().includes('ib sd'))) {
@@ -648,8 +651,8 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
       newRow[measuringPtIdx] = finalMp;
     }
 
-    const plantCodeStr = getEquipmentPlant(log, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || '5F01');
-    const note = `HM Mesin ${plantCodeStr} tgl ${sapDate}`;
+    const plantCodeStr = getEquipmentPlant(log, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null // FIX #4: Jangan hardcode '5F01' [2026-11-06]);
+    const note = `HM Mesin ${plantCodeStr || 'R5'} tgl ${sapDate}`; // FIX #4: null-safe plant code
     if (shortTextIdx !== -1) newRow[shortTextIdx] = note;
 
     wsData.push(newRow);
@@ -821,8 +824,8 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
       rowData[measuringPtIdx] = finalMp;
     }
 
-    const plantCodeStr = getEquipmentPlant(eq, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || '5F01');
-    let note = `HM Mesin ${plantCodeStr} tgl ${sapDate}`;
+    const plantCodeStr = getEquipmentPlant(eq, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null // FIX #4: Jangan hardcode '5F01' [2026-11-06]);
+    let note = `HM Mesin ${plantCodeStr || 'R5'} tgl ${sapDate}`; // FIX #4: null-safe
     if (note.length > 30) note = note.substring(0, 30);
     if (shortTextIdx !== -1) rowData[shortTextIdx] = note;
     for (let c = 0; c < rowData.length; c++) {
@@ -879,9 +882,9 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
       newRow[measuringPtIdx] = finalMp;
     }
 
-    const plantCodeStr = getEquipmentPlant(log, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || '5F01');
+    const plantCodeStr = getEquipmentPlant(log, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null // FIX #4: Jangan hardcode '5F01' [2026-11-06]);
     const userNotes = (log?.notes || log?.catatan || '').trim();
-    let note = userNotes ? userNotes : `HM Mesin ${plantCodeStr} tgl ${sapDate}`;
+    let note = userNotes ? userNotes : `HM Mesin ${plantCodeStr || 'R5'} tgl ${sapDate}`; // FIX #4: null-safe
     if (note.length > 30) note = note.substring(0, 30);
     if (shortTextIdx !== -1) newRow[shortTextIdx] = note;
 
@@ -1055,8 +1058,8 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
         rowData[measuringPtIdx] = finalMp;
       }
 
-      const plantCodeStr = getEquipmentPlant(eq, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || '5F01');
-      const note = `HM Mesin ${plantCodeStr} tgl ${sapDate}`;
+      const plantCodeStr = getEquipmentPlant(eq, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null // FIX #4: Jangan hardcode '5F01' [2026-11-06]);
+      const note = `HM Mesin ${plantCodeStr || 'R5'} tgl ${sapDate}`; // FIX #4: null-safe plant code
       if (shortTextIdx !== -1) rowData[shortTextIdx] = note;
       for (let c = 0; c < rowData.length; c++) {
         if (typeof rowData[c] === 'string' && (rowData[c].toLowerCase().includes('import') || rowData[c].toLowerCase().includes('ik17') || rowData[c].toLowerCase().includes('ib sd'))) {
@@ -1111,8 +1114,8 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
         newRow[measuringPtIdx] = finalMp;
       }
 
-      const plantCodeStr = getEquipmentPlant(log, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || '5F01');
-      let note = `HM Mesin ${plantCodeStr} tgl ${sapDate}`;
+      const plantCodeStr = getEquipmentPlant(log, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null // FIX #4: Jangan hardcode '5F01' [2026-11-06]);
+      let note = `HM Mesin ${plantCodeStr || 'R5'} tgl ${sapDate}`; // FIX #4: null-safe
       if (note.length > 30) note = note.substring(0, 30);
       if (shortTextIdx !== -1) newRow[shortTextIdx] = note;
 

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+﻿import { useState, useMemo, useEffect, useRef } from 'react';
 import { format, startOfWeek, addDays, startOfMonth, endOfMonth, isSameDay, subMonths, addMonths, getDaysInMonth, subDays } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Search, Plus, Minus, X, Save, Clock, AlertTriangle, CheckCircle, ClipboardList, Download, FileDown, Trash2, Eye, Upload, History, Flag, FileSpreadsheet, RefreshCw, Layers, Lock, ExternalLink } from 'lucide-react';
@@ -2997,8 +2997,18 @@ export default function DailyDashboard({
 
                   const exportHeaders = (exportTpl?.headers && Array.isArray(exportTpl.headers) && exportTpl.headers.length > 0) ? exportTpl.headers : DEFAULT_SAP_HEADERS;
                   const exportOriginalData = exportTpl?.originalData || [];
-                  const tplEquipments = (exportTpl?.equipments && Array.isArray(exportTpl.equipments) && exportTpl.equipments.length > 0)
+                  // FIX #2: Pre-filter template equipments berdasarkan plant user SEBELUM dijadikan
+                  // exportEquipments, untuk mencegah equipment unit lain ikut ke dalam export. [2026-11-06]
+                  const rawTplEquipments = (exportTpl?.equipments && Array.isArray(exportTpl.equipments) && exportTpl.equipments.length > 0)
                     ? exportTpl.equipments
+                    : null;
+                  const tplEquipments = rawTplEquipments
+                    ? (isUserRole && userPlant
+                        ? rawTplEquipments.filter(eq => {
+                            const p = getEquipmentPlant(eq, masterMap, userPlant);
+                            return p === userPlant;
+                          })
+                        : rawTplEquipments)
                     : null;
                   const eqFromDb = (eqResult?.data && eqResult.data.length > 0)
                     ? eqResult.data.map(r => ({
@@ -3089,10 +3099,35 @@ export default function DailyDashboard({
 
                   try {
                     let targetEquipments = filterTargetEquipments(exportEquipments, selectedExportPlants, selectedExportEqs, currentUser?.role, userPlant);
+                    // FIX #1: Jangan fallback ke semua exportEquipments jika filter kosong.
+                    // Fallback berbahaya ini adalah penyebab equipment unit lain (Digester, Boiler dll)
+                    // ikut masuk ke upload user dari plant berbeda (misal 5F22). [2026-11-06]
                     if (!targetEquipments || targetEquipments.length === 0) {
-                      // Data sudah diambil di blok paralel di atas (plant-scoped, berbatas waktu).
-                      // Jangan query ulang di sini — query tambahan hanya menambah waktu tunggu.
-                      targetEquipments = exportEquipments;
+                      if (isUserRole && userPlant) {
+                        // User role: filter ketat harus berhasil — jika gagal, ada masalah master data
+                        setIsExporting(false);
+                        alert(
+                          ⚠️ Tidak ada equipment untuk Plant \.\n\n +
+                          Total equipment dimuat: \\n\n +
+                          Kemungkinan penyebab:\n +
+                          • Master EQ atau template belum diupload untuk plant \\n +
+                          • Field 'plant' di master data kosong/Uncategorized\n\n +
+                          Solusi: Pastikan master data plant \ sudah diupload dengan benar, lalu coba lagi.
+                        );
+                        return;
+                      }
+                      // Admin dengan plant list terpilih: filter sekali lagi sebelum pakai semua
+                      if (selectedExportPlants && selectedExportPlants.length > 0) {
+                        const selectedSet = new Set(selectedExportPlants.map(p => String(p).trim().toUpperCase()));
+                        targetEquipments = exportEquipments.filter(eq => {
+                          const p = getEquipmentPlant(eq, masterMap, selectedExportPlants[0]);
+                          return selectedSet.has(p);
+                        });
+                      }
+                      // Jika masih kosong setelah filter admin: pakai semua (admin memang punya akses semua)
+                      if (!targetEquipments || targetEquipments.length === 0) {
+                        targetEquipments = exportEquipments;
+                      }
                     }
 
                     // ── Validasi akhir: pastikan ada equipment sebelum export ──
