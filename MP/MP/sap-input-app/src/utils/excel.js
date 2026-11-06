@@ -283,9 +283,9 @@ export function validateDailyHours(dailyLogsMap, startDate, endDate, selectedEqs
     logs.forEach(log => {
       if (selectedEqs && selectedEqs.length > 0 && !selectedEqs.includes(log.indukEqNum)) return;
       if (selectedPlants && selectedPlants.length > 0) {
-        const logPlant = String(log.plant || '').trim().toUpperCase();
+        const logPlant = String(log.plant || getEquipmentPlant(log, masterMap, '') || '').trim().toUpperCase();
         const selPlants = selectedPlants.map(p => String(p).trim().toUpperCase());
-        if (logPlant && !selPlants.includes(logPlant)) return;
+        if (!logPlant || !selPlants.includes(logPlant)) return; // STRICT plant isolation
       }
       const key = log.indukEqNum || log.indukDesc || 'UNKNOWN';
       if (!minutesPerInduk[key]) {
@@ -480,9 +480,9 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     if (!logEqNum) return;
     if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(logEqNum)) return;
     if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
-      const logPlant = String(log.plant || '').trim().toUpperCase();
+      const logPlant = String(log.plant || getEquipmentPlant(log, masterMap, '') || '').trim().toUpperCase();
       const selPlants = docDetails.selectedPlants.map(p => String(p).trim().toUpperCase());
-      if (logPlant && !selPlants.includes(logPlant)) return;
+      if (!logPlant || !selPlants.includes(logPlant)) return; // STRICT plant isolation
     }
     const pEqNum = eqToParentEqNum[logEqNum] || logEqNum;
     const durationHours = (log.durationMinutes || 0) / 60;
@@ -549,6 +549,13 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     if (!eqKey) return;
     const eqKeyNorm = eqKey.replace(/^0+/, '');
     if (EXCLUDED_SAP_EQS.has(eqKey) || EXCLUDED_SAP_EQS.has(eqKeyNorm)) return;
+
+    // DEFENSE-IN-DEPTH: Ensure equipment strictly belongs to selected export plants
+    if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
+      const selPlants = docDetails.selectedPlants.map(p => String(p).trim().toUpperCase());
+      const eqPlant = getEquipmentPlant(eq, masterMap, '');
+      if (eqPlant && !selPlants.includes(eqPlant)) return;
+    }
 
     const rowIdx = eq.rowIndex;
     if (rowIdx !== undefined && safeOriginalData[rowIdx] && processedRowIndices.has(rowIdx)) return;
@@ -617,9 +624,9 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     if (EXCLUDED_SAP_EQS.has(logEqNum) || EXCLUDED_SAP_EQS.has(logEqNumNorm)) return;
 
     if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
-      const logPlant = String(log.plant || '').trim().toUpperCase();
+      const logPlant = String(log.plant || getEquipmentPlant(log, masterMap, '') || '').trim().toUpperCase();
       const selPlants = docDetails.selectedPlants.map(p => String(p).trim().toUpperCase());
-      if (logPlant && !selPlants.includes(logPlant)) return;
+      if (!logPlant || !selPlants.includes(logPlant)) return; // STRICT plant isolation
     }
 
     exportedEqKeys.add(logEqNum);
@@ -712,9 +719,9 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
       if (!logEqNum) return;
       if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(logEqNum)) return;
       if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
-        const logPlant = String(log.plant || '').trim().toUpperCase();
+        const logPlant = String(log.plant || getEquipmentPlant(log, masterMap, '') || '').trim().toUpperCase();
         const selPlants = docDetails.selectedPlants.map(p => String(p).trim().toUpperCase());
-        if (logPlant && !selPlants.includes(logPlant)) return;
+        if (!logPlant || !selPlants.includes(logPlant)) return; // STRICT plant isolation
       }
       const pEqNum = eqToParentEqNum[logEqNum] || logEqNum;
       const durationHours = (log.durationMinutes || 0) / 60;
@@ -782,6 +789,13 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     const eqKeyNorm = eqKey.replace(/^0+/, '');
     if (EXCLUDED_SAP_EQS.has(eqKey) || EXCLUDED_SAP_EQS.has(eqKeyNorm)) return;
 
+    // DEFENSE-IN-DEPTH: Ensure equipment strictly belongs to selected export plants
+    if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
+      const selPlants = docDetails.selectedPlants.map(p => String(p).trim().toUpperCase());
+      const eqPlant = getEquipmentPlant(eq, masterMap, '');
+      if (eqPlant && !selPlants.includes(eqPlant)) return;
+    }
+
     const rowIdx = eq.rowIndex;
     if (rowIdx !== undefined && safeOriginalData[rowIdx] && processedRowIndices.has(rowIdx)) return;
     if (rowIdx !== undefined && safeOriginalData[rowIdx]) processedRowIndices.add(rowIdx);
@@ -845,9 +859,9 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
 
     const log = loggedEquipmentsMap[eqKey];
     if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
-      const logPlant = String(log?.plant || '').trim().toUpperCase();
+      const logPlant = String(log?.plant || getEquipmentPlant(log, masterMap, '') || '').trim().toUpperCase();
       const selPlants = docDetails.selectedPlants.map(p => String(p).trim().toUpperCase());
-      if (logPlant && !selPlants.includes(logPlant)) return;
+      if (!logPlant || !selPlants.includes(logPlant)) return; // STRICT plant isolation
     }
 
     exportedEqKeys.add(eqKey);
@@ -959,9 +973,9 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       if (!logEqNum) return;
       if (docDetails.selectedEqs && docDetails.selectedEqs.length > 0 && !docDetails.selectedEqs.includes(logEqNum)) return;
       if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
-        const logPlant = String(log.plant || '').trim().toUpperCase();
+        const logPlant = String(log.plant || getEquipmentPlant(log, masterMap, '') || '').trim().toUpperCase();
         const selPlants = docDetails.selectedPlants.map(p => String(p).trim().toUpperCase());
-        if (logPlant && !selPlants.includes(logPlant)) return;
+        if (!logPlant || !selPlants.includes(logPlant)) return; // STRICT plant isolation
       }
       const pEqNum = eqToParentEqNum[logEqNum] || logEqNum;
       const durationHours = (log.durationMinutes || 0) / 60;
@@ -1015,6 +1029,13 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
       if (!eqKey) return;
       const eqKeyNorm = eqKey.replace(/^0+/, '');
       if (EXCLUDED_SAP_EQS.has(eqKey) || EXCLUDED_SAP_EQS.has(eqKeyNorm)) return;
+
+    // DEFENSE-IN-DEPTH: Ensure equipment strictly belongs to selected export plants
+    if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
+      const selPlants = docDetails.selectedPlants.map(p => String(p).trim().toUpperCase());
+      const eqPlant = getEquipmentPlant(eq, masterMap, '');
+      if (eqPlant && !selPlants.includes(eqPlant)) return;
+    }
 
       const rowIdx = eq.rowIndex;
       if (rowIdx !== undefined && safeOriginalData[rowIdx] && processedRowIndices.has(rowIdx)) return;
@@ -1078,9 +1099,9 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
 
       const log = loggedEquipmentsMap[eqKey];
       if (docDetails.selectedPlants && docDetails.selectedPlants.length > 0) {
-        const logPlant = String(log?.plant || '').trim().toUpperCase();
+        const logPlant = String(log?.plant || getEquipmentPlant(log, masterMap, '') || '').trim().toUpperCase();
         const selPlants = docDetails.selectedPlants.map(p => String(p).trim().toUpperCase());
-        if (logPlant && !selPlants.includes(logPlant)) return;
+        if (!logPlant || !selPlants.includes(logPlant)) return; // STRICT plant isolation
       }
 
       exportedEqKeys.add(eqKey);
