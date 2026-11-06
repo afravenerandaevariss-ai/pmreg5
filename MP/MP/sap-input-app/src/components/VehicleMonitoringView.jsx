@@ -5114,7 +5114,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
         {/* ── Clean Table with Sticky/Freeze Header ── */}
         <div className="p-4 bg-white">
-          <div className="overflow-x-auto xl:overflow-x-hidden max-h-[calc(100vh-250px)] min-h-[420px] excel-cell-border border border-slate-200 rounded-xl relative shadow-2xs">
+          <div className="overflow-x-auto max-h-[calc(100vh-250px)] min-h-[420px] excel-cell-border border border-slate-200 rounded-xl relative shadow-2xs">
             <table className="w-full text-xs border-separate border-spacing-0">
               <thead className="sticky top-0 z-30 shadow-xs">
                 <tr className="bg-slate-100/95 text-slate-800 text-xs font-black uppercase tracking-wider text-center whitespace-nowrap">
@@ -5167,18 +5167,18 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           className="hover:bg-emerald-50/40 even:bg-slate-50/50 transition-colors"
                         >
                           {/* 1. No */}
-                          <td className="px-2 py-2 text-center text-slate-500 font-mono font-bold text-xs">{rowNum}</td>
+                          <td className="px-3.5 py-3 text-center text-slate-500 font-mono font-bold text-xs">{rowNum}</td>
 
                           {/* 2. Kebun / Unit */}
-                          <td className="px-2 py-2 text-center">
+                          <td className="px-3.5 py-3 text-center whitespace-nowrap">
                             <div className="font-extrabold text-slate-900 text-xs">{row.plant}</div>
-                            <div className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5 truncate max-w-[85px] mx-auto">{row.plantDesc || row.plant}</div>
+                            <div className="text-xs text-slate-500 font-medium leading-tight mt-0.5">{row.plantDesc || row.plant}</div>
                           </td>
 
                           {/* 3. No. Equipment */}
-                          <td className="px-2 py-2 text-center bg-emerald-50/30 border-x border-emerald-100">
+                          <td className="px-3.5 py-3 text-center bg-emerald-50/20 border-x border-emerald-100 whitespace-nowrap">
                             {row.equipment && row.equipment !== '-' ? (
-                              <span className="font-mono font-black text-xs text-emerald-950 bg-emerald-100/90 px-1.5 py-0.5 rounded-md border border-emerald-300 inline-block shadow-2xs tracking-wide">
+                              <span className="font-mono font-black text-xs text-emerald-950 bg-emerald-100/90 px-3 py-1 rounded-lg border border-emerald-300 inline-block shadow-2xs tracking-wide">
                                 {row.equipment}
                               </span>
                             ) : (
@@ -5187,20 +5187,22 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           </td>
 
                           {/* 4. Cost Center */}
-                          <td className="px-2 py-2 text-center font-mono font-bold text-slate-800 text-xs">
+                          <td className="px-3.5 py-3 text-center font-mono font-bold text-slate-800 text-xs whitespace-nowrap">
                             {row.costCenter}
                           </td>
 
                           {/* 5. Deskripsi Kendaraan */}
-                          <td className="px-2.5 py-2 text-center">
-                            <div className="font-bold text-slate-900 text-xs leading-tight">{row.description || '-'}</div>
-                            <span className="inline-block mt-0.5 bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold">{row.objectType || 'VEH'}</span>
+                          <td className="px-4 py-3 text-center">
+                            <div className="font-bold text-slate-900 text-xs leading-snug whitespace-nowrap">{row.description || '-'}</div>
+                            <span className="inline-block mt-1 bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-0.5 rounded-md text-xs font-mono font-bold shadow-2xs">
+                              {row.objectType || 'VEH'}
+                            </span>
                           </td>
 
                           {/* 6. REFERENCE */}
-                          <td className="px-2.5 py-2 text-center bg-slate-50/30">
+                          <td className="px-4 py-3 text-center bg-slate-50/30">
                             <div
-                              className="text-xs font-semibold text-slate-800 leading-tight"
+                              className="text-xs font-semibold text-slate-800 leading-snug max-w-xs truncate mx-auto"
                               title={row.referenceAll || row.referencePrimary || '-'}
                             >
                               {row.referencePrimary || '-'}
@@ -5208,11 +5210,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           </td>
 
                           {/* 7. Solar (Liter) */}
-                          <td className="px-2 py-2 text-center font-mono font-black text-amber-950 bg-amber-50/40 border-x border-amber-100 text-xs whitespace-nowrap">
+                          <td className="px-3.5 py-3 text-center font-mono font-black text-amber-950 bg-amber-50/30 border-x border-amber-100 text-xs whitespace-nowrap">
                             {row.debitLiters > 0 ? (
-                              <span className="inline-flex items-center justify-center gap-1 font-mono font-black text-xs">
-                                <span>{row.debitLiters.toLocaleString('id-ID')}</span>
-                                <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-1 py-0.2 rounded border border-amber-200">L</span>
+                              <span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap font-mono font-black text-xs">
+                                <span className="text-xs">{row.debitLiters.toLocaleString('id-ID')}</span>
+                                <span className="text-xs font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-200">L</span>
                               </span>
                             ) : (
                               <span className="text-slate-300 font-mono text-xs">-</span>
@@ -5220,17 +5222,29 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           </td>
 
                           {/* 8. ACTIVITY */}
-                          <td className="px-2 py-2 text-center font-mono font-black text-blue-950 bg-blue-50/40 border-r border-blue-100 text-xs whitespace-nowrap">
+                          <td className="px-3.5 py-3 text-center font-mono font-black text-blue-950 bg-blue-50/30 border-r border-blue-100 text-xs whitespace-nowrap">
                             {row.creditKm > 0 && (
-                              <div className="inline-flex items-center justify-center gap-1">
-                                <span>{row.creditKm.toLocaleString('id-ID')}</span>
-                                <span className="text-[10px] font-bold text-blue-800 bg-blue-100 border border-blue-200 px-1 py-0.2 rounded">KM</span>
+                              <div className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
+                                <span className="text-xs">{row.creditKm.toLocaleString('id-ID')}</span>
+                                <span className="text-xs font-bold text-blue-900 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md">KM</span>
+                                {row.reconcileStatus === 'MATCH' && (
+                                  <span className="text-emerald-600 text-xs font-bold" title="Sesuai 100% dengan logbook ZESTHLP16PA">✓</span>
+                                )}
+                                {row.reconcileStatus === 'DIFF' && (
+                                  <span className="text-amber-600 text-xs font-bold" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} KM`}>⚠️</span>
+                                )}
                               </div>
                             )}
                             {row.creditHm > 0 && (
-                              <div className="inline-flex items-center justify-center gap-1">
-                                <span>{row.creditHm.toLocaleString('id-ID')}</span>
-                                <span className="text-[10px] font-bold text-purple-800 bg-purple-100 border border-purple-200 px-1 py-0.2 rounded">HM</span>
+                              <div className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
+                                <span className="text-xs">{row.creditHm.toLocaleString('id-ID')}</span>
+                                <span className="text-xs font-bold text-purple-900 bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md">HM</span>
+                                {row.reconcileStatus === 'MATCH' && (
+                                  <span className="text-emerald-600 text-xs font-bold" title="Sesuai 100% dengan logbook ZESTHLP16PA">✓</span>
+                                )}
+                                {row.reconcileStatus === 'DIFF' && (
+                                  <span className="text-amber-600 text-xs font-bold" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} HM`}>⚠️</span>
+                                )}
                               </div>
                             )}
                             {row.creditKm === 0 && row.creditHm === 0 && (
@@ -5238,11 +5252,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             )}
                           </td>
 
-                          {/* 9. Rasio / Efisiensi */}
-                          <td className="px-2 py-2 text-center bg-emerald-50/30 border-r border-emerald-100 whitespace-nowrap">
+                          {/* 9. Rasio / Efisiensi (Nilai Rasio Saja) */}
+                          <td className="px-3.5 py-3 text-center bg-emerald-50/20 border-r border-emerald-100 whitespace-nowrap">
                             {row.efficiency && row.efficiency.ratioVal > 0 ? (
                               <span
-                                className={`font-mono font-black text-xs px-2 py-1 rounded-md inline-flex items-center gap-1 shadow-2xs ${
+                                className={`font-mono font-black text-xs px-3 py-1 rounded-lg inline-flex items-center gap-1.5 whitespace-nowrap shadow-2xs ${
                                   row.efficiency.color === 'emerald'
                                     ? 'bg-emerald-100 text-emerald-950 border border-emerald-300'
                                     : row.efficiency.color === 'amber'
@@ -5252,39 +5266,39 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                                 title={`Standar ${row.efficiency.code}: ${row.efficiency.targetText}`}
                               >
                                 <span>{row.efficiency.ratioVal}</span>
-                                <span className="text-[9.5px] font-extrabold opacity-80">{row.efficiency.uom}</span>
+                                <span className="text-xs font-bold text-slate-700 opacity-90">{row.efficiency.uom}</span>
                               </span>
                             ) : (
                               <span className="text-slate-300 font-mono text-xs">-</span>
                             )}
                           </td>
 
-                          {/* 10. Keterangan Efisiensi */}
-                          <td className="px-2 py-2 text-center bg-slate-50/40 border-r border-slate-200 whitespace-nowrap">
+                          {/* 10. Keterangan Efisiensi (Badge Status Terpisah) */}
+                          <td className="px-3.5 py-3 text-center bg-slate-50/30 border-r border-slate-200 whitespace-nowrap">
                             {row.efficiency?.isStandby ? (
                               <span
-                                className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs tracking-wide"
+                                className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs tracking-wide"
                                 title="Kendaraan Standby / Rusak / Libur (Dummy 1 KM/HM SAP, tidak dihitung efisiensi)"
                               >
                                 Standby / Rusak
                               </span>
                             ) : row.efficiency?.isNoFuel ? (
                               <span
-                                className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs"
+                                className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs"
                                 title="Aktivitas operasional tercatat tanpa pemakaian BBM pada Cost Center ini (Unit Sewa / Pool BBM Luar)"
                               >
                                 Tanpa Solar
                               </span>
                             ) : row.efficiency?.status === 'NO_ACTIVITY' ? (
                               <span
-                                className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs"
+                                className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs"
                                 title="Ada pengisian solar tanpa aktivitas KM/HM pada Cost Center ini"
                               >
                                 {row.efficiency.badgeLabel || 'Tanpa Aktivitas'}
                               </span>
                             ) : row.efficiency && row.efficiency.ratioVal > 0 ? (
                               <span
-                                className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tight shadow-2xs ${
+                                className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black uppercase tracking-tight shadow-2xs ${
                                   row.efficiency.color === 'emerald'
                                     ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                                     : row.efficiency.color === 'amber'
@@ -5301,12 +5315,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           </td>
 
                           {/* 11. Biaya Solar (Rp) */}
-                          <td className="px-2.5 py-2 text-center font-mono font-bold text-xs text-slate-800 whitespace-nowrap">
+                          <td className="px-3.5 py-3 text-center font-mono font-bold text-xs text-slate-800 whitespace-nowrap">
                             {row.debitRp > 0 ? `Rp ${row.debitRp.toLocaleString('id-ID')}` : '-'}
                           </td>
-
-                          {/* 12. Aksi (Detail) */}
-                          <td className="px-2 py-2 text-center no-print whitespace-nowrap">
+                          <td className="px-3.5 py-3 text-center no-print whitespace-nowrap">
                             <button
                               type="button"
                               onClick={async () => {
