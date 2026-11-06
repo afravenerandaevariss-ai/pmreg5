@@ -604,7 +604,7 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
       rowData[measuringPtIdx] = finalMp;
     }
 
-    const plantCodeStr = getEquipmentPlant(eq, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null // FIX #4: Jangan hardcode '5F01' [2026-11-06]);
+    const plantCodeStr = getEquipmentPlant(eq, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null); // FIX #4: Jangan hardcode '5F01' [2026-11-06]
     const note = `HM Mesin ${plantCodeStr || 'R5'} tgl ${sapDate}`; // FIX #4: null-safe plant code
     if (shortTextIdx !== -1) rowData[shortTextIdx] = note;
     for (let c = 0; c < rowData.length; c++) {
@@ -658,7 +658,7 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
       newRow[measuringPtIdx] = finalMp;
     }
 
-    const plantCodeStr = getEquipmentPlant(log, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null // FIX #4: Jangan hardcode '5F01' [2026-11-06]);
+    const plantCodeStr = getEquipmentPlant(log, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null); // FIX #4: Jangan hardcode '5F01' [2026-11-06]
     const note = `HM Mesin ${plantCodeStr || 'R5'} tgl ${sapDate}`; // FIX #4: null-safe plant code
     if (shortTextIdx !== -1) newRow[shortTextIdx] = note;
 
@@ -838,7 +838,7 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
       rowData[measuringPtIdx] = finalMp;
     }
 
-    const plantCodeStr = getEquipmentPlant(eq, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null // FIX #4: Jangan hardcode '5F01' [2026-11-06]);
+    const plantCodeStr = getEquipmentPlant(eq, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null); // FIX #4: Jangan hardcode '5F01' [2026-11-06]
     let note = `HM Mesin ${plantCodeStr || 'R5'} tgl ${sapDate}`; // FIX #4: null-safe
     if (note.length > 30) note = note.substring(0, 30);
     if (shortTextIdx !== -1) rowData[shortTextIdx] = note;
@@ -896,7 +896,7 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
       newRow[measuringPtIdx] = finalMp;
     }
 
-    const plantCodeStr = getEquipmentPlant(log, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null // FIX #4: Jangan hardcode '5F01' [2026-11-06]);
+    const plantCodeStr = getEquipmentPlant(log, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null); // FIX #4: Jangan hardcode '5F01' [2026-11-06]
     const userNotes = (log?.notes || log?.catatan || '').trim();
     let note = userNotes ? userNotes : `HM Mesin ${plantCodeStr || 'R5'} tgl ${sapDate}`; // FIX #4: null-safe
     if (note.length > 30) note = note.substring(0, 30);
@@ -1079,7 +1079,7 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
         rowData[measuringPtIdx] = finalMp;
       }
 
-      const plantCodeStr = getEquipmentPlant(eq, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null // FIX #4: Jangan hardcode '5F01' [2026-11-06]);
+      const plantCodeStr = getEquipmentPlant(eq, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null); // FIX #4: Jangan hardcode '5F01' [2026-11-06]
       const note = `HM Mesin ${plantCodeStr || 'R5'} tgl ${sapDate}`; // FIX #4: null-safe plant code
       if (shortTextIdx !== -1) rowData[shortTextIdx] = note;
       for (let c = 0; c < rowData.length; c++) {
@@ -1135,7 +1135,7 @@ export function exportCumulativeToSAP(headers, originalData, equipments, dailyLo
         newRow[measuringPtIdx] = finalMp;
       }
 
-      const plantCodeStr = getEquipmentPlant(log, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null // FIX #4: Jangan hardcode '5F01' [2026-11-06]);
+      const plantCodeStr = getEquipmentPlant(log, masterMap, docDetails.selectedPlants?.[0] || docDetails.plant || null); // FIX #4: Jangan hardcode '5F01' [2026-11-06]
       let note = `HM Mesin ${plantCodeStr || 'R5'} tgl ${sapDate}`; // FIX #4: null-safe
       if (note.length > 30) note = note.substring(0, 30);
       if (shortTextIdx !== -1) newRow[shortTextIdx] = note;

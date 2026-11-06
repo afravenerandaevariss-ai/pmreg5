@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { format, startOfWeek, addDays, startOfMonth, endOfMonth, isSameDay, subMonths, addMonths, getDaysInMonth, subDays } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Search, Plus, Minus, X, Save, Clock, AlertTriangle, CheckCircle, ClipboardList, Download, FileDown, Trash2, Eye, Upload, History, Flag, FileSpreadsheet, RefreshCw, Layers, Lock, ExternalLink } from 'lucide-react';
@@ -3107,12 +3107,12 @@ export default function DailyDashboard({
                         // User role: filter ketat harus berhasil — jika gagal, ada masalah master data
                         setIsExporting(false);
                         alert(
-                          ⚠️ Tidak ada equipment untuk Plant \.\n\n +
-                          Total equipment dimuat: \\n\n +
-                          Kemungkinan penyebab:\n +
-                          • Master EQ atau template belum diupload untuk plant \\n +
-                          • Field 'plant' di master data kosong/Uncategorized\n\n +
-                          Solusi: Pastikan master data plant \ sudah diupload dengan benar, lalu coba lagi.
+                          `⚠️ Tidak ada equipment untuk Plant ${userPlant}.\n\n` +
+                          `Total equipment dimuat: ${exportEquipments.length}\n` +
+                          `Kemungkinan penyebab:\n` +
+                          `• Master EQ atau template belum diupload untuk plant ${userPlant}\n` +
+                          `• Field 'plant' di master data kosong/Uncategorized\n\n` +
+                          `Solusi: Pastikan master data plant ${userPlant} sudah diupload dengan benar, lalu coba lagi.`
                         );
                         return;
                       }

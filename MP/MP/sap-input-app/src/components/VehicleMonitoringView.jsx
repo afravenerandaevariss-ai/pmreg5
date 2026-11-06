@@ -14,7 +14,7 @@ import { toPng } from 'html-to-image';
 import { fetchVehicleMaster, fetchVehicleLogs, saveVehicleData, invalidateVehicleCache, fetchMasterEquipment, fetchZCOData, saveZCOData, getSystemConfig, fetchDailyLogs, fetchFuelData, saveFuelData, fetchFuelDailyForMonth, saveFuelDailyForMonth, makeFuelTxKey } from '../lib/supabaseService';
 import WhatsAppSenderModal from './WhatsAppSenderModal';
 
-// â”€â”€â”€ Plant Master Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Plant Master Data --------------------------------------------------------
 const PLANT_INFO = {
   // Kal-Bar
   "5E01": { desc: "KEBUN GUNUNG MELIAU",    wilayah: "Kal-Bar" },
@@ -52,7 +52,7 @@ const PLANT_INFO = {
   "5E19": { desc: "KEBUN LONGKALI",         wilayah: "Kal-Tim" },
 };
 
-// â”€â”€â”€ Job Code Master â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Job Code Master ----------------------------------------------------------
 const JOB_CODE_DESC = {
   "11210": "Angkut Hasil Panen (Lain)",
   "11602": "Angkut Bahan (Kebun)",
@@ -83,10 +83,10 @@ const JOB_CODE_DESC = {
   "EQ002": "Equipment Maintenance",
 };
 
-// â”€â”€â”€ UoM Labels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- UoM Labels ---------------------------------------------------------------
 const UOM_LABEL = { KG: "Kilogram", KM: "Kilometer", HM: "Jam Operasi", M: "Meter", HA: "Hektar", M3: "Meter Kubik", HK: "Hari Kerja" };
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Helpers ------------------------------------------------------------------
 function excelSerialToDate(serial) {
   const utcDays = Math.floor(serial - 25569);
   const dateInfo = new Date(utcDays * 86400 * 1000);
@@ -150,7 +150,7 @@ const StatusBadge = ({ status, text }) => {
   );
 };
 
-// â”€â”€â”€ WA Schedule Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- WA Schedule Badge --------------------------------------------------------
 function WAScheduleBadge({ onOpen }) {
   const [countdown, setCountdown] = React.useState('');
   const [nextLabel, setNextLabel] = React.useState('');
@@ -225,14 +225,14 @@ function WAScheduleBadge({ onOpen }) {
       <span className={`font-mono text-[11px] px-1.5 py-0.5 rounded-lg ${
         isActive ? 'bg-emerald-200 text-emerald-900' : 'bg-slate-200 text-slate-600'
       }`}>
-        {isActive ? 'ðŸŸ¢ Segera!' : countdown}
+        {isActive ? '🟢 Segera!' : countdown}
       </span>
       <Clock size={11} className="text-slate-400" />
     </button>
   );
 }
 
-// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Main Component -----------------------------------------------------------
 export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   // Dev-only check: strictly true in local dev / localhost only
   const isLocalDev = Boolean(
@@ -240,14 +240,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname))
   );
 
-  // â”€â”€â”€ Role Detection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Normalize role string â€” handles all DB variants: 'USER','Unit','unit','UNIT'
+  // --- Role Detection --------------------------------------------------------
+  // Normalize role string — handles all DB variants: 'USER','Unit','unit','UNIT'
   const roleUpper = currentUser?.role?.toUpperCase() || '';
 
   // Strictly role DEV only (ADMIN and USER are both hidden)
   const isDevUser = roleUpper === 'DEV';
 
-  // Explicit USER/UNIT check â€” blocks regardless of plant value
+  // Explicit USER/UNIT check — blocks regardless of plant value
   const isUserRole = roleUpper === 'USER' || roleUpper === 'UNIT';
 
   // ADMIN if: role is Admin/ADMIN/REGIONAL/DEV OR plant is ALL/5R00
@@ -324,7 +324,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [lastRefreshed, setLastRefreshed] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(''); // granular status during upload
 
-  // â”€â”€ Fuel Evaluation State (Simplified & Unified) â”€â”€
+  // -- Fuel Evaluation State (Simplified & Unified) --
   const [fuelData, setFuelData] = useState({ summaries: [], daily: [] });
   const [fuelUploadInfo, setFuelUploadInfo] = useState(null);
   const [fuelYear, setFuelYear] = useState('2026');
@@ -339,15 +339,15 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [fuelModalTab, setFuelModalTab] = useState('zest'); // 'zest' | 'debit' | 'credit'
   const FUEL_PAGE_SIZE = 25;
 
-  // â”€â”€ Load Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // isManualRefresh: true  â†’ tombol Refresh diklik, force-fetch vehicle_logs & master_map dari server
-  //                  false â†’ initial load, prioritaskan cache dulu agar cepat
+  // -- Load Data ----------------------------------------------------------------
+  // isManualRefresh: true  -> tombol Refresh diklik, force-fetch vehicle_logs & master_map dari server
+  //                  false -> initial load, prioritaskan cache dulu agar cepat
   const loadData = useCallback(async (isManualRefresh = false) => {
     setLoading(true);
     setError(null);
     try {
       // vehicle_logs (2.2k+ rows, 2 halaman PostgREST) butuh ~19s di PROD.
-      // Timeout 15s membuat fallback {data:[]} menang balapan â†’ seluruh transaksi tampil 0.
+      // Timeout 15s membuat fallback {data:[]} menang balapan -> seluruh transaksi tampil 0.
       const TIMEOUT_MS = 90000;
       const withTimeout = (promise, fallback = { data: [], error: null }) =>
         Promise.race([
@@ -355,9 +355,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           new Promise(resolve => setTimeout(() => resolve(fallback), TIMEOUT_MS))
         ]);
 
-      // vehicle_logs â†’ selalu force-fetch saat manual refresh (transaksi aktif berubah sering)
-      // vehicle_master, zco â†’ force saat manual refresh
-      // masterEquipment â†’ cukup cache (jarang berubah, data besar)
+      // vehicle_logs -> selalu force-fetch saat manual refresh (transaksi aktif berubah sering)
+      // vehicle_master, zco -> force saat manual refresh
+      // masterEquipment -> cukup cache (jarang berubah, data besar)
       const [vRes, lRes, eqRes, zRes, mapRes, fRes] = await Promise.all([
         withTimeout(fetchVehicleMaster(isManualRefresh),            { data: [], error: null }),
         withTimeout(fetchVehicleLogs(isManualRefresh),              { data: [], error: null }),
@@ -445,7 +445,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   }, [isAdmin, activeTab]);
 
 
-  // â”€â”€ Excel Upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Excel Upload -------------------------------------------------------------
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -650,7 +650,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         setVehicles(finalVehicles);
         setLogs(finalLogs);
 
-        // Save to DB in background â€” UI already shows data
+        // Save to DB in background — UI already shows data
         setUploadProgress(`Menyimpan ${finalLogs.length} transaksi ke server...`);
         const { data: saveRes, error: saveErr } = await saveVehicleData(finalVehicles, finalLogs);
         if (saveErr) {
@@ -693,7 +693,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     reader.readAsArrayBuffer(file);
   };
 
-  // â”€â”€ Clear Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Clear Data ---------------------------------------------------------------
   const handleClearData = async () => {
     setLoading(true);
     try {
@@ -704,7 +704,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     finally { setLoading(false); }
   };
 
-  // â”€â”€ ZCO Upload & Clear â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- ZCO Upload & Clear -------------------------------------------------------
   const handleZCOFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -812,7 +812,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     finally { setLoading(false); }
   };
 
-  // â”€â”€ Fuel Evaluation (SALRD & SLARC) Upload & Clear â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Fuel Evaluation (SALRD & SLARC) Upload & Clear ----------------------------
   // ── Fuel Evaluation (SALRD & SLARC) Upload & Clear ────────────────────────────
   const handleFuelUploadByMode = (e, uploadType = 'all') => {
     const file = e.target.files[0];
@@ -1276,7 +1276,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     finally { setLoading(false); }
   };
 
-  // â”€â”€ Filter month logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Filter month logs --------------------------------------------------------
   const monthLogs = useMemo(() => {
     const start = `${targetMonth}-01`;
     const end   = `${targetMonth}-31`;
@@ -1321,7 +1321,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
   }, [targetMonth, targetInputDate]);
 
-  // â”€â”€ Summary per Plant â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Summary per Plant --------------------------------------------------------
   const summaryData = useMemo(() => {
     const targetDate = new Date(targetInputDate);
     const list = [];
@@ -1469,7 +1469,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return result;
   }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetMonth, targetInputDate, autoWorkingDays, selectedWilayah, searchPlant, filterStatus, sortBy, sortAsc, masterEquipments, masterMap, isAdmin, currentUser]);
 
-  // â”€â”€ Unit Focused Mode calculations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Unit Focused Mode calculations ------------------------------------------
   const unitFocusedData = useMemo(() => {
     if (!effectivePlant) return { vehiclesList: [], kpis: { total: 0, active: 0, avgDays: 0, lastUpdate: '-', statusColor: 'grey', statusText: 'Belum Ada Data' } };
 
@@ -1601,7 +1601,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     };
   }, [vehicles, activeMonthLogs, selectedPlant, targetMonth, targetInputDate, masterEquipments]);
 
-  // â”€â”€ Per-Vehicle Detail (all plants, original tab) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Per-Vehicle Detail (all plants, original tab) ---------------------------
   const vehicleDetailData = useMemo(() => {
     const tDate = new Date(targetInputDate);
     
@@ -1671,7 +1671,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return result;
   }, [vehicles, activeMonthLogs, cancelledMonthLogs, targetInputDate, selectedWilayah, searchVehicle, filterStatus, currentUser, isAdmin]);
 
-  // â”€â”€ Filtered Log Records (Original Logs tab) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Filtered Log Records (Original Logs tab) ---------------------------------
   const filteredLogs = useMemo(() => {
     let result = showCancelled ? monthLogs : activeMonthLogs;
     
@@ -1696,7 +1696,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return result;
   }, [monthLogs, activeMonthLogs, showCancelled, selectedWilayah, searchVehicle, filterUoM, filterJobCode, currentUser, isAdmin]);
 
-  // â”€â”€ Aggregate Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Aggregate Stats -----------------------------------------------------------
   const stats = useMemo(() => {
     const active = summaryData.filter(r => r.totalTx > 0).length;
     const totalTx = monthLogs.length;
@@ -1709,7 +1709,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return { active, totalTx, totalCancelled, totalVeh, upToDate, late, notUpToDate, avgPct };
   }, [summaryData, monthLogs, cancelledMonthLogs, vehicles]);
 
-  // â”€â”€ Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Export --------------------------------------------------------------------
   const handleExportSummary = () => {
     const wb = XLSX.utils.book_new();
     const rows = summaryData.map(r => ({
@@ -1739,22 +1739,22 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       const reportDateStr = format(reportDateObj, 'dd MMM yyyy', { locale: id });
       const targetDateStrFormatted = format(targetDateObj, 'dd/MM/yyyy');
       
-      let text = `*ðŸ“Š MONITORING TRANSAKSI LOGBOOK REGIONAL 5*\n`;
+      let text = `*📊 MONITORING TRANSAKSI LOGBOOK REGIONAL 5*\n`;
       text += `*Periode:* 1 s.d ${reportDateStr}\n`;
       text += `*Target Input:* ${targetDateStrFormatted} (H-1)\n\n`;
       
       const sorted = [...summaryData].sort((a, b) => a.rank - b.rank);
       
-      text += `*ðŸ† PERINGKAT UNIT (Berdasarkan Kepatuhan UTD):*\n`;
+      text += `*🏆 PERINGKAT UNIT (Berdasarkan Kepatuhan UTD):*\n`;
       sorted.forEach(item => {
         if (item.totalTx === 0) return;
-        const statusEmoji = item.statusColor === 'green' ? 'ðŸŸ¢' : item.statusColor === 'yellow' ? 'ðŸŸ¡' : 'ðŸ”´';
+        const statusEmoji = item.statusColor === 'green' ? '🟢' : item.statusColor === 'yellow' ? '🟡' : '🔴';
         text += `${item.rank}. *${item.plant}* - ${item.desc}: *${item.pctUtd.toFixed(1)}%* UTD (${item.utdCount}/${item.totalTx} tx) ${statusEmoji} (Last: ${item.lastLogDate ? format(new Date(item.lastLogDate + 'T00:00:00'), 'dd/MM') : '-'})\n`;
       });
       
       const zeroTx = sorted.filter(item => item.totalTx === 0);
       if (zeroTx.length > 0) {
-        text += `\n*âš ï¸ Unit Tanpa Transaksi:* \n`;
+        text += `\n*⚠️ Unit Tanpa Transaksi:* \n`;
         text += zeroTx.map(item => `${item.plant} (${item.desc})`).join(', ') + '\n';
       }
       
@@ -1866,7 +1866,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
   };
 
-  // â”€â”€ Fuel Evaluation Computed Data & ZESTHLP16PA Mapping â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Fuel Evaluation Computed Data & ZESTHLP16PA Mapping -------------------
   const MONTH_NAMES = [
     { val: '01', label: 'Januari' },
     { val: '02', label: 'Februari' },
@@ -1888,7 +1888,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return Array.from(set).sort().reverse();
   }, [fuelData]);
 
-  // â”€â”€ Database VLOOKUP: Cost Center -> Equipment Master â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Database VLOOKUP: Cost Center -> Equipment Master -----------------------
   const costCenterToEquipmentMap = useMemo(() => {
     const map = new Map();
 
@@ -1977,7 +1977,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return map;
   }, [zcoData]);
 
-  // â”€â”€ Pre-Index ZESTHLP16PA Logs by No. Equipment & Date â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Pre-Index ZESTHLP16PA Logs by No. Equipment & Date ---------------------
   const zestLogsByEquipment = useMemo(() => {
     const map = new Map();
     (logs || []).forEach(l => {
@@ -2219,7 +2219,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     let result = [];
 
     if (!fuelDate) {
-      // â”€â”€ Rekap Bulanan â”€â”€
+      // -- Rekap Bulanan --
       let list = fuelData?.summaries || [];
       if (fuelMonth === 'ALL') {
         list = list.filter(s => s.month?.startsWith(fuelYear));
@@ -2274,7 +2274,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         };
       });
     } else {
-      // â”€â”€ Filter Tanggal Spesifik (Harian Drill-Down) â”€â”€
+      // -- Filter Tanggal Spesifik (Harian Drill-Down) --
       const dayDaily = (fuelData?.daily || []).filter(d => d.d === fuelDate);
       const dayLogs = (logs || []).filter(l => l.date === fuelDate);
 
@@ -2534,7 +2534,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     XLSX.writeFile(wb, `Detail_Log_Kendaraan_${targetMonth}.xlsx`);
   };
 
-  // â”€â”€ Sort handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Sort handler --------------------------------------------------------------
   const handleSort = (col) => {
     if (sortBy === col) setSortAsc(!sortAsc);
     else { setSortBy(col); setSortAsc(true); }
@@ -2543,7 +2543,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     ? (sortAsc ? <ChevronUp size={12} className="inline ml-1" /> : <ChevronDown size={12} className="inline ml-1" />)
     : null;
 
-  // â”€â”€ Paginated logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Paginated logs -------------------------------------------------------------
   const paginatedLogs = useMemo(() => {
     const start = (logPage - 1) * LOG_PAGE_SIZE;
     return filteredLogs.slice(start, start + LOG_PAGE_SIZE);
@@ -2735,7 +2735,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         style={{ backgroundImage: "url('/sawit.jpg')" }}
       />
 
-      {/* â”€â”€ Side Drawer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* -- Side Drawer ------------------------------------------- */}
       {drawerItem && (
         <>
           {/* Backdrop */}
@@ -2748,7 +2748,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             {/* Drawer header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-900">
               <div>
-                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">{drawerItem.wilayah} Â· {drawerItem.plant}</p>
+                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">{drawerItem.wilayah} • {drawerItem.plant}</p>
                 <h3 className="text-sm font-bold text-white mt-0.5 uppercase">{drawerItem.desc}</h3>
               </div>
               <button onClick={() => setDrawerItem(null)} className="text-slate-400 hover:text-white transition p-1 rounded-2xl hover:bg-slate-700">
@@ -2809,7 +2809,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     drawerItem.plantLogs.forEach(l => { if (l.job_code) jcMap[l.job_code] = (jcMap[l.job_code] || 0) + 1; });
                     return Object.entries(jcMap).map(([jc, cnt]) => (
                       <span key={jc} className="bg-indigo-50 border border-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-mono text-[10px]">
-                        {jc}{JOB_CODE_DESC[jc] ? ` (${JOB_CODE_DESC[jc]})` : ''} Â· {cnt}x
+                        {jc}{JOB_CODE_DESC[jc] ? ` (${JOB_CODE_DESC[jc]})` : ''} • {cnt}x
                       </span>
                     ));
                   })()}
@@ -2871,7 +2871,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           }
         `}</style>
 
-        {/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* -- Header ----------------------------------------------- */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-sm no-print">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -2880,7 +2880,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             </div>
             <h2 className="text-xl font-bold text-white">Monitoring Logbook Kendaraan</h2>
             <p className="text-slate-400 text-xs mt-0.5">
-              Dashboard monitoring operasional kendaraan Regional 5 â€” Bulan {targetMonth}
+              Dashboard monitoring operasional kendaraan Regional 5 — Bulan {targetMonth}
             </p>
           </div>
 
@@ -2943,7 +2943,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         </div>
 
-        {/* â”€â”€ Error / Upload Info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* -- Error / Upload Info ----------------------------------- */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-start gap-3">
             <AlertCircle size={18} className="shrink-0 mt-0.5" />
@@ -2962,7 +2962,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             <div className="text-sm">
               <p className="font-bold text-xs">Upload berhasil: {uploadInfo.file}</p>
               <p className="text-emerald-700 mt-0.5 text-[11px]">
-                {uploadInfo.processed} transaksi diproses Â· {uploadInfo.cancelled} dibatalkan Â· {uploadInfo.skipped} baris dilewati Â· {uploadInfo.plants} plant Â· {uploadInfo.jobCodes} job code
+                {uploadInfo.processed} transaksi diproses • {uploadInfo.cancelled} dibatalkan • {uploadInfo.skipped} baris dilewati • {uploadInfo.plants} plant • {uploadInfo.jobCodes} job code
               </p>
             </div>
             <button onClick={() => { setUploadInfo(null); try { sessionStorage.removeItem('vehicle_upload_info'); } catch (e) {} }} className="ml-auto text-emerald-400 hover:text-emerald-600"><XCircle size={16} /></button>
@@ -2997,16 +2997,16 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         )}
 
-        {/* â”€â”€ Tab Navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* -- Tab Navigation ---------------------------------------- */}
         {!screenshotMode && (
           <div className="flex gap-1 bg-slate-200/60 p-1.5 rounded-xl w-fit flex-wrap">
             {[
-              { key: 'unit-checklist',    label: 'ðŸ“‹ Checklist Kebun (Unit)', icon: Calendar,        show: true },
-              { key: 'summary-regional',  label: 'ðŸ¢ Rekap Regional 5',      icon: BarChart2,       show: true },
-              { key: 'detail-veh',        label: 'ðŸšš Daftar Kendaraan',      icon: Truck,           show: isAdmin },
-              { key: 'log-raw',           label: 'ðŸ“„ Log Transaksi Asli',    icon: FileSpreadsheet, show: true },
-              { key: 'zco-reconciliation',label: 'ðŸ’° Verifikasi Biaya (ZCO)', icon: Coins,          show: true },
-              { key: 'fuel-evaluation',   label: 'â›½ Evaluasi BBM (Solar)',    icon: Fuel,           show: true },
+              { key: 'unit-checklist', label: 'Checklist Kebun (Unit)', icon: Calendar,        show: true },
+              { key: 'summary-regional', label: 'Rekap Regional 5', icon: BarChart2,       show: true },
+              { key: 'detail-veh', label: 'Daftar Kendaraan', icon: Truck,           show: isAdmin },
+              { key: 'log-raw', label: 'Log Transaksi Asli', icon: FileSpreadsheet, show: true },
+              { key: 'zco-reconciliation', label: 'Verifikasi Biaya (ZCO)', icon: Coins,          show: true },
+              { key: 'fuel-evaluation', label: 'Evaluasi BBM (Solar)', icon: Fuel,           show: true },
             ].filter(t => t.show).map(({ key, label, icon: Icon }) => (
               <button key={key} onClick={() => { setActiveTab(key); setError(null); }}
                 className={`flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold transition-colors duration-300 ${activeTab === key ? 'bg-gradient-to-tr from-[#064e3b] to-[#2dd4bf] text-white shadow-md shadow-emerald-900/20' : 'text-slate-500 hover:text-[#064e3b] hover:bg-emerald-50'}`}>
@@ -3016,7 +3016,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         )}
 
-        {/* â”€â”€ Controls (Adapts based on active tab) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* -- Controls (Adapts based on active tab) ------------------ */}
         {!screenshotMode && activeTab !== 'fuel-evaluation' && (
           <div className={`${
             isLocalDev 
@@ -3030,7 +3030,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
                   MDS DATA-DENSE MODE (MORNINGSTAR X PTPN IV HYBRID)
                 </span>
-                <span className="font-mono text-slate-400 font-semibold">LOCAL DEV ONLY â€¢ COMPACT NUMERALS</span>
+                <span className="font-mono text-slate-400 font-semibold">LOCAL DEV ONLY • COMPACT NUMERALS</span>
               </div>
             )}
 
@@ -3051,7 +3051,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             </div>
           {activeTab === 'unit-checklist' ? (
             // Unit view controls: plant selection
-            // ADMIN/DEV â†’ full dropdown; USER â†’ locked read-only badge
+            // ADMIN/DEV -> full dropdown; USER -> locked read-only badge
             <div className="flex flex-col col-span-2">
               <label className="text-[10px] font-bold text-slate-400 uppercase mb-1">
                 {isAdmin ? 'Pilih Kebun / Unit' : 'Unit / Kebun Anda'}
@@ -3117,9 +3117,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         </div>
         )}
 
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-        {/* TAB 1: Checklist Kebun (Unit) â€” VERY SIMPLE & DIRECT       */}
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ----------------------------------------------------------- */}
+        {/* TAB 1: Checklist Kebun (Unit) — VERY SIMPLE & DIRECT       */}
+        {/* ----------------------------------------------------------- */}
         {activeTab === 'unit-checklist' && (
           <div className="space-y-4">
             
@@ -3224,7 +3224,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                               </span>
                               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 <span className="font-mono">{selectedPlant}</span>
-                                <span className="text-emerald-500">Â·</span>
+                                <span className="text-emerald-500">•</span>
                                 {PLANT_INFO[selectedPlant]?.desc || selectedPlant}
                               </span>
                               {PLANT_INFO[selectedPlant]?.wilayah && (
@@ -3321,7 +3321,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                               <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-inner max-w-4xl">
                                 <h5 className="font-bold text-slate-700 text-xs mb-3 flex items-center gap-1.5">
                                   <Truck size={14} className="text-[#064e3b]" /> 
-                                  Detail Transaksi Logbook Kendaraan {v.vehicle_code} â€” Bulan {targetMonth}
+                                  Detail Transaksi Logbook Kendaraan {v.vehicle_code} — Bulan {targetMonth}
                                 </h5>
                                 
                                 <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
@@ -3411,9 +3411,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         )}
 
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ----------------------------------------------------------- */}
         {/* TAB 2: Summary Regional (Semua Kebun)                      */}
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ----------------------------------------------------------- */}
         {activeTab === 'summary-regional' && (
           <div className="space-y-4">
 
@@ -3637,9 +3637,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         )}
 
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-        {/* TAB 3: Daftar Kendaraan â€” ADMIN & DEV only                 */}
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ----------------------------------------------------------- */}
+        {/* TAB 3: Daftar Kendaraan — ADMIN & DEV only                 */}
+        {/* ----------------------------------------------------------- */}
         {activeTab === 'detail-veh' && isAdmin && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3">
@@ -3684,7 +3684,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           className="text-[#064e3b] hover:underline hover:text-emerald-700 transition font-mono font-bold text-left"
                           title={`Lihat Log Transaksi Asli untuk ${v.vehicle_code}`}
                         >
-                          {v.vehicle_code} â†—
+                          {v.vehicle_code} ↗
                         </button>
                       </td>
                       <td className="px-3 py-2.5 text-center font-bold text-[#064e3b]">{v.plant}</td>
@@ -3747,9 +3747,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         )}
 
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ----------------------------------------------------------- */}
         {/* TAB 4: Log Transaksi Asli                                 */}
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ----------------------------------------------------------- */}
         {activeTab === 'log-raw' && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 flex-wrap bg-slate-50/50">
@@ -3774,7 +3774,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 </select>
                 <select value={filterJobCode} onChange={e => { setFilterJobCode(e.target.value); setLogPage(1); }}
                   className="px-3 py-2 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white">
-                  {jobCodeOptions.map(jc => <option key={jc} value={jc}>{jc === 'ALL' ? 'Semua Pekerjaan (Job Code)' : `${jc} â€“ ${JOB_CODE_DESC[jc] || jc}`}</option>)}
+                  {jobCodeOptions.map(jc => <option key={jc} value={jc}>{jc === 'ALL' ? 'Semua Pekerjaan (Job Code)' : `${jc} – ${JOB_CODE_DESC[jc] || jc}`}</option>)}
                 </select>
                 <button onClick={() => setShowCancelled(!showCancelled)}
                   className={`flex items-center gap-1.5 px-3 py-2 border rounded-2xl text-xs font-semibold transition ${showCancelled ? 'bg-red-50 border-red-200 text-red-600' : 'border-slate-200 text-slate-500 hover:bg-slate-50 bg-white'}`}>
@@ -3858,13 +3858,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             {totalPages > 1 && (
               <div className="p-3 border-t border-slate-100 flex items-center justify-between bg-slate-50">
                 <span className="text-xs text-slate-400">
-                  Halaman {logPage} dari {totalPages} Â· {filteredLogs.length} transaksi
+                  Halaman {logPage} dari {totalPages} • {filteredLogs.length} transaksi
                 </span>
                 <div className="flex gap-1">
                   <button onClick={() => setLogPage(1)} disabled={logPage === 1}
-                    className="px-3 py-1.5 rounded-2xl text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-200 bg-white">Â«</button>
+                    className="px-3 py-1.5 rounded-2xl text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-200 bg-white">«</button>
                   <button onClick={() => setLogPage(p => Math.max(1, p - 1))} disabled={logPage === 1}
-                    className="px-3 py-1.5 rounded-2xl text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-200 bg-white">â€¹</button>
+                    className="px-3 py-1.5 rounded-2xl text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-200 bg-white">‹</button>
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     const page = Math.max(1, Math.min(logPage - 2 + i, totalPages - 4 + i));
                     return (
@@ -3875,9 +3875,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     );
                   })}
                   <button onClick={() => setLogPage(p => Math.min(totalPages, p + 1))} disabled={logPage === totalPages}
-                    className="px-3 py-1.5 rounded-2xl text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-200 bg-white">â€º</button>
+                    className="px-3 py-1.5 rounded-2xl text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-200 bg-white">›</button>
                   <button onClick={() => setLogPage(totalPages)} disabled={logPage === totalPages}
-                    className="px-3 py-1.5 rounded-2xl text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-200 bg-white">Â»</button>
+                    className="px-3 py-1.5 rounded-2xl text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-200 bg-white">»</button>
                 </div>
               </div>
         )}
@@ -3914,8 +3914,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               className="px-3 py-2 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white font-semibold text-slate-700"
             >
               <option value="ALL">Semua Status</option>
-              <option value="Cek">âš ï¸ Cek</option>
-              <option value="Oke">ðŸŸ¢ Oke</option>
+              <option value="Cek">⚠️ Cek</option>
+              <option value="Oke">🟢 Oke</option>
             </select>
             {zcoFilterStatus === 'Cek' && totalCekRows > 0 && (
               <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 text-red-700 px-3 py-1.5 rounded-2xl text-[11px] font-bold shadow-sm">
@@ -3942,7 +3942,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         </div>
 
-        {/* â”€â”€ Summary Metric Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* -- Summary Metric Cards ------------------------------- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 pb-0 bg-white no-print">
           <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex flex-col justify-between shadow-xs">
             <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Total Biaya SAP (Cost)</span>
@@ -4113,7 +4113,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       </div>
     )}
 
-      {/* ðŸ”¥ Danger Zone (Regional only) ðŸ”¥ */}
+      {/* 🔥 Danger Zone (Regional only) 🔥 */}
       {isAdmin && (
         <div className="no-print">
           <button
@@ -4128,7 +4128,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             <div className="border border-red-200 bg-red-50/50 rounded-2xl p-5 space-y-4 mt-2">
               <div className="flex items-center gap-2 mb-1">
                 <ShieldAlert size={16} className="text-red-600 shrink-0" />
-                <p className="text-xs font-bold text-red-700 uppercase tracking-wide">âš  Danger Zone â€” Tindakan Ini Tidak Dapat Dibatalkan</p>
+                <p className="text-xs font-bold text-red-700 uppercase tracking-wide">⚠️ Danger Zone — Tindakan Ini Tidak Dapat Dibatalkan</p>
               </div>
               <p className="text-[11px] text-red-600">Hapus data hanya jika Anda yakin. Ketikkan kata konfirmasi pada kolom di bawah untuk mengaktifkan tombol hapus.</p>
 
@@ -4191,7 +4191,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
     {activeTab === 'fuel-evaluation' && (
       <div className="relative z-10 bg-white/95 backdrop-blur-xs rounded-2xl border border-slate-300 shadow-sm overflow-hidden max-w-[1400px] mx-auto w-full font-sans">
-        {/* â”€â”€ Single Unified Filter Bar (Tahun, Bulan, Tanggal, Kebun, Cari) â”€â”€ */}
+        {/* -- Single Unified Filter Bar (Tahun, Bulan, Tanggal, Kebun, Cari) -- */}
         <div className="p-4 border-b border-slate-200 bg-slate-50/80 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px] flex flex-col md:flex-row md:items-center justify-between gap-3 flex-wrap no-print">
           <div className="flex items-center gap-2.5 flex-wrap flex-1">
             {/* 1. Pilih Tahun */}
@@ -4234,7 +4234,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     className="text-[9px] font-bold text-red-600 hover:text-red-700 ml-1.5 cursor-pointer"
                     title="Kembali ke rekap 1 bulan penuh"
                   >
-                    âœ• Reset
+                    ✕ Reset
                   </button>
                 )}
               </div>
@@ -4309,7 +4309,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         </div>
 
-        {/* â”€â”€ 3 Essential Summary Cards (Solar First, Then KM/HM, Then Average Efficiency) â”€â”€ */}
+        {/* -- 3 Essential Summary Cards (Solar First, Then KM/HM, Then Average Efficiency) -- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 bg-white no-print">
           {/* Card 1: TOTAL PEMAKAIAN SOLAR */}
           <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-4 flex flex-col justify-between shadow-xs">
@@ -4337,7 +4337,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <span className="text-2xl font-black text-blue-950 font-mono">
                 {fuelKPIs.totalKm.toLocaleString('id-ID')} <span className="text-sm font-bold text-blue-800">KM</span>
                 {fuelKPIs.totalHm > 0 && (
-                  <span className="text-slate-600 font-normal text-lg"> Â· {fuelKPIs.totalHm.toLocaleString('id-ID')} <span className="text-xs font-bold text-blue-800">HM</span></span>
+                  <span className="text-slate-600 font-normal text-lg"> • {fuelKPIs.totalHm.toLocaleString('id-ID')} <span className="text-xs font-bold text-blue-800">HM</span></span>
                 )}
               </span>
               <div className="text-xs font-semibold text-blue-700 mt-0.5">
@@ -4369,13 +4369,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 )}
               </div>
               <div className="text-xs font-semibold text-emerald-700 mt-0.5">
-                Standar: Mobil â‰¥ 3.5 KM/L Â· Alat Berat â‰¤ 3.0 L/HM
+                Standar: Mobil ≥ 3.5 KM/L • Alat Berat ≤ 3.0 L/HM
               </div>
             </div>
           </div>
         </div>
 
-        {/* â”€â”€ Active Filter Status Badge â”€â”€ */}
+        {/* -- Active Filter Status Badge -- */}
         <div className="sticky top-0 z-20 px-4 py-2.5 bg-slate-100/95 backdrop-blur-xs border-y border-slate-200 flex items-center justify-between text-xs text-slate-600 shadow-2xs">
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-700">Filter Aktif:</span>
@@ -4398,7 +4398,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           </div>
         </div>
 
-        {/* â”€â”€ Clean Table with Sticky/Freeze Header â”€â”€ */}
+        {/* -- Clean Table with Sticky/Freeze Header -- */}
         <div className="p-4 bg-white">
           <div className="overflow-auto max-h-[calc(100vh-270px)] min-h-[420px] excel-cell-border border border-slate-200 rounded-xl relative shadow-2xs">
             <table className="w-full text-xs border-separate border-spacing-0">
@@ -4490,7 +4490,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             </div>
                           </td>
 
-                          {/* 7. Solar (Liter) â”€â”€ FIRST */}
+                          {/* 7. Solar (Liter) -- FIRST */}
                           <td className="px-3 py-2.5 text-center font-mono font-black text-amber-950 bg-amber-50/40 border-x border-amber-100 text-xs whitespace-nowrap">
                             {row.debitLiters > 0 ? (
                               <span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap font-mono font-black text-xs">
@@ -4502,17 +4502,17 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             )}
                           </td>
 
-                          {/* 8. KM / HM â”€â”€ SECOND (With verification variance against ZESTHLP16PA) */}
+                          {/* 8. KM / HM -- SECOND (With verification variance against ZESTHLP16PA) */}
                           <td className="px-3 py-2.5 text-center font-mono font-black text-blue-950 bg-blue-50/40 border-r border-blue-100 text-xs whitespace-nowrap">
                             {row.creditKm > 0 && (
                               <div className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
                                 <span>{row.creditKm.toLocaleString('id-ID')}</span>
                                 <span className="text-[10px] font-bold text-blue-800 bg-blue-100 border border-blue-200 px-1.5 py-0.2 rounded">KM</span>
                                 {row.reconcileStatus === 'MATCH' && (
-                                  <span className="text-emerald-600 text-xs font-bold" title="Sesuai 100% dengan logbook ZESTHLP16PA">âœ“</span>
+                                  <span className="text-emerald-600 inline-flex items-center" title="Sesuai 100% dengan logbook ZESTHLP16PA"><Check size={12} className="stroke-[3]" /></span>
                                 )}
                                 {row.reconcileStatus === 'DIFF' && (
-                                  <span className="text-amber-600 text-xs font-bold" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} KM`}>âš ï¸</span>
+                                  <span className="text-amber-500 inline-flex items-center" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} KM`}><AlertTriangle size={12} className="stroke-[2.5]" /></span>
                                 )}
                               </div>
                             )}
@@ -4521,10 +4521,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                                 <span>{row.creditHm.toLocaleString('id-ID')}</span>
                                 <span className="text-[10px] font-bold text-purple-800 bg-purple-100 border border-purple-200 px-1.5 py-0.2 rounded">HM</span>
                                 {row.reconcileStatus === 'MATCH' && (
-                                  <span className="text-emerald-600 text-xs font-bold" title="Sesuai 100% dengan logbook ZESTHLP16PA">âœ“</span>
+                                  <span className="text-emerald-600 inline-flex items-center" title="Sesuai 100% dengan logbook ZESTHLP16PA"><Check size={12} className="stroke-[3]" /></span>
                                 )}
                                 {row.reconcileStatus === 'DIFF' && (
-                                  <span className="text-amber-600 text-xs font-bold" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} HM`}>âš ï¸</span>
+                                  <span className="text-amber-500 inline-flex items-center" title={`Selisih dengan ZEST: ${row.varianceKmHm > 0 ? '+' : ''}${row.varianceKmHm} HM`}><AlertTriangle size={12} className="stroke-[2.5]" /></span>
                                 )}
                               </div>
                             )}
@@ -4634,7 +4634,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       </div>
     )}
 
-    {/* â”€â”€ Impeccable Detail Modal with ZESTHLP16PA vs SLARC Reconciliation â”€â”€ */}
+    {/* -- Impeccable Detail Modal with ZESTHLP16PA vs SLARC Reconciliation -- */}
     {selectedFuelVeh && (() => {
       const isDateInMonth = (dStr, mStr) => {
         if (!mStr) return true;
@@ -4751,9 +4751,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 <h3 className="text-lg font-black text-white">{selectedFuelVeh.description || selectedFuelVeh.costCenter}</h3>
                 <p className="text-xs text-slate-300 mt-1 flex items-center gap-2 flex-wrap">
                   <span>No. Equipment: <strong className="font-mono text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-700">{selectedFuelVeh.equipment && selectedFuelVeh.equipment !== '-' ? selectedFuelVeh.equipment : 'Unmapped'}</strong></span>
-                  <span>Â·</span>
+                  <span>•</span>
                   <span>Cost Center: <strong className="font-mono text-amber-300">{selectedFuelVeh.costCenter}</strong></span>
-                  <span>Â·</span>
+                  <span>•</span>
                   <span>Unit: <strong className="text-white">{selectedFuelVeh.plant} ({selectedFuelVeh.plantDesc})</strong></span>
                 </p>
               </div>
@@ -4821,7 +4821,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     {fuelLiters.toLocaleString('id-ID')} <span className="text-xs font-bold text-slate-500">L</span>
                   </div>
                   <span className="text-[9.5px] text-slate-500 font-medium">
-                    {fuelCostRp > 0 ? `Rp ${fuelCostRp.toLocaleString('id-ID')} · Total Pemakaian Solar` : 'Total Pemakaian Solar'}
+                    {fuelCostRp > 0 ? `Rp ${fuelCostRp.toLocaleString('id-ID')} • Total Pemakaian Solar` : 'Total Pemakaian Solar'}
                   </span>
                 </div>
 
