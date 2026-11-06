@@ -490,20 +490,15 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const monthDropdownLabel = useMemo(() => {
     const isAll = fuelMonths.includes('ALL') || fuelMonths.length === 12;
     if (isAll) return 'Semua Bulan (01 - 12)';
-    if (fuelMonths.length === 0) return 'Pilih Bulan';
+    if (fuelMonths.length === 0) return 'Pilih Bulan (0 Bulan)';
 
     const sorted = [...fuelMonths].sort();
-    const isSequentialFrom1 = sorted.every((m, idx) => parseInt(m) === idx + 1);
-    if (isSequentialFrom1 && sorted.length > 1) {
-      return `Bulan 1 - ${sorted.length} (${sorted.length} Bulan)`;
-    }
-
     if (sorted.length === 1) {
       const found = MONTH_NAMES.find(m => m.val === sorted[0]);
       return found ? `${found.val} - ${found.label}` : sorted[0];
     }
 
-    return `${sorted.length} Bulan (${sorted.join(', ')})`;
+    return `${sorted.length} Bulan Dipilih`;
   }, [fuelMonths]);
 
   // Backward-compatible computed helpers
@@ -4741,117 +4736,111 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               </button>
 
               {/* Popover / Dropdown Menu dengan Centang (Checkboxes) */}
-              {showMonthDropdown && (
-                <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 w-80 animate-in fade-in duration-150">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2">
-                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-700">Pilih Bulan (Centang)</span>
-                    <button
-                      type="button"
-                      onClick={() => setShowMonthDropdown(false)}
-                      className="text-slate-400 hover:text-slate-600 p-0.5"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
+              {showMonthDropdown && (() => {
+                const isAllSelected = fuelMonths.includes('ALL') || fuelMonths.length === 12;
+                return (
+                  <div className="absolute top-full left-0 mt-1.5 z-50 bg-white border border-slate-200/90 rounded-2xl shadow-2xl p-3.5 w-84 animate-in fade-in duration-150 ring-1 ring-black/5">
+                    {/* Header: Toggle Semua Bulan (Sekali klik tercentang semua, klik lagi batal semua) */}
+                    <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 mb-2.5">
+                      <label className="flex items-center gap-2 cursor-pointer select-none group">
+                        <input
+                          type="checkbox"
+                          checked={isAllSelected}
+                          onChange={() => {
+                            setFuelPage(1);
+                            if (isAllSelected) {
+                              // Klik sekali lagi -> tidak tercentang semua
+                              setFuelMonths([]);
+                            } else {
+                              // Klik sekali -> tercentang semua
+                              setFuelMonths(MONTH_NAMES.map(x => x.val));
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500 cursor-pointer accent-emerald-700"
+                        />
+                        <span className="text-xs font-black text-slate-800 tracking-wide group-hover:text-emerald-900 transition-colors">
+                          Pilih Semua Bulan
+                        </span>
+                      </label>
 
-                  {/* Preset Shortcuts: Bulan 1-9, Bulan 1-8, Semua Bulan */}
-                  <div className="flex flex-wrap gap-1 mb-2.5 pb-2 border-b border-slate-100 text-[10px]">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFuelMonths(['01', '02', '03', '04', '05', '06', '07', '08', '09']);
-                        setFuelPage(1);
-                      }}
-                      className="px-2 py-0.5 rounded-md font-bold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 cursor-pointer"
-                      title="Pilih Bulan 1 sampai 9 (Januari - September)"
-                    >
-                      Bulan 1 - 9
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFuelMonths(['01', '02', '03', '04', '05', '06', '07', '08']);
-                        setFuelPage(1);
-                      }}
-                      className="px-2 py-0.5 rounded-md font-bold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 cursor-pointer"
-                      title="Pilih Bulan 1 sampai 8 (Januari - Agustus)"
-                    >
-                      Bulan 1 - 8
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFuelMonths(['ALL']);
-                        setFuelPage(1);
-                      }}
-                      className="px-2 py-0.5 rounded-md font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300 cursor-pointer"
-                    >
-                      Semua
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFuelMonths(['09']);
-                        setFuelPage(1);
-                      }}
-                      className="px-2 py-0.5 rounded-md font-bold text-slate-500 hover:text-slate-700 border border-slate-200 cursor-pointer ml-auto"
-                    >
-                      Bulan 09
-                    </button>
-                  </div>
-
-                  {/* 12 Months Checkbox Grid */}
-                  <div className="grid grid-cols-2 gap-1 max-h-56 overflow-y-auto pr-1">
-                    {MONTH_NAMES.map(m => {
-                      const isChecked = fuelMonths.includes('ALL') || fuelMonths.includes(m.val);
-                      return (
-                        <label
-                          key={m.val}
-                          className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition select-none ${
-                            isChecked ? 'bg-emerald-50/80 text-emerald-950 font-bold' : 'hover:bg-slate-50 text-slate-700'
-                          }`}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                          {isAllSelected ? '12/12' : `${fuelMonths.length}/12`}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowMonthDropdown(false)}
+                          className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                          title="Tutup"
                         >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => {
-                              setFuelPage(1);
-                              if (fuelMonths.includes('ALL')) {
-                                const all12 = MONTH_NAMES.map(x => x.val);
-                                const next = all12.filter(x => x !== m.val);
-                                setFuelMonths(next);
-                              } else if (fuelMonths.includes(m.val)) {
-                                const next = fuelMonths.filter(x => x !== m.val);
-                                setFuelMonths(next.length === 0 ? ['09'] : next);
-                              } else {
-                                const next = [...fuelMonths, m.val].sort();
-                                if (next.length === 12) setFuelMonths(['ALL']);
-                                else setFuelMonths(next);
-                              }
-                            }}
-                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer w-3.5 h-3.5"
-                          />
-                          <span>{m.val} - {m.label}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
 
-                  {/* Dropdown Footer */}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-2 text-[10px]">
-                    <span className="text-slate-400 font-medium">
-                      {fuelMonths.includes('ALL') ? '12 bulan dipilih' : `${fuelMonths.length} bulan dipilih`}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowMonthDropdown(false)}
-                      className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold transition shadow-xs cursor-pointer"
-                    >
-                      Terapkan
-                    </button>
+                    {/* 12 Months Professional 2-Column Grid */}
+                    <div className="grid grid-cols-2 gap-1.5 max-h-64 overflow-y-auto pr-1">
+                      {MONTH_NAMES.map(m => {
+                        const isChecked = fuelMonths.includes('ALL') || fuelMonths.includes(m.val);
+                        return (
+                          <label
+                            key={m.val}
+                            className={`flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-medium cursor-pointer transition-all select-none border ${
+                              isChecked
+                                ? 'bg-emerald-50/90 text-emerald-950 font-bold border-emerald-300 shadow-2xs'
+                                : 'bg-white text-slate-700 border-slate-200/70 hover:bg-slate-50 hover:border-slate-300'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                setFuelPage(1);
+                                if (fuelMonths.includes('ALL')) {
+                                  const all12 = MONTH_NAMES.map(x => x.val);
+                                  const next = all12.filter(x => x !== m.val);
+                                  setFuelMonths(next);
+                                } else if (fuelMonths.includes(m.val)) {
+                                  const next = fuelMonths.filter(x => x !== m.val);
+                                  setFuelMonths(next);
+                                } else {
+                                  const next = [...fuelMonths, m.val].sort();
+                                  if (next.length === 12) setFuelMonths(['ALL']);
+                                  else setFuelMonths(next);
+                                }
+                              }}
+                              className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500 cursor-pointer accent-emerald-700 shrink-0"
+                            />
+                            <span className="font-mono text-[11px] font-bold text-slate-500 shrink-0">{m.val}</span>
+                            <span className="truncate">{m.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    {/* Dropdown Footer */}
+                    <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 mt-2.5 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFuelMonths([]);
+                          setFuelPage(1);
+                        }}
+                        className="text-[11px] font-bold text-slate-400 hover:text-red-600 transition cursor-pointer"
+                      >
+                        Batal Semua
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowMonthDropdown(false)}
+                        className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1 cursor-pointer"
+                      >
+                        <Check size={12} /> Terapkan
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
 
             {/* 3. Rentang Tanggal (Optional / Drill-down) */}
