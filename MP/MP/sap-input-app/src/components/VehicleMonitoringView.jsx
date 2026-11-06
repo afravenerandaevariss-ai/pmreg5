@@ -92,6 +92,36 @@ function excelSerialToDate(serial) {
   const dateInfo = new Date(utcDays * 86400 * 1000);
   return new Date(dateInfo.getUTCFullYear(), dateInfo.getUTCMonth(), dateInfo.getUTCDate());
 }
+export function parseSapNumber(raw) {
+  if (raw === null || raw === undefined || raw === '') return 0;
+  if (typeof raw === 'number') return isNaN(raw) ? 0 : raw;
+  let s = String(raw).trim();
+  if (!s || s === '-') return 0;
+  let isNeg = false;
+  if (s.endsWith('-')) {
+    isNeg = true;
+    s = s.slice(0, -1).trim();
+  } else if (s.startsWith('-')) {
+    isNeg = true;
+    s = s.substring(1).trim();
+  }
+  if (s.includes('.') && s.includes(',')) {
+    s = s.replace(/\./g, '').replace(/,/g, '.');
+  } else if (s.includes('.')) {
+    const parts = s.split('.');
+    if (parts.length > 2) {
+      s = s.replace(/\./g, '');
+    } else if (parts[1].length === 3 && parts[0].length >= 1) {
+      s = s.replace(/\./g, '');
+    }
+  } else if (s.includes(',')) {
+    s = s.replace(/,/g, '.');
+  }
+  const num = parseFloat(s);
+  if (isNaN(num)) return 0;
+  return isNeg ? -num : num;
+}
+
 
 function formatDateStr(rawDate) {
   if (rawDate === undefined || rawDate === null || rawDate === '') return null;
@@ -915,10 +945,22 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
           if (targetDebitSheet && workbook.Sheets[targetDebitSheet]) {
             const rows = XLSX.utils.sheet_to_json(workbook.Sheets[targetDebitSheet], { defval: '' });
+            console.log(`[SALRD Ingestion] Sheet "${targetDebitSheet}" total rows before filter: ${rows.length}`);
+            let excludedNonFuel = 0;
+            let debitReversals = 0;
+
             for (const r of rows) {
               const ce = String(r['Cost Element'] || r['CostElement'] || '').trim();
               const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
-              if (ce !== '51100057' && uom !== 'L') continue;
+              
+              // STRICT FILTER: Cost Element must strictly be '51100057' (Bi Kons. Pers. Bahan) AND unit strictly 'L'
+              // Explicitly exclude 51100065 (Pelumas/Oil), 51100064 (Kebut Op/Brake fluid), 51100104 (Pemel Kendaraan)
+              if (ce !== '51100057' || uom !== 'L') {
+                if (uom === 'L' || ce === '51100065' || ce === '51100064' || ce === '51100104') {
+                  excludedNonFuel++;
+                }
+                continue;
+              }
 
               const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim();
               if (!cc) continue;
@@ -929,8 +971,21 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               const year = dateStr ? dateStr.substring(0, 4) : '2026';
               const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : (targetMonth || '2026-08'));
 
-              const liters = Math.abs(parseFloat(r['Total quantity'] || r['Qty'] || 0) || 0);
-              const rupiah = Math.abs(parseFloat(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0) || 0);
+              const drCr = String(r['Dr/Cr indicator'] || r['Dr/Cr'] || r['Dr/C'] || '').trim().toUpperCase();
+              const isReversal = drCr === 'C' || drCr === 'H';
+
+              let liters = parseSapNumber(r['Total quantity'] || r['Qty'] || 0);
+              let rupiah = parseSapNumber(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0);
+
+              if (isReversal) {
+                debitReversals++;
+                liters = -Math.abs(liters);
+                rupiah = -Math.abs(rupiah);
+              } else {
+                liters = Math.abs(liters);
+                rupiah = Math.abs(rupiah);
+              }
+
               const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
               const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
               const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
@@ -949,6 +1004,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 p: plant
               });
             }
+            console.log(`[SALRD Ingestion] Accepted strictly 51100057+L: ${debitRowsCount} rows (Reversals: ${debitReversals}), Excluded non-fuel rows: ${excludedNonFuel}`);
           }
         }
 
@@ -961,6 +1017,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
           if (targetCreditSheet && workbook.Sheets[targetCreditSheet]) {
             const rows = XLSX.utils.sheet_to_json(workbook.Sheets[targetCreditSheet], { defval: '' });
+            console.log(`[SLARC Ingestion] Sheet "${targetCreditSheet}" total rows before deduplication: ${rows.length}`);
+            const seenCreditUploadKeys = new Set();
+            let creditDupsSkipped = 0;
+
             for (const r of rows) {
               const ce = String(r['Cost Element'] || r['CostElement'] || '').trim();
               const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
@@ -977,10 +1037,19 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               const year = dateStr ? dateStr.substring(0, 4) : '2026';
               const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : (targetMonth || '2026-08'));
 
-              const qty = Math.abs(parseFloat(r['Total quantity'] || r['Qty'] || 0) || 0);
+              const qty = Math.abs(parseSapNumber(r['Total quantity'] || r['Qty'] || 0) || 0);
               const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
               const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
+              const cleanName = name.split('|')[0].trim().toLowerCase();
               const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
+
+              // Deduplicate double-posted or paired SAP allocation documents (same cc, date, uom, qty, activity)
+              const dedupKey = `${cc}_${dateStr || monthStr}_${isKm ? 'KM' : 'HM'}_${qty}_${cleanName}`;
+              if (seenCreditUploadKeys.has(dedupKey)) {
+                creditDupsSkipped++;
+                continue;
+              }
+              seenCreditUploadKeys.add(dedupKey);
 
               creditRowsCount++;
               newDaily.push({
@@ -996,6 +1065,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 p: plant
               });
             }
+            console.log(`[SLARC Ingestion] Accepted unique SLARC rows: ${creditRowsCount}, Deduplicated paired allocations: ${creditDupsSkipped}`);
           }
         }
 
@@ -1004,6 +1074,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
           if (firstSheet) {
             const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+            const seenCreditFallbackKeys = new Set();
             for (const r of rows) {
               const cc = String(r['Cost Center'] || r['CostCenter'] || '').trim();
               if (!cc) continue;
@@ -1014,21 +1085,36 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               const period = String(r['Period'] || '').trim();
               const year = dateStr ? dateStr.substring(0, 4) : '2026';
               const monthStr = dateStr ? dateStr.substring(0, 7) : (period ? `${year}-${period.padStart(2, '0')}` : (targetMonth || '2026-08'));
-              const qty = Math.abs(parseFloat(r['Total quantity'] || r['Qty'] || 0) || 0);
-              const rupiah = Math.abs(parseFloat(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0) || 0);
+
+              const drCr = String(r['Dr/Cr indicator'] || r['Dr/Cr'] || r['Dr/C'] || '').trim().toUpperCase();
+              const isReversal = drCr === 'C' || drCr === 'H';
+              let qty = parseSapNumber(r['Total quantity'] || r['Qty'] || 0);
+              let rupiah = parseSapNumber(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0);
               const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
               const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
               const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim();
 
-              if (ce === '51100057' || uom === 'L') {
+              // Strict SALRD filter: 51100057 + L (exclude lubricants and brake fluids)
+              if (ce === '51100057' && uom === 'L') {
+                if (isReversal) {
+                  qty = -Math.abs(qty);
+                  rupiah = -Math.abs(rupiah);
+                } else {
+                  qty = Math.abs(qty);
+                  rupiah = Math.abs(rupiah);
+                }
                 debitRowsCount++;
                 newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'D', q: qty, u: 'L', r: rupiah, doc, n: name, p: plant });
-              } else if (ce === '90043002' || uom === 'KM') {
-                creditRowsCount++;
-                newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'C', q: qty, u: 'KM', r: 0, doc, n: name, p: plant });
-              } else if (ce === '90043003' || uom === 'HR' || uom === 'HM') {
-                creditRowsCount++;
-                newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'C', q: qty, u: 'HM', r: 0, doc, n: name, p: plant });
+              } else if (ce === '90043002' || uom === 'KM' || ce === '90043003' || uom === 'HR' || uom === 'HM') {
+                const isKm = ce === '90043002' || uom === 'KM';
+                const cleanQty = Math.abs(qty);
+                const cleanName = name.split('|')[0].trim().toLowerCase();
+                const dedupKey = `${cc}_${dateStr || monthStr}_${isKm ? 'KM' : 'HM'}_${cleanQty}_${cleanName}`;
+                if (!seenCreditFallbackKeys.has(dedupKey)) {
+                  seenCreditFallbackKeys.add(dedupKey);
+                  creditRowsCount++;
+                  newDaily.push({ c: cc, d: dateStr || `${monthStr}-01`, m: monthStr, t: 'C', q: cleanQty, u: isKm ? 'KM' : 'HM', r: 0, doc, n: name, p: plant });
+                }
               }
             }
           }
@@ -1184,9 +1270,18 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             }
             // Auto update credit if there are credit daily transactions
             if (txsC.length > 0) {
-              existing.creditKm = Math.round(txsC.filter(d => d.u === 'KM').reduce((sum, d) => sum + (parseFloat(d.q) || 0), 0) * 100) / 100;
-              existing.creditHm = Math.round(txsC.filter(d => d.u === 'HM').reduce((sum, d) => sum + (parseFloat(d.q) || 0), 0) * 100) / 100;
-
+              // Deduplicate double-posted or paired SAP allocation documents (same date, uom, qty, activity)
+              const seenCreditKeys = new Set();
+              const dedupedTxsC = [];
+              for (const d of txsC) {
+                const k = `${d.d || ''}_${d.u || ''}_${Math.abs(parseFloat(d.q) || 0)}_${String(d.n || '').split('|')[0].trim().toLowerCase()}`;
+                if (!seenCreditKeys.has(k)) {
+                  seenCreditKeys.add(k);
+                  dedupedTxsC.push(d);
+                }
+              }
+              existing.creditKm = Math.round(dedupedTxsC.filter(d => d.u === 'KM').reduce((sum, d) => sum + (parseFloat(d.q) || 0), 0) * 100) / 100;
+              existing.creditHm = Math.round(dedupedTxsC.filter(d => d.u === 'HM' || d.u === 'HR').reduce((sum, d) => sum + (parseFloat(d.q) || 0), 0) * 100) / 100;
               const narrations = new Set(existing.slarcNarrations || []);
               const partnerObjs = new Set(existing.partnerObjects || []);
               for (const d of txsC) {
@@ -4752,17 +4847,18 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         ? Math.round(dailyDebitRp)
         : (selectedFuelVeh.debitRp && selectedFuelVeh.debitRp > 0 ? selectedFuelVeh.debitRp : 0);
 
+      // Task 1: Weighted average fuel cost per liter (Biaya Solar per L)
+      const avgCostPerLiter = fuelLiters > 0 ? Math.round(fuelCostRp / fuelLiters) : 0;
+
+      // Task 2: Take KM/HM strictly from SALRC at the summary/aggregate level, NOT from detailed line-item transactions
+      const slarcTotal = ((selectedFuelVeh.creditKm || selectedFuelVeh.creditHm || 0) > 0)
+        ? (selectedFuelVeh.creditKm || selectedFuelVeh.creditHm)
+        : 0;
+
       const dailyCreditForVeh = (fuelData.daily || []).filter(d => 
         d.c === selectedFuelVeh.costCenter && d.t === 'C' && (!selectedFuelVeh.month || d.m === selectedFuelVeh.month || isDateInMonth(d.d, selectedFuelVeh.month))
       );
       const dailyCreditQty = dailyCreditForVeh.reduce((acc, d) => acc + (d.q || 0), 0);
-
-      const slarcTotal = dailyCreditForVeh.length > 0
-        ? Math.round(dailyCreditQty * 100) / 100
-        : ((selectedFuelVeh.creditKm || selectedFuelVeh.creditHm || 0) > 0
-          ? (selectedFuelVeh.creditKm || selectedFuelVeh.creditHm)
-          : 0);
-
       // Clean reference helper ensuring no blank '-' or placeholder '1'
       const cleanRefVal = (val) => {
         const s = String(val || '').trim();
@@ -4778,14 +4874,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
       const zestTotal = zestDailyList.reduce((acc, l) => acc + (parseFloat(l.hm_km) || 0), 0) || selectedFuelVeh.zestTotalKmHm || 0;
       const variance = Math.round((slarcTotal - zestTotal) * 100) / 100;
-      const uomLabel = (selectedFuelVeh.creditKm > 0 || dailyCreditForVeh.some(d => d.u === 'KM'))
+      const uomLabel = (selectedFuelVeh.creditKm > 0)
         ? 'KM'
-        : (selectedFuelVeh.creditHm > 0 || dailyCreditForVeh.some(d => d.u === 'HM' || d.u === 'HR'))
+        : (selectedFuelVeh.creditHm > 0)
         ? 'HM'
         : (selectedFuelVeh.objectType && ['TRACTOR', 'EXCAVATOR', 'GRADER', 'WLOADER', 'HEAVY'].some(h => (selectedFuelVeh.objectType || '').toUpperCase().includes(h)))
         ? 'HM'
         : 'KM';
-
       // Build daily reconciliation list (SLARC + ZEST aligned by date)
       const slarcDailyList = dailyCreditForVeh.length > 0 ? dailyCreditForVeh : (selectedFuelVeh.matchedSlarcDaily || []);
 
@@ -4917,26 +5012,26 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   <div className="text-lg font-black text-amber-950 font-mono mt-0.5">
                     {fuelLiters.toLocaleString('id-ID')} <span className="text-xs font-bold text-slate-500">L</span>
                   </div>
-                  <span className="text-[9.5px] text-slate-500 font-medium">
-                    {fuelCostRp > 0 ? `Rp ${fuelCostRp.toLocaleString('id-ID')} · Total Pemakaian Solar` : 'Total Pemakaian Solar'}
+                  <div className="text-[11px] font-bold text-amber-800 font-mono mt-0.5">
+                    {avgCostPerLiter > 0 ? `Rp ${avgCostPerLiter.toLocaleString('id-ID')} / L` : '-'}
+                  </div>
+                  <span className="text-[9.5px] text-slate-500 font-medium block mt-0.5">
+                    {fuelCostRp > 0 ? `Total: Rp ${fuelCostRp.toLocaleString('id-ID')}` : 'Total Pemakaian Solar'}
                   </span>
                 </div>
 
-                {/* 2. KM/HM */}
+                {/* 2. KM/HM (SLARC Summary Only) */}
                 <div 
-                  onClick={() => setFuelModalTab('credit')}
-                  className={`bg-white p-3 rounded-xl border transition shadow-2xs text-center cursor-pointer hover:scale-[1.01] ${
-                    effectiveModalTab === 'credit' ? 'border-blue-400 ring-2 ring-blue-100 bg-blue-50/20' : 'border-slate-200 hover:border-blue-200'
-                  }`}
+                  className="bg-white p-3 rounded-xl border transition shadow-2xs text-center border-slate-200"
                 >
                   <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-blue-900 uppercase">
                     <Activity size={11} className="text-blue-600" />
-                    <span>{isDevUser ? '2. KM/HM (SLARC)' : '2. KM/HM'}</span>
+                    <span>{isDevUser ? '2. KM/HM (SLARC Ringkasan)' : '2. KM/HM'}</span>
                   </div>
                   <div className="text-lg font-black text-blue-900 font-mono mt-0.5">
                     {slarcTotal.toLocaleString('id-ID')} <span className="text-xs font-bold text-slate-500">{uomLabel}</span>
                   </div>
-                  <span className="text-[9.5px] text-slate-400">Posting Output Aktivitas</span>
+                  <span className="text-[9.5px] text-slate-400">Ringkasan Output Aktivitas</span>
                 </div>
 
                 {isDevUser && (
@@ -5032,16 +5127,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               >
                 <Droplet size={13} className="text-amber-600" /> Pengisian Solar ({dailyDebitForVeh.length})
               </button>
-              <button
-                onClick={() => setFuelModalTab('credit')}
-                className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
-                  effectiveModalTab === 'credit'
-                    ? 'border-blue-600 text-blue-900 bg-blue-50/50 rounded-t-lg'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <FileSpreadsheet size={13} className="text-blue-600" /> Transaksi SLARC ({dailyCreditForVeh.length})
-              </button>
+              {/* Transaksi SLARC tab button removed per Task 2 (KM/HM summary only) */}
             </div>
 
             {/* Modal Body Table Content */}
@@ -5228,24 +5314,34 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                         <th className="px-3 py-1.5 text-center w-28">No. Dokumen</th>
                         <th className="px-3 py-1.5 text-center w-24">Jumlah</th>
                         <th className="px-3 py-1.5 text-center w-28">Nilai (Rp)</th>
+                        <th className="px-3 py-1.5 text-center w-28 text-amber-900 bg-amber-50/60 font-black">Biaya Solar / L</th>
                         <th className="px-3 py-1.5 text-center">Uraian / SPBU</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
-                      {matchedDaily.map((d, i) => (
-                        <tr key={i} className="hover:bg-slate-50 text-center">
-                          <td className="px-2.5 py-1.5 text-center font-mono text-slate-400">{i + 1}</td>
-                          <td className="px-3 py-1.5 text-center font-mono font-medium text-slate-800">{d.d}</td>
-                          <td className="px-3 py-1.5 text-center font-mono text-[10px] text-slate-600">{d.doc || '-'}</td>
-                          <td className={`px-3 py-1.5 text-center font-mono font-black ${d.q < 0 ? 'text-red-600' : 'text-amber-950'}`}>
-                            {d.q < 0 ? `- ${Math.abs(d.q).toLocaleString('id-ID')}` : d.q.toLocaleString('id-ID')} <span className="text-[10px] text-slate-500 font-normal">L</span>
-                          </td>
-                          <td className={`px-3 py-1.5 text-center font-mono ${d.r < 0 ? 'text-red-600 font-bold' : 'text-slate-700'}`}>
-                            {d.r !== 0 ? `${d.r < 0 ? '- Rp ' : 'Rp '}${Math.abs(d.r).toLocaleString('id-ID')}` : '-'}
-                          </td>
-                          <td className="px-3 py-1.5 text-center text-slate-600 text-[10.5px] truncate max-w-xs">{d.n || '-'}</td>
-                        </tr>
-                      ))}
+                      {matchedDaily.map((d, i) => {
+                        const absLiters = Math.abs(d.q || 0);
+                        const absRp = Math.abs(d.r || 0);
+                        const costPerL = absLiters > 0 ? Math.round(absRp / absLiters) : 0;
+
+                        return (
+                          <tr key={i} className="hover:bg-slate-50 text-center">
+                            <td className="px-2.5 py-1.5 text-center font-mono text-slate-400">{i + 1}</td>
+                            <td className="px-3 py-1.5 text-center font-mono font-medium text-slate-800">{d.d}</td>
+                            <td className="px-3 py-1.5 text-center font-mono text-[10px] text-slate-600">{d.doc || '-'}</td>
+                            <td className={`px-3 py-1.5 text-center font-mono font-black ${d.q < 0 ? 'text-red-600' : 'text-amber-950'}`}>
+                              {d.q < 0 ? `- ${Math.abs(d.q).toLocaleString('id-ID')}` : d.q.toLocaleString('id-ID')} <span className="text-[10px] text-slate-500 font-normal">L</span>
+                            </td>
+                            <td className={`px-3 py-1.5 text-center font-mono ${d.r < 0 ? 'text-red-600 font-bold' : 'text-slate-700'}`}>
+                              {d.r !== 0 ? `${d.r < 0 ? '- Rp ' : 'Rp '}${Math.abs(d.r).toLocaleString('id-ID')}` : '-'}
+                            </td>
+                            <td className="px-3 py-1.5 text-center font-mono font-bold text-amber-900 bg-amber-50/30">
+                              {costPerL > 0 ? `Rp ${costPerL.toLocaleString('id-ID')}` : '-'}
+                            </td>
+                            <td className="px-3 py-1.5 text-center text-slate-600 text-[10.5px] truncate max-w-xs">{d.n || '-'}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                     <tfoot>
                       <tr className="bg-amber-50/80 font-extrabold text-[11px] text-slate-800 border-t-2 border-amber-200">
@@ -5258,68 +5354,18 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                         <td className="px-3 py-2 text-center font-mono font-bold text-slate-800">
                           Rp {Math.round(matchedDaily.reduce((acc, d) => acc + (d.r || 0), 0)).toLocaleString('id-ID')}
                         </td>
+                        <td className="px-3 py-2 text-center font-mono font-black text-amber-950 bg-amber-100/70">
+                          {avgCostPerLiter > 0 ? `Rp ${avgCostPerLiter.toLocaleString('id-ID')} / L` : '-'}
+                        </td>
                         <td className="px-3 py-2 text-center text-[10px] text-amber-900 font-medium">
-                          Total Pemakaian Debit SAP
+                          Rata-rata Tertimbang Biaya Solar
                         </td>
                       </tr>
                     </tfoot>
                   </table>
                 );
               })()}
-
-              {/* TAB 4: SLARC DAILY CREDIT */}
-              {effectiveModalTab === 'credit' && (() => {
-                const matchedDaily = dailyCreditForVeh;
-
-                if (matchedDaily.length === 0) {
-                  return (
-                    <div className="text-center py-10 text-slate-400">
-                      <FileSpreadsheet size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
-                      <p className="font-semibold text-slate-600 text-xs">Tidak ada detail transaksi aktivitas SLARC tercatat untuk kendaraan ini pada periode {selectedFuelVeh.month || 'ini'}.</p>
-                    </div>
-                  );
-                }
-
-                return (
-                  <table className="w-full text-[11px] border-collapse excel-cell-border text-center">
-                    <thead>
-                      <tr className="bg-slate-100 text-slate-700 font-extrabold uppercase text-[10px]">
-                        <th className="px-2.5 py-1.5 text-center w-10">No</th>
-                        <th className="px-3 py-1.5 text-center w-24">Tanggal</th>
-                        <th className="px-3 py-1.5 text-center w-28">No. Dokumen</th>
-                        <th className="px-3 py-1.5 text-center w-24">Jumlah</th>
-                        <th className="px-3 py-1.5 text-center">Uraian SAP</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {matchedDaily.map((d, i) => (
-                        <tr key={i} className="hover:bg-slate-50 text-center">
-                          <td className="px-2.5 py-1.5 text-center font-mono text-slate-400">{i + 1}</td>
-                          <td className="px-3 py-1.5 text-center font-mono font-medium text-slate-800">{d.d}</td>
-                          <td className="px-3 py-1.5 text-center font-mono text-[10px] text-slate-600">{d.doc || '-'}</td>
-                          <td className="px-3 py-1.5 text-center font-mono font-black text-blue-950">
-                            {d.q.toLocaleString('id-ID')} <span className="text-[10px] text-slate-500 font-normal">{d.u}</span>
-                          </td>
-                          <td className="px-3 py-1.5 text-center text-slate-600 text-[10.5px] truncate max-w-xs">{d.n || '-'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-blue-50/80 font-extrabold text-[11px] text-slate-800 border-t-2 border-blue-200">
-                        <td colSpan={3} className="px-3 py-2 text-center uppercase tracking-wide text-blue-950">
-                          Total SLARC ({matchedDaily.length} Transaksi)
-                        </td>
-                        <td className="px-3 py-2 text-center font-mono font-black text-blue-950">
-                          {Math.round(matchedDaily.reduce((acc, d) => acc + (d.q || 0), 0) * 100) / 100} <span className="text-[10px] text-slate-600 font-normal">{matchedDaily[0]?.u || uomLabel}</span>
-                        </td>
-                        <td className="px-3 py-2 text-center text-[10px] text-blue-900 font-medium">
-                          Sesuai Ringkasan Aktivitas SAP
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                );
-              })()}
+              {/* Transaksi SLARC detailed breakdown table removed per Task 2 (KM/HM summary only) */}
             </div>
 
             {/* Modal Footer */}
