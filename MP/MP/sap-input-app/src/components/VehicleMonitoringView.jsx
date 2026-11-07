@@ -619,9 +619,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           const { data: mDaily } = await fetchFuelDailyForMonth(ym);
           if (mDaily && mDaily.length > 0) {
             setFuelData(prev => {
-              const map = new Map((prev.daily || []).map(d => [`${d.doc}_${d.c}_${d.d}_${d.t}`, d]));
+              const map = new Map((prev.daily || []).map(d => [makeFuelTxKey(d), d]));
               for (const d of mDaily) {
-                map.set(`${d.doc}_${d.c}_${d.d}_${d.t}`, d);
+                const k = makeFuelTxKey(d);
+                if (!map.has(k)) map.set(k, d);
               }
               return { ...prev, daily: Array.from(map.values()) };
             });
@@ -1155,17 +1156,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 continue;
               }
 
-              let isAcceptedUom = isStandardFuelUom;
-              if (!isAcceptedUom) {
-                parsedLitersFromText = extractLitersFromText(fullText);
-                const isFuelText = /solar|dexlite|biodiesel|gasoline|bbm|bahan bakar/i.test(fullText);
-                if (parsedLitersFromText > 0 || isFuelText || !rawUom) {
-                  isAcceptedUom = true;
-                }
-              }
-
-              if (!isAcceptedUom) {
+              // Task 1: Strict filter — CE 51100057 MUST have UoM exactly L (or alias LTR/LITER). No text-based fallback.
+              if (!isStandardFuelUom) {
                 excludedNonFuel++;
+                console.debug(`[SALRD] Excluded CE 51100057 row: UoM="${rawUom}" (not L/LTR/LITER) - ${name}`);
                 continue;
               }
 
@@ -1187,10 +1181,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
               let liters = parseSapNumber(r['Total quantity'] || r['Qty'] || 0);
               let rupiah = parseSapNumber(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0);
-
-              if (liters === 0 && parsedLitersFromText > 0) {
-                liters = parsedLitersFromText;
-              }
 
               if (isReversal) {
                 debitReversals++;
@@ -1322,15 +1312,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               const isStandardFuelUom = ['L', 'LTR', 'LITER'].includes(rawUom);
               let parsedLiters = 0;
               if (ce === '51100057') {
-                let isAcc = isStandardFuelUom;
-                if (!isAcc) {
-                  parsedLiters = extractLitersFromText(fullText);
-                  if (parsedLiters > 0 || /solar|dexlite|biodiesel|gasoline|bbm|bahan bakar/i.test(fullText) || !rawUom) {
-                    isAcc = true;
-                  }
-                }
-                if (isAcc) {
-                  if (qty === 0 && parsedLiters > 0) qty = parsedLiters;
+                // Task 1: Strict filter — only L/LTR/LITER UoM accepted for CE 51100057. No text fallback.
+                if (!isStandardFuelUom) {
+                  console.debug(`[SALRD-fallback] Excluded CE 51100057 row: UoM="${rawUom}" (not L/LTR/LITER) - ${name}`);
+                } else {
                   if (isReversal) {
                     qty = -Math.abs(qty);
                     rupiah = -Math.abs(rupiah);
@@ -5338,6 +5323,21 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                                   if (targetMonthsToFetch.length === 0) {
                                     targetMonthsToFetch = ['2026-01', '2026-02', '2026-09', '2026-10'];
                                   }
+                                } else if (fuelStartDate || fuelEndDate) {
+                                  // Date-range mode: derive months from fuelStartDate..fuelEndDate
+                                  const sM = (fuelStartDate || fuelEndDate).substring(0, 7);
+                                  const eM = (fuelEndDate || fuelStartDate).substring(0, 7);
+                                  const rangeMonths = new Set();
+                                  let cur = sM;
+                                  while (cur <= eM) {
+                                    rangeMonths.add(cur);
+                                    const [ry, rm] = cur.split('-').map(Number);
+                                    const next = rm === 12 ? `${ry + 1}-01` : `${ry}-${String(rm + 1).padStart(2, '0')}`;
+                                    cur = next;
+                                  }
+                                  // Also include any months this vehicle has summaries for
+                                  activeMonthsForVeh.forEach(m => rangeMonths.add(m));
+                                  targetMonthsToFetch = [...rangeMonths];
                                 } else if (fuelMonths.length > 0 && !fuelMonths.includes('ALL')) {
                                   targetMonthsToFetch = fuelMonths.map(m => m.length === 2 ? `${fuelYear}-${m}` : m);
                                 } else if (row.month && row.month.length === 7) {
@@ -5415,6 +5415,16 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       const isDateInSelectedPeriod = (dStr, dMonth) => {
         if (!selectedFuelVeh.month) return true;
         const mStr = String(selectedFuelVeh.month).trim();
+        // Case: Date range mode "YYYY-MM-DD s/d YYYY-MM-DD" (from fuelStartDate/fuelEndDate)
+        if (mStr.includes(' s/d ') || mStr.includes('s/d')) {
+          const parts = mStr.split(/s\/d/).map(x => x.trim());
+          const startD = parts[0] || fuelStartDate || '';
+          const endD = parts[1] || fuelEndDate || '';
+          if (!dStr) return Boolean(dMonth && ((!startD || dMonth >= startD.substring(0,7)) && (!endD || dMonth <= endD.substring(0,7))));
+          if (startD && dStr < startD) return false;
+          if (endD && dStr > endD) return false;
+          return true;
+        }
         // Case: "2026 (Semua Bulan)" or "ALL" or year-only "2026"
         if (mStr.includes('Semua Bulan') || mStr === 'ALL' || mStr === fuelYear) {
           return Boolean((dStr && dStr.startsWith(fuelYear)) || (dMonth && dMonth.startsWith(fuelYear)));
@@ -5515,7 +5525,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       });
 
       const reconciliationRows = Array.from(combinedDateMap.values()).sort((a, b) => b.date.localeCompare(a.date));
-      const effectiveModalTab = (!isDevUser && (fuelModalTab === 'reconcile' || fuelModalTab === 'zest')) ? 'debit' : fuelModalTab;
+      const effectiveModalTab = fuelModalTab || 'debit';
       if (reconciliationRows.length === 0 && (slarcTotal > 0 || zestTotal > 0)) {
         reconciliationRows.push({
           date: selectedFuelVeh.month || 'Periode Ini',
@@ -5579,8 +5589,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               </button>
             </div>
 
-            {/* Source of Reference Info Banner (Role DEV only) */}
-            {isDevUser && (
+            {/* Source of Reference Info Banner */}
+            {(
               <div className="px-5 pt-3 pb-0 bg-slate-50">
               <div className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs flex-wrap ${
                 selectedFuelVeh.referencePriority === 1 || selectedFuelVeh.referencePriority === 2
@@ -5619,7 +5629,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
             {/* Reconciliation Comparison Top Banner */}
             <div className="bg-slate-50 border-b border-slate-200 p-4">
-              <div className={`grid grid-cols-1 ${isDevUser ? 'sm:grid-cols-4' : 'sm:grid-cols-2'} gap-3 items-center`}>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-center">
                 {/* 1. Bahan Bakar (L) */}
                 <div 
                   onClick={() => setFuelModalTab('debit')}
@@ -5642,13 +5652,16 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   </span>
                 </div>
 
-                {/* 2. KM/HM (SLARC Summary Only) */}
+                {/* 2. KM/HM (Activity Detail) */}
                 <div 
-                  className="bg-white p-3 rounded-xl border transition shadow-2xs text-center border-slate-200"
+                  onClick={() => setFuelModalTab('reconcile')}
+                  className={`bg-white p-3 rounded-xl border transition shadow-2xs text-center cursor-pointer hover:scale-[1.01] ${
+                    effectiveModalTab === 'reconcile' ? 'border-blue-400 ring-2 ring-blue-100 bg-blue-50/20' : 'border-slate-200 hover:border-blue-200'
+                  }`}
                 >
                   <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-blue-900 uppercase">
                     <Activity size={11} className="text-blue-600" />
-                    <span>{isDevUser ? '2. ACTIVITY (SLARC Ringkasan)' : '2. ACTIVITY'}</span>
+                    <span>2. ACTIVITY</span>
                   </div>
                   <div className="text-lg font-black text-blue-900 font-mono mt-0.5">
                     {slarcTotal.toLocaleString('id-ID')} <span className="text-xs font-bold text-slate-500">{uomLabel}</span>
@@ -5656,89 +5669,61 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   <span className="text-[9.5px] text-slate-400">Ringkasan Output Aktivitas</span>
                 </div>
 
-                {isDevUser && (
-                  <>
-                    {/* 3. ZESTHLP16PA (Logbook) - DEV ONLY */}
-                    <div 
-                      onClick={() => setFuelModalTab('zest')}
-                      className={`bg-white p-3 rounded-xl border transition shadow-2xs text-center cursor-pointer hover:scale-[1.01] ${
-                        effectiveModalTab === 'zest' ? 'border-emerald-400 ring-2 ring-emerald-100 bg-emerald-50/20' : 'border-slate-200 hover:border-emerald-200'
-                      }`}
-                    >
-                      <span className="text-[10px] font-bold text-slate-500 uppercase">3. ZESTHLP16PA (Logbook)</span>
-                      <div className="text-lg font-black text-emerald-900 font-mono mt-0.5">
-                        {zestTotal.toLocaleString('id-ID')} <span className="text-xs font-bold text-slate-500">{uomLabel}</span>
-                      </div>
-                      <span className="text-[9.5px] text-slate-400">Total HM/KM dari Logbook</span>
-                    </div>
+                {/* 3. ZESTHLP16PA (Logbook) */}
+                <div 
+                  onClick={() => setFuelModalTab('zest')}
+                  className={`bg-white p-3 rounded-xl border transition shadow-2xs text-center cursor-pointer hover:scale-[1.01] ${
+                    effectiveModalTab === 'zest' ? 'border-emerald-400 ring-2 ring-emerald-100 bg-emerald-50/20' : 'border-slate-200 hover:border-emerald-200'
+                  }`}
+                >
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">3. ZESTHLP16PA (Logbook)</span>
+                  <div className="text-lg font-black text-emerald-900 font-mono mt-0.5">
+                    {zestTotal.toLocaleString('id-ID')} <span className="text-xs font-bold text-slate-500">{uomLabel}</span>
+                  </div>
+                  <span className="text-[9.5px] text-slate-400">Total HM/KM dari Logbook</span>
+                </div>
 
-                    {/* 4. Status Rekonsiliasi - DEV ONLY */}
-                    <div 
-                      onClick={() => setFuelModalTab('reconcile')}
-                      className={`p-3 rounded-xl border text-center transition cursor-pointer hover:scale-[1.01] ${
-                        effectiveModalTab === 'reconcile' ? 'ring-2 ring-emerald-200 ' : ''
-                      }${
-                        variance === 0 && (slarcTotal > 0 || zestTotal > 0)
-                          ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                          : slarcTotal > 0 && zestTotal > 0
-                          ? 'bg-amber-50 border-amber-200 text-amber-900'
-                          : 'bg-slate-100 border-slate-200 text-slate-700'
-                      }`}
-                    >
-                      <span className="text-[10px] font-bold uppercase">Status Rekonsiliasi</span>
-                      <div className="text-sm font-black mt-0.5 flex items-center justify-center gap-1.5">
-                        {variance === 0 && (slarcTotal > 0 || zestTotal > 0) ? (
-                          <>
-                            <CheckCircle size={15} className="text-emerald-600" />
-                            <span>100% SESUAI (Klop)</span>
-                          </>
-                        ) : slarcTotal > 0 && zestTotal > 0 ? (
-                          <>
-                            <AlertTriangle size={15} className="text-amber-600" />
-                            <span>Selisih: {variance > 0 ? `+${variance}` : variance} {uomLabel}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Info size={15} className="text-slate-500" />
-                            <span>{slarcTotal > 0 ? 'Tercatat di SLARC' : 'Tercatat di ZEST'}</span>
-                          </>
-                        )}
-                      </div>
-                      <span className="text-[9.5px] font-medium block mt-0.5">
-                        {variance === 0 ? 'Tidak ada perbedaan nilai output' : 'Perlu sinkronisasi logbook'}
-                      </span>
-                    </div>
-                  </>
-                )}
+                {/* 4. Status Rekonsiliasi */}
+                <div 
+                  onClick={() => setFuelModalTab('reconcile')}
+                  className={`p-3 rounded-xl border text-center transition cursor-pointer hover:scale-[1.01] ${
+                    effectiveModalTab === 'reconcile' ? 'ring-2 ring-emerald-200 ' : ''
+                  }${
+                    variance === 0 && (slarcTotal > 0 || zestTotal > 0)
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                      : slarcTotal > 0 && zestTotal > 0
+                      ? 'bg-amber-50 border-amber-200 text-amber-900'
+                      : 'bg-slate-100 border-slate-200 text-slate-700'
+                  }`}
+                >
+                  <span className="text-[10px] font-bold uppercase">Status Rekonsiliasi</span>
+                  <div className="text-sm font-black mt-0.5 flex items-center justify-center gap-1.5">
+                    {variance === 0 && (slarcTotal > 0 || zestTotal > 0) ? (
+                      <>
+                        <CheckCircle size={15} className="text-emerald-600" />
+                        <span>100% SESUAI (Klop)</span>
+                      </>
+                    ) : slarcTotal > 0 && zestTotal > 0 ? (
+                      <>
+                        <AlertTriangle size={15} className="text-amber-600" />
+                        <span>Selisih: {variance > 0 ? `+${variance}` : variance} {uomLabel}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Info size={15} className="text-slate-500" />
+                        <span>{slarcTotal > 0 ? 'Tercatat di SLARC' : 'Tercatat di ZEST'}</span>
+                      </>
+                    )}
+                  </div>
+                  <span className="text-[9.5px] font-medium block mt-0.5">
+                    {variance === 0 ? 'Tidak ada perbedaan nilai output' : 'Perlu sinkronisasi logbook'}
+                  </span>
+                </div>
               </div>
             </div>
 
             {/* Modal Tabs */}
             <div className="flex border-b border-slate-200 px-4 pt-3 gap-2 bg-white flex-wrap">
-              {isDevUser && (
-                <>
-              <button
-                onClick={() => setFuelModalTab('reconcile')}
-                className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
-                  effectiveModalTab === 'reconcile'
-                    ? 'border-indigo-600 text-indigo-900 bg-indigo-50/50 rounded-t-lg'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Activity size={13} className="text-indigo-600" /> Verifikasi Activity ({reconciliationRows.length})
-              </button>
-              <button
-                onClick={() => setFuelModalTab('zest')}
-                className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
-                  effectiveModalTab === 'zest'
-                    ? 'border-emerald-600 text-emerald-900 bg-emerald-50/50 rounded-t-lg'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Calendar size={13} className="text-emerald-600" /> Log ZESTHLP16PA ({selectedFuelVeh.matchedZestLogs?.length || 0})
-              </button>
-                              </>
-              )}
               <button
                 onClick={() => setFuelModalTab('debit')}
                 className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
@@ -5749,13 +5734,32 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               >
                 <Droplet size={13} className="text-amber-600" /> Pengisian Solar ({dailyDebitForVeh.length})
               </button>
-              {/* Transaksi SLARC tab button removed per Task 2 (KM/HM summary only) */}
+              <button
+                onClick={() => setFuelModalTab('reconcile')}
+                className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
+                  effectiveModalTab === 'reconcile'
+                    ? 'border-blue-600 text-blue-900 bg-blue-50/50 rounded-t-lg'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Activity size={13} className="text-blue-600" /> Detail Activity ({reconciliationRows.length})
+              </button>
+              <button
+                onClick={() => setFuelModalTab('zest')}
+                className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
+                  effectiveModalTab === 'zest'
+                    ? 'border-emerald-600 text-emerald-900 bg-emerald-50/50 rounded-t-lg'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Calendar size={13} className="text-emerald-600" /> Log ZESTHLP16PA ({selectedFuelVeh.matchedZestLogs?.length || (selectedFuelVeh.allZestLogs?.length || 0)})
+              </button>
             </div>
 
             {/* Modal Body Table Content */}
             <div className="p-4 overflow-y-auto flex-1">
               {/* TAB 1: RECONCILIATION SIDE BY SIDE */}
-              {isDevUser && effectiveModalTab === 'reconcile' && (
+              {effectiveModalTab === 'reconcile' && (
                 <div>
                   {reconciliationRows.length === 0 ? (
                     <div className="text-center py-10 text-slate-400">
@@ -5849,7 +5853,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               )}
 
               {/* TAB 2: ZESTHLP16PA LOGS & REFERENCES */}
-              {isDevUser && effectiveModalTab === 'zest' && (() => {
+              {effectiveModalTab === 'zest' && (() => {
                 const zestList = (selectedFuelVeh.matchedZestLogs && selectedFuelVeh.matchedZestLogs.length > 0)
                   ? selectedFuelVeh.matchedZestLogs
                   : (selectedFuelVeh.allZestLogs || []);

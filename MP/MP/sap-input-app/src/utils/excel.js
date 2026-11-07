@@ -264,10 +264,12 @@ export async function parseRegionalMP(file, masterMap) {
  * @param {string} startDate     - 'yyyy-MM-dd' (inclusive)
  * @param {string} endDate       - 'yyyy-MM-dd' (inclusive)
  * @param {string[]} [selectedEqs] - optional filter by indukEqNum
+ * @param {string[]} [selectedPlants] - optional filter by plant code
+ * @param {Map}     [masterMap]  - master equipment map untuk resolusi plant (FIX: sebelumnya undefined di scope ini)
  *
  * @returns {{ valid: boolean, violations: Array<{ date: string, indukEqNum: string, indukDesc: string, totalMinutes: number }> }}
  */
-export function validateDailyHours(dailyLogsMap, startDate, endDate, selectedEqs, selectedPlants) {
+export function validateDailyHours(dailyLogsMap, startDate, endDate, selectedEqs, selectedPlants, masterMap) {
   const MAX_MINUTES_PER_DAY = 24 * 60; // 1440 minutes
   const violations = [];
 

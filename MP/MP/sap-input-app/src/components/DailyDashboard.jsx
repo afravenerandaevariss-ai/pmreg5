@@ -2985,11 +2985,14 @@ export default function DailyDashboard({
                     setDailyLogs(freshLogs);
                   } else {
                     console.warn('[export] batas waktu total tercapai saat mengambil daily_logs — memakai data cache.');
+                    // FIX #3: Beri tahu user bahwa data dari cache (koneksi lambat/timeout)
+                    alert('⚠️ Koneksi ke server lambat. Data jam jalan yang digunakan mungkin bukan data terbaru.\n\nJika penting, tutup dan buka kembali modal export setelah koneksi stabil.');
                   }
 
 
                   // Ensure templateData is complete, or auto-fetch from DB
-                  let exportTpl = templateData;
+                  // FIX #5: Gunakan internalTemplateData sebagai fallback jika templateData (props) null
+                  let exportTpl = templateData || internalTemplateData;
                   if (tplResult?.data?.headers && tplResult.data.originalData) {
                     exportTpl = tplResult.data;
                     setInternalTemplateData(tplResult.data);
@@ -2999,6 +3002,10 @@ export default function DailyDashboard({
                   const exportOriginalData = exportTpl?.originalData || [];
                   // FIX #2: Pre-filter template equipments berdasarkan plant user SEBELUM dijadikan
                   // exportEquipments, untuk mencegah equipment unit lain ikut ke dalam export. [2026-11-06]
+                  // FIX TDZ KRITIS [2026-11-07]: userPlant dipindah ke sini
+                  // agar tidak menyebabkan ReferenceError saat dipakai di filter tplEquipments di bawah
+                  const userPlant = (currentUser?.plant || '5F01').trim().toUpperCase();
+
                   const rawTplEquipments = (exportTpl?.equipments && Array.isArray(exportTpl.equipments) && exportTpl.equipments.length > 0)
                     ? exportTpl.equipments
                     : null;
@@ -3035,7 +3042,8 @@ export default function DailyDashboard({
                     effStartDate,
                     effEndDate,
                     selectedExportEqs,
-                    isUserRole ? [currentUser?.plant || '5F01'] : selectedExportPlants
+                    isUserRole ? [currentUser?.plant || '5F01'] : selectedExportPlants,
+                    masterMap // FIX: kirim masterMap supaya plant isolation di validasi bekerja benar
                   );
                   if (!validation.valid) {
                     setExportHourViolations(validation.violations);
@@ -3045,7 +3053,7 @@ export default function DailyDashboard({
                     return;
                   }
 
-                  const userPlant = (currentUser?.plant || '5F01').trim().toUpperCase();
+                  // userPlant sudah dideklarasikan lebih awal (FIX TDZ KRITIS [2026-11-07])
                   const exportPayload = {
                     date: effEndDate,
                     startDate: effStartDate,
@@ -3105,7 +3113,7 @@ export default function DailyDashboard({
                     if (!targetEquipments || targetEquipments.length === 0) {
                       if (isUserRole && userPlant) {
                         // User role: filter ketat harus berhasil — jika gagal, ada masalah master data
-                        setIsExporting(false);
+                        // isExporting direset oleh outer finally — tidak perlu set manual di sini
                         alert(
                           `⚠️ Tidak ada equipment untuk Plant ${userPlant}.\n\n` +
                           `Total equipment dimuat: ${exportEquipments.length}\n` +
@@ -3159,6 +3167,10 @@ export default function DailyDashboard({
                     console.error("Export Error:", err);
                     alert("Terjadi kendala saat mengekspor Excel: " + (err.message || err));
                   }
+                  // FIX [2026-11-07]: outer catch untuk error yang tidak tertangkap inner try (TDZ, TypeError, dll)
+                  } catch (outerErr) {
+                    console.error('[export] Error tidak terduga saat export:', outerErr);
+                    alert('Terjadi error saat mempersiapkan export:\n' + (outerErr?.message || String(outerErr)));
                   } finally {
                     setIsExporting(false);
                   }

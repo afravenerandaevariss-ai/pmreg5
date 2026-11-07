@@ -813,10 +813,17 @@ export function makeFuelTxKey(d) {
   const dPart = String(d.d || '').trim();
   const cPart = String(d.c || '').trim();
   const tPart = String(d.t || '').trim();
-  const docPart = String(d.doc || '').trim();
   const qPart = Math.round((parseFloat(d.q) || 0) * 100) / 100;
-  const rPart = Math.round(parseFloat(d.r) || 0);
   const uPart = String(d.u || '').trim().toUpperCase();
+  // Task 2 Fix: For SLARC credit rows (t='C'), exclude doc number so paired SAP allocation
+  // documents with different doc numbers but same CC+date+qty+activity are deduplicated.
+  if (tPart === 'C') {
+    const nPart = String(d.n || '').split('|')[0].trim().toLowerCase();
+    return `${dPart}_${cPart}_C_${qPart}_${uPart}_${nPart}`;
+  }
+  // For SALRD debit rows: include doc number (each invoice/posting is unique)
+  const docPart = String(d.doc || '').trim();
+  const rPart = Math.round(parseFloat(d.r) || 0);
   const nPart = String(d.n || '').trim();
   return `${dPart}_${cPart}_${tPart}_${docPart}_${qPart}_${rPart}_${uPart}_${nPart}`;
 }
