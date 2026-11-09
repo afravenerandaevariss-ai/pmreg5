@@ -5629,7 +5629,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
             {/* Reconciliation Comparison Top Banner */}
             <div className="bg-slate-50 border-b border-slate-200 p-4">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-center">
+              {/* Non-DEV: hanya tampilkan card Bahan Bakar (jumlah solar) + Activity */}
+              <div className={`grid gap-3 items-center ${isDevUser ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
                 {/* 1. Bahan Bakar (L) */}
                 <div 
                   onClick={() => setFuelModalTab('debit')}
@@ -5669,7 +5670,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   <span className="text-[9.5px] text-slate-400">Ringkasan Output Aktivitas</span>
                 </div>
 
-                {/* 3. ZESTHLP16PA (Logbook) */}
+                {/* 3. ZESTHLP16PA (Logbook) — hanya untuk role DEV */}
+                {isDevUser && (
                 <div 
                   onClick={() => setFuelModalTab('zest')}
                   className={`bg-white p-3 rounded-xl border transition shadow-2xs text-center cursor-pointer hover:scale-[1.01] ${
@@ -5682,8 +5684,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   </div>
                   <span className="text-[9.5px] text-slate-400">Total HM/KM dari Logbook</span>
                 </div>
+                )}
 
-                {/* 4. Status Rekonsiliasi */}
+                {/* 4. Status Rekonsiliasi — hanya untuk role DEV */}
+                {isDevUser && (
                 <div 
                   onClick={() => setFuelModalTab('reconcile')}
                   className={`p-3 rounded-xl border text-center transition cursor-pointer hover:scale-[1.01] ${
@@ -5719,6 +5723,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     {variance === 0 ? 'Tidak ada perbedaan nilai output' : 'Perlu sinkronisasi logbook'}
                   </span>
                 </div>
+                )}
               </div>
             </div>
 
@@ -5744,6 +5749,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               >
                 <Activity size={13} className="text-blue-600" /> Detail Activity ({reconciliationRows.length})
               </button>
+              {/* Tab Log ZESTHLP16PA — hanya untuk role DEV */}
+              {isDevUser && (
               <button
                 onClick={() => setFuelModalTab('zest')}
                 className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
@@ -5754,6 +5761,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               >
                 <Calendar size={13} className="text-emerald-600" /> Log ZESTHLP16PA ({selectedFuelVeh.matchedZestLogs?.length || (selectedFuelVeh.allZestLogs?.length || 0)})
               </button>
+              )}
             </div>
 
             {/* Modal Body Table Content */}
