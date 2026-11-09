@@ -5102,18 +5102,18 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           <div className="overflow-x-auto max-h-[calc(100vh-250px)] min-h-[420px] excel-cell-border border border-slate-200 rounded-xl relative shadow-2xs">
             <table className="w-full min-w-[1240px] text-xs border-separate border-spacing-0">
               <colgroup>
-                <col style={{ width: '3.5%' }} />
+                <col style={{ width: '2.5%' }} />
                 <col style={{ width: '7.5%' }} />
-                <col style={{ width: '9.5%' }} />
-                <col style={{ width: '9.5%' }} />
-                <col style={{ width: '14%' }} />
-                <col style={{ width: '14%' }} />
-                <col style={{ width: '8%' }} />
                 <col style={{ width: '8.5%' }} />
-                <col style={{ width: '9%' }} />
+                <col style={{ width: '8.5%' }} />
+                <col style={{ width: '18.5%' }} />
                 <col style={{ width: '11%' }} />
-                <col style={{ width: '9.5%' }} />
-                <col style={{ width: '6%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '7.5%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '8.5%' }} />
+                <col style={{ width: '5%' }} />
               </colgroup>
               <thead className="sticky top-0 z-30 shadow-xs">
                 <tr className="bg-slate-100/95 text-slate-800 text-[11px] font-black uppercase tracking-tight text-center whitespace-nowrap">
@@ -5204,6 +5204,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             >
                               {row.referencePrimary || '-'}
                             </div>
+                            {row.referenceAll && row.referenceAll !== row.referencePrimary && (
+                              <div
+                                className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5 truncate max-w-full"
+                                title={row.referenceAll}
+                              >
+                                {row.referenceAll.replace(row.referencePrimary || '', '').replace(/^[,;\s]+/, '')}
+                              </div>
+                            )}
                           </td>
 
                           {/* 7. Solar (Liter) */}
@@ -5238,65 +5246,97 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           </td>
 
                           {/* 9. Rasio / Efisiensi */}
-                          <td className="px-1.5 py-2 text-center bg-emerald-50/30 border-r border-emerald-100 whitespace-nowrap">
+                          <td className="px-1.5 py-1.5 text-center bg-emerald-50/30 border-r border-emerald-100 whitespace-nowrap">
                             {row.efficiency && row.efficiency.ratioVal > 0 ? (
-                              <span
-                                className={`font-mono font-black text-xs px-2 py-1 rounded-md inline-flex items-center gap-1 shadow-2xs ${
-                                  row.efficiency.color === 'emerald'
-                                    ? 'bg-emerald-100 text-emerald-950 border border-emerald-300'
-                                    : row.efficiency.color === 'amber'
-                                    ? 'bg-amber-100 text-amber-950 border border-amber-300'
-                                    : 'bg-rose-100 text-rose-950 border border-rose-300'
-                                }`}
-                                title={`Standar ${row.efficiency.code}: ${row.efficiency.targetText}`}
-                              >
-                                <span>{row.efficiency.ratioVal}</span>
-                                <span className="text-[9.5px] font-extrabold opacity-80">{row.efficiency.uom}</span>
-                              </span>
+                              <div className="inline-flex flex-col items-center justify-center">
+                                <span
+                                  className={`font-mono font-black text-xs px-2 py-0.5 rounded-md inline-flex items-center gap-1 shadow-2xs ${
+                                    row.efficiency.color === 'emerald'
+                                      ? 'bg-emerald-100 text-emerald-950 border border-emerald-300'
+                                      : row.efficiency.color === 'amber'
+                                      ? 'bg-amber-100 text-amber-950 border border-amber-300'
+                                      : 'bg-rose-100 text-rose-950 border border-rose-300'
+                                  }`}
+                                  title={`Standar ${row.efficiency.code}: ${row.efficiency.targetText}`}
+                                >
+                                  <span>{row.efficiency.ratioVal}</span>
+                                  <span className="text-[9.5px] font-extrabold opacity-80">{row.efficiency.uom}</span>
+                                </span>
+                                {row.efficiency.rule?.target && (
+                                  <span className="text-[9px] font-semibold text-slate-500 mt-0.5 tracking-tight">
+                                    Std: {row.efficiency.rule.type === 'KM/L' ? '≥' : '≤'}{row.efficiency.rule.target}
+                                  </span>
+                                )}
+                              </div>
                             ) : (
                               <span className="text-slate-300 font-mono text-xs">-</span>
                             )}
                           </td>
 
-                          {/* 10. Keterangan Efisiensi (AntiSlop: 140px column prevents overflow collision) */}
-                          <td className="px-2.5 py-2 text-center bg-slate-50/40 border-r border-slate-200 whitespace-nowrap">
-                            {row.efficiency?.isStandby ? (
-                              <span
-                                className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs tracking-wide"
-                                title="Kendaraan Standby / Rusak / Libur (Dummy 1 KM/HM SAP, tidak dihitung efisiensi)"
-                              >
-                                Standby / Rusak
-                              </span>
-                            ) : row.efficiency?.isNoFuel ? (
-                              <span
-                                className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs"
-                                title="Aktivitas operasional tercatat tanpa pemakaian BBM pada Cost Center ini (Unit Sewa / Pool BBM Luar)"
-                              >
-                                Tanpa Solar
-                              </span>
-                            ) : row.efficiency?.status === 'NO_ACTIVITY' ? (
-                              <span
-                                className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs"
-                                title="Ada pengisian solar tanpa aktivitas KM/HM pada Cost Center ini"
-                              >
-                                {row.efficiency.badgeLabel || 'Tanpa Aktivitas'}
-                              </span>
-                            ) : row.efficiency && row.efficiency.ratioVal > 0 ? (
-                              <span
-                                className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tight shadow-2xs ${
-                                  row.efficiency.color === 'emerald'
-                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                    : row.efficiency.color === 'amber'
-                                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                                    : 'bg-rose-100 text-rose-800 border border-rose-300'
-                                }`}
-                                title={`Standar ${row.efficiency.code}: ${row.efficiency.targetText}`}
-                              >
-                                {row.efficiency.badgeLabel}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300 text-xs">-</span>
-                            )}
+                          {/* 10. Keterangan Efisiensi (AntiSlop: 9% snug column with variance delta) */}
+                          <td className="px-1.5 py-1.5 text-center bg-slate-50/40 border-r border-slate-200 whitespace-nowrap">
+                            <div className="inline-flex flex-col items-center justify-center">
+                              {row.efficiency?.isStandby ? (
+                                <>
+                                  <span
+                                    className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs tracking-wide"
+                                    title="Kendaraan Standby / Rusak / Libur (Dummy 1 KM/HM SAP, tidak dihitung efisiensi)"
+                                  >
+                                    Standby / Rusak
+                                  </span>
+                                  <span className="text-[9px] font-medium text-slate-400 mt-0.5">Dummy 1 SAP</span>
+                                </>
+                              ) : row.efficiency?.isNoFuel ? (
+                                <>
+                                  <span
+                                    className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs"
+                                    title="Aktivitas operasional tercatat tanpa pemakaian BBM pada Cost Center ini (Unit Sewa / Pool BBM Luar)"
+                                  >
+                                    Tanpa Solar
+                                  </span>
+                                  <span className="text-[9px] font-medium text-amber-700 mt-0.5">Sewa / Pool Luar</span>
+                                </>
+                              ) : row.efficiency?.status === 'NO_ACTIVITY' ? (
+                                <>
+                                  <span
+                                    className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs"
+                                    title="Ada pengisian solar tanpa aktivitas KM/HM pada Cost Center ini"
+                                  >
+                                    {row.efficiency.badgeLabel || 'Tanpa Aktivitas'}
+                                  </span>
+                                  <span className="text-[9px] font-medium text-amber-700 mt-0.5">Hanya BBM</span>
+                                </>
+                              ) : row.efficiency && row.efficiency.ratioVal > 0 ? (
+                                <>
+                                  <span
+                                    className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tight shadow-2xs ${
+                                      row.efficiency.color === 'emerald'
+                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                        : row.efficiency.color === 'amber'
+                                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                        : 'bg-rose-100 text-rose-800 border border-rose-300'
+                                    }`}
+                                    title={`Standar ${row.efficiency.code}: ${row.efficiency.targetText}`}
+                                  >
+                                    {row.efficiency.badgeLabel}
+                                  </span>
+                                  {row.efficiency.rule?.target && (
+                                    <span className={`text-[9px] font-bold mt-0.5 ${
+                                      row.efficiency.color === 'emerald' ? 'text-emerald-700' :
+                                      row.efficiency.color === 'amber' ? 'text-amber-700' : 'text-rose-600'
+                                    }`}>
+                                      {(() => {
+                                        const diff = Number((row.efficiency.ratioVal - row.efficiency.rule.target).toFixed(2));
+                                        const sign = diff > 0 ? '+' : '';
+                                        return `${sign}${diff} ${row.efficiency.uom}`;
+                                      })()}
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-slate-300 text-xs">-</span>
+                              )}
+                            </div>
                           </td>
 
                           {/* 11. Biaya Solar (Rp) */}
