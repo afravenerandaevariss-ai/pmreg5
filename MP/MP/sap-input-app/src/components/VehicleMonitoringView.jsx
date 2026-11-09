@@ -402,6 +402,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     currentUser.plant === 'ALL'
   )));
 
+  // Can see full audit details (ZEST card, Rekon card, Log ZEST tab, Rekon columns)
+  // Both DEV and ADMIN/REGIONAL roles have access, only standard USER/UNIT role is restricted
+  const canSeeZestRecon = isDevUser || isAdmin;
+
 
   const today = new Date();
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
@@ -5310,7 +5314,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                               type="button"
                               onClick={async () => {
                                 setSelectedFuelVeh(row);
-                                setFuelModalTab(isDevUser ? 'reconcile' : 'debit');
+                                setFuelModalTab(canSeeZestRecon ? 'reconcile' : 'debit');
                                 const vehCC = String(row.costCenter || '').trim().toUpperCase();
                                 // Find which months have data for this vehicle across summaries
                                 const activeMonthsForVeh = (fuelData.summaries || [])
@@ -5590,7 +5594,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             </div>
 
             {/* Source of Reference Info Banner */}
-            {isDevUser ? (
+            {canSeeZestRecon ? (
               <div className="px-5 pt-3 pb-0 bg-slate-50">
               <div className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs flex-wrap ${
                 selectedFuelVeh.referencePriority === 1 || selectedFuelVeh.referencePriority === 2
@@ -5644,8 +5648,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
             {/* Reconciliation Comparison Top Banner */}
             <div className="bg-slate-50 border-b border-slate-200 p-4">
-              {/* Non-DEV: hanya tampilkan card Bahan Bakar (jumlah solar) + Activity */}
-              <div className={`grid gap-3 items-center ${isDevUser ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
+              {/* USER: hanya tampilkan card Bahan Bakar (jumlah solar) + Activity */}
+              <div className={`grid gap-3 items-center ${canSeeZestRecon ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
                 {/* 1. Bahan Bakar (L) */}
                 <div 
                   onClick={() => setFuelModalTab('debit')}
@@ -5685,8 +5689,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   <span className="text-[9.5px] text-slate-400">Ringkasan Output Aktivitas</span>
                 </div>
 
-                {/* 3. ZESTHLP16PA (Logbook) — hanya untuk role DEV */}
-                {isDevUser && (
+                {/* 3. ZESTHLP16PA (Logbook) — untuk role DEV & ADMIN */}
+                {canSeeZestRecon && (
                 <div 
                   onClick={() => setFuelModalTab('zest')}
                   className={`bg-white p-3 rounded-xl border transition shadow-2xs text-center cursor-pointer hover:scale-[1.01] ${
@@ -5701,8 +5705,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 </div>
                 )}
 
-                {/* 4. Status Rekonsiliasi — hanya untuk role DEV */}
-                {isDevUser && (
+                {/* 4. Status Rekonsiliasi — untuk role DEV & ADMIN */}
+                {canSeeZestRecon && (
                 <div 
                   onClick={() => setFuelModalTab('reconcile')}
                   className={`p-3 rounded-xl border text-center transition cursor-pointer hover:scale-[1.01] ${
@@ -5764,8 +5768,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               >
                 <Activity size={13} className="text-blue-600" /> Detail Activity ({reconciliationRows.length})
               </button>
-              {/* Tab Log ZESTHLP16PA — hanya untuk role DEV */}
-              {isDevUser && (
+              {/* Tab Log ZESTHLP16PA — untuk role DEV & ADMIN */}
+              {canSeeZestRecon && (
               <button
                 onClick={() => setFuelModalTab('zest')}
                 className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
@@ -5797,8 +5801,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           <th className="px-3 py-1.5 text-center w-24">Tanggal</th>
                           <th className="px-3 py-1.5 text-center w-28">No. Dokumen</th>
                           <th className="px-3 py-1.5 text-center w-48">Reference / Keterangan</th>
-                          <th className="px-3 py-1.5 text-center w-24 bg-blue-50 text-blue-950 font-bold">{isDevUser ? 'SLARC' : 'ACTIVITY'}</th>
-                          {isDevUser && (
+                          <th className="px-3 py-1.5 text-center w-24 bg-blue-50 text-blue-950 font-bold">{canSeeZestRecon ? 'SLARC' : 'ACTIVITY'}</th>
+                          {canSeeZestRecon && (
                             <>
                               <th className="px-3 py-1.5 text-center w-24 bg-emerald-50 text-emerald-950 font-bold">ZESTHLP16PA</th>
                               <th className="px-3 py-1.5 text-center w-20">Selisih</th>
@@ -5819,9 +5823,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                               <td className="px-3 py-1.5 text-center font-mono text-[10px] text-slate-600">{r.doc || '-'}</td>
                               <td className="px-3 py-1.5 text-center text-slate-800 font-semibold truncate max-w-xs">{r.ref || '-'}</td>
                               <td className="px-3 py-1.5 text-center font-mono font-bold text-blue-900 bg-blue-50/30">
-                                {r.slarcQty > 0 ? `${r.slarcQty} ${!isDevUser ? uomLabel : ''}` : '-'}
+                                {r.slarcQty > 0 ? `${r.slarcQty} ${!canSeeZestRecon ? uomLabel : ''}` : '-'}
                               </td>
-                              {isDevUser && (
+                              {canSeeZestRecon && (
                                 <>
                                   <td className="px-3 py-2 text-center font-mono font-bold text-emerald-900 bg-emerald-50/30">
                                     {r.zestQty > 0 ? r.zestQty : '-'}
@@ -5862,7 +5866,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           <td className="px-3 py-2 text-center font-mono font-black text-blue-950 bg-blue-100/50">
                             {Math.round(reconciliationRows.reduce((acc, r) => acc + (r.slarcQty || 0), 0) * 100) / 100} <span className="text-[10px] text-slate-500 font-normal">{uomLabel}</span>
                           </td>
-                          {isDevUser && (
+                          {canSeeZestRecon && (
                             <>
                               <td className="px-3 py-2 text-center font-mono font-black text-emerald-950 bg-emerald-100/50">
                                 {Math.round(reconciliationRows.reduce((acc, r) => acc + (r.zestQty || 0), 0) * 100) / 100} <span className="text-[10px] text-slate-500 font-normal">{uomLabel}</span>
