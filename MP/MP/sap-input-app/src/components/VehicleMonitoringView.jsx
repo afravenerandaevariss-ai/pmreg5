@@ -383,13 +383,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   );
 
   // ─── Role Detection ────────────────────────────────────────────────────────
-  // Normalize role string — handles all DB variants: 'USER','Unit','unit','UNIT'
+  // Normalize role string: handles all DB variants: 'USER','Unit','unit','UNIT'
   const roleUpper = currentUser?.role?.toUpperCase() || '';
 
   // Strictly role DEV only (ADMIN and USER are both hidden)
   const isDevUser = roleUpper === 'DEV';
 
-  // Explicit USER/UNIT check — blocks regardless of plant value
+  // Explicit USER/UNIT check: blocks regardless of plant value
   const isUserRole = roleUpper === 'USER' || roleUpper === 'UNIT';
 
   // ADMIN if: role is Admin/ADMIN/REGIONAL/DEV OR plant is ALL/5R00
@@ -866,7 +866,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         setVehicles(finalVehicles);
         setLogs(finalLogs);
 
-        // Save to DB in background — UI already shows data
+        // Save to DB in background: UI already shows data
         setUploadProgress(`Menyimpan ${finalLogs.length} transaksi ke server...`);
         const { data: saveRes, error: saveErr } = await saveVehicleData(finalVehicles, finalLogs);
         if (saveErr) {
@@ -1156,7 +1156,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 continue;
               }
 
-              // Task 1: Strict filter — CE 51100057 MUST have UoM exactly L (or alias LTR/LITER). No text-based fallback.
+              // Task 1: Strict filter: CE 51100057 MUST have UoM exactly L (or alias LTR/LITER). No text-based fallback.
               if (!isStandardFuelUom) {
                 excludedNonFuel++;
                 console.debug(`[SALRD] Excluded CE 51100057 row: UoM="${rawUom}" (not L/LTR/LITER) - ${name}`);
@@ -1312,7 +1312,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               const isStandardFuelUom = ['L', 'LTR', 'LITER'].includes(rawUom);
               let parsedLiters = 0;
               if (ce === '51100057') {
-                // Task 1: Strict filter — only L/LTR/LITER UoM accepted for CE 51100057. No text fallback.
+                // Task 1: Strict filter: only L/LTR/LITER UoM accepted for CE 51100057. No text fallback.
                 if (!isStandardFuelUom) {
                   console.debug(`[SALRD-fallback] Excluded CE 51100057 row: UoM="${rawUom}" (not L/LTR/LITER) - ${name}`);
                 } else {
@@ -3372,7 +3372,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             </div>
             <h2 className="text-xl font-bold text-white">Monitoring Logbook Kendaraan</h2>
             <p className="text-slate-400 text-xs mt-0.5">
-              Dashboard monitoring operasional kendaraan Regional 5 — Bulan {targetMonth}
+              Dashboard monitoring operasional kendaraan Regional 5: Bulan {targetMonth}
             </p>
           </div>
 
@@ -3501,7 +3501,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               { key: 'fuel-evaluation',   label: '⛽ Evaluasi BBM (Solar)',    icon: Fuel,           show: true },
             ].filter(t => t.show).map(({ key, label, icon: Icon }) => (
               <button key={key} onClick={() => { setActiveTab(key); setError(null); }}
-                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold transition-colors duration-300 ${activeTab === key ? 'bg-gradient-to-tr from-[#064e3b] to-[#2dd4bf] text-white shadow-md shadow-emerald-900/20' : 'text-slate-500 hover:text-[#064e3b] hover:bg-emerald-50'}`}>
+                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold transition-colors duration-300 ${activeTab === key ? 'bg-[#064e3b] text-white shadow-xs' : 'text-slate-600 hover:text-[#064e3b] hover:bg-emerald-50'}`}>
                 <Icon size={14} /> {label}
               </button>
             ))}
@@ -3610,7 +3610,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         )}
 
         {/* ─────────────────────────────────────────────────────────── */}
-        {/* TAB 1: Checklist Kebun (Unit) — VERY SIMPLE & DIRECT       */}
+        {/* TAB 1: Checklist Kebun (Unit): VERY SIMPLE & DIRECT */}
         {/* ─────────────────────────────────────────────────────────── */}
         {activeTab === 'unit-checklist' && (
           <div className="space-y-4">
@@ -3813,7 +3813,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                               <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-inner max-w-4xl">
                                 <h5 className="font-bold text-slate-700 text-xs mb-3 flex items-center gap-1.5">
                                   <Truck size={14} className="text-[#064e3b]" /> 
-                                  Detail Transaksi Logbook Kendaraan {v.vehicle_code} — Bulan {targetMonth}
+                                  Detail Transaksi Logbook Kendaraan {v.vehicle_code}: Bulan {targetMonth}
                                 </h5>
                                 
                                 <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
@@ -4130,7 +4130,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         )}
 
         {/* ─────────────────────────────────────────────────────────── */}
-        {/* TAB 3: Daftar Kendaraan — ADMIN & DEV only                 */}
+        {/* TAB 3: Daftar Kendaraan: ADMIN & DEV only */}
         {/* ─────────────────────────────────────────────────────────── */}
         {activeTab === 'detail-veh' && isAdmin && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -4620,7 +4620,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             <div className="border border-red-200 bg-red-50/50 rounded-2xl p-5 space-y-4 mt-2">
               <div className="flex items-center gap-2 mb-1">
                 <ShieldAlert size={16} className="text-red-600 shrink-0" />
-                <p className="text-xs font-bold text-red-700 uppercase tracking-wide">⚠️ Danger Zone — Tindakan Ini Tidak Dapat Dibatalkan</p>
+                <p className="text-xs font-bold text-red-700 uppercase tracking-wide">Danger Zone: Tindakan Ini Tidak Dapat Dibatalkan</p>
               </div>
               <p className="text-[11px] text-red-600">Hapus data hanya jika Anda yakin. Ketikkan kata konfirmasi pada kolom di bawah untuk mengaktifkan tombol hapus.</p>
 
@@ -5547,11 +5547,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 no-print animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl border border-slate-300 shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden">
             {/* Modal Header */}
-            <div className="bg-slate-900 text-white p-5 flex items-start justify-between">
+            <div className="bg-[#064e3b] text-white p-5 flex items-start justify-between border-b border-emerald-900">
               <div>
                 <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                   <Fuel size={18} className="text-amber-400" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-950/60 px-2.5 py-0.5 rounded-full border border-amber-800">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300 bg-emerald-950/80 px-2.5 py-0.5 rounded-md border border-amber-500/40">
                     Audit Kendaraan: BBM Solar & Logbook Operasional
                   </span>
                 </div>
@@ -5589,7 +5589,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               </div>
               <button
                 onClick={() => setSelectedFuelVeh(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-xl hover:bg-slate-800 transition cursor-pointer"
+                className="text-emerald-200 hover:text-white p-1 rounded-lg hover:bg-emerald-900/60 transition cursor-pointer"
               >
                 <X size={20} />
               </button>
@@ -5676,7 +5676,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   <span className="text-[9.5px] text-slate-400">Ringkasan Output Aktivitas</span>
                 </div>
 
-                {/* 3. ZESTHLP16PA (Logbook) — hanya untuk role DEV */}
+                {/* 3. ZESTHLP16PA (Logbook): hanya untuk role DEV */}
                 {isDevUser && (
                 <div 
                   onClick={() => setFuelModalTab('zest')}
@@ -5692,7 +5692,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 </div>
                 )}
 
-                {/* 4. Status Rekonsiliasi — hanya untuk role DEV */}
+                {/* 4. Status Rekonsiliasi: hanya untuk role DEV */}
                 {isDevUser && (
                 <div 
                   onClick={() => setFuelModalTab('reconcile')}
@@ -5755,7 +5755,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               >
                 <Activity size={13} className="text-blue-600" /> Detail Activity ({displayActivityRows.length})
               </button>
-              {/* Tab Log ZESTHLP16PA — hanya untuk role DEV */}
+              {/* Tab Log ZESTHLP16PA: hanya untuk role DEV */}
               {isDevUser && (
               <button
                 onClick={() => setFuelModalTab('zest')}
@@ -6024,7 +6024,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             <div className="bg-slate-100 px-4 py-3 border-t border-slate-200 flex justify-end">
               <button
                 onClick={() => setSelectedFuelVeh(null)}
-                className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-1.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+                className="bg-[#064e3b] hover:bg-emerald-800 text-white px-5 py-2 rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
               >
                 Tutup
               </button>

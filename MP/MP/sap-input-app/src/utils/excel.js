@@ -51,7 +51,7 @@ function forceColumnsAsText(ws, colIndices) {
 
 /**
  * Accurately resolve plant code (e.g. 5F01, 5F08, etc.) from equipment object, functional location, or masterMap
- * FIX: Jangan hardcode fallback ke '5F01' — gunakan defaultPlant yang dikirim caller.
+ * FIX: Jangan hardcode fallback ke '5F01': gunakan defaultPlant yang dikirim caller.
  */
 export function getEquipmentPlant(eq, masterMap, defaultPlant) {
   // Normalise defaultPlant sekali di awal
@@ -59,7 +59,7 @@ export function getEquipmentPlant(eq, masterMap, defaultPlant) {
     ? String(defaultPlant).trim().toUpperCase()
     : null;
 
-  // FIX #4: Jangan hardcode '5F01' — kembalikan safeDefault atau null agar caller bisa handle [2026-11-06]
+  // FIX #4: Jangan hardcode '5F01': kembalikan safeDefault atau null agar caller bisa handle [2026-11-06]
   if (!eq) return safeDefault || null;
 
   let p = String(eq.plant || '').trim().toUpperCase();
@@ -83,7 +83,7 @@ export function getEquipmentPlant(eq, masterMap, defaultPlant) {
     }
   }
 
-  // FIX #4: Gunakan defaultPlant dari caller — jangan hardcode '5F01' [2026-11-06]
+  // FIX #4: Gunakan defaultPlant dari caller: jangan hardcode '5F01' [2026-11-06]
   // Caller (exportDailyToSAP, dll) harus mengirim defaultPlant yang benar (plant user)
   return safeDefault || null;
 }
@@ -491,7 +491,7 @@ export function exportDailyToSAP(headers, originalData, equipments, dailyLogsMap
     parentHmMap[pEqNum] = (parentHmMap[pEqNum] || 0) + durationHours;
   });
 
-  // STEP 2: Resolve HM per template row — parent and all sub-equipments get parentHmMap[pEqNum]
+  // STEP 2: Resolve HM per template row: parent and all sub-equipments get parentHmMap[pEqNum]
   const dailyDurations = {};
   (equipments || []).forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
@@ -732,7 +732,7 @@ export function exportAccumulatedToSAP(headers, originalData, equipments, dailyL
     });
   });
 
-  // STEP 2: Resolve HM per template row — parent and all sub-equipments get parentHmMap[pEqNum]
+  // STEP 2: Resolve HM per template row: parent and all sub-equipments get parentHmMap[pEqNum]
   (equipments || []).forEach(eq => {
     const eqKey = String(eq.eqNum || eq.eq_num || '').trim();
     if (!eqKey) return;

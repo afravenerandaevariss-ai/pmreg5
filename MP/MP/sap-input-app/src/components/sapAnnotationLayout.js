@@ -9,16 +9,16 @@
  *     Ini diukur, bukan ditebak: pemanggil menyerahkan sampler "tinta"
  *     (kepadatan piksel gelap) lewat opts.ink.
  *  2. Keterangan tidak boleh saling menimpa dan tidak boleh menutupi kotak
- *     penanda lain — teks harus selalu terbaca.
+ *     penanda lain: teks harus selalu terbaca.
  *  3. Keterangan tetap berada dalam area gambar ATAU margin kosong di
  *     sekeliling gambar (opts.margin), supaya bisa diletakkan di luar layar SAP
  *     tanpa menghalangi tulisan.
  *  4. Panah menghubungkan keterangan ke kotak targetnya tanpa celah.
  *
  * Cara kerja: dua fase.
- *   Fase 1 — kandidat "klasik" di kanan/kiri/atas/bawah kotak (dekat kotak).
+ *   Fase 1: kandidat "klasik" di kanan/kiri/atas/bawah kotak (dekat kotak).
  *            Dipakai bila sudah bersih (tanpa tabrakan, tanpa menutupi teks).
- *   Fase 2 — sapuan grid (sweep) di seluruh area gambar + margin, dipilih
+ *   Fase 2: sapuan grid (sweep) di seluruh area gambar + margin, dipilih
  *            posisi berbiaya minimum. Biaya = tabrakan + tinta tertutup + jarak.
  *
  * Keluaran memakai ruang piksel gambar (0..naturalWidth, 0..naturalHeight)
@@ -32,7 +32,7 @@ export const LABEL_FONT_PX = 11; // ukuran font acuan keterangan (px, ruang gamb
 export const LABEL_PAD_X = 5;    // padding horizontal acuan (px)
 export const LABEL_PAD_Y = 1.5;  // padding vertikal acuan (px)
 
-/** Batas minimum yang dipakai renderer (px LAYAR) — harus sama dengan SapAnnotationLayer. */
+/** Batas minimum yang dipakai renderer (px LAYAR): harus sama dengan SapAnnotationLayer. */
 export const MIN_FONT_SCREEN_PX = 9;
 export const MIN_PAD_X_SCREEN_PX = 3;
 export const MIN_PAD_Y_SCREEN_PX = 1;
@@ -41,7 +41,7 @@ export const MIN_PAD_Y_SCREEN_PX = 1;
  * Perkiraan lebar rata-rata 1 karakter (fraksi dari ukuran font), font semibold.
  * Diukur dari label yang benar-benar ter-render: 0.436–0.506 (median ~0.47).
  * Dipakai 0.52 (sedikit lebih lebar) supaya planner tidak pernah menganggap
- * label lebih sempit dari kenyataan — itu penyebab label saling menimpa.
+ * label lebih sempit dari kenyataan: itu penyebab label saling menimpa.
  */
 export const LABEL_CHAR_W = 0.52;
 
@@ -61,13 +61,13 @@ export const INK_CLEAN = 0.02;            // tinta di bawah batas ini dianggap b
  *
  * Renderer memakai clamp minimum 9 px LAYAR. Pada skala tampilan kecil
  * (viewScale < 9/11 ≈ 0.818) font layar tertahan di 9 px, sehingga dalam ruang
- * gambar asli font menjadi 9/viewScale — lebih besar dari LABEL_FONT_PX.
+ * gambar asli font menjadi 9/viewScale: lebih besar dari LABEL_FONT_PX.
  *
  * Planner WAJIB memakai angka ini, bukan LABEL_FONT_PX, supaya lebar perkiraan
  * sama dengan lebar nyata. Sebelumnya planner memakai 11 px natural sementara
  * renderer menggambar ~16.5 px natural, jadi label ~50% lebih lebar dari
  * perkiraan: label saling bertabrakan, lalu algoritma anti-tabrakan memindah-
- * mindahkannya — penyebab keterangan tampak "lari-lari".
+ * mindahkannya: penyebab keterangan tampak "lari-lari".
  */
 export function effectiveLabelFontPx(viewScale = 1) {
   const vs = viewScale > 0 ? viewScale : 1;
@@ -146,7 +146,7 @@ export function buildAnnotationLayout(annotations, nw, nh, opts = {}) {
     bottom: Math.max(0, (opts.margin && opts.margin.bottom) || 0),
   };
 
-  // Metrik nyata (bukan asumsi) — lihat effectiveLabelFontPx().
+  // Metrik nyata (bukan asumsi): lihat effectiveLabelFontPx().
   const fontPx = effectiveLabelFontPx(viewScale);
   const ePad = effectiveLabelPad(viewScale);
   const lh = estimateLabelHeight(fontPx, ePad.y, ePad.border);

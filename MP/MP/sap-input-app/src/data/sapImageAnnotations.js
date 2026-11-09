@@ -624,19 +624,19 @@ export const sapImageAnnotations = {
     },
   ],
   // ── IW32: penutupan teknis (TECO) & verifikasi di IW38 ────────────────────
-  // Layar IW32 dengan menu Order ➔ Complete terbuka. Kotak merah tercetak
+  // Layar IW32 dengan menu Order -> Complete terbuka. Kotak merah tercetak
   // menandai kolom deskripsi order yang akan ditutup.
   "/images/iw32/step_2.png": [
     {
       box: { x: 50.3, y: 28.8, w: 33.2, h: 2.8 },
-      label: { text: "Pilih Complete (technically) — Ctrl+F12", side: 'left' }
+      label: { text: "Pilih Complete (technically): Ctrl+F12", side: 'left' }
     },
     {
       box: { x: 28.25, y: 17.79, w: 36.18, h: 3.05 },
       label: { text: "Pastikan order yang ditutup: Perbaikan Separator 610", side: 'right' }
     },
   ],
-  // Layar IW38 "Change PM Orders: Selection of Orders" — sama dengan iw38/step_2.
+  // Layar IW38 "Change PM Orders: Selection of Orders": sama dengan iw38/step_2.
   "/images/iw32/step_3.png": [
     {
       box: { x: 0.96, y: 15.86, w: 40.03, h: 12.05 },
@@ -651,7 +651,7 @@ export const sapImageAnnotations = {
       label: { text: "Isi tanggal akhir Period", side: 'right' }
     },
   ],
-  // Layar IW38 parameter seleksi — sama dengan iw38/step_3.
+  // Layar IW38 parameter seleksi: sama dengan iw38/step_3.
   "/images/iw32/step_4.png": [
     {
       box: { x: 1, y: 18.95, w: 40, h: 3.32 },
@@ -677,7 +677,7 @@ export function getImageAnnotation(imagePath) {
   // Hanya kunci PERSIS yang dipakai. Pencocokan berdasarkan nama berkas pernah
   // dipakai sebagai cadangan, dan akibatnya gambar yang belum terdaftar
   // (mis. /images/iw32/step_2.png) mewarisi anotasi gambar lain yang kebetulan
-  // bernama step_2.png — keterangan pun menempel pada elemen yang salah.
+  // bernama step_2.png: keterangan pun menempel pada elemen yang salah.
   // Gambar tanpa entri sekarang sengaja tidak beranotasi.
   return sapImageAnnotations[normalized] || [];
 }

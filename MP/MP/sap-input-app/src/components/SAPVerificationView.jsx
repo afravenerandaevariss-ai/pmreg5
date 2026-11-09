@@ -32,10 +32,10 @@ export default function SAPVerificationView({ equipments, currentUser }) {
   )));
 
   // ── Session-level caches (survive re-renders, reset on page refresh) ──────
-  const _cacheMasterEq    = useRef(null); // { data: [...] } — 17,277 rows, fetched once
+  const _cacheMasterEq    = useRef(null); // { data: [...] }: 17,277 rows, fetched once
   const _cacheMasterMap   = useRef(null); // raw master_map entries, fetched once
-  const _cacheIK17Base    = useRef(null); // ik17_parsed_data.json — 63k rows, fetched once
-  const _cacheIK17DB      = useRef({ data: null, ts: 0 }); // ik17_raw_data — TTL 60s
+  const _cacheIK17Base    = useRef(null); // ik17_parsed_data.json: 63k rows, fetched once
+  const _cacheIK17DB      = useRef({ data: null, ts: 0 }); // ik17_raw_data: TTL 60s
   const _cacheMonitoredEq = useRef(null); // all-time induk_eq_num+plant from daily_logs, fetched once
   const [filterPlant, setFilterPlant] = useState(() => (!isAdmin && currentUser?.plant ? currentUser.plant : 'ALL'));
   const [filterJenis, setFilterJenis] = useState('');

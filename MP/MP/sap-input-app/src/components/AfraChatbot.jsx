@@ -277,7 +277,7 @@ export default function AfraChatbot({ currentUser }) {
                 </div>
               ))}
 
-              {/* FAQ chips — hidden when user is focused on a Q&A, shown via showFaq */}
+              {/* FAQ chips: hidden when user is focused on a Q&A, shown via showFaq */}
               {showFaq && (
                 <div className="flex flex-col gap-0 mt-1">
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest px-1 mb-2">

@@ -9,7 +9,7 @@
  *
  * Implementasi: gambar dirender sekali ke canvas offscreen, lalu diubah menjadi
  * summed-area table (integral image) sehingga kepadatan tinta pada sembarang
- * rect bisa dihitung O(1) — planner bisa menguji ratusan kandidat posisi tanpa
+ * rect bisa dihitung O(1): planner bisa menguji ratusan kandidat posisi tanpa
  * membaca ulang piksel.
  */
 

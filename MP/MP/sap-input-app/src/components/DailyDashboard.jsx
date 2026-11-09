@@ -2353,7 +2353,7 @@ export default function DailyDashboard({
                       </span>
                     </td>
                     <td className="px-5 py-3.5 font-mono font-black text-slate-700 group-hover:text-[#064e3b] transition-colors">{Math.floor(log.durationMinutes / 60)}h {String(log.durationMinutes % 60).padStart(2, '0')}m</td>
-                    <td className="px-4 py-2.5 text-slate-500 max-w-[160px] truncate text-[11px]" title={log.notes}>{log.notes || <span className="text-slate-400">—</span>}</td>
+                    <td className="px-4 py-2.5 text-slate-500 max-w-[160px] truncate text-[11px]" title={log.notes}>{log.notes || <span className="text-slate-400">-</span>}</td>
                     <td className="px-4 py-2.5 text-right">
                       {!isUserRole && (
                         <div className="flex items-center justify-end gap-1">
@@ -2979,12 +2979,12 @@ export default function DailyDashboard({
                       if (res && !res.error && res.data) {
                         freshLogs = { ...freshLogs, ...res.data };
                       } else {
-                        console.warn(`[export] daily_logs ${monthList[i]} gagal/timeout — memakai data cache.`);
+                        console.warn(`[export] daily_logs ${monthList[i]} gagal/timeout: memakai data cache.`);
                       }
                     });
                     setDailyLogs(freshLogs);
                   } else {
-                    console.warn('[export] batas waktu total tercapai saat mengambil daily_logs — memakai data cache.');
+                    console.warn('[export] batas waktu total tercapai saat mengambil daily_logs: memakai data cache.');
                     // FIX #3: Beri tahu user bahwa data dari cache (koneksi lambat/timeout)
                     alert('⚠️ Koneksi ke server lambat. Data jam jalan yang digunakan mungkin bukan data terbaru.\n\nJika penting, tutup dan buka kembali modal export setelah koneksi stabil.');
                   }
@@ -3112,8 +3112,8 @@ export default function DailyDashboard({
                     // ikut masuk ke upload user dari plant berbeda (misal 5F22). [2026-11-06]
                     if (!targetEquipments || targetEquipments.length === 0) {
                       if (isUserRole && userPlant) {
-                        // User role: filter ketat harus berhasil — jika gagal, ada masalah master data
-                        // isExporting direset oleh outer finally — tidak perlu set manual di sini
+                        // User role: filter ketat harus berhasil: jika gagal, ada masalah master data
+                        // isExporting direset oleh outer finally: tidak perlu set manual di sini
                         alert(
                           `⚠️ Tidak ada equipment untuk Plant ${userPlant}.\n\n` +
                           `Total equipment dimuat: ${exportEquipments.length}\n` +
@@ -3140,7 +3140,7 @@ export default function DailyDashboard({
 
                     // ── Validasi akhir: pastikan ada equipment sebelum export ──
                     if (!targetEquipments || targetEquipments.length === 0) {
-                      const plantInfo = userPlant || currentUser?.plant || '—';
+                      const plantInfo = userPlant || currentUser?.plant || '-';
                       const totalEq = (exportEquipments || []).length;
                       alert(
                         `⚠️ Tidak ada equipment ditemukan untuk Plant ${plantInfo}.\n\n` +
@@ -3206,7 +3206,7 @@ export default function DailyDashboard({
                 </div>
                 <div>
                   <h3 className="font-bold text-base leading-tight">
-                    PERINGATAN — JAM JALAN &gt; 24 JAM
+                    PERINGATAN: JAM JALAN &gt; 24 JAM
                   </h3>
                   <p className="text-xs mt-0.5 text-amber-100">
                     Data melebihi 24 jam/hari. Anda dapat tetap melanjutkan export ke Excel.
@@ -3473,7 +3473,7 @@ export default function DailyDashboard({
                 </div>
               )}
               {importSummary.updated === 0 && importSummary.added === 0 && (
-                <p className="text-sm text-center text-slate-500 py-4">Tidak ada perubahan — semua data sudah sinkron.</p>
+                <p className="text-sm text-center text-slate-500 py-4">Tidak ada perubahan: semua data sudah sinkron.</p>
               )}
             </div>
             {/* Footer */}

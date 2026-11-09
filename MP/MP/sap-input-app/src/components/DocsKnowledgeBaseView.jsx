@@ -314,7 +314,7 @@ export default function DocsKnowledgeBaseView({ currentUser, onBackToApp }) {
               </p>
               <CodeSnippet
                 language="bash"
-                title="PostgREST REST API — Query Data via HTTP cURL"
+                title="PostgREST REST API: Query Data via HTTP cURL"
                 code={`# Mengambil data logbook kendaraan plant 5F01 bulan berjalan
 curl -X GET "https://pmreg5.afratarigan.my.id/postgrest/vehicle_logs?plant=eq.5F01&date=gte.2026-09-01&order=date.desc" \\
   -H "Authorization: Bearer YOUR_ANON_TOKEN" \\

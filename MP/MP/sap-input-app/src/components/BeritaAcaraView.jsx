@@ -297,7 +297,7 @@ export default function BeritaAcaraView({ currentUser }) {
       return;
     }
 
-    // ── Step 4: Resolve fields — unitOverrides (Supabase) > sheet > default ──
+    // Step 4: Resolve fields: unitOverrides (Supabase) > sheet > default
     const today = new Date();
     const monthRoman = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'][today.getMonth()];
     const year = today.getFullYear();
@@ -508,7 +508,7 @@ export default function BeritaAcaraView({ currentUser }) {
             throw new Error(sbError?.message || 'filter failed');
           }
         } catch (_filterErr) {
-          // Fallback: load all rows (pre-migration schema — unit_code column not yet added)
+          // Fallback: load all rows (pre-migration schema: unit_code column not yet added)
           try {
             const { data: ovData } = await supabase.from(T_BA_EDITS).select('*');
             if (ovData) overrides = ovData;
@@ -661,7 +661,7 @@ export default function BeritaAcaraView({ currentUser }) {
         action: 'upload_pdf',
         parentFolderId: DRIVE_PARENT_FOLDER_ID,
         unitCode: baData.plantCode,
-        // ★ FIX: Prefix unitCode ke unitName agar pencarian subfolder di GDrive
+        // FIX: Prefix unitCode ke unitName agar pencarian subfolder di GDrive
         // tidak salah karena substring match. Contoh: "Gunung Meliau" (5E01) 
         // sebelumnya cocok dengan folder "5F01 PABRIK GUNUNG MELIAU" (5F01) 
         // karena GAS melakukan pencarian substring. Dengan format "5E01 Gunung Meliau",
@@ -691,7 +691,7 @@ export default function BeritaAcaraView({ currentUser }) {
         driveFolderUrl = result.folderUrl || driveFolderUrl;
         driveFolderId = result.folderId || driveFolderId;
       } else {
-        // GAS not configured yet — save record only (for demo/testing)
+        // GAS not configured yet: save record only (for demo/testing)
         console.warn('GAS URL belum dikonfigurasi. File hanya dicatat di database.');
       }
 
@@ -781,7 +781,7 @@ export default function BeritaAcaraView({ currentUser }) {
         { onConflict: 'unit_code,no_eq' }
       );
       if (upsertErr) {
-        console.warn('[BA] upsert (unit_code,no_eq) failed:', upsertErr.message, '— trying fallback');
+        console.warn('[BA] upsert (unit_code,no_eq) failed:', upsertErr.message, ': trying fallback');
         throw upsertErr;
       }
     } catch (_unitErr) {
@@ -792,7 +792,7 @@ export default function BeritaAcaraView({ currentUser }) {
           { onConflict: 'no_eq' }
         );
         if (fbErr) {
-          console.warn('[BA] upsert (no_eq) failed:', fbErr.message, '— trying plain insert');
+          console.warn('[BA] upsert (no_eq) failed:', fbErr.message, ': trying plain insert');
           throw fbErr;
         }
       } catch (_fbErr) {
@@ -1709,7 +1709,7 @@ export default function BeritaAcaraView({ currentUser }) {
             <div className="flex items-center gap-2">
               <FolderOpen size={18} className="text-purple-600" />
               <h3 className="font-bold text-slate-800 text-sm">Riwayat Upload PDF</h3>
-              <span className="text-xs text-slate-500">— Unit {baData.plantCode}</span>
+              <span className="text-xs text-slate-500">(Unit {baData.plantCode})</span>
             </div>
             <button
               onClick={() => loadUploadHistory(baData.plantCode)}
@@ -1764,7 +1764,7 @@ export default function BeritaAcaraView({ currentUser }) {
                         )}
                       </td>
                       <td className="px-5 py-3 text-slate-500 text-xs max-w-[200px] truncate">
-                        {record.notes || <span className="text-slate-300 italic">—</span>}
+                        {record.notes || <span className="text-slate-300 italic">-</span>}
                       </td>
                       <td className="px-5 py-3 text-slate-600 text-xs">{record.uploaded_by}</td>
                       <td className="px-5 py-3 text-slate-500 text-xs">

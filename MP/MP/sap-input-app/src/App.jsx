@@ -658,7 +658,7 @@ function App() {
     } catch(e) {}
   }
 
-  // masterMap and templateData are large blobs (3+ MB) — never initialize from localStorage
+  // masterMap and templateData are large blobs (3+ MB): never initialize from localStorage
   // to avoid serving stale data (e.g., old masterMap without Distrik/Kebun plants).
   // They will always be fetched fresh from the DB during loadData().
   const [masterMap, setMasterMap] = useState(null);
@@ -856,7 +856,7 @@ function App() {
     shortText: `HM - ${format(new Date(), 'dd/MM/yyyy')}`
   });
 
-  // Load data on mount — Supabase only
+  // Load data on mount: Supabase only
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -919,7 +919,7 @@ function App() {
             setSapSyncedDates(syncResult.data);
           }
 
-          // ✅ Clear loading spinner — dashboard will now render with template data
+          // Clear loading spinner: dashboard will now render with template data
           setLoading(false);
 
           // --- PHASE 2: Load remaining data in background (master_equipment, hierarchy, masterMap) ---
@@ -1150,7 +1150,7 @@ function App() {
       setLoading(true);
       const newMap = await parseMasterEQ(file);
       
-      // REPLACE (bukan merge) — file baru sepenuhnya menggantikan data lama
+      // REPLACE (bukan merge): file baru sepenuhnya menggantikan data lama
       setMasterMap(newMap);
       if (supabase) await saveSystemConfig('master_map', Array.from(newMap.entries()));
       setError(null);

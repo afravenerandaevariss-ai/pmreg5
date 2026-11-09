@@ -1,10 +1,10 @@
 /**
- * RekapMonitoringView — Monitoring Rekap Regional Jam Jalan Mesin
+ * RekapMonitoringView: Monitoring Rekap Regional Jam Jalan Mesin
  *
- * Design system: CMMS PTPN IV — "Industrial Command Center"
+ * Design system: CMMS PTPN IV ("Industrial Command Center")
  * Register: product  |  Brand: Forest Canopy #064e3b
  *
- * Polish pass (2026-08-13) — all P0/P1/P2 from critique resolved:
+ * Polish pass (2026-08-13): all P0/P1/P2 from critique resolved:
  *  P0  font floor 11px, removed DAY_ABBR 8px sub-row from header
  *  P1  legend moved ABOVE table · symbol vocabulary cut 5→3
  *  P1  MiniBar: removed width transition (layout-thrash, decorative)
@@ -79,7 +79,7 @@ function ComplianceBadge({ pct }) {
   );
 }
 
-/* ─── Mini bar (no width transition — P1 fix) ───────────────── */
+/* Mini bar (no width transition: P1 fix) */
 function MiniBar({ pct }) {
   const fill =
     pct >= 90 ? '#10b981' :
@@ -87,7 +87,7 @@ function MiniBar({ pct }) {
   return (
     <div className="flex items-center gap-1.5 w-full min-w-[80px]">
       <div className="flex-1 h-1.5 rounded-full bg-slate-200 overflow-hidden" style={{ minWidth: 40 }}>
-        {/* No transition — static data value, not state indicator */}
+        {/* No transition: static data value, not state indicator */}
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: fill }} />
       </div>
       <ComplianceBadge pct={pct} />
@@ -138,7 +138,7 @@ export default function RekapMonitoringView({ currentUser, equipments }) {
   const isAdmin = roleUpper === 'ADMIN' || roleUpper === 'DEV' || roleUpper === 'REGIONAL';
   const userPlant = currentUser?.plant;
 
-  /* Plant list — Tampilkan SEMUA unit pabrik Regional 5 untuk semua role */
+  /* Plant list: Tampilkan SEMUA unit pabrik Regional 5 untuk semua role */
   const pabrikList = useMemo(() => {
     const map = new Map(ALL_PABRIK_PLANTS.map(p => [p.code, p]));
     if (equipments && equipments.length > 0) {
@@ -163,7 +163,7 @@ export default function RekapMonitoringView({ currentUser, equipments }) {
     return s;
   }, [logsData]);
 
-  /* Day columns — simplified flags: isTarget / isToday / isFuture */
+  /* Day columns: simplified flags: isTarget / isToday / isFuture */
   const dayColumns = useMemo(() =>
     Array.from({ length: daysInMonth }, (_, i) => {
       const d       = i + 1;
@@ -265,7 +265,7 @@ export default function RekapMonitoringView({ currentUser, equipments }) {
           <ClipboardCheck size={17} className="text-[#064e3b] flex-shrink-0" aria-hidden="true" />
           <div className="min-w-0">
             <h2 className="text-sm font-bold text-slate-900 leading-tight truncate">
-              Rekap Monitoring HM Equipment — Regional 5
+              Rekap Monitoring HM Equipment (Regional 5)
             </h2>
             <p className="text-[11px] text-slate-500 leading-tight">
               Target input s/d{' '}
@@ -427,7 +427,7 @@ export default function RekapMonitoringView({ currentUser, equipments }) {
         ) : (
           <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-[0_1px_2px_0_rgb(0,0,0,0.05)]">
 
-            {/* Table header bar — brand #064e3b */}
+            {/* Table header bar: brand #064e3b */}
             <div className="bg-[#064e3b] px-4 py-2.5 flex items-center justify-between">
               <h3 className="text-[11px] font-bold text-emerald-100 tracking-wide uppercase">
                 HM Equipment · {monthLabel.toUpperCase()} · Reg 5
@@ -475,7 +475,7 @@ export default function RekapMonitoringView({ currentUser, equipments }) {
                         scope="col"
                         title={
                           isFuture  ? 'Belum waktunya' :
-                          isToday   ? `Hari ini — belum target` :
+                          isToday   ? `Hari ini: belum target` :
                           `Target: ${dateStr}`
                         }
                         className={`w-9 min-w-[36px] px-0.5 pt-2 pb-1.5 text-center border-l border-emerald-800/40 select-none align-bottom
@@ -578,7 +578,7 @@ export default function RekapMonitoringView({ currentUser, equipments }) {
                         <td className={`text-center font-black px-2 py-2.5 border-l border-slate-100 font-mono text-[11px] ${
                           plant.missing > 0 ? 'text-red-500' : 'text-slate-300'
                         }`}>
-                          {plant.missing > 0 ? plant.missing : '—'}
+                          {plant.missing > 0 ? plant.missing : '-'}
                         </td>
                         <td className="px-3 py-2 border-l border-slate-100">
                           <MiniBar pct={plant.pct} />
@@ -618,7 +618,7 @@ export default function RekapMonitoringView({ currentUser, equipments }) {
                     <td className={`text-center font-black px-2 py-2.5 border-l border-slate-700 font-mono text-[11px] ${
                       plantStats.some(p => p.missing > 0) ? 'text-red-400' : 'text-slate-500'
                     }`}>
-                      {plantStats.reduce((a, p) => a + p.missing, 0) || '—'}
+                      {plantStats.reduce((a, p) => a + p.missing, 0) || '-'}
                     </td>
                     <td className="px-3 py-2.5 border-l border-slate-700">
                       <ComplianceBadge pct={overallCompliance} />
@@ -630,7 +630,7 @@ export default function RekapMonitoringView({ currentUser, equipments }) {
           </div>
         )}
 
-        {/* ── Missing detail — compact list (P2 fix) ──────── */}
+        {/* Missing detail: compact list (P2 fix) */}
         {!isLoading && daysWithMissing.length > 0 && (
           <div className="rounded-xl border border-red-200 bg-white overflow-hidden shadow-[0_1px_2px_0_rgb(0,0,0,0.04)]">
             <div className="flex items-center gap-2 px-4 py-2.5 border-b border-red-100 bg-red-50">
@@ -641,7 +641,7 @@ export default function RekapMonitoringView({ currentUser, equipments }) {
               </span>
             </div>
 
-            {/* Compact list — no card grid */}
+            {/* Compact list: no card grid */}
             <div className="divide-y divide-slate-100">
               {daysWithMissing.map(({ day, dateStr, dow }) => {
                 const missingPlants = pabrikList.filter(p => !submittedSet.has(`${p.code}_${dateStr}`));

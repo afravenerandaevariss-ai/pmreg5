@@ -836,7 +836,7 @@ export async function fetchFuelData(forceRefresh = false) {
   const summaries = Array.isArray(data) ? data : (Array.isArray(data.summaries) ? data.summaries : []);
   const primaryDaily = Array.isArray(data) ? [] : (Array.isArray(data.daily) ? data.daily : []);
 
-  // Fetch supplemental daily data from fuel_daily (ID 22) — older months Jan-Jul
+  // Fetch supplemental daily data from fuel_daily (ID 22): older months Jan-Jul
   let supplementalDaily = [];
   try {
     const { data: dailyData } = await getSystemConfig('fuel_daily', forceRefresh);

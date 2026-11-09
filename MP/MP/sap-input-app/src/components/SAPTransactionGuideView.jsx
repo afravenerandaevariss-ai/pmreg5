@@ -773,7 +773,7 @@ export default function SAPTransactionGuideView() {
           title: 'Buka IW32 & Masukkan Nomor Order',
           desc: 'Ketik T-Code IW32 pada command field, masukkan nomor Work Order yang akan ditutup (contoh: 200000757404), lalu tekan Enter. Pastikan pekerjaan sudah selesai dilakukan di lapangan sebelum TECO.',
           image: '/images/iw32/step_1.png',
-          imgCaption: 'Change Order: Initial Screen — Input Nomor Order'
+          imgCaption: 'Change Order: Initial Screen: Input Nomor Order'
         },
         {
           num: 2,
@@ -787,21 +787,21 @@ export default function SAPTransactionGuideView() {
           title: 'Cek Status Order di IW38: Kriteria Seleksi',
           desc: 'Buka IW38 (Change PM Orders) untuk memeriksa hasilnya. Centang Order status: Outstanding, In process, dan Completed. Isi Period 01.06.2026 sampai 29.06.2026, lalu tekan Enter.',
           image: '/images/iw32/step_3.png',
-          imgCaption: 'IW38 — Kriteria Seleksi Order status & Period'
+          imgCaption: 'IW38: Kriteria Seleksi Order status & Period'
         },
         {
           num: 4,
           title: 'Isi Maintenance Plant 5* & Layout /EUT IW38',
           desc: 'Isi Maintenance Plant dengan 5* agar mencakup seluruh plant Regional 5. Pada bagian Others, ketik Layout /EUT IW38 supaya kolom System Status ikut tampil, lalu tekan Enter.',
           image: '/images/iw32/step_4.png',
-          imgCaption: 'IW38 — Filter Maintenance Plant 5* & Layout /EUT IW38'
+          imgCaption: 'IW38: Filter Maintenance Plant 5* & Layout /EUT IW38'
         },
         {
           num: 5,
           title: 'Verifikasi Status TECO pada Daftar Order',
           desc: 'Daftar order tampil. Periksa kolom System Status: order yang berhasil ditutup menampilkan TECO. Penutupan teknis selesai.',
           image: '/images/iw32/step_5.png',
-          imgCaption: 'IW38 — System Status TECO pada Daftar Order'
+          imgCaption: 'IW38: System Status TECO pada Daftar Order'
         }
       ],
       tips: 'Jika terjadi kesalahan closing atau ada bon suku cadang susulan, jangan panik! Anda bisa membatalkan TECO kapan saja (lihat panduan Cancel TECO di tab Troubleshooting).'

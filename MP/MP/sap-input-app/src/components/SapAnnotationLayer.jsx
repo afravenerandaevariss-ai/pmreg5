@@ -22,9 +22,9 @@ import { buildInkSampler, getCachedInkSampler, putCachedInkSampler } from './ima
  *   presisi baik saat gambar dikecilkan (max-height) maupun diperbesar di modal.
  * - Posisi keterangan dihitung buildAnnotationLayout() dengan dua masukan yang
  *   membuatnya tidak pernah menutupi tulisan SAP:
- *     1. `ink` — peta tinta (piksel gelap) dari gambar itu sendiri, sehingga
+ *     1. `ink`: peta tinta (piksel gelap) dari gambar itu sendiri, sehingga
  *        kandidat yang menutupi teks langsung dihukum.
- *     2. `margin` — ruang kosong kiri/kanan gambar yang DIUKUR SENDIRI oleh
+ *     2. `margin`: ruang kosong kiri/kanan gambar yang DIUKUR SENDIRI oleh
  *        layer ini dari kontainer pembungkusnya, sehingga keterangan bisa
  *        diletakkan DI LUAR area SAP tanpa menghalangi tulisan.
  * - Ukuran teks/padding dihitung dari skala tampilan nyata (ResizeObserver),
@@ -45,7 +45,7 @@ export default function SapAnnotationLayer({
   // Peta tinta gambar INI, disimpan bersama kuncinya (src + ukuran asli).
   // Kunci dipakai saat render untuk memastikan peta tinta gambar lain tidak
   // pernah dipakai: kalau kuncinya tidak cocok, peta dianggap belum siap dan
-  // keterangan menunggu — bukan digambar dulu lalu berpindah.
+  // keterangan menunggu: bukan digambar dulu lalu berpindah.
   const [ink, setInk] = useState(null);
   // Gutter diukur di useLayoutEffect (sebelum paint), jadi nilainya sudah final
   // saat frame pertama; flag ini hanya memastikan keterangan menunggu satu
@@ -82,7 +82,7 @@ export default function SapAnnotationLayer({
     const container = wrapper && wrapper.parentElement;
     if (!wrapper || !container) {
       // Struktur DOM tak terduga: jangan biarkan keterangan tidak pernah
-      // digambar — pakai margin nol dan lanjutkan.
+      // digambar: pakai margin nol dan lanjutkan.
       setGutterReady(true);
       return;
     }
@@ -119,7 +119,7 @@ export default function SapAnnotationLayer({
     const el = rootRef.current;
     const img = el && el.parentElement ? el.parentElement.querySelector('img') : null;
     const settle = (sampler) => setInk({ key: inkKey, sampler });
-    // Gambar sudah selesai dimuat (termasuk kasus gambar tidak ditemukan —
+    // Gambar sudah selesai dimuat (termasuk kasus gambar tidak ditemukan:
     // buildInk mengembalikan null): tentukan hasil sekarang, jangan menggantung.
     if (!img || (img.complete && img.naturalWidth)) { settle(buildInk(img)); return; }
     const onLoad = () => settle(buildInk(img));

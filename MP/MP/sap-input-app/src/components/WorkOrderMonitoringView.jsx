@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 const T_PARSED_EXCEL = 'parsed_excel';
 const BUCKET_EXCEL   = 'excel_uploads';
 
-// localStorage keys — data persists across refreshes in the same browser
+// localStorage keys: data persists across refreshes in the same browser
 const LS_IW39   = 'wo_iw39_data';
 const LS_ZVTAB  = 'wo_zvtab_data';
 const LS_046EXP = 'wo_046exp_data';
@@ -380,12 +380,12 @@ export default function WorkOrderMonitoringView({ currentUser }) {
           console.warn('Supabase upsert failed. Data saved to localStorage only.', upsertError.message);
         }
 
-        // localStorage already saved — resolve with parsed data
+        // localStorage already saved: resolve with parsed data
         setUploadProgress(100);
         return clientParsed;
       }
 
-      // ── Step 4: No client parse result — try backend API path ─────────
+      // Step 4: No client parse result: try backend API path
       setUploadProgress(60);
       const { error: uploadError } = await supabase.storage
         .from(BUCKET_EXCEL)

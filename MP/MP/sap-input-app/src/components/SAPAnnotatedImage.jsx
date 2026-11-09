@@ -36,7 +36,7 @@ export default function SAPAnnotatedImage({
   // memegang ukuran gambar LAMA sampai gambar baru selesai di-decode. Karena itu
   // pembacaan hanya diterima saat `complete` benar (gambar untuk src SEKARANG
   // sudah selesai dimuat) dan hasilnya ditandai dengan src-nya. Ukuran gambar
-  // lama jadi tidak pernah dipakai untuk anotasi gambar baru — itulah penyebab
+  // lama jadi tidak pernah dipakai untuk anotasi gambar baru: itulah penyebab
   // kotak/keterangan merah terlihat meloncat.
   const activeNatural = natural && natural.src === image ? natural : null;
 
