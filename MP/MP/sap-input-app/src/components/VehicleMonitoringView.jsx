@@ -5100,20 +5100,20 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         {/* ── Clean Table with Sticky/Freeze Header ── */}
         <div className="p-3 sm:p-4 bg-white">
           <div className="overflow-x-auto max-h-[calc(100vh-250px)] min-h-[420px] excel-cell-border border border-slate-200 rounded-xl relative shadow-2xs">
-            <table className="w-full text-xs border-separate border-spacing-0 table-fixed">
+            <table className="min-w-[1360px] w-full text-xs border-separate border-spacing-0">
               <colgroup>
-                <col style={{ width: '3.5%' }} />
-                <col style={{ width: '7%' }} />
-                <col style={{ width: '8.5%' }} />
-                <col style={{ width: '8.5%' }} />
-                <col style={{ width: '19%' }} />
-                <col style={{ width: '17%' }} />
-                <col style={{ width: '7.5%' }} />
-                <col style={{ width: '8%' }} />
-                <col style={{ width: '8%' }} />
-                <col style={{ width: '9%' }} />
-                <col style={{ width: '8%' }} />
-                <col style={{ width: '6%' }} />
+                <col style={{ width: '45px' }} />
+                <col style={{ width: '85px' }} />
+                <col style={{ width: '120px' }} />
+                <col style={{ width: '110px' }} />
+                <col style={{ minWidth: '220px' }} />
+                <col style={{ minWidth: '180px' }} />
+                <col style={{ width: '105px' }} />
+                <col style={{ width: '105px' }} />
+                <col style={{ width: '115px' }} />
+                <col style={{ width: '140px' }} />
+                <col style={{ width: '125px' }} />
+                <col style={{ width: '75px' }} />
               </colgroup>
               <thead className="sticky top-0 z-30 shadow-xs">
                 <tr className="bg-slate-100/95 text-slate-800 text-[11px] font-black uppercase tracking-tight text-center whitespace-nowrap">
@@ -5258,8 +5258,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                             )}
                           </td>
 
-                          {/* 10. Keterangan Efisiensi */}
-                          <td className="px-1.5 py-2 text-center bg-slate-50/40 border-r border-slate-200 whitespace-nowrap">
+                          {/* 10. Keterangan Efisiensi (AntiSlop: 140px column prevents overflow collision) */}
+                          <td className="px-2.5 py-2 text-center bg-slate-50/40 border-r border-slate-200 whitespace-nowrap">
                             {row.efficiency?.isStandby ? (
                               <span
                                 className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs tracking-wide"
