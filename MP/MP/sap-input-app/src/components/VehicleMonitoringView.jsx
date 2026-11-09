@@ -5100,20 +5100,20 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         {/* ── Clean Table with Sticky/Freeze Header ── */}
         <div className="p-3 sm:p-4 bg-white">
           <div className="overflow-x-auto max-h-[calc(100vh-250px)] min-h-[420px] excel-cell-border border border-slate-200 rounded-xl relative shadow-2xs">
-            <table className="min-w-[1360px] w-full text-xs border-separate border-spacing-0">
+            <table className="w-full min-w-[1240px] text-xs border-separate border-spacing-0">
               <colgroup>
-                <col style={{ width: '45px' }} />
-                <col style={{ width: '85px' }} />
-                <col style={{ width: '120px' }} />
-                <col style={{ width: '110px' }} />
-                <col style={{ minWidth: '220px' }} />
-                <col style={{ minWidth: '180px' }} />
-                <col style={{ width: '105px' }} />
-                <col style={{ width: '105px' }} />
-                <col style={{ width: '115px' }} />
-                <col style={{ width: '140px' }} />
-                <col style={{ width: '125px' }} />
-                <col style={{ width: '75px' }} />
+                <col style={{ width: '3.5%' }} />
+                <col style={{ width: '7.5%' }} />
+                <col style={{ width: '9.5%' }} />
+                <col style={{ width: '9.5%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '8.5%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '9.5%' }} />
+                <col style={{ width: '6%' }} />
               </colgroup>
               <thead className="sticky top-0 z-30 shadow-xs">
                 <tr className="bg-slate-100/95 text-slate-800 text-[11px] font-black uppercase tracking-tight text-center whitespace-nowrap">
