@@ -402,10 +402,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     currentUser.plant === 'ALL'
   )));
 
-  // Can see full audit details (ZEST card, Rekon card, Log ZEST tab, Rekon columns)
-  // Both DEV and ADMIN/REGIONAL roles have access, only standard USER/UNIT role is restricted
-  const canSeeZestRecon = isDevUser || isAdmin;
-
 
   const today = new Date();
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
@@ -5314,7 +5310,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                               type="button"
                               onClick={async () => {
                                 setSelectedFuelVeh(row);
-                                setFuelModalTab(canSeeZestRecon ? 'reconcile' : 'debit');
+                                setFuelModalTab(isDevUser ? 'reconcile' : 'debit');
                                 const vehCC = String(row.costCenter || '').trim().toUpperCase();
                                 // Find which months have data for this vehicle across summaries
                                 const activeMonthsForVeh = (fuelData.summaries || [])
@@ -5529,7 +5525,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       });
 
       const reconciliationRows = Array.from(combinedDateMap.values()).sort((a, b) => b.date.localeCompare(a.date));
-      const effectiveModalTab = fuelModalTab || 'debit';
+      const rawModalTab = fuelModalTab || (isDevUser ? 'reconcile' : 'debit');
+      const effectiveModalTab = (!isDevUser && rawModalTab === 'zest') ? 'debit' : rawModalTab;
+      const displayActivityRows = isDevUser 
+        ? reconciliationRows 
+        : (reconciliationRows.filter(r => (r.slarcQty || 0) > 0).length > 0 
+            ? reconciliationRows.filter(r => (r.slarcQty || 0) > 0) 
+            : reconciliationRows);
       if (reconciliationRows.length === 0 && (slarcTotal > 0 || zestTotal > 0)) {
         reconciliationRows.push({
           date: selectedFuelVeh.month || 'Periode Ini',
@@ -5593,8 +5595,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               </button>
             </div>
 
-            {/* Source of Reference Info Banner */}
-            {canSeeZestRecon ? (
+            {/* Source of Reference Info Banner (strictly role DEV) */}
+            {isDevUser && (
               <div className="px-5 pt-3 pb-0 bg-slate-50">
               <div className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs flex-wrap ${
                 selectedFuelVeh.referencePriority === 1 || selectedFuelVeh.referencePriority === 2
@@ -5629,27 +5631,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 </span>
               </div>
               </div>
-            ) : (
-              (selectedFuelVeh.referenceAll || selectedFuelVeh.referencePrimary) && (
-                <div className="px-5 pt-3 pb-0 bg-slate-50">
-                  <div className="p-2.5 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-3 text-xs flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-slate-100 text-slate-800 border border-slate-300">
-                        KETERANGAN AKTIVITAS
-                      </span>
-                      <span className="font-semibold text-[11px] text-slate-800">
-                        {selectedFuelVeh.referenceAll || selectedFuelVeh.referencePrimary}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )
             )}
 
             {/* Reconciliation Comparison Top Banner */}
             <div className="bg-slate-50 border-b border-slate-200 p-4">
               {/* USER: hanya tampilkan card Bahan Bakar (jumlah solar) + Activity */}
-              <div className={`grid gap-3 items-center ${canSeeZestRecon ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
+              <div className={`grid gap-3 items-center ${isDevUser ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
                 {/* 1. Bahan Bakar (L) */}
                 <div 
                   onClick={() => setFuelModalTab('debit')}
@@ -5689,8 +5676,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   <span className="text-[9.5px] text-slate-400">Ringkasan Output Aktivitas</span>
                 </div>
 
-                {/* 3. ZESTHLP16PA (Logbook) — untuk role DEV & ADMIN */}
-                {canSeeZestRecon && (
+                {/* 3. ZESTHLP16PA (Logbook) — hanya untuk role DEV */}
+                {isDevUser && (
                 <div 
                   onClick={() => setFuelModalTab('zest')}
                   className={`bg-white p-3 rounded-xl border transition shadow-2xs text-center cursor-pointer hover:scale-[1.01] ${
@@ -5705,8 +5692,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 </div>
                 )}
 
-                {/* 4. Status Rekonsiliasi — untuk role DEV & ADMIN */}
-                {canSeeZestRecon && (
+                {/* 4. Status Rekonsiliasi — hanya untuk role DEV */}
+                {isDevUser && (
                 <div 
                   onClick={() => setFuelModalTab('reconcile')}
                   className={`p-3 rounded-xl border text-center transition cursor-pointer hover:scale-[1.01] ${
@@ -5766,10 +5753,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Activity size={13} className="text-blue-600" /> Detail Activity ({reconciliationRows.length})
+                <Activity size={13} className="text-blue-600" /> Detail Activity ({displayActivityRows.length})
               </button>
-              {/* Tab Log ZESTHLP16PA — untuk role DEV & ADMIN */}
-              {canSeeZestRecon && (
+              {/* Tab Log ZESTHLP16PA — hanya untuk role DEV */}
+              {isDevUser && (
               <button
                 onClick={() => setFuelModalTab('zest')}
                 className={`px-3 py-1.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
@@ -5788,7 +5775,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               {/* TAB 1: RECONCILIATION SIDE BY SIDE */}
               {effectiveModalTab === 'reconcile' && (
                 <div>
-                  {reconciliationRows.length === 0 ? (
+                  {displayActivityRows.length === 0 ? (
                     <div className="text-center py-10 text-slate-400">
                       <Activity size={36} className="mx-auto mb-2 text-slate-300 stroke-[1.5]" />
                       <p className="font-semibold text-slate-600 text-xs">Belum ada data transaksi aktivitas harian untuk kendaraan ini.</p>
@@ -5801,8 +5788,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           <th className="px-3 py-1.5 text-center w-24">Tanggal</th>
                           <th className="px-3 py-1.5 text-center w-28">No. Dokumen</th>
                           <th className="px-3 py-1.5 text-center w-48">Reference / Keterangan</th>
-                          <th className="px-3 py-1.5 text-center w-24 bg-blue-50 text-blue-950 font-bold">{canSeeZestRecon ? 'SLARC' : 'ACTIVITY'}</th>
-                          {canSeeZestRecon && (
+                          <th className="px-3 py-1.5 text-center w-24 bg-blue-50 text-blue-950 font-bold">{isDevUser ? 'SLARC' : 'ACTIVITY'}</th>
+                          {isDevUser && (
                             <>
                               <th className="px-3 py-1.5 text-center w-24 bg-emerald-50 text-emerald-950 font-bold">ZESTHLP16PA</th>
                               <th className="px-3 py-1.5 text-center w-20">Selisih</th>
@@ -5812,7 +5799,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">
-                        {reconciliationRows.map((r, i) => {
+                        {displayActivityRows.map((r, i) => {
                           const diff = Math.round((r.slarcQty - r.zestQty) * 100) / 100;
                           const isMatch = Math.abs(diff) < 0.01 && r.slarcQty > 0 && r.zestQty > 0;
 
@@ -5823,9 +5810,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                               <td className="px-3 py-1.5 text-center font-mono text-[10px] text-slate-600">{r.doc || '-'}</td>
                               <td className="px-3 py-1.5 text-center text-slate-800 font-semibold truncate max-w-xs">{r.ref || '-'}</td>
                               <td className="px-3 py-1.5 text-center font-mono font-bold text-blue-900 bg-blue-50/30">
-                                {r.slarcQty > 0 ? `${r.slarcQty} ${!canSeeZestRecon ? uomLabel : ''}` : '-'}
+                                {r.slarcQty > 0 ? `${r.slarcQty} ${!isDevUser ? uomLabel : ''}` : '-'}
                               </td>
-                              {canSeeZestRecon && (
+                              {isDevUser && (
                                 <>
                                   <td className="px-3 py-2 text-center font-mono font-bold text-emerald-900 bg-emerald-50/30">
                                     {r.zestQty > 0 ? r.zestQty : '-'}
@@ -5861,20 +5848,20 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                       <tfoot>
                         <tr className="bg-slate-100 font-extrabold text-[11px] text-slate-800 border-t-2 border-slate-300">
                           <td colSpan={4} className="px-3 py-2 text-center uppercase tracking-wide">
-                            Total ({reconciliationRows.length} Transaksi)
+                            Total ({displayActivityRows.length} Transaksi)
                           </td>
                           <td className="px-3 py-2 text-center font-mono font-black text-blue-950 bg-blue-100/50">
-                            {Math.round(reconciliationRows.reduce((acc, r) => acc + (r.slarcQty || 0), 0) * 100) / 100} <span className="text-[10px] text-slate-500 font-normal">{uomLabel}</span>
+                            {Math.round(displayActivityRows.reduce((acc, r) => acc + (r.slarcQty || 0), 0) * 100) / 100} <span className="text-[10px] text-slate-500 font-normal">{uomLabel}</span>
                           </td>
-                          {canSeeZestRecon && (
+                          {isDevUser && (
                             <>
                               <td className="px-3 py-2 text-center font-mono font-black text-emerald-950 bg-emerald-100/50">
                                 {Math.round(reconciliationRows.reduce((acc, r) => acc + (r.zestQty || 0), 0) * 100) / 100} <span className="text-[10px] text-slate-500 font-normal">{uomLabel}</span>
                               </td>
                               <td className="px-3 py-2 text-center font-mono text-[10px]">
                                 {(() => {
-                                  const totalSlarc = reconciliationRows.reduce((acc, r) => acc + (r.slarcQty || 0), 0);
-                                  const totalZest = reconciliationRows.reduce((acc, r) => acc + (r.zestQty || 0), 0);
+                                  const totalSlarc = displayActivityRows.reduce((acc, r) => acc + (r.slarcQty || 0), 0);
+                                  const totalZest = displayActivityRows.reduce((acc, r) => acc + (r.zestQty || 0), 0);
                                   const diff = Math.round((totalSlarc - totalZest) * 100) / 100;
                                   return diff !== 0 ? <span className="text-amber-700 font-bold">{diff > 0 ? `+${diff}` : diff}</span> : <span className="text-emerald-700 font-bold">0</span>;
                                 })()}
