@@ -5590,7 +5590,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             </div>
 
             {/* Source of Reference Info Banner */}
-            {(
+            {isDevUser ? (
               <div className="px-5 pt-3 pb-0 bg-slate-50">
               <div className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs flex-wrap ${
                 selectedFuelVeh.referencePriority === 1 || selectedFuelVeh.referencePriority === 2
@@ -5625,6 +5625,21 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 </span>
               </div>
               </div>
+            ) : (
+              (selectedFuelVeh.referenceAll || selectedFuelVeh.referencePrimary) && (
+                <div className="px-5 pt-3 pb-0 bg-slate-50">
+                  <div className="p-2.5 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-3 text-xs flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-slate-100 text-slate-800 border border-slate-300">
+                        KETERANGAN AKTIVITAS
+                      </span>
+                      <span className="font-semibold text-[11px] text-slate-800">
+                        {selectedFuelVeh.referenceAll || selectedFuelVeh.referencePrimary}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )
             )}
 
             {/* Reconciliation Comparison Top Banner */}
@@ -5782,10 +5797,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           <th className="px-3 py-1.5 text-center w-24">Tanggal</th>
                           <th className="px-3 py-1.5 text-center w-28">No. Dokumen</th>
                           <th className="px-3 py-1.5 text-center w-48">Reference / Keterangan</th>
-                          <th className="px-3 py-1.5 text-center w-24 bg-blue-50 text-blue-950 font-bold">SLARC</th>
-                          <th className="px-3 py-1.5 text-center w-24 bg-emerald-50 text-emerald-950 font-bold">ZESTHLP16PA</th>
-                          <th className="px-3 py-1.5 text-center w-20">Selisih</th>
-                          <th className="px-3 py-1.5 text-center w-24">Status</th>
+                          <th className="px-3 py-1.5 text-center w-24 bg-blue-50 text-blue-950 font-bold">{isDevUser ? 'SLARC' : 'ACTIVITY'}</th>
+                          {isDevUser && (
+                            <>
+                              <th className="px-3 py-1.5 text-center w-24 bg-emerald-50 text-emerald-950 font-bold">ZESTHLP16PA</th>
+                              <th className="px-3 py-1.5 text-center w-20">Selisih</th>
+                              <th className="px-3 py-1.5 text-center w-24">Status</th>
+                            </>
+                          )}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">
@@ -5800,33 +5819,37 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                               <td className="px-3 py-1.5 text-center font-mono text-[10px] text-slate-600">{r.doc || '-'}</td>
                               <td className="px-3 py-1.5 text-center text-slate-800 font-semibold truncate max-w-xs">{r.ref || '-'}</td>
                               <td className="px-3 py-1.5 text-center font-mono font-bold text-blue-900 bg-blue-50/30">
-                                {r.slarcQty > 0 ? r.slarcQty : '-'}
+                                {r.slarcQty > 0 ? `${r.slarcQty} ${!isDevUser ? uomLabel : ''}` : '-'}
                               </td>
-                              <td className="px-3 py-2 text-center font-mono font-bold text-emerald-900 bg-emerald-50/30">
-                                {r.zestQty > 0 ? r.zestQty : '-'}
-                              </td>
-                              <td className="px-3 py-1.5 text-center font-mono text-[10px]">
-                                {diff !== 0 ? (
-                                  <span className="text-amber-700 font-bold">{diff > 0 ? `+${diff}` : diff}</span>
-                                ) : (
-                                  <span className="text-emerald-700 font-bold">0</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-1.5 text-center">
-                                {isMatch ? (
-                                  <span className="inline-block px-2 py-0.5 text-[9px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                                    Sesuai
-                                  </span>
-                                ) : r.slarcQty > 0 && r.zestQty > 0 ? (
-                                  <span className="inline-block px-2 py-0.5 text-[9px] font-bold rounded-full bg-amber-100 text-amber-800 border border-amber-300">
-                                    Selisih
-                                  </span>
-                                ) : (
-                                  <span className="inline-block px-2 py-0.5 text-[9px] font-medium rounded-full bg-slate-100 text-slate-600">
-                                    {r.slarcQty > 0 ? 'Hanya SLARC' : 'Hanya ZEST'}
-                                  </span>
-                                )}
-                              </td>
+                              {isDevUser && (
+                                <>
+                                  <td className="px-3 py-2 text-center font-mono font-bold text-emerald-900 bg-emerald-50/30">
+                                    {r.zestQty > 0 ? r.zestQty : '-'}
+                                  </td>
+                                  <td className="px-3 py-1.5 text-center font-mono text-[10px]">
+                                    {diff !== 0 ? (
+                                      <span className="text-amber-700 font-bold">{diff > 0 ? `+${diff}` : diff}</span>
+                                    ) : (
+                                      <span className="text-emerald-700 font-bold">0</span>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-1.5 text-center">
+                                    {isMatch ? (
+                                      <span className="inline-block px-2 py-0.5 text-[9px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                        Sesuai
+                                      </span>
+                                    ) : r.slarcQty > 0 && r.zestQty > 0 ? (
+                                      <span className="inline-block px-2 py-0.5 text-[9px] font-bold rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                                        Selisih
+                                      </span>
+                                    ) : (
+                                      <span className="inline-block px-2 py-0.5 text-[9px] font-medium rounded-full bg-slate-100 text-slate-600">
+                                        {r.slarcQty > 0 ? 'Hanya SLARC' : 'Hanya ZEST'}
+                                      </span>
+                                    )}
+                                  </td>
+                                </>
+                              )}
                             </tr>
                           );
                         })}
@@ -5839,20 +5862,24 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                           <td className="px-3 py-2 text-center font-mono font-black text-blue-950 bg-blue-100/50">
                             {Math.round(reconciliationRows.reduce((acc, r) => acc + (r.slarcQty || 0), 0) * 100) / 100} <span className="text-[10px] text-slate-500 font-normal">{uomLabel}</span>
                           </td>
-                          <td className="px-3 py-2 text-center font-mono font-black text-emerald-950 bg-emerald-100/50">
-                            {Math.round(reconciliationRows.reduce((acc, r) => acc + (r.zestQty || 0), 0) * 100) / 100} <span className="text-[10px] text-slate-500 font-normal">{uomLabel}</span>
-                          </td>
-                          <td className="px-3 py-2 text-center font-mono text-[10px]">
-                            {(() => {
-                              const totalSlarc = reconciliationRows.reduce((acc, r) => acc + (r.slarcQty || 0), 0);
-                              const totalZest = reconciliationRows.reduce((acc, r) => acc + (r.zestQty || 0), 0);
-                              const diff = Math.round((totalSlarc - totalZest) * 100) / 100;
-                              return diff !== 0 ? <span className="text-amber-700 font-bold">{diff > 0 ? `+${diff}` : diff}</span> : <span className="text-emerald-700 font-bold">0</span>;
-                            })()}
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            <span className="text-[10px] font-bold text-slate-600">Ringkasan</span>
-                          </td>
+                          {isDevUser && (
+                            <>
+                              <td className="px-3 py-2 text-center font-mono font-black text-emerald-950 bg-emerald-100/50">
+                                {Math.round(reconciliationRows.reduce((acc, r) => acc + (r.zestQty || 0), 0) * 100) / 100} <span className="text-[10px] text-slate-500 font-normal">{uomLabel}</span>
+                              </td>
+                              <td className="px-3 py-2 text-center font-mono text-[10px]">
+                                {(() => {
+                                  const totalSlarc = reconciliationRows.reduce((acc, r) => acc + (r.slarcQty || 0), 0);
+                                  const totalZest = reconciliationRows.reduce((acc, r) => acc + (r.zestQty || 0), 0);
+                                  const diff = Math.round((totalSlarc - totalZest) * 100) / 100;
+                                  return diff !== 0 ? <span className="text-amber-700 font-bold">{diff > 0 ? `+${diff}` : diff}</span> : <span className="text-emerald-700 font-bold">0</span>;
+                                })()}
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <span className="text-[10px] font-bold text-slate-600">Ringkasan</span>
+                              </td>
+                            </>
+                          )}
                         </tr>
                       </tfoot>
                     </table>
