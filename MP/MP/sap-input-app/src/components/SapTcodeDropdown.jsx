@@ -246,20 +246,13 @@ export default function SapTcodeDropdown({
         aria-haspopup="true"
         aria-controls={open ? panelId : undefined}
         style={{ transition: 'none' }}
-        className={`group inline-flex min-h-[44px] lg:min-h-0 lg:h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-2 rounded-lg px-2 2xl:px-3 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${
+        className={`group inline-flex min-h-[44px] lg:min-h-0 lg:h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${
           open
             ? 'bg-emerald-800 text-white shadow-xs'
             : 'bg-transparent text-emerald-900 hover:bg-emerald-50 active:bg-emerald-100'
         }`}
       >
         <span>{buttonLabel}</span>
-        <span
-          className={`rounded-md px-1.5 py-0.5 font-mono text-[0.6875rem] font-bold tabular-nums leading-none ${
-            open ? 'bg-white text-emerald-900' : 'bg-emerald-100 text-emerald-900'
-          }`}
-        >
-          {cleanedItems.length}
-        </span>
         {open ? (
           <ChevronUp size={14} aria-hidden="true" className="text-white shrink-0" />
         ) : (
