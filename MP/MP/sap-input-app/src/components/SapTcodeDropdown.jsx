@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback, useId } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback, useId } from 'react';
 import { ChevronDown, ChevronUp, FileText, Search, X } from 'lucide-react';
 import {
   SAP_TCODE_CATEGORIES,
@@ -9,6 +9,7 @@ import {
 export default function SapTcodeDropdown({
   items = SAP_TCODE_CATALOG,
   selectedCode = '',
+  selectedItemId = '',
   onSelect,
   buttonLabel = 'Daftar T-Code PM',
   isOpen,
@@ -450,13 +451,14 @@ export default function SapTcodeDropdown({
                   <div className="space-y-1">
                     {group.items.map((item) => {
                       const isDoc = item.type === 'document';
-                      const isActive =
-                        !isDoc &&
-                        normalizedSelected !== '' &&
-                        normalizedSelected
-                          .split('/')
-                          .map((part) => part.trim())
-                          .includes(item.code.toUpperCase());
+                      const isActive = selectedItemId
+                        ? item.id === selectedItemId
+                        : !isDoc &&
+                          normalizedSelected !== '' &&
+                          normalizedSelected
+                            .split('/')
+                            .map((part) => part.trim())
+                            .includes(item.code.toUpperCase());
 
                       return (
                         <button

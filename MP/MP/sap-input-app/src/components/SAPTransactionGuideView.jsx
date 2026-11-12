@@ -1,17 +1,17 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { 
-  BookOpen, Search, Info, HelpCircle, ExternalLink, Image as ImageIcon, Code2, AlertTriangle, 
-  PlayCircle, LogIn, FileText, Wrench, Play, Settings, Clipboard, CheckSquare, 
-  Layers, ZoomIn, ZoomOut, Plus, Minus, X, RotateCcw, ChevronDown, ChevronUp, ChevronRight,
-  Download, Copy, Check, Clock, ShieldCheck, Tag, Terminal, Cpu, Database,
-  ArrowRight, FileSpreadsheet, RefreshCw, Sparkles, Filter, CheckCircle2, AlertCircle,
-  Eye, EyeOff, Maximize2, Minimize2, Truck, Gauge, Activity, ListChecks
+import { useState, useEffect, useRef } from 'react';
+import {
+  BookOpen, Search, Info, Image as ImageIcon, AlertTriangle,
+  FileText, Layers, ZoomIn, ZoomOut, X, RotateCcw, ChevronDown, ChevronUp,
+  Copy, Check, ShieldCheck, Terminal,
+  ArrowRight, Sparkles, CheckCircle2, AlertCircle,
+  Eye, EyeOff, Gauge, ListChecks
 } from 'lucide-react';
 import SAPAnnotatedImage from './SAPAnnotatedImage';
 import SapAnnotationLayer from './SapAnnotationLayer';
 import { getImageAnnotation } from '../data/sapImageAnnotations';
 import SapFlowMap from './SapFlowMap';
 import SapTcodeDropdown from './SapTcodeDropdown';
+import { SAP_TCODE_CATALOG, dedupeSapTcodeCatalog } from '../data/sapTcodeCatalog';
 
 // ─────────────────────────────────────────────────────────────
 // Tema visual per pilar untuk halaman Katalog SOP (18 Modul).
@@ -71,6 +71,44 @@ const PILLAR_THEME = {
   },
 };
 
+const TROUBLESHOOT_TOPICS = [
+  {
+    id: 'ts-cancel-teco',
+    badge: 'IW32',
+    title: 'Cara Membatalkan Status TECO (Cancel Technical Completion)',
+    subtitle: 'Klinik Troubleshooting (Kasus 1)',
+    keywords: 'cancel teco rel released batal suku cadang work order',
+  },
+  {
+    id: 'ts-recutover',
+    badge: '5E / 5F',
+    title: 'Standar Kode Unit Recutover PTPN IV (Kebun & Pabrik)',
+    subtitle: 'Klinik Troubleshooting (Kasus 2)',
+    keywords: 'recutover kode unit kebun pabrik planning plant',
+  },
+  {
+    id: 'ts-gos',
+    badge: 'GOS',
+    title: 'Cara Melampirkan Foto & Dokumen ke Objek SAP (GOS Attachment)',
+    subtitle: 'Klinik Troubleshooting (Kasus 3)',
+    keywords: 'gos services for object create attachment foto dokumen',
+  },
+  {
+    id: 'ts-vbs',
+    badge: 'VBS',
+    title: 'Otomasi Script VBScript SAP GUI (Input Massal Cepat)',
+    subtitle: 'Klinik Troubleshooting (Kasus 4)',
+    keywords: 'vbscript vbs script recording playback ie01 massal',
+  },
+  {
+    id: 'ts-status-bar',
+    badge: 'I / W / E',
+    title: 'Panduan Arti Kode & Warna Notifikasi Status Bar SAP',
+    subtitle: 'Klinik Troubleshooting (Kasus 5)',
+    keywords: 'status bar pesan error merah kuning warning hijau information abort',
+  },
+];
+
 export default function SAPTransactionGuideView() {
   // Dev-only check: strictly true in local dev / localhost only
   const isLocalDev = Boolean(
@@ -83,43 +121,128 @@ export default function SAPTransactionGuideView() {
   const [selectedTcodeKey, setSelectedTcodeKey] = useState('iw31');
   const [detailViewMode, setDetailViewMode] = useState('steps'); // 'steps' | 'fields' | 'all'
   const [searchQuery, setSearchQuery] = useState('');
+  const [heroSearchOpen, setHeroSearchOpen] = useState(false);
   const [copiedKey, setCopiedKey] = useState(null);
+  const [copyErrorKey, setCopyErrorKey] = useState(null);
   const [activeWorkflow, setActiveWorkflow] = useState('corrective'); // 'corrective' | 'preventive' | 'logbook'
   const [selectedFlowStep, setSelectedFlowStep] = useState(1);
   const [catalogFilter, setCatalogFilter] = useState('all'); // 'all' | 'pilar1' | 'pilar2' | 'pilar3'
   const [catalogSearch, setCatalogSearch] = useState(''); // Pencarian lokal khusus halaman Katalog SOP
-  const [showTcodeSidebar, setShowTcodeSidebar] = useState(false); // Hidden by default for wider right area
   const [activeDropdown, setActiveDropdown] = useState(null); // 'flow' | 'pilar1' | 'pilar2' | 'pilar3' | 'troubleshoot' | 'catalog' | 'tcodeList' | null
   const [selectedCatalogEntry, setSelectedCatalogEntry] = useState(null);
   const rootRef = useRef(null);
+  const heroSearchRef = useRef(null);
+  const heroSearchInputRef = useRef(null);
+  const copyTimerRef = useRef(null);
   // Image Lightbox / Zoom Modal State
   const [zoomedImage, setZoomedImage] = useState(null);
   const [zoomScale, setZoomScale] = useState(1);
   const [modalShowArrows, setModalShowArrows] = useState(true);
   const [modalNatural, setModalNatural] = useState(null);
 
-  // Copy helper
-  const handleCopy = (text, key) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
+  const openZoomModal = (img) => {
+    setZoomedImage(img);
+    setZoomScale(1);
+    setModalNatural(null);
   };
 
-  // Keyboard shortcut Ctrl+K to focus search and Esc to close zoom modal
+  const closeZoomModal = () => {
+    setZoomedImage(null);
+    setZoomScale(1);
+    setModalNatural(null);
+  };
+
+  useEffect(() => () => {
+    if (copyTimerRef.current) {
+      clearTimeout(copyTimerRef.current);
+    }
+  }, []);
+
+  // Copy helper with textarea fallback for restricted or non-secure browser contexts.
+  const handleCopy = async (text, key) => {
+    let copied = false;
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      } catch {
+        copied = false;
+      }
+    }
+
+    if (!copied && typeof document !== 'undefined') {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.top = '-9999px';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        copied = document.execCommand('copy');
+      } catch {
+        copied = false;
+      }
+      document.body.removeChild(textarea);
+    }
+
+    if (copyTimerRef.current) {
+      clearTimeout(copyTimerRef.current);
+    }
+
+    if (copied) {
+      setCopyErrorKey(null);
+      setCopiedKey(key);
+    } else {
+      setCopiedKey(null);
+      setCopyErrorKey(key);
+    }
+
+    copyTimerRef.current = setTimeout(() => {
+      setCopiedKey(null);
+      setCopyErrorKey(null);
+    }, 2000);
+  };
+
+  // Keyboard shortcuts: Ctrl+K focuses search; Escape dismisses active overlays.
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        document.getElementById('sap-guide-search-input')?.focus();
+        heroSearchInputRef.current?.focus();
+        setHeroSearchOpen(true);
+        return;
       }
-      if (e.key === 'Escape' && zoomedImage) {
-        setZoomedImage(null);
-        setZoomScale(1);
+      if (e.key === 'Escape') {
+        if (zoomedImage) {
+          closeZoomModal();
+        } else if (heroSearchOpen) {
+          setHeroSearchOpen(false);
+        } else if (activeDropdown && activeDropdown !== 'tcodeList') {
+          setActiveDropdown(null);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [zoomedImage]);
+  }, [zoomedImage, heroSearchOpen, activeDropdown]);
+
+  useEffect(() => {
+    if (!heroSearchOpen) return undefined;
+    const handlePointerOutside = (event) => {
+      if (heroSearchRef.current && !heroSearchRef.current.contains(event.target)) {
+        setHeroSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerOutside);
+    document.addEventListener('touchstart', handlePointerOutside, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handlePointerOutside);
+      document.removeEventListener('touchstart', handlePointerOutside);
+    };
+  }, [heroSearchOpen]);
 
   // Database of 18 SAP PM Modules with Step-by-Step Images
   const modulesDatabase = {
@@ -1398,42 +1521,95 @@ export default function SAPTransactionGuideView() {
     document.getElementById(`modul-${no}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
-  // Filtered T-Codes based on search and active tab
-  const filteredTcodes = useMemo(() => {
-    let list = Object.entries(modulesDatabase).map(([key, data]) => ({ key, ...data }));
-    
-    if (activeTab === 'pilar1' || activeTab === 'pilar2' || activeTab === 'pilar3') {
-      list = list.filter(item => item.pilar === activeTab);
-    }
-    
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(item => 
-        item.tcode.toLowerCase().includes(q) ||
-        item.title.toLowerCase().includes(q) ||
-        item.moduleName.toLowerCase().includes(q) ||
-        item.purpose.toLowerCase().includes(q) ||
-        item.fields.some(f => f.name.toLowerCase().includes(q) || f.desc.toLowerCase().includes(q))
-      );
-    }
-    return list;
-  }, [activeTab, searchQuery]);
+  const cleanedTcodeCatalog = dedupeSapTcodeCatalog(SAP_TCODE_CATALOG);
+
+  // Live Hero Quick Search across modules, troubleshooting cases, T-Codes, and DOCX references.
+  const normalizedHeroQuery = searchQuery.trim().toLowerCase();
+  const quickSearchMatches = (() => {
+    if (!normalizedHeroQuery) return [];
+
+    const results = [];
+    const seenCodes = new Set();
+
+    Object.entries(modulesDatabase).forEach(([key, data]) => {
+      const haystack = [
+        data.tcode,
+        data.title,
+        data.moduleName,
+        data.pilarName,
+        data.purpose,
+        data.ptpnStandard,
+        data.role,
+        ...(data.fields || []).map((f) => `${f.name} ${f.example} ${f.desc}`),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      if (haystack.includes(normalizedHeroQuery)) {
+        data.tcode
+          .split('/')
+          .map((part) => part.trim().toUpperCase())
+          .filter(Boolean)
+          .forEach((code) => seenCodes.add(code));
+
+        results.push({
+          kind: 'module',
+          id: `mod-${key}`,
+          badge: data.tcode,
+          title: `${data.title} (Modul ${data.moduleNo})`,
+          subtitle: `${data.pilarName} - ${data.moduleName}`,
+          pilar: data.pilar,
+          tcodeKey: key,
+        });
+      }
+    });
+
+    TROUBLESHOOT_TOPICS.forEach((topic) => {
+      const haystack = `${topic.badge} ${topic.title} ${topic.subtitle} ${topic.keywords}`.toLowerCase();
+      if (haystack.includes(normalizedHeroQuery)) {
+        results.push({
+          kind: 'troubleshoot',
+          id: topic.id,
+          badge: topic.badge,
+          title: topic.title,
+          subtitle: topic.subtitle,
+        });
+      }
+    });
+
+    cleanedTcodeCatalog.forEach((entry) => {
+      const haystack = [
+        entry.code,
+        entry.fileName,
+        entry.description,
+        entry.category,
+        entry.relatedTcode,
+        ...(entry.keywords || []),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      if (!haystack.includes(normalizedHeroQuery)) return;
+      if (entry.type !== 'document' && seenCodes.has(entry.code.toUpperCase())) return;
+
+      results.push({
+        kind: 'catalog',
+        id: `cat-${entry.id}`,
+        badge: entry.type === 'document' ? 'DOCX' : entry.code,
+        title: entry.type === 'document' ? entry.fileName : entry.description,
+        subtitle: entry.category,
+        catalogItem: entry,
+      });
+    });
+
+    return results.slice(0, 12);
+  })();
 
   // Keep selectedTcodeKey valid
   const activeTcode = modulesDatabase[selectedTcodeKey] || modulesDatabase.iw31;
 
-  // Auto-switch selected tcode when tab changes if current tcode not in new tab
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    if (tab === 'pilar1' && modulesDatabase[selectedTcodeKey]?.pilar !== 'pilar1') {
-      setSelectedTcodeKey('il01');
-    } else if (tab === 'pilar2' && modulesDatabase[selectedTcodeKey]?.pilar !== 'pilar2') {
-      setSelectedTcodeKey('ip01');
-    } else if (tab === 'pilar3' && modulesDatabase[selectedTcodeKey]?.pilar !== 'pilar3') {
-      setSelectedTcodeKey('iw31');
-    }
-   };
- 
   // CMMS Dropdown Selection Handler
   const handleDropdownSelect = (tab, tcodeKey = null, workflowKey = null) => {
     setActiveTab(tab);
@@ -1446,6 +1622,14 @@ export default function SAPTransactionGuideView() {
     }
     setSelectedCatalogEntry(null);
     setActiveDropdown(null);
+    setHeroSearchOpen(false);
+  };
+
+  const getPreferredScrollBehavior = () => {
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    return prefersReducedMotion ? 'auto' : 'smooth';
   };
 
   const scrollToGuideTop = (behavior = 'smooth') => {
@@ -1463,12 +1647,10 @@ export default function SAPTransactionGuideView() {
   };
 
   const handleSelectTcodeCatalogItem = (item) => {
-    const prefersReducedMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    const scrollBehavior = prefersReducedMotion ? 'auto' : 'smooth';
+    const scrollBehavior = getPreferredScrollBehavior();
 
     setActiveDropdown(null);
+    setHeroSearchOpen(false);
     setSelectedCatalogEntry(item);
     if (item.targetKey === 'troubleshoot') {
       setActiveTab('troubleshoot');
@@ -1482,11 +1664,77 @@ export default function SAPTransactionGuideView() {
     }
   };
 
+  const handleSelectQuickSearchItem = (item) => {
+    const scrollBehavior = getPreferredScrollBehavior();
+
+    setHeroSearchOpen(false);
+    setActiveDropdown(null);
+    setSearchQuery('');
+
+    if (item.kind === 'catalog' && item.catalogItem) {
+      handleSelectTcodeCatalogItem(item.catalogItem);
+      return;
+    }
+
+    setSelectedCatalogEntry(null);
+    if (item.kind === 'troubleshoot') {
+      setActiveTab('troubleshoot');
+      scrollToGuideTop(scrollBehavior);
+      return;
+    }
+
+    if (item.tcodeKey && modulesDatabase[item.tcodeKey]) {
+      setActiveTab(item.pilar || modulesDatabase[item.tcodeKey].pilar);
+      setSelectedTcodeKey(item.tcodeKey);
+      scrollToGuideTop(scrollBehavior);
+    }
+  };
+
+  const handleHeroSearchKeyDown = (event) => {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      setHeroSearchOpen(false);
+      return;
+    }
+    if (event.key === 'ArrowDown' && quickSearchMatches.length > 0) {
+      event.preventDefault();
+      setHeroSearchOpen(true);
+      const firstResult = heroSearchRef.current?.querySelector('button[data-hero-search-item="true"]');
+      firstResult?.focus();
+      return;
+    }
+    if (event.key === 'Enter' && quickSearchMatches.length > 0) {
+      event.preventDefault();
+      handleSelectQuickSearchItem(quickSearchMatches[0]);
+    }
+  };
+
+  const handleHeroResultsKeyDown = (event) => {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      setHeroSearchOpen(false);
+      heroSearchInputRef.current?.focus();
+      return;
+    }
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    const buttons = Array.from(
+      heroSearchRef.current?.querySelectorAll('button[data-hero-search-item="true"]') || []
+    );
+    if (buttons.length === 0) return;
+    const currentIdx = buttons.indexOf(document.activeElement);
+    event.preventDefault();
+    if (event.key === 'ArrowDown') {
+      buttons[Math.min(currentIdx + 1, buttons.length - 1)]?.focus();
+    } else if (currentIdx <= 0) {
+      heroSearchInputRef.current?.focus();
+    } else {
+      buttons[currentIdx - 1]?.focus();
+    }
+  };
+
   const handleOpenFromCatalog = (mod) => {
-    const prefersReducedMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    const scrollBehavior = prefersReducedMotion ? 'auto' : 'smooth';
+    const scrollBehavior = getPreferredScrollBehavior();
+    setSelectedCatalogEntry(null);
 
     if (mod.targetKey === 'troubleshoot') {
       setActiveTab('troubleshoot');
@@ -1521,18 +1769,39 @@ export default function SAPTransactionGuideView() {
 
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => handleCopy(activeTcode.tcode, 'header_tcode')}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-700 ${
+                      copyErrorKey === 'header_tcode'
+                        ? 'bg-rose-50 text-rose-800 border-rose-300'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300'
+                    }`}
                   >
-                    {copiedKey === 'header_tcode' ? <Check size={14} className="text-emerald-700" /> : <Copy size={14} />}
-                    <span>{copiedKey === 'header_tcode' ? 'Tersalin!' : 'Salin T-Code'}</span>
+                    {copiedKey === 'header_tcode' ? (
+                      <Check size={14} aria-hidden="true" className="text-emerald-700" />
+                    ) : copyErrorKey === 'header_tcode' ? (
+                      <AlertCircle size={14} aria-hidden="true" className="text-rose-700" />
+                    ) : (
+                      <Copy size={14} aria-hidden="true" />
+                    )}
+                    <span>
+                      {copiedKey === 'header_tcode'
+                        ? 'Tersalin!'
+                        : copyErrorKey === 'header_tcode'
+                          ? 'Gagal salin'
+                          : 'Salin T-Code'}
+                    </span>
                   </button>
                   <button
-                    onClick={() => setActiveTab('catalog')}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 transition-colors cursor-pointer"
+                    type="button"
+                    onClick={() => {
+                      setSelectedCatalogEntry(null);
+                      setActiveTab('catalog');
+                    }}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-300 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-700"
                     title="Lihat matriks 18 modul resmi"
                   >
-                    <BookOpen size={14} className="text-teal-600" />
+                    <BookOpen size={14} aria-hidden="true" className="text-teal-700" />
                     <span>Matriks Modul {activeTcode.moduleNo}</span>
                   </button>
                 </div>
@@ -1540,32 +1809,35 @@ export default function SAPTransactionGuideView() {
 
 
               {/* Sub-Nav View Mode */}
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+              <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-3">
                 <button
+                  type="button"
                   onClick={() => setDetailViewMode('steps')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                     detailViewMode === 'steps' ? 'bg-emerald-800 text-white border border-emerald-900' : 'bg-transparent text-emerald-950 hover:bg-emerald-50'
                   }`}
                 >
-                  <ImageIcon size={14} />
+                  <ImageIcon size={14} aria-hidden="true" />
                   <span>📸 Panduan Layar Bergambar ({activeTcode.stepsData?.length || 0} Langkah)</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setDetailViewMode('fields')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                     detailViewMode === 'fields' ? 'bg-emerald-800 text-white border border-emerald-900' : 'bg-transparent text-emerald-950 hover:bg-emerald-50'
                   }`}
                 >
-                  <TableIcon size={14} />
+                  <TableIcon size={14} aria-hidden="true" />
                   <span>📑 Aturan Field SAP & Contoh ({activeTcode.fields?.length || 0} Field)</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setDetailViewMode('all')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                     detailViewMode === 'all' ? 'bg-emerald-800 text-white border border-emerald-900' : 'bg-transparent text-emerald-950 hover:bg-emerald-50'
                   }`}
                 >
-                  <Eye size={14} />
+                  <Eye size={14} aria-hidden="true" />
                   <span>Tampilkan Semua</span>
                 </button>
               </div>
@@ -1621,7 +1893,7 @@ export default function SAPTransactionGuideView() {
                               alt={step.title}
                               caption={step.imgCaption || step.title}
                               stepData={step}
-                              onZoom={(img) => { setZoomedImage(img); setZoomScale(1); }}
+                              onZoom={openZoomModal}
                             />
                           </div>
                         )}
@@ -1702,13 +1974,15 @@ export default function SAPTransactionGuideView() {
       {/* ─────────────────────────────────────────────────────────────
           1. HEADER BANNER (Light Modern Corporate Theme)
       ───────────────────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-r from-emerald-50/90 via-teal-50/70 to-white/90 backdrop-blur-xs p-6 md:p-8 border-b border-emerald-100/80 relative z-10 overflow-hidden">
-        <div className="absolute right-0 top-0 w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+      <div className={`bg-gradient-to-r from-emerald-50/90 via-teal-50/70 to-white/90 backdrop-blur-xs p-6 md:p-8 border-b border-emerald-100/80 relative ${heroSearchOpen ? 'z-50' : 'z-10'}`}>
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute right-0 top-0 w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl -mr-20 -mt-20" />
+        </div>
         <div className={`relative z-10 ${isLocalDev ? 'max-w-[1720px]' : 'max-w-[1520px]'} mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6`}>
           <div className="space-y-2">
             <div className="flex items-center gap-3">
               <span className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-600/20">
-                <BookOpen size={24} />
+                <BookOpen size={24} aria-hidden="true" />
               </span>
               <div>
                 <span className="text-xs font-bold text-emerald-800 bg-emerald-100/90 px-3 py-1 rounded-full border border-emerald-200">
@@ -1725,26 +1999,157 @@ export default function SAPTransactionGuideView() {
           </div>
 
           {/* Quick Search */}
-          <div className="w-full md:w-80">
+          <div ref={heroSearchRef} className="relative w-full md:w-80">
             <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <Search
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-600"
+                size={16}
+              />
               <input
+                ref={heroSearchInputRef}
                 id="sap-guide-search-input"
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => {
+                  setActiveDropdown(null);
+                  if (searchQuery.trim()) setHeroSearchOpen(true);
+                }}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setActiveDropdown(null);
+                  setHeroSearchOpen(Boolean(e.target.value.trim()));
+                }}
+                onKeyDown={handleHeroSearchKeyDown}
+                aria-label="Cari T-Code, Error, atau Modul SOP SAP PM"
+                aria-expanded={heroSearchOpen && normalizedHeroQuery.length > 0}
+                aria-controls="hero-quick-search-results"
                 placeholder="Cari T-Code, Error, Modul... (Ctrl+K)"
-                className="w-full bg-white border border-slate-200 focus:border-emerald-500 rounded-xl pl-10 pr-10 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all shadow-xs"
+                className="w-full min-h-[42px] bg-white border border-slate-400 focus:border-emerald-700 rounded-xl pl-10 pr-10 py-2.5 text-xs font-medium text-slate-900 placeholder:text-slate-600 focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-emerald-700 transition-all shadow-xs"
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
-                  <X size={14} />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setHeroSearchOpen(false);
+                    heroSearchInputRef.current?.focus();
+                  }}
+                  aria-label="Hapus pencarian cepat"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-emerald-700"
+                >
+                  <X size={14} aria-hidden="true" />
                 </button>
               )}
             </div>
-            <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 px-1">
-              <span>💡 Coba: <strong className="text-emerald-700 font-semibold cursor-pointer hover:underline" onClick={() => { setSearchQuery('IW32'); setActiveTab('pilar3'); setSelectedTcodeKey('iw32'); }}>IW32</strong>, <strong className="text-emerald-700 font-semibold cursor-pointer hover:underline" onClick={() => setActiveTab('troubleshoot')}>Cancel TECO</strong>, <strong className="text-emerald-700 font-semibold cursor-pointer hover:underline" onClick={() => { setSearchQuery('Logbook'); setActiveTab('pilar3'); setSelectedTcodeKey('zesthlc003pa'); }}>Logbook</strong></span>
-              <span className="text-slate-600 font-bold bg-white px-2 py-0.5 rounded border border-slate-200">18 Modul</span>
+
+            {heroSearchOpen && normalizedHeroQuery.length > 0 && (
+              <div
+                id="hero-quick-search-results"
+                role="region"
+                aria-label="Hasil pencarian cepat SOP SAP PM"
+                onKeyDown={handleHeroResultsKeyDown}
+                className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl border border-slate-300 bg-white p-2 shadow-2xl"
+              >
+                <div className="flex items-center justify-between border-b border-slate-200 px-2.5 py-1.5 mb-1.5">
+                  <span className="text-[11px] font-bold text-slate-700">
+                    Hasil Pencarian Cepat
+                  </span>
+                  <span className="font-mono text-[11px] font-bold text-slate-600 tabular-nums">
+                    {quickSearchMatches.length} item
+                  </span>
+                </div>
+
+                {quickSearchMatches.length === 0 ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-5 text-center space-y-1">
+                    <p className="text-xs font-bold text-slate-900">
+                      Tidak ada modul atau T-Code yang cocok
+                    </p>
+                    <p className="text-[11px] text-slate-600">
+                      Coba kata kunci seperti IW32, Cancel TECO, DOCX, atau Logbook.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="max-h-72 overflow-y-auto overscroll-contain space-y-1">
+                    {quickSearchMatches.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        data-hero-search-item="true"
+                        onClick={() => handleSelectQuickSearchItem(item)}
+                        className="w-full cursor-pointer rounded-xl border border-transparent px-2.5 py-2 text-left transition-colors hover:border-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-emerald-700 flex items-start gap-2.5"
+                      >
+                        <span
+                          className={`mt-0.5 inline-flex min-w-[4.25rem] shrink-0 items-center justify-center rounded-md border px-2 py-0.5 font-mono text-[11px] font-bold ${
+                            item.badge === 'DOCX'
+                              ? 'border-amber-700 bg-amber-50 text-amber-900'
+                              : item.kind === 'troubleshoot'
+                                ? 'border-rose-700 bg-rose-50 text-rose-900'
+                                : 'border-emerald-700 bg-emerald-50 text-emerald-900'
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-xs font-semibold text-slate-900 leading-snug break-words">
+                            {item.title}
+                          </span>
+                          <span className="block text-[11px] text-slate-600 mt-0.5 truncate">
+                            {item.subtitle}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between text-[11px] text-slate-700 mt-2 px-1 gap-2">
+              <span className="flex flex-wrap items-center gap-1">
+                <span>💡 Coba:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setHeroSearchOpen(false);
+                    setSelectedCatalogEntry(null);
+                    setActiveTab('pilar3');
+                    setSelectedTcodeKey('iw32');
+                  }}
+                  className="cursor-pointer font-semibold text-emerald-800 hover:underline focus-visible:outline-2 focus-visible:outline-emerald-700 rounded px-0.5"
+                >
+                  IW32
+                </button>
+                <span>,</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setHeroSearchOpen(false);
+                    setSelectedCatalogEntry(null);
+                    setActiveTab('troubleshoot');
+                  }}
+                  className="cursor-pointer font-semibold text-emerald-800 hover:underline focus-visible:outline-2 focus-visible:outline-emerald-700 rounded px-0.5"
+                >
+                  Cancel TECO
+                </button>
+                <span>,</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setHeroSearchOpen(false);
+                    setSelectedCatalogEntry(null);
+                    setActiveTab('pilar3');
+                    setSelectedTcodeKey('zesthlc003pa');
+                  }}
+                  className="cursor-pointer font-semibold text-emerald-800 hover:underline focus-visible:outline-2 focus-visible:outline-emerald-700 rounded px-0.5"
+                >
+                  Logbook
+                </button>
+              </span>
+              <span className="shrink-0 text-slate-700 font-bold bg-white px-2 py-0.5 rounded border border-slate-300">18 Modul</span>
             </div>
           </div>
         </div>
@@ -1766,7 +2171,7 @@ export default function SAPTransactionGuideView() {
                 <span className="font-bold text-xs tracking-wide text-slate-900">SOP PM</span>
                 <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-100/80 px-1.5 py-0.5 rounded border border-emerald-200">REG 5</span>
               </div>
-              <span className="text-xs text-slate-500 leading-tight block mt-0.5">Navigasi Terpadu</span>
+              <span className="text-xs text-slate-600 leading-tight block mt-0.5">Navigasi Terpadu</span>
             </div>
           </div>
 
@@ -1783,19 +2188,22 @@ export default function SAPTransactionGuideView() {
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setActiveDropdown(activeDropdown === 'flow' ? null : 'flow')}
-                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all ${
+                onClick={() => {
+                  setHeroSearchOpen(false);
+                  setActiveDropdown(activeDropdown === 'flow' ? null : 'flow');
+                }}
+                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                   activeTab === 'flow' || activeDropdown === 'flow'
                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
                 <span>Peta Alur Kerja</span>
-                {activeDropdown === 'flow' ? <ChevronUp size={13} className="text-emerald-700" /> : <ChevronDown size={13} className="text-slate-400 group-hover:text-slate-600" />}
+                {activeDropdown === 'flow' ? <ChevronUp size={13} aria-hidden="true" className="text-emerald-700" /> : <ChevronDown size={13} aria-hidden="true" className="text-slate-600 group-hover:text-slate-900" />}
               </button>
               {activeDropdown === 'flow' && (
                 <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-slate-200 rounded-2xl p-2 shadow-2xl min-w-[270px] flex flex-col gap-1">
-                  <div className="px-3 py-1.5 text-[11px] font-mono font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 mb-1">
+                  <div className="px-3 py-1.5 text-[11px] font-mono font-bold text-slate-600 uppercase tracking-wider border-b border-slate-100 mb-1">
                     Pilih Alur Kerja:
                   </div>
                   {[
@@ -1805,15 +2213,16 @@ export default function SAPTransactionGuideView() {
                   ].map(item => (
                     <button
                       key={item.key}
+                      type="button"
                       onClick={() => handleDropdownSelect('flow', null, item.key)}
-                      className={`px-3 py-2 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer flex flex-col ${
+                      className={`px-3 py-2 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer flex flex-col focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                         activeTab === 'flow' && activeWorkflow === item.key
                           ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200'
                           : 'text-slate-700 hover:text-slate-900 hover:bg-slate-50'
                       }`}
                     >
                       <span>{item.label}</span>
-                      <span className="text-[11px] text-slate-500 mt-0.5">{item.desc}</span>
+                      <span className="text-[11px] text-slate-600 mt-0.5">{item.desc}</span>
                     </button>
                   ))}
                 </div>
@@ -1824,28 +2233,32 @@ export default function SAPTransactionGuideView() {
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setActiveDropdown(activeDropdown === 'pilar1' ? null : 'pilar1')}
-                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all ${
+                onClick={() => {
+                  setHeroSearchOpen(false);
+                  setActiveDropdown(activeDropdown === 'pilar1' ? null : 'pilar1');
+                }}
+                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                   activeTab === 'pilar1' || activeDropdown === 'pilar1'
                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
                 <span>Pilar 1: Master Data</span>
-                {activeDropdown === 'pilar1' ? <ChevronUp size={13} className="text-emerald-700" /> : <ChevronDown size={13} className="text-slate-400 group-hover:text-slate-600" />}
+                {activeDropdown === 'pilar1' ? <ChevronUp size={13} aria-hidden="true" className="text-emerald-700" /> : <ChevronDown size={13} aria-hidden="true" className="text-slate-600 group-hover:text-slate-900" />}
               </button>
               {activeDropdown === 'pilar1' && (
                 <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-slate-200 rounded-2xl p-2 shadow-2xl min-w-[290px] max-h-[360px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 flex flex-col gap-1">
-                  <div className="px-3 py-1.5 text-[11px] font-mono font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 mb-1">
+                  <div className="px-3 py-1.5 text-[11px] font-mono font-bold text-slate-600 uppercase tracking-wider border-b border-slate-100 mb-1">
                     Modul 01 - 08 (Master Data):
                   </div>
                   {Object.entries(modulesDatabase)
-                    .filter(([_, d]) => d.pilar === 'pilar1')
+                    .filter(([, d]) => d.pilar === 'pilar1')
                     .map(([k, d]) => (
                       <button
                         key={k}
+                        type="button"
                         onClick={() => handleDropdownSelect('pilar1', k)}
-                        className={`px-3 py-2 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer flex items-center justify-between ${
+                        className={`px-3 py-2 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer flex items-center justify-between focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                           activeTab === 'pilar1' && selectedTcodeKey === k
                             ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200'
                             : 'text-slate-700 hover:text-slate-900 hover:bg-slate-50'
@@ -1855,7 +2268,7 @@ export default function SAPTransactionGuideView() {
                           <span className="font-mono font-bold mr-1.5 text-slate-900">{d.tcode}</span>
                           <span className="text-[11px] text-slate-600 truncate">{d.title.split('(')[0]}</span>
                         </div>
-                        <span className="text-[10px] font-mono font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded shrink-0 ml-2 border border-slate-200/80">M{d.moduleNo}</span>
+                        <span className="text-[10px] font-mono font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded shrink-0 ml-2 border border-slate-200/80">M{d.moduleNo}</span>
                       </button>
                     ))}
                 </div>
@@ -1866,28 +2279,32 @@ export default function SAPTransactionGuideView() {
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setActiveDropdown(activeDropdown === 'pilar2' ? null : 'pilar2')}
-                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all ${
+                onClick={() => {
+                  setHeroSearchOpen(false);
+                  setActiveDropdown(activeDropdown === 'pilar2' ? null : 'pilar2');
+                }}
+                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                   activeTab === 'pilar2' || activeDropdown === 'pilar2'
                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
                 <span>Pilar 2: Planning</span>
-                {activeDropdown === 'pilar2' ? <ChevronUp size={13} className="text-emerald-700" /> : <ChevronDown size={13} className="text-slate-400 group-hover:text-slate-600" />}
+                {activeDropdown === 'pilar2' ? <ChevronUp size={13} aria-hidden="true" className="text-emerald-700" /> : <ChevronDown size={13} aria-hidden="true" className="text-slate-600 group-hover:text-slate-900" />}
               </button>
               {activeDropdown === 'pilar2' && (
                 <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-slate-200 rounded-2xl p-2 shadow-2xl min-w-[290px] flex flex-col gap-1">
-                  <div className="px-3 py-1.5 text-[11px] font-mono font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 mb-1">
+                  <div className="px-3 py-1.5 text-[11px] font-mono font-bold text-slate-600 uppercase tracking-wider border-b border-slate-100 mb-1">
                     Modul 09 - 11 (Planning & Preventif):
                   </div>
                   {Object.entries(modulesDatabase)
-                    .filter(([_, d]) => d.pilar === 'pilar2')
+                    .filter(([, d]) => d.pilar === 'pilar2')
                     .map(([k, d]) => (
                       <button
                         key={k}
+                        type="button"
                         onClick={() => handleDropdownSelect('pilar2', k)}
-                        className={`px-3 py-2 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer flex items-center justify-between ${
+                        className={`px-3 py-2 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer flex items-center justify-between focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                           activeTab === 'pilar2' && selectedTcodeKey === k
                             ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200'
                             : 'text-slate-700 hover:text-slate-900 hover:bg-slate-50'
@@ -1897,7 +2314,7 @@ export default function SAPTransactionGuideView() {
                           <span className="font-mono font-bold mr-1.5 text-slate-900">{d.tcode}</span>
                           <span className="text-[11px] text-slate-600 truncate">{d.title.split('(')[0]}</span>
                         </div>
-                        <span className="text-[10px] font-mono font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded shrink-0 ml-2 border border-slate-200/80">M{d.moduleNo}</span>
+                        <span className="text-[10px] font-mono font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded shrink-0 ml-2 border border-slate-200/80">M{d.moduleNo}</span>
                       </button>
                     ))}
                 </div>
@@ -1908,28 +2325,32 @@ export default function SAPTransactionGuideView() {
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setActiveDropdown(activeDropdown === 'pilar3' ? null : 'pilar3')}
-                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all ${
+                onClick={() => {
+                  setHeroSearchOpen(false);
+                  setActiveDropdown(activeDropdown === 'pilar3' ? null : 'pilar3');
+                }}
+                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                   activeTab === 'pilar3' || activeDropdown === 'pilar3'
                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
                 <span>Pilar 3: Bisnis Proses</span>
-                {activeDropdown === 'pilar3' ? <ChevronUp size={13} className="text-emerald-700" /> : <ChevronDown size={13} className="text-slate-400 group-hover:text-slate-600" />}
+                {activeDropdown === 'pilar3' ? <ChevronUp size={13} aria-hidden="true" className="text-emerald-700" /> : <ChevronDown size={13} aria-hidden="true" className="text-slate-600 group-hover:text-slate-900" />}
               </button>
               {activeDropdown === 'pilar3' && (
                 <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-slate-200 rounded-2xl p-2 shadow-2xl min-w-[320px] max-h-[380px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 flex flex-col gap-1">
-                  <div className="px-3 py-1.5 text-[11px] font-mono font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 mb-1">
+                  <div className="px-3 py-1.5 text-[11px] font-mono font-bold text-slate-600 uppercase tracking-wider border-b border-slate-100 mb-1">
                     Modul 12 - 18 (Bisnis Proses & Eksekusi):
                   </div>
                   {Object.entries(modulesDatabase)
-                    .filter(([_, d]) => d.pilar === 'pilar3')
+                    .filter(([, d]) => d.pilar === 'pilar3')
                     .map(([k, d]) => (
                       <button
                         key={k}
+                        type="button"
                         onClick={() => handleDropdownSelect('pilar3', k)}
-                        className={`px-3 py-2 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer flex items-center justify-between ${
+                        className={`px-3 py-2 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer flex items-center justify-between focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                           activeTab === 'pilar3' && selectedTcodeKey === k
                             ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200'
                             : 'text-slate-700 hover:text-slate-900 hover:bg-slate-50'
@@ -1939,7 +2360,7 @@ export default function SAPTransactionGuideView() {
                           <span className="font-mono font-bold mr-1.5 text-slate-900">{d.tcode}</span>
                           <span className="text-[11px] text-slate-600 truncate">{d.title.split('(')[0]}</span>
                         </div>
-                        <span className="text-[10px] font-mono font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded shrink-0 ml-2 border border-slate-200/80">M{d.moduleNo}</span>
+                        <span className="text-[10px] font-mono font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded shrink-0 ml-2 border border-slate-200/80">M{d.moduleNo}</span>
                       </button>
                     ))}
                 </div>
@@ -1950,19 +2371,22 @@ export default function SAPTransactionGuideView() {
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setActiveDropdown(activeDropdown === 'troubleshoot' ? null : 'troubleshoot')}
-                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all ${
+                onClick={() => {
+                  setHeroSearchOpen(false);
+                  setActiveDropdown(activeDropdown === 'troubleshoot' ? null : 'troubleshoot');
+                }}
+                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                   activeTab === 'troubleshoot' || activeDropdown === 'troubleshoot'
                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
                 <span>Troubleshooting</span>
-                {activeDropdown === 'troubleshoot' ? <ChevronUp size={13} className="text-emerald-700" /> : <ChevronDown size={13} className="text-slate-400 group-hover:text-slate-600" />}
+                {activeDropdown === 'troubleshoot' ? <ChevronUp size={13} aria-hidden="true" className="text-emerald-700" /> : <ChevronDown size={13} aria-hidden="true" className="text-slate-600 group-hover:text-slate-900" />}
               </button>
               {activeDropdown === 'troubleshoot' && (
                 <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-slate-200 rounded-2xl p-2 shadow-2xl min-w-[280px] flex flex-col gap-1">
-                  <div className="px-3 py-1.5 text-[11px] font-mono font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 mb-1">
+                  <div className="px-3 py-1.5 text-[11px] font-mono font-bold text-slate-600 uppercase tracking-wider border-b border-slate-100 mb-1">
                     Klinik Solusi Masalah:
                   </div>
                   {[
@@ -1973,11 +2397,12 @@ export default function SAPTransactionGuideView() {
                   ].map((item, idx) => (
                     <button
                       key={idx}
+                      type="button"
                       onClick={() => handleDropdownSelect('troubleshoot')}
-                      className="px-3 py-2 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer flex flex-col text-slate-700 hover:text-slate-900 hover:bg-slate-50"
+                      className="px-3 py-2 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer flex flex-col text-slate-700 hover:text-slate-900 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-emerald-700"
                     >
                       <span className="font-semibold text-emerald-800">{item.label}</span>
-                      <span className="text-[11px] text-slate-500 mt-0.5">{item.desc}</span>
+                      <span className="text-[11px] text-slate-600 mt-0.5">{item.desc}</span>
                     </button>
                   ))}
                 </div>
@@ -1988,24 +2413,28 @@ export default function SAPTransactionGuideView() {
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setActiveDropdown(activeDropdown === 'catalog' ? null : 'catalog')}
-                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all ${
+                onClick={() => {
+                  setHeroSearchOpen(false);
+                  setActiveDropdown(activeDropdown === 'catalog' ? null : 'catalog');
+                }}
+                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                   activeTab === 'catalog' || activeDropdown === 'catalog'
                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
                 <span>Katalog SOP</span>
-                {activeDropdown === 'catalog' ? <ChevronUp size={13} className="text-emerald-700" /> : <ChevronDown size={13} className="text-slate-400 group-hover:text-slate-600" />}
+                {activeDropdown === 'catalog' ? <ChevronUp size={13} aria-hidden="true" className="text-emerald-700" /> : <ChevronDown size={13} aria-hidden="true" className="text-slate-600 group-hover:text-slate-900" />}
               </button>
               {activeDropdown === 'catalog' && (
                 <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-slate-200 rounded-2xl p-2 shadow-2xl min-w-[260px] flex flex-col gap-1">
                   <button
+                    type="button"
                     onClick={() => handleDropdownSelect('catalog')}
-                    className="px-3 py-2 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer flex flex-col text-slate-700 hover:text-slate-900 hover:bg-slate-50"
+                    className="px-3 py-2 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer flex flex-col text-slate-700 hover:text-slate-900 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-emerald-700"
                   >
                     <span className="font-bold text-emerald-800">Matriks 18 Modul Resmi</span>
-                    <span className="text-[11px] text-slate-500 mt-0.5">Lihat matriks SOP & relasi bisnis proses</span>
+                    <span className="text-[11px] text-slate-600 mt-0.5">Lihat matriks SOP & relasi bisnis proses</span>
                   </button>
                 </div>
               )}
@@ -2014,8 +2443,12 @@ export default function SAPTransactionGuideView() {
             {/* 7. DAFTAR T-CODE PM (Searchable & Categorized) */}
             <SapTcodeDropdown
               selectedCode={selectedCatalogEntry?.code || activeTcode.tcode}
+              selectedItemId={selectedCatalogEntry?.id || ''}
               isOpen={activeDropdown === 'tcodeList'}
-              onOpenChange={(open) => setActiveDropdown(open ? 'tcodeList' : null)}
+              onOpenChange={(open) => {
+                if (open) setHeroSearchOpen(false);
+                setActiveDropdown(open ? 'tcodeList' : null);
+              }}
               onSelect={handleSelectTcodeCatalogItem}
             />
           </nav>
@@ -2023,10 +2456,10 @@ export default function SAPTransactionGuideView() {
           {/* Right Side Status Badges */}
           <div className="order-2 xl:order-3 flex items-center gap-2 shrink-0 ml-auto pl-0 2xl:pl-2">
             <div className="hidden sm:flex items-center gap-1 2xl:gap-2 px-1.5 2xl:px-3 py-1.5 text-xs text-slate-700 font-medium whitespace-nowrap">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span className="text-slate-500">Modul:</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-600" aria-hidden="true"></span>
+              <span className="text-slate-600">Modul:</span>
               <span className="text-slate-900 font-mono font-bold">{activeTcode.tcode}</span>
-              <span className="text-slate-500 font-mono">M{activeTcode.moduleNo}</span>
+              <span className="text-slate-600 font-mono">M{activeTcode.moduleNo}</span>
             </div>
           </div>
 
@@ -2087,19 +2520,27 @@ export default function SAPTransactionGuideView() {
                     'catalog_entry'
                   )
                 }
-                className="min-h-[44px] lg:min-h-[36px] inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-500 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-emerald-700"
+                className={`min-h-[44px] lg:min-h-[36px] inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-emerald-700 ${
+                  copyErrorKey === 'catalog_entry'
+                    ? 'border-rose-700 bg-rose-50 text-rose-900'
+                    : 'border-slate-500 bg-white text-slate-800 hover:bg-slate-100'
+                }`}
               >
                 {copiedKey === 'catalog_entry' ? (
                   <Check size={14} aria-hidden="true" className="text-emerald-800" />
+                ) : copyErrorKey === 'catalog_entry' ? (
+                  <AlertCircle size={14} aria-hidden="true" className="text-rose-700" />
                 ) : (
                   <Copy size={14} aria-hidden="true" />
                 )}
                 <span>
                   {copiedKey === 'catalog_entry'
                     ? 'Tersalin!'
-                    : selectedCatalogEntry.type === 'document'
-                      ? 'Salin Nama File'
-                      : 'Salin T-Code'}
+                    : copyErrorKey === 'catalog_entry'
+                      ? 'Gagal salin'
+                      : selectedCatalogEntry.type === 'document'
+                        ? 'Salin Nama File'
+                        : 'Salin T-Code'}
                 </span>
               </button>
               <button
@@ -2122,24 +2563,27 @@ export default function SAPTransactionGuideView() {
               </div>
               <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-xs">
                 <button
+                  type="button"
                   onClick={() => { setActiveWorkflow('corrective'); setSelectedFlowStep(1); }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                     activeWorkflow === 'corrective' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-transparent text-emerald-950 hover:bg-emerald-50'
                   }`}
                 >
                   ⚡ Corrective (PM01)
                 </button>
                 <button
+                  type="button"
                   onClick={() => { setActiveWorkflow('preventive'); setSelectedFlowStep(1); }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                     activeWorkflow === 'preventive' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-transparent text-emerald-950 hover:bg-emerald-50'
                   }`}
                 >
                   📅 Preventive (PM02)
                 </button>
                 <button
+                  type="button"
                   onClick={() => { setActiveWorkflow('logbook'); setSelectedFlowStep(1); }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                     activeWorkflow === 'logbook' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-transparent text-emerald-950 hover:bg-emerald-50'
                   }`}
                 >
@@ -2154,12 +2598,13 @@ export default function SAPTransactionGuideView() {
                 workflowKey={activeWorkflow}
                 selectedStep={selectedFlowStep}
                 onSelectStep={setSelectedFlowStep}
-                onZoomImage={setZoomedImage}
+                onZoomImage={openZoomModal}
                 onOpenModule={(key, pilar) => {
                   if (modulesDatabase[key]) {
-                    setActiveTab(pilar || "pilar3");
+                    setSelectedCatalogEntry(null);
+                    setActiveTab(pilar || modulesDatabase[key].pilar || 'pilar3');
                     setSelectedTcodeKey(key);
-                    window.scrollTo({ top: 0, behavior: "smooth" });
+                    scrollToGuideTop(getPreferredScrollBehavior());
                   }
                 }}
               />
@@ -2221,7 +2666,7 @@ export default function SAPTransactionGuideView() {
                     image="/images/cancel_teco/step_1.png"
                     alt="Layar Input IW32"
                     caption="Masukkan /NIW32 dan Nomor Order"
-                    onZoom={(img) => { setZoomedImage(img); setZoomScale(1); }}
+                    onZoom={openZoomModal}
                   />
                 </div>
               </div>
@@ -2242,7 +2687,7 @@ export default function SAPTransactionGuideView() {
                     image="/images/cancel_teco/step_2.png"
                     alt="Menu Cancel TECO di IW32"
                     caption="Menu Bar: Order ➔ Function ➔ Complete ➔ Cancel Technical"
-                    onZoom={(img) => { setZoomedImage(img); setZoomScale(1); }}
+                    onZoom={openZoomModal}
                   />
                 </div>
               </div>
@@ -2336,7 +2781,7 @@ export default function SAPTransactionGuideView() {
                     image="/images/il01/step_5.png"
                     alt="GOS Attachment Menu"
                     caption="Menu Service for Object ➔ Create Attachment"
-                    onZoom={(img) => { setZoomedImage(img); setZoomScale(1); }}
+                    onZoom={openZoomModal}
                   />
                 </div>
               </div>
@@ -2351,10 +2796,11 @@ export default function SAPTransactionGuideView() {
                   </span>
                   <div>
                     <h3 className="text-sm font-bold text-slate-900">Otomasi Script VBScript SAP GUI (Input Massal Cepat)</h3>
-                    <p className="text-xs text-slate-500">Script VBS untuk input massal equipment tanpa ketik manual (C:\Logbook\ie01.vbs).</p>
+                    <p className="text-xs text-slate-600">Script VBS untuk input massal equipment tanpa ketik manual (C:\Logbook\ie01.vbs).</p>
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={() => handleCopy(`If Not IsObject(application) Then
    Set SapGuiAuto  = GetObject("SAPGUI")
    Set application = SapGuiAuto.GetScriptingEngine
@@ -2372,10 +2818,26 @@ End If
 session.findById("wnd[0]").maximize
 session.findById("wnd[0]/tbar[0]/okcd").text = "ie01"
 session.findById("wnd[0]").sendVKey 0`, 'vbs_code')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 cursor-pointer shadow-2xs"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border cursor-pointer shadow-2xs focus-visible:outline-2 focus-visible:outline-emerald-700 ${
+                    copyErrorKey === 'vbs_code'
+                      ? 'bg-rose-50 text-rose-800 border-rose-300'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300'
+                  }`}
                 >
-                  {copiedKey === 'vbs_code' ? <Check size={14} className="text-emerald-700" /> : <Copy size={14} />}
-                  <span>{copiedKey === 'vbs_code' ? 'Tersalin!' : 'Salin Contoh VBS'}</span>
+                  {copiedKey === 'vbs_code' ? (
+                    <Check size={14} aria-hidden="true" className="text-emerald-700" />
+                  ) : copyErrorKey === 'vbs_code' ? (
+                    <AlertCircle size={14} aria-hidden="true" className="text-rose-700" />
+                  ) : (
+                    <Copy size={14} aria-hidden="true" />
+                  )}
+                  <span>
+                    {copiedKey === 'vbs_code'
+                      ? 'Tersalin!'
+                      : copyErrorKey === 'vbs_code'
+                        ? 'Gagal salin'
+                        : 'Salin Contoh VBS'}
+                  </span>
                 </button>
               </div>
 
@@ -2521,15 +2983,16 @@ session.findById("wnd[0]").sendVKey 0`}
                 ].map((seg) => (
                   <button
                     key={seg.key}
+                    type="button"
                     onClick={() => setCatalogFilter(seg.key)}
-                    className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                      catalogFilter === seg.key ? seg.activeClass : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                    className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all focus-visible:outline-2 focus-visible:outline-emerald-700 ${
+                      catalogFilter === seg.key ? seg.activeClass : 'text-slate-700 hover:bg-white hover:text-slate-900'
                     }`}
                   >
                     <span>{seg.label}</span>
                     <span
                       className={`rounded-md px-1.5 py-px font-mono text-[10px] font-black ${
-                        catalogFilter === seg.key ? 'bg-white/25 text-white' : 'bg-white text-slate-500'
+                        catalogFilter === seg.key ? 'bg-white/25 text-white' : 'bg-white text-slate-700'
                       }`}
                     >
                       {seg.count}
@@ -2539,21 +3002,24 @@ session.findById("wnd[0]").sendVKey 0`}
               </div>
 
               <div className="relative lg:w-80">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                <Search aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-600" size={15} />
                 <input
                   type="text"
                   value={catalogSearch}
                   onChange={(e) => setCatalogSearch(e.target.value)}
+                  aria-label="Cari modul, T-Code, atau aturan SOP"
                   placeholder="Cari modul, T-Code, atau aturan SOP..."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-9 text-xs text-slate-800 placeholder-slate-400 transition-all focus:border-teal-500 focus:bg-white focus:outline-none"
+                  className="w-full rounded-xl border border-slate-300 bg-slate-50 py-2.5 pl-10 pr-9 text-xs text-slate-900 placeholder:text-slate-600 transition-all focus:border-teal-600 focus:bg-white focus-visible:outline-2 focus-visible:outline-teal-700"
                 />
                 {catalogSearch && (
                   <button
+                    type="button"
                     onClick={() => setCatalogSearch('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-slate-400 hover:text-slate-700"
+                    aria-label="Bersihkan pencarian modul"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-slate-600 hover:bg-slate-200 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-teal-700"
                     title="Bersihkan pencarian"
                   >
-                    <X size={14} />
+                    <X size={14} aria-hidden="true" />
                   </button>
                 )}
               </div>
@@ -2564,26 +3030,27 @@ session.findById("wnd[0]").sendVKey 0`}
               {/* Daftar isi modul */}
               <aside className="hidden lg:sticky lg:top-6 lg:block lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1">
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
-                  <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    <ListChecks size={13} className="text-teal-600" />
+                  <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                    <ListChecks size={13} aria-hidden="true" className="text-teal-700" />
                     Daftar Isi Modul
                   </div>
                   <div className="mt-3 space-y-4">
                     {catalogGroups.map((group) => (
                       <div key={group.key}>
                         <div className="flex items-center gap-2 px-1">
-                          <span className={`h-2 w-2 rounded-full ${group.dot}`} />
-                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">{group.short}</span>
+                          <span className={`h-2 w-2 rounded-full ${group.dot}`} aria-hidden="true" />
+                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-600">{group.short}</span>
                         </div>
                         <div className="mt-1.5 space-y-0.5 border-l border-slate-200 pl-2">
                           {group.modules.map((mod) => (
                             <button
                               key={mod.no}
+                              type="button"
                               onClick={() => jumpToCatalogModule(mod.no)}
-                              className="flex w-full cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-slate-50"
+                              className="flex w-full cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-teal-700"
                             >
-                              <span className="mt-px font-mono text-[10px] font-black text-slate-400">{mod.no}</span>
-                              <span className="text-[11px] font-medium leading-snug text-slate-600">
+                              <span className="mt-px font-mono text-[10px] font-black text-slate-600">{mod.no}</span>
+                              <span className="text-[11px] font-medium leading-snug text-slate-700">
                                 {mod.title.replace(/^(Master Data|Bisnis Proses) - /, '')}
                               </span>
                             </button>
@@ -2592,7 +3059,7 @@ session.findById("wnd[0]").sendVKey 0`}
                       </div>
                     ))}
                     {catalogGroups.length === 0 && (
-                      <p className="px-1 text-[11px] text-slate-500">Tidak ada modul yang cocok dengan filter saat ini.</p>
+                      <p className="px-1 text-[11px] text-slate-600">Tidak ada modul yang cocok dengan filter saat ini.</p>
                     )}
                   </div>
                 </div>
@@ -2602,12 +3069,12 @@ session.findById("wnd[0]").sendVKey 0`}
               <div className="space-y-8">
                 {catalogGroups.length === 0 && (
                   <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
-                    <Search size={22} className="mx-auto text-slate-300" />
-                    <p className="mt-3 text-sm font-bold text-slate-700">Modul tidak ditemukan</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Coba kata kunci lain, misalnya <span className="font-mono font-bold text-slate-700">IW31</span>,{' '}
-                      <span className="font-mono font-bold text-slate-700">BOM</span>, atau{' '}
-                      <span className="font-mono font-bold text-slate-700">logbook</span>.
+                    <Search size={22} aria-hidden="true" className="mx-auto text-slate-500" />
+                    <p className="mt-3 text-sm font-bold text-slate-800">Modul tidak ditemukan</p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      Coba kata kunci lain, misalnya <span className="font-mono font-bold text-slate-800">IW31</span>,{' '}
+                      <span className="font-mono font-bold text-slate-800">BOM</span>, atau{' '}
+                      <span className="font-mono font-bold text-slate-800">logbook</span>.
                     </p>
                   </div>
                 )}
@@ -2618,7 +3085,7 @@ session.findById("wnd[0]").sendVKey 0`}
                     <div className={`flex flex-col gap-3 rounded-2xl border bg-white p-4 shadow-2xs sm:flex-row sm:items-center sm:justify-between ${group.softBorder}`}>
                       <div className="flex items-start gap-3">
                         <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm ${group.bar}`}>
-                          <Layers size={18} />
+                          <Layers size={18} aria-hidden="true" />
                         </span>
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
@@ -2627,10 +3094,10 @@ session.findById("wnd[0]").sendVKey 0`}
                               {group.modules.length} modul
                             </span>
                           </div>
-                          <p className="mt-0.5 max-w-2xl text-xs leading-relaxed text-slate-600">{group.desc}</p>
+                          <p className="mt-0.5 max-w-2xl text-xs leading-relaxed text-slate-700">{group.desc}</p>
                         </div>
                       </div>
-                      <span className="shrink-0 font-mono text-[11px] font-bold text-slate-400">{group.range}</span>
+                      <span className="shrink-0 font-mono text-[11px] font-bold text-slate-600">{group.range}</span>
                     </div>
 
                     {/* Kartu modul */}
@@ -2642,7 +3109,7 @@ session.findById("wnd[0]").sendVKey 0`}
                           className={`group relative flex scroll-mt-24 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${group.cardHover}`}
                         >
                           <div className={`h-1 w-full bg-gradient-to-r ${group.bar}`} />
-                          <span className="pointer-events-none absolute right-4 top-4 select-none font-mono text-4xl font-black leading-none text-slate-100">
+                          <span aria-hidden="true" className="pointer-events-none absolute right-4 top-4 select-none font-mono text-4xl font-black leading-none text-slate-200">
                             {mod.no}
                           </span>
 
@@ -2651,8 +3118,8 @@ session.findById("wnd[0]").sendVKey 0`}
                               <span className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 font-mono text-[10px] font-black ${group.chip}`}>
                                 MODUL {mod.no}
                               </span>
-                              <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-600">
-                                <ShieldCheck size={11} className="text-slate-400" />
+                              <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                                <ShieldCheck size={11} aria-hidden="true" className="text-slate-600" />
                                 {mod.role}
                               </span>
                             </div>
@@ -2671,13 +3138,13 @@ session.findById("wnd[0]").sendVKey 0`}
 
                             <div className="rounded-xl bg-slate-50 p-3">
                               <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700">
-                                <ListChecks size={12} className={group.text} />
+                                <ListChecks size={12} aria-hidden="true" className={group.text} />
                                 SOP &amp; Aturan Kunci
                               </div>
                               <ul className="mt-2 space-y-1">
                                 {mod.keyRules.map((rule, rIdx) => (
-                                  <li key={rIdx} className="flex items-start gap-1.5 text-[11px] leading-snug text-slate-600">
-                                    <CheckCircle2 size={12} className={`mt-0.5 shrink-0 ${group.text}`} />
+                                  <li key={rIdx} className="flex items-start gap-1.5 text-[11px] leading-snug text-slate-700">
+                                    <CheckCircle2 size={12} aria-hidden="true" className={`mt-0.5 shrink-0 ${group.text}`} />
                                     <span>{rule}</span>
                                   </li>
                                 ))}
@@ -2686,22 +3153,23 @@ session.findById("wnd[0]").sendVKey 0`}
 
                             {mod.highlights && (
                               <div className={`flex items-start gap-2 rounded-xl border-l-4 px-3 py-2 ${group.tipBg}`}>
-                                <Sparkles size={13} className="mt-0.5 shrink-0" />
+                                <Sparkles size={13} aria-hidden="true" className="mt-0.5 shrink-0" />
                                 <p className="text-[11px] leading-relaxed">{mod.highlights}</p>
                               </div>
                             )}
                           </div>
 
                           <div className="mt-auto flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3">
-                            <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-600">
                               {mod.tcodes.length} T-Code · {mod.keyRules.length} aturan
                             </span>
                             <button
+                              type="button"
                               onClick={() => handleOpenFromCatalog(mod)}
-                              className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold text-white shadow-2xs transition-all ${group.btn}`}
+                              className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold text-white shadow-2xs transition-all focus-visible:outline-2 focus-visible:outline-emerald-700 ${group.btn}`}
                             >
                               <span>Buka Panduan ({mod.tcodes[0]})</span>
-                              <ArrowRight size={13} />
+                              <ArrowRight size={13} aria-hidden="true" />
                             </button>
                           </div>
                         </article>
@@ -2723,18 +3191,21 @@ session.findById("wnd[0]").sendVKey 0`}
         const modalAnnotations = getImageAnnotation(zoomedImage);
         const hasModalAnnotations = Array.isArray(modalAnnotations) && modalAnnotations.length > 0;
         return (
-          <div 
-            className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => { setZoomedImage(null); setZoomScale(1); }}
+          <div
+            className="fixed inset-0 z-[60] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={closeZoomModal}
           >
-            <div 
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Tangkapan Layar SAP GUI Resolusi Penuh"
               className="relative max-w-5xl w-full max-h-[94vh] bg-white rounded-2xl border border-slate-200 p-3 shadow-2xl flex flex-col overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Controls */}
               <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 mb-2 gap-2 flex-wrap">
                 <span className="text-xs font-bold text-slate-800 flex items-center gap-2 truncate">
-                  <ImageIcon size={14} className="text-emerald-700 shrink-0" />
+                  <ImageIcon size={14} aria-hidden="true" className="text-emerald-700 shrink-0" />
                   <span className="truncate">Tangkapan Layar SAP GUI Resolusi Penuh</span>
                 </span>
                 <div className="flex items-center gap-1.5 sm:gap-2">
@@ -2742,44 +3213,52 @@ session.findById("wnd[0]").sendVKey 0`}
                     <button
                       type="button"
                       onClick={() => setModalShowArrows(!modalShowArrows)}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                         modalShowArrows 
-                          ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100' 
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          ? 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100' 
+                          : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
                       }`}
                       title={modalShowArrows ? 'Sembunyikan Panah & Keterangan' : 'Tampilkan Panah & Keterangan'}
                     >
-                      {modalShowArrows ? <EyeOff size={13} className="text-rose-600" /> : <Eye size={13} className="text-slate-500" />}
+                      {modalShowArrows ? <EyeOff size={13} aria-hidden="true" className="text-rose-700" /> : <Eye size={13} aria-hidden="true" className="text-slate-600" />}
                       <span>{modalShowArrows ? 'Sembunyikan Panah' : 'Tampilkan Panah'}</span>
                     </button>
                   )}
                   <button
+                    type="button"
                     onClick={() => setZoomScale(s => Math.min(s + 0.25, 2.5))}
-                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
+                    aria-label="Perbesar tangkapan layar"
+                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-700"
                     title="Perbesar (Zoom In)"
                   >
-                    <ZoomIn size={15} />
+                    <ZoomIn size={15} aria-hidden="true" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => setZoomScale(s => Math.max(s - 0.25, 0.75))}
-                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
+                    aria-label="Perkecil tangkapan layar"
+                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-700"
                     title="Perkecil (Zoom Out)"
                   >
-                    <ZoomOut size={15} />
+                    <ZoomOut size={15} aria-hidden="true" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => setZoomScale(1)}
-                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
+                    aria-label="Reset ukuran tangkapan layar"
+                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-700"
                     title="Reset Ukuran"
                   >
-                    <RotateCcw size={15} />
+                    <RotateCcw size={15} aria-hidden="true" />
                   </button>
                   <button
-                    onClick={() => { setZoomedImage(null); setZoomScale(1); }}
-                    className="p-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 ml-1 cursor-pointer"
+                    type="button"
+                    onClick={closeZoomModal}
+                    aria-label="Tutup tampilan pembesaran gambar"
+                    className="p-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 ml-1 cursor-pointer focus-visible:outline-2 focus-visible:outline-rose-700"
                     title="Tutup (Esc)"
                   >
-                    <X size={16} />
+                    <X size={16} aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -2813,8 +3292,8 @@ session.findById("wnd[0]").sendVKey 0`}
                 </div>
               </div>
 
-              <div className="text-center text-[11px] text-slate-500 mt-2">
-                Tekan <kbd className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-300 text-slate-700 font-mono">Esc</kbd> atau klik di luar untuk menutup
+              <div className="text-center text-[11px] text-slate-600 mt-2">
+                Tekan <kbd className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-300 text-slate-800 font-mono">Esc</kbd> atau klik di luar untuk menutup
               </div>
             </div>
           </div>
@@ -2828,7 +3307,7 @@ session.findById("wnd[0]").sendVKey 0`}
 // Icon helper
 function TableIcon({ size = 16, className = '' }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={className}>
       <path d="M12 3v18" />
       <rect width="18" height="18" x="3" y="3" rx="2" />
       <path d="M3 9h18" />

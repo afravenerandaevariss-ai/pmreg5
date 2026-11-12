@@ -417,7 +417,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [zcoUploadInfo, setZcoUploadInfo]       = useState(null);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState(null);
-  const [debugMapStr, setDebugMapStr] = useState('');
   const [uploadInfo, setUploadInfo] = useState(null);
   const [isSavingImage, setIsSavingImage] = useState(false);
   const [dataReady, setDataReady] = useState(false);
@@ -1142,11 +1141,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               const ce = rawCe.replace(/^0+/, '');
               const rawUom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
               const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
-              const matDesc = String(r['Material Description'] || '').trim();
-              const fullText = `${name} ${matDesc}`;
 
               const isStandardFuelUom = ['L', 'LTR', 'LITER'].includes(rawUom);
-              let parsedLitersFromText = 0;
               const isFuelCostElement = ce === '51100057';
 
               if (!isFuelCostElement) {
@@ -1159,7 +1155,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               // Task 1: Strict filter: CE 51100057 MUST have UoM exactly L (or alias LTR/LITER). No text-based fallback.
               if (!isStandardFuelUom) {
                 excludedNonFuel++;
-                console.debug(`[SALRD] Excluded CE 51100057 row: UoM="${rawUom}" (not L/LTR/LITER) - ${name}`);
                 continue;
               }
 
@@ -1305,17 +1300,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               let rupiah = parseSapNumber(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0);
               const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
               const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
-              const matDesc = String(r['Material Description'] || '').trim();
-              const fullText = `${name} ${matDesc}`;
               const plant = String(r['Plant'] || rawCc.substring(0, 4) || '').trim().toUpperCase();
 
               const isStandardFuelUom = ['L', 'LTR', 'LITER'].includes(rawUom);
-              let parsedLiters = 0;
               if (ce === '51100057') {
                 // Task 1: Strict filter: only L/LTR/LITER UoM accepted for CE 51100057. No text fallback.
-                if (!isStandardFuelUom) {
-                  console.debug(`[SALRD-fallback] Excluded CE 51100057 row: UoM="${rawUom}" (not L/LTR/LITER) - ${name}`);
-                } else {
+                if (isStandardFuelUom) {
                   if (isReversal) {
                     qty = -Math.abs(qty);
                     rupiah = -Math.abs(rupiah);
