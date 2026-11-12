@@ -1726,7 +1726,7 @@ function App() {
         </header>
 
         {/* Scrollable Content */}
-        <main className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 print:overflow-visible print:block print:p-0">
+        <main className={`flex-1 overflow-y-auto ${activeTab === 'sap-guide' ? 'p-0' : 'p-3 sm:p-6 lg:p-8'} print:overflow-visible print:block print:p-0`}>
           
           {activeTab !== 'dashboard' && activeTab !== 'monitoring' && activeTab !== 'verifikasi' && activeTab !== 'berita-acara' && activeTab !== 'sap-guide' && activeTab !== 'work-order' && activeTab !== 'inbox' && activeTab !== 'knowledge-base' && (
             <div className="flex justify-between items-end mb-8">
@@ -1813,7 +1813,7 @@ function App() {
 
           {/* TAB: SAP GUIDE */}
           {activeTab === 'sap-guide' && (
-            <div className="-mx-3 -my-3 sm:-mx-6 sm:-my-6 lg:-mx-8 lg:-my-8 min-h-[calc(100vh-100px)]">
+            <div className="min-h-full">
               <SAPTransactionGuideView />
             </div>
           )}
@@ -1833,7 +1833,7 @@ function App() {
           )}
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-3 mb-6 shadow-sm">
+            <div className={`bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-3 mb-6 shadow-sm ${activeTab === 'sap-guide' ? 'mx-4 my-4 sm:mx-6 lg:mx-8' : ''}`}>
               <AlertCircle size={20} />
               <p>{error}</p>
             </div>
