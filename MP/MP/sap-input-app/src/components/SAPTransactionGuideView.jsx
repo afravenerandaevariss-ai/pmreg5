@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   BookOpen, Search, Info, HelpCircle, ExternalLink, Image as ImageIcon, Code2, AlertTriangle, 
   PlayCircle, LogIn, FileText, Wrench, Play, Settings, Clipboard, CheckSquare, 
@@ -11,6 +11,7 @@ import SAPAnnotatedImage from './SAPAnnotatedImage';
 import SapAnnotationLayer from './SapAnnotationLayer';
 import { getImageAnnotation } from '../data/sapImageAnnotations';
 import SapFlowMap from './SapFlowMap';
+import SapTcodeDropdown from './SapTcodeDropdown';
 
 // ─────────────────────────────────────────────────────────────
 // Tema visual per pilar untuk halaman Katalog SOP (18 Modul).
@@ -88,7 +89,9 @@ export default function SAPTransactionGuideView() {
   const [catalogFilter, setCatalogFilter] = useState('all'); // 'all' | 'pilar1' | 'pilar2' | 'pilar3'
   const [catalogSearch, setCatalogSearch] = useState(''); // Pencarian lokal khusus halaman Katalog SOP
   const [showTcodeSidebar, setShowTcodeSidebar] = useState(false); // Hidden by default for wider right area
-  const [activeDropdown, setActiveDropdown] = useState(null); // 'flow' | 'pilar1' | 'pilar2' | 'pilar3' | 'troubleshoot' | 'catalog' | null
+  const [activeDropdown, setActiveDropdown] = useState(null); // 'flow' | 'pilar1' | 'pilar2' | 'pilar3' | 'troubleshoot' | 'catalog' | 'tcodeList' | null
+  const [selectedCatalogEntry, setSelectedCatalogEntry] = useState(null);
+  const rootRef = useRef(null);
   // Image Lightbox / Zoom Modal State
   const [zoomedImage, setZoomedImage] = useState(null);
   const [zoomScale, setZoomScale] = useState(1);
@@ -1441,17 +1444,57 @@ export default function SAPTransactionGuideView() {
       setActiveWorkflow(workflowKey);
       setSelectedFlowStep(1);
     }
+    setSelectedCatalogEntry(null);
     setActiveDropdown(null);
   };
 
+  const scrollToGuideTop = (behavior = 'smooth') => {
+    if (typeof window === 'undefined') return;
+    window.scrollTo({ top: 0, behavior });
+    let el = rootRef.current?.parentElement;
+    while (el) {
+      const style = window.getComputedStyle(el);
+      if (/(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight) {
+        el.scrollTo({ top: 0, behavior });
+        break;
+      }
+      el = el.parentElement;
+    }
+  };
+
+  const handleSelectTcodeCatalogItem = (item) => {
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const scrollBehavior = prefersReducedMotion ? 'auto' : 'smooth';
+
+    setActiveDropdown(null);
+    setSelectedCatalogEntry(item);
+    if (item.targetKey === 'troubleshoot') {
+      setActiveTab('troubleshoot');
+      scrollToGuideTop(scrollBehavior);
+      return;
+    }
+    if (item.targetKey && modulesDatabase[item.targetKey]) {
+      setActiveTab(item.pilar || modulesDatabase[item.targetKey].pilar);
+      setSelectedTcodeKey(item.targetKey);
+      scrollToGuideTop(scrollBehavior);
+    }
+  };
+
   const handleOpenFromCatalog = (mod) => {
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const scrollBehavior = prefersReducedMotion ? 'auto' : 'smooth';
+
     if (mod.targetKey === 'troubleshoot') {
       setActiveTab('troubleshoot');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      scrollToGuideTop(scrollBehavior);
     } else if (modulesDatabase[mod.targetKey]) {
       setActiveTab(modulesDatabase[mod.targetKey].pilar);
       setSelectedTcodeKey(mod.targetKey);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      scrollToGuideTop(scrollBehavior);
     }
   };
 
@@ -1644,7 +1687,7 @@ export default function SAPTransactionGuideView() {
   );
 
   return (
-    <div className="relative bg-[#f8fafc] border-slate-200/80 shadow-sm text-slate-800 min-h-screen rounded-2xl border overflow-clip font-sans">
+    <div ref={rootRef} className="relative bg-[#f8fafc] border-slate-200/80 shadow-sm text-slate-800 min-h-screen rounded-2xl border overflow-clip font-sans">
       
       {/* ─────────────────────────────────────────────────────────────
           DECORATIVE AMBIENT ATMOSPHERE
@@ -1661,7 +1704,7 @@ export default function SAPTransactionGuideView() {
       ───────────────────────────────────────────────────────────── */}
       <div className="bg-gradient-to-r from-emerald-50/90 via-teal-50/70 to-white/90 backdrop-blur-xs p-6 md:p-8 border-b border-emerald-100/80 relative z-10 overflow-hidden">
         <div className="absolute right-0 top-0 w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
-        <div className={`relative z-10 ${isLocalDev ? 'max-w-[1720px]' : 'max-w-7xl'} mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6`}>
+        <div className={`relative z-10 ${isLocalDev ? 'max-w-[1720px]' : 'max-w-[1520px]'} mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6`}>
           <div className="space-y-2">
             <div className="flex items-center gap-3">
               <span className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-600/20">
@@ -1710,11 +1753,11 @@ export default function SAPTransactionGuideView() {
       {/* ─────────────────────────────────────────────────────────────
           2. NAVBAR SOP PM REGIONAL 5 (Light Enterprise Clean Style)
       ───────────────────────────────────────────────────────────── */}
-      <div className="bg-white/95 backdrop-blur-md border-b border-slate-200/90 text-slate-800 sticky top-0 z-40 shadow-xs">
-        <div className={`${isLocalDev ? 'max-w-[1720px]' : 'max-w-7xl'} mx-auto px-4 flex items-center justify-between h-14 md:h-16 relative`}>
+      <div className="bg-white/95 backdrop-blur-md border-b border-slate-200/90 text-slate-800 relative md:sticky md:top-0 z-40 shadow-xs">
+        <div className={`${isLocalDev ? 'max-w-[1720px]' : 'max-w-[1520px]'} mx-auto px-2.5 sm:px-4 xl:px-2.5 2xl:px-4 flex flex-wrap xl:flex-nowrap items-center justify-between gap-x-1 2xl:gap-x-2 gap-y-2 min-h-14 py-2 xl:py-0 xl:min-h-16 relative`}>
           
           {/* Left Brand / Section Indicator */}
-          <div className="flex items-center gap-2.5 shrink-0 mr-3">
+          <div className="order-1 flex items-center gap-2 shrink-0 mr-0 2xl:mr-2">
             <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center shadow-xs">
               <BookOpen size={16} className="text-emerald-700" />
             </div>
@@ -1728,7 +1771,10 @@ export default function SAPTransactionGuideView() {
           </div>
 
           {/* Center: Dropdown Navigation Pills */}
-          <nav className="flex items-center gap-1 py-1 flex-1 max-w-4xl relative overflow-visible">
+          <nav
+            aria-label="Navigasi SOP SAP Plant Maintenance"
+            className="order-3 xl:order-2 w-full xl:w-auto flex flex-wrap items-center gap-2 xl:gap-0.5 2xl:gap-1.5 py-1 flex-1 min-w-0 relative overflow-visible"
+          >
             {activeDropdown && (
               <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setActiveDropdown(null)} />
             )}
@@ -1738,7 +1784,7 @@ export default function SAPTransactionGuideView() {
               <button
                 type="button"
                 onClick={() => setActiveDropdown(activeDropdown === 'flow' ? null : 'flow')}
-                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-all ${
+                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all ${
                   activeTab === 'flow' || activeDropdown === 'flow'
                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-xs font-bold'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -1779,7 +1825,7 @@ export default function SAPTransactionGuideView() {
               <button
                 type="button"
                 onClick={() => setActiveDropdown(activeDropdown === 'pilar1' ? null : 'pilar1')}
-                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-all ${
+                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all ${
                   activeTab === 'pilar1' || activeDropdown === 'pilar1'
                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-xs font-bold'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -1821,7 +1867,7 @@ export default function SAPTransactionGuideView() {
               <button
                 type="button"
                 onClick={() => setActiveDropdown(activeDropdown === 'pilar2' ? null : 'pilar2')}
-                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-all ${
+                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all ${
                   activeTab === 'pilar2' || activeDropdown === 'pilar2'
                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-xs font-bold'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -1863,7 +1909,7 @@ export default function SAPTransactionGuideView() {
               <button
                 type="button"
                 onClick={() => setActiveDropdown(activeDropdown === 'pilar3' ? null : 'pilar3')}
-                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-all ${
+                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all ${
                   activeTab === 'pilar3' || activeDropdown === 'pilar3'
                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-xs font-bold'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -1905,7 +1951,7 @@ export default function SAPTransactionGuideView() {
               <button
                 type="button"
                 onClick={() => setActiveDropdown(activeDropdown === 'troubleshoot' ? null : 'troubleshoot')}
-                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-all ${
+                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all ${
                   activeTab === 'troubleshoot' || activeDropdown === 'troubleshoot'
                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-xs font-bold'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -1943,7 +1989,7 @@ export default function SAPTransactionGuideView() {
               <button
                 type="button"
                 onClick={() => setActiveDropdown(activeDropdown === 'catalog' ? null : 'catalog')}
-                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-all ${
+                className={`group inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 2xl:gap-1.5 rounded-lg px-2 2xl:px-3 text-xs font-semibold transition-all ${
                   activeTab === 'catalog' || activeDropdown === 'catalog'
                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-xs font-bold'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -1964,11 +2010,19 @@ export default function SAPTransactionGuideView() {
                 </div>
               )}
             </div>
+
+            {/* 7. DAFTAR T-CODE PM (Searchable & Categorized) */}
+            <SapTcodeDropdown
+              selectedCode={selectedCatalogEntry?.code || activeTcode.tcode}
+              isOpen={activeDropdown === 'tcodeList'}
+              onOpenChange={(open) => setActiveDropdown(open ? 'tcodeList' : null)}
+              onSelect={handleSelectTcodeCatalogItem}
+            />
           </nav>
 
           {/* Right Side Status Badges */}
-          <div className="flex items-center gap-2 shrink-0 ml-auto pl-2">
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 font-medium">
+          <div className="order-2 xl:order-3 flex items-center gap-2 shrink-0 ml-auto pl-0 2xl:pl-2">
+            <div className="hidden sm:flex items-center gap-1 2xl:gap-2 px-1.5 2xl:px-3 py-1.5 text-xs text-slate-700 font-medium whitespace-nowrap">
               <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
               <span className="text-slate-500">Modul:</span>
               <span className="text-slate-900 font-mono font-bold">{activeTcode.tcode}</span>
@@ -1981,7 +2035,84 @@ export default function SAPTransactionGuideView() {
       {/* ─────────────────────────────────────────────────────────────
           3. MAIN CONTENT AREA (100% Full Width, Clean & Spacious)
       ───────────────────────────────────────────────────────────── */}
-      <div className={`relative z-10 ${isLocalDev ? 'max-w-[1720px]' : 'max-w-7xl'} mx-auto p-4 md:p-8 space-y-6`}>
+      <div className={`relative z-10 ${isLocalDev ? 'max-w-[1720px]' : 'max-w-[1520px]'} mx-auto p-4 md:p-8 space-y-6`}>
+        {selectedCatalogEntry && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-300 bg-white p-4 shadow-xs"
+          >
+            <div className="flex items-start gap-3 min-w-0">
+              <span
+                className={`mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-1 font-mono text-xs font-bold ${
+                  selectedCatalogEntry.type === 'document'
+                    ? 'border-amber-700 bg-amber-50 text-amber-900'
+                    : 'border-emerald-700 bg-emerald-50 text-emerald-900'
+                }`}
+              >
+                {selectedCatalogEntry.type === 'document' && (
+                  <FileText size={13} aria-hidden="true" />
+                )}
+                <span>{selectedCatalogEntry.code}</span>
+              </span>
+              <div className="min-w-0 space-y-0.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-bold text-slate-900 break-words">
+                    {selectedCatalogEntry.type === 'document'
+                      ? selectedCatalogEntry.fileName
+                      : selectedCatalogEntry.description}
+                  </span>
+                  <span className="rounded-md border border-slate-300 bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                    {selectedCatalogEntry.category}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  {selectedCatalogEntry.type === 'document'
+                    ? `${selectedCatalogEntry.description}. File sumber dikelola sebagai arsip dokumen SOP, dan panduan interaktif terkait (${activeTcode.tcode} M${activeTcode.moduleNo}) ditampilkan di bawah.`
+                    : selectedCatalogEntry.targetKey === 'troubleshoot'
+                      ? 'Menampilkan Klinik Troubleshooting untuk penanganan konfirmasi dan status order.'
+                      : `Panduan referensi SAP GUI terkait dibuka pada Modul ${activeTcode.moduleNo} (${activeTcode.tcode}).`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() =>
+                  handleCopy(
+                    selectedCatalogEntry.type === 'document'
+                      ? selectedCatalogEntry.fileName
+                      : selectedCatalogEntry.code,
+                    'catalog_entry'
+                  )
+                }
+                className="min-h-[44px] lg:min-h-[36px] inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-500 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-emerald-700"
+              >
+                {copiedKey === 'catalog_entry' ? (
+                  <Check size={14} aria-hidden="true" className="text-emerald-800" />
+                ) : (
+                  <Copy size={14} aria-hidden="true" />
+                )}
+                <span>
+                  {copiedKey === 'catalog_entry'
+                    ? 'Tersalin!'
+                    : selectedCatalogEntry.type === 'document'
+                      ? 'Salin Nama File'
+                      : 'Salin T-Code'}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCatalogEntry(null)}
+                aria-label="Tutup informasi T-Code terpilih"
+                className="min-h-[44px] min-w-[44px] lg:min-h-[36px] lg:min-w-[36px] inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-500 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-emerald-700"
+              >
+                <X size={15} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        )}
         {activeTab === 'flow' && (
           <div className="space-y-6 animate-in fade-in-50 duration-200">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
