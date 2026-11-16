@@ -4492,8 +4492,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   const formattedCost = row.zcoCost !== 0
                     ? row.zcoCost.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
                     : '0';
-                  const formattedActy = (row.activity || row.logActivity) > 0 
-                    ? (row.activity || row.logActivity).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) 
+                  const formattedActy = row.activity > 0 
+                    ? row.activity.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) 
                     : '-';
                   const formattedRate = row.zcoRate > 0 
                     ? row.zcoRate.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) 
