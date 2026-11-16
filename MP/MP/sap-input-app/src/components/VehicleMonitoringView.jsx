@@ -3114,8 +3114,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           statusText = 'Oke';
         } else {
           cekStatus = 'Cek';
-          // Apabila ada activity tapi tidak ada cost (cost <= 0)
-          if (activity > 0 && zcoCost <= 0) {
+          // Apabila biaya negatif → perlu diperiksa
+          if (zcoCost < 0) {
+            statusColor = 'red';
+            statusText = 'Periksa';
+          // Apabila ada activity tapi tidak ada cost (cost = 0)
+          } else if (activity > 0 && zcoCost === 0) {
             statusColor = 'orange';
             statusText = 'Belum Ada Pembebanan Biaya';
           } else if (zcoCost > 0 && (activity === 0 || logActivityVal === 0)) {
@@ -3123,7 +3127,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             statusText = 'Logbook Belum Dibuat';
           } else {
             statusColor = 'red';
-            statusText = 'Perbaiki';
+            statusText = 'Periksa';
           }
         }
       }
@@ -4485,8 +4489,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 </tr>
               ) : (
                 filteredZCOData.slice((zcoPage - 1) * LOG_PAGE_SIZE, zcoPage * LOG_PAGE_SIZE).map((row, idx) => {
-                  const formattedCost = row.zcoCost > 0 
-                    ? row.zcoCost.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) 
+                  const formattedCost = row.zcoCost !== 0
+                    ? row.zcoCost.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
                     : '0';
                   const formattedActy = (row.activity || row.logActivity) > 0 
                     ? (row.activity || row.logActivity).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) 
@@ -4514,7 +4518,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                       <td className="px-3 py-2 font-semibold text-slate-800 font-mono text-[11px] leading-tight">
                         {row.rawCostCenter}
                       </td>
-                      <td className="px-3 py-2 text-right font-bold text-slate-800 font-mono">
+                      <td className={`px-3 py-2 text-right font-bold font-mono ${row.zcoCost < 0 ? 'text-red-600' : 'text-slate-800'}`}>
                         {formattedCost}
                       </td>
                       <td className="px-3 py-2 text-right font-extrabold text-[#064e3b] bg-emerald-50/30 font-mono">
