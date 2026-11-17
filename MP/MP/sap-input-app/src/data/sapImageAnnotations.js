@@ -429,6 +429,82 @@ export const sapImageAnnotations = {
       label: { text: "Periksa nomor item 0140", side: 'right' }
     },
   ],
+  "/images/pm04/step_1.png": [
+    {
+      box: { x: 4.1, y: 38.2, w: 52.4, h: 9.7 },
+      label: { text: "Isi Order Type PM04 & Priority", side: 'right' }
+    },
+    {
+      box: { x: 3.5, y: 51.3, w: 51.5, h: 5.6 },
+      label: { text: "Masukan Nomor Equipment Mesin Sasaran", side: 'right' }
+    },
+    {
+      box: { x: 4.4, y: 60.4, w: 29.7, h: 6.6 },
+      label: { text: "Masukan Planning Plant Unit", side: 'right' }
+    },
+  ],
+  "/images/pm04/step_2.png": [
+    {
+      box: { x: 37.4, y: 19.9, w: 49.3, h: 4.8 },
+      label: { text: "Isi Keterangan Kegiatan Investasi", side: 'above' }
+    },
+    {
+      box: { x: 58.7, y: 45.4, w: 30.6, h: 4.4 },
+      label: { text: "Pilih PMActType = INV (Investment)", side: 'right' }
+    },
+    {
+      box: { x: 35.7, y: 86.8, w: 16.2, h: 3.8 },
+      label: { text: "Control Key First Operation = EXT (External)", side: 'above' }
+    },
+  ],
+  "/images/pm04/step_3.png": [
+    {
+      box: { x: 8.5, y: 19.9, w: 4.2, h: 3.2 },
+      label: { text: "Durasi Pekerjaan = 0 H", side: 'right' }
+    },
+    {
+      box: { x: 71.3, y: 19.8, w: 5.3, h: 3.3 },
+      label: { text: "Pilih Res/PurcRq = Immediately", side: 'left' }
+    },
+  ],
+  "/images/pm04/step_4.png": [
+    {
+      box: { x: 21.0, y: 38.4, w: 45.3, h: 3.9 },
+      label: { text: "Input Short Text, Qty (1 AU), dan Nilai Gross Price (IDR)", side: 'above' }
+    },
+  ],
+  "/images/pm04/step_5.png": [
+    {
+      box: { x: 2.0, y: 30.4, w: 21.6, h: 2.4 },
+      label: { text: "Isi Requisitioner (PAPEL) & Parameter Pengadaan", side: 'right' }
+    },
+  ],
+  "/images/pm04/step_6.png": [
+    {
+      box: { x: 3.1, y: 59.5, w: 79.5, h: 8.4 },
+      label: { text: "Wajib Alokasi WBS Element & Project Definition", side: 'above' }
+    },
+    {
+      box: { x: 39.2, y: 5.5, w: 4.8, h: 5.0 },
+      label: { text: "Klik Simpan (Save) Dokumen Order PM04", side: 'right' }
+    },
+  ],
+  "/images/pm04/step_7.png": [
+    {
+      box: { x: 4.6, y: 16.2, w: 2.7, h: 2.8 },
+      label: { text: "Klik Bendera Hijau untuk Release (REL)", side: 'right' }
+    },
+    {
+      box: { x: 1.7, y: 23.7, w: 37.1, h: 3.9 },
+      label: { text: "Status Berubah REL NMAT PRC SETC", side: 'right' }
+    },
+  ],
+  "/images/pm04/step_8.png": [
+    {
+      box: { x: 4.9, y: 77.4, w: 51.1, h: 17.5 },
+      label: { text: "Nomor Purchase Requisition (PR) Otomatis Terbit", side: 'above' }
+    },
+  ],
   "/images/iw32/step_1.png": [
     {
       box: { x: 39.1, y: 67.6, w: 33.8, h: 13 },

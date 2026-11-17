@@ -560,7 +560,31 @@ export const SAP_TCODE_CATALOG = [
     keywords: ['item notifikasi', 'display selection'],
   },
 
-  // Maintenance Orders & Confirmations (16)
+  // Maintenance Orders & Confirmations (18)
+  {
+    id: 'IW31',
+    code: 'IW31',
+    description: 'Create Maintenance Order',
+    categoryKey: 'orders_confirmations',
+    category: 'Maintenance Orders & Confirmations',
+    type: 'tcode',
+    targetKey: 'iw31',
+    pilar: 'pilar3',
+    hasDirectGuide: true,
+    keywords: ['create order', 'work order', 'pm01', 'pm02', 'surat perintah kerja'],
+  },
+  {
+    id: 'PM04',
+    code: 'PM04',
+    description: 'Create Investment Order (Work Order Investasi)',
+    categoryKey: 'orders_confirmations',
+    category: 'Maintenance Orders & Confirmations',
+    type: 'tcode',
+    targetKey: 'pm04',
+    pilar: 'pilar3',
+    hasDirectGuide: true,
+    keywords: ['pm04', 'investasi', 'investment order', 'capex', 'wbs element', 'ducting fiber cyclone', 'external service', 'pr otomatis', 'iw31 pm04'],
+  },
   {
     id: 'IW32',
     code: 'IW32',

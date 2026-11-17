@@ -877,6 +877,98 @@ export default function SAPTransactionGuideView() {
       tips: 'Menyimpan komponen suku cadang di IW31 otomatis menerbitkan Reservation Number di modul Gudang (MM). Gudang dapat langsung memproses pengeluaran barang (Goods Issue) menggunakan nomor reservasi tersebut.'
     },
 
+    pm04: {
+      tcode: 'IW31 / PM04',
+      title: 'Create Investment Order (Work Order Investasi PM04)',
+      moduleNo: '14',
+      moduleName: 'Investment Order (PM04)',
+      pilar: 'pilar3',
+      pilarName: 'Bisnis Proses & Eksekusi',
+      role: 'Asisten Teknik / Masinis Kepala / Planner Investasi / Finance',
+      difficulty: 'Tinggi',
+      purpose: 'Membuat dokumen Work Order khusus proyek investasi pabrik dan kebun (Capex), renovasi besar, rekondisi mesin, atau penggantian aset yang memerlukan alokasi WBS Element Proyek serta penerbitan otomatis Purchase Requisition (PR) untuk pengadaan jasa vendor/rekanan eksternal.',
+      ptpnStandard: 'Order Type: PM04 (Investment Order). PM Activity Type: INV (Investment). First Operation Control Key: EXT (External Service). Alokasi biaya diselesaikan (settlement) ke WBS Element Proyek Investasi (AuC / Asset under Construction), bukan ke Cost Center Opex rutin. Sistem SAP otomatis menerbitkan nomor Purchase Requisition (PR) saat status order berubah menjadi REL (Released).',
+      fields: [
+        { name: 'Order Type', type: 'Required', example: 'PM04', desc: 'Tipe order khusus investasi/kapitalisasi aset pabrik dan kebun (Capex).' },
+        { name: 'Priority', type: 'Required', example: 'Medium / High', desc: 'Prioritas pelaksanaan proyek investasi mesin/fasilitas.' },
+        { name: 'Equipment', type: 'Required', example: '1000197313 (Fiber Cyclone No. 1)', desc: 'Nomor master equipment mesin sasaran investasi/penggantian.' },
+        { name: 'Planning Plant', type: 'Required', example: '5F15 (PKS Pelaihari) / 5F01', desc: 'Kode unit kerja/PKS tempat proyek investasi dilaksanakan.' },
+        { name: 'Order Description', type: 'Required', example: 'Penggantian Ducting Fiber Cyclone', desc: 'Uraian lengkap nama kegiatan pekerjaan investasi aset.' },
+        { name: 'Planner Group', type: 'Required', example: '500 / 5F15 (Planner Teknik)', desc: 'Regu perencana pemeliharaan teknis unit.' },
+        { name: 'Main Work Center', type: 'Required', example: 'TEK-WSH / 5F15 (Teknisi Workshop)', desc: 'Work Center penanggung jawab teknis pelaksanaan di unit.' },
+        { name: 'PM Activity Type', type: 'Required', example: 'INV (Investment)', desc: 'Jenis aktivitas pemeliharaan khusus investasi modal (Capex).' },
+        { name: 'Control Key (First Opr)', type: 'Required', example: 'EXT (PTPN External Labor Maint)', desc: 'Kunci kontrol operasi eksternal agar SAP mengaktifkan subtab Services & pengadaan rekanan.' },
+        { name: 'Duration (Dur)', type: 'Required', example: '0 H', desc: 'Durasi jam kerja internal pada baris operasi (0 H untuk jasa eksternal).' },
+        { name: 'Res./Purc. req.', type: 'Required', example: 'Immediately', desc: 'Parameter aktivasi agar Purchase Requisition (PR) langsung terbit otomatis saat order berstatus REL.' },
+        { name: 'Services (Short Text, Qty, Price)', type: 'Required', example: 'Penggantian Ducting Fiber Cyclone, 1 AU, Rp 1.000.000', desc: 'Rincian deskripsi jasa rekanan, kuantitas satuan aktivitas (AU), dan estimasi gross price.' },
+        { name: 'Cost Element', type: 'Required', example: '51101999', desc: 'Akun biaya kapitalisasi / pembebanan jasa investasi proyek.' },
+        { name: 'Requisitioner', type: 'Required', example: 'PAPEL (Pabrik Pelaihari)', desc: 'Kode bagian/pemohon pengadaan jasa investasi pada tab External.' },
+        { name: 'Material Group & Purch. Group', type: 'Required', example: 'S999 (Jasa Pemeliharaan) / P08', desc: 'Grup material jasa dan kode bagian pengadaan/procurement.' },
+        { name: 'WBS Element', type: 'Required', example: 'PC-26-5F15-05-27-03', desc: 'Nomor elemen WBS proyek investasi tempat seluruh biaya dikapitalisasi.' },
+        { name: 'Project Definition', type: 'Required', example: 'PC-26-5F15', desc: 'Kode induk proyek investasi yang menaungi WBS Element.' },
+        { name: 'Related T-Codes', type: 'Info', example: 'IW31 (Create) | IW32 (Release/Change) | IW33 (Display) | KO02 (Settlement) | CJ20N (WBS)', desc: 'Rangkaian transaksi SAP terintegrasi untuk siklus hidup WO Investasi PM04.' }
+      ],
+      stepsData: [
+        {
+          num: 1,
+          title: 'Initial Screen IW31: Penentuan Order Type PM04 & Target Equipment',
+          desc: 'Akses T-Code IW31 di command field SAP GUI. Masukkan Order Type = PM04 (Investment Order), Priority = Medium, nomor Equipment mesin sasaran (misal: 1000197313 - FIBER CYCLONE NO. 1), dan Planning Plant (misal: 5F15 - PKS Pelaihari). Tekan tombol Enter untuk masuk ke formulir pembuatan Work Order.',
+          image: '/images/pm04/step_1.png',
+          imgCaption: 'Layar Awal IW31: Input Order Type PM04, Equipment, dan Planning Plant'
+        },
+        {
+          num: 2,
+          title: 'Central Header: Uraian Kegiatan Investasi & Activity Type INV',
+          desc: 'Ketikkan judul pekerjaan pada kolom Order Description (misal: "Penggantian Ducting Fiber Cyclone"). Isi Planner Group (500) dan Main Work Center (TEK-WSH). Pada bagian Person responsible, pilih PM Activity Type = INV (Investment). Pada First operation di bagian bawah, pastikan Control Key diisi "EXT" (PTPN External Labor Maintenance).',
+          image: '/images/pm04/step_2.png',
+          imgCaption: 'Tab HeaderData: Judul Pekerjaan, PMActType INV, dan Control Key EXT'
+        },
+        {
+          num: 3,
+          title: 'Tab Operations: Pengaturan Durasi & Reservasi PR Immediately',
+          desc: 'Klik tab Operations. Pada baris operasi 0010, tentukan durasi pekerjaan (Dur = 0 H). Geser scrollbar horizontal ke arah kanan hingga menemukan kolom Res/PurcRq, lalu pilih opsi "Immediately" agar sistem SAP langsung menerbitkan dokumen Purchase Requisition (PR) secara otomatis saat order dirilis.',
+          image: '/images/pm04/step_3.png',
+          imgCaption: 'Tab Operations: Durasi Kerja 0H & Penentuan Res/Purc. Req Immediately'
+        },
+        {
+          num: 4,
+          title: 'General Operation: Input Rincian Jasa Pemborongan & Estimasi Nilai (Services)',
+          desc: 'Sorot baris operasi 0010 dan klik subtab General di bawahnya, kemudian pilih tab Services. Masukkan rincian pekerjaan: Line 10, Short Text ("Penggantian Ducting Fiber Cyclone"), Quantity = 1, Unit = AU (Activity Unit), Gross Price = nilai estimasi anggaran (misal: Rp 1.000.000 IDR), dan Cost Element = 51101999 (Kapitalisasi Jasa Investasi).',
+          image: '/images/pm04/step_4.png',
+          imgCaption: 'Subtab Services: Rincian Item Jasa, Volume (AU), Nilai Anggaran (Gross Price) & Cost Element'
+        },
+        {
+          num: 5,
+          title: 'Tab External: Penunjukan Requisitioner & Purchasing Group',
+          desc: 'Beralih ke subtab External pada General Operation Data. Masukkan kode Requisitioner (misal: PAPEL untuk Bagian Pengolahan Pabrik Pelaihari). Pastikan Material Group terisi S999 (Jasa Pemeliharaan/Investasi) dan Purchasing Group terisi kode pengadaan unit (misal: P08 / P051) untuk keperluan proses tender vendor.',
+          image: '/images/pm04/step_5.png',
+          imgCaption: 'Subtab External: Penunjukan Pemohon (Requisitioner PAPEL) & Purchasing Group'
+        },
+        {
+          num: 6,
+          title: 'Tab Additional Data: Alokasi WBS Element Proyek & Simpan Order',
+          desc: 'Kembali ke Header Data dan klik tab Additional Data. Pada bagian Organization, wajib menginput WBS Element (misal: PC-26-5F15-05-27-03) dan Project Definition (PC-26-5F15). Seluruh pembebanan biaya investasi akan diselesaikan ke WBS Element ini. Klik tombol Simpan (ikon Disket). Sistem menerbitkan nomor Order PM04 resmi (status awal: CRTD MANC NTUP).',
+          image: '/images/pm04/step_6.png',
+          imgCaption: 'Tab Additional Data: Pengikatan WBS Element Proyek & Simpan Dokumen (Save)'
+        },
+        {
+          num: 7,
+          title: 'Otorisasi & Rilis Order Investasi (IW32)',
+          desc: 'Buka T-Code IW32, masukkan nomor Work Order yang baru dibuat (misal: 230000018873). Klik tombol Bendera Hijau (Release - F8 / Ctrl+F1) untuk merilis order. Simpan dokumen (Ctrl+S). Status sistem pada header order akan berubah menjadi "REL NMAT PRC SETC" (Released, Settlement Rule Created).',
+          image: '/images/pm04/step_7.png',
+          imgCaption: 'Layar IW32: Rilis Work Order (Bendera Hijau) hingga Berstatus REL'
+        },
+        {
+          num: 8,
+          title: 'Verifikasi Penerbitan Nomor Purchase Requisition (PR) Otomatis',
+          desc: 'Masuk kembali ke menu order di IW32 atau IW33, buka tab Operations ➔ subtab General ➔ subtab Act. Data. Periksa blok Purchasing: kolom Requisition secara otomatis telah terisi nomor Purchase Requisition resmi SAP (misal: 1200051225 item 10). Nomor PR ini langsung diteruskan ke Bagian Pengadaan (Procurement) untuk penerbitan Purchase Order (PO) kontrak rekanan.',
+          image: '/images/pm04/step_8.png',
+          imgCaption: 'Subtab Act. Data: Nomor Purchase Requisition (PR) Otomatis Terbit oleh Sistem SAP'
+        }
+      ],
+      tips: 'KUNCI SUKSES WORK ORDER INVESTASI (PM04):\n1. T-Code Terkait: IW31 (Buat Order PM04), IW32 (Rilis & TECO), IW33 (Monitoring Display), KO02/CJ20N (Validasi Settlement WBS Element).\n2. Wajib mengisi WBS Element proyek pada tab Additional Data agar biaya tidak salah membebani Cost Center rutin.\n3. Wajib menggunakan Control Key EXT dengan rincian Services (Line, Short Text, Qty, AU, Gross Price, Cost Element 51101999).\n4. Nomor Purchase Requisition (PR) otomatis diterbitkan oleh SAP pada tab Operations -> Act. Data saat order berstatus REL (Immediately), tanpa perlu membuat PR manual di ME51N.'
+    },
+
     iw32: {
       tcode: 'IW32 / Release',
       title: 'Change & Release Maintenance Order (REL) & TECO',
@@ -1429,16 +1521,18 @@ export default function SAPTransactionGuideView() {
       no: '14',
       pilarKey: 'pilar3',
       title: 'Bisnis Proses - Investment Order PM04 (Overhaul & Kapitalisasi)',
-      tcodes: ['IW31 (PM04)', 'IW32', 'KO02'],
-      targetKey: 'iw31',
-      role: 'Manajer Teknik / Finance Akuntansi',
-      scope: 'Work Order khusus pekerjaan renovasi besar, rekondisi mesin, atau proyek kapitalisasi aset pabrik.',
+      tcodes: ['IW31 (PM04)', 'IW32', 'IW33', 'KO02', 'CJ20N'],
+      targetKey: 'pm04',
+      role: 'Manajer Teknik / Asisten Kepala / Finance Akuntansi',
+      scope: 'Work Order khusus pekerjaan renovasi besar, rekondisi mesin, penggantian aset pabrik, dan proyek investasi modal (Capex).',
       keyRules: [
-        'Wajib settlement ke WBS Element (Proyek Investasi) atau Nomor Aset Fisik (Asset under Construction)',
-        'Anggaran terikat ke RKAP Capex / Investasi Perusahaan',
-        'Memerlukan otorisasi level pimpinan unit'
+        'Wajib memakai Order Type PM04 dan PM Activity Type INV (Investment)',
+        'First Operation berstatus External (Control Key EXT)',
+        'Input rincian item jasa pemborongan (Services) beserta estimasi Gross Price dan Cost Element (51101999)',
+        'Wajib mengisi Requisitioner (PAPEL) dan alokasi WBS Element Proyek pada tab Additional Data',
+        'Nomor Purchase Requisition (PR) SAP terbit otomatis saat Work Order dirilis (Status REL)'
       ],
-      highlights: 'Biaya tidak dibebankan ke biaya operasional rutin (Opex), melainkan dikapitalisasi ke aset.'
+      highlights: 'Biaya tidak dibebankan ke biaya operasional rutin (Opex Cost Center), melainkan dikapitalisasi ke WBS Element Proyek / Aset Dalam Pengerjaan (AuC).'
     },
     {
       no: '15',
