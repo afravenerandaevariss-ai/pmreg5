@@ -610,12 +610,12 @@ export default function WorkOrderMonitoringView({ currentUser }) {
     data.forEach(item => {
       const statusStr = item['System status'] || '';
       const firstToken = statusStr.trim().split(/\s+/)[0].toUpperCase();
-      if (firstToken && ['REL', 'TECO', 'CLSD'].includes(firstToken)) {
+      if (firstToken && ['REL', 'TECO', 'CLSD', 'CRTD'].includes(firstToken)) {
         statuses.add(firstToken);
       }
     });
-    // Ensure the specific order or at least only these 3 if they exist
-    return ['REL', 'TECO', 'CLSD'];
+    // Return in fixed order: REL, TECO, CRTD, CLSD (hanya yang ada di data)
+    return ['REL', 'TECO', 'CRTD', 'CLSD'].filter(s => statuses.has(s));
   }, [data]);
 
   const indonesianMonths = [
