@@ -665,7 +665,9 @@ export default function WorkOrderMonitoringView({ currentUser }) {
       const matchesType = !selectedType || typeVal === selectedType.toLowerCase();
       
       const firstStatusToken = statusVal.trim().split(/\s+/)[0].toUpperCase();
-      const matchesStatus = selectedStatus.length === 0 || selectedStatus.some(status => firstStatusToken.startsWith(status));
+      const matchesStatus = selectedStatus.length === 0 
+        ? false 
+        : selectedStatus.some(status => firstStatusToken.startsWith(status));
       
       const matchesMonth = !selectedMonth || getExcelMonth(item['Reference Date']) === Number(selectedMonth);
       
@@ -1019,46 +1021,77 @@ export default function WorkOrderMonitoringView({ currentUser }) {
 
               {/* Filter System Status */}
               <div className="relative" ref={statusDropdownRef}>
-                <button 
-                  onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-                  className="bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs text-slate-700 font-semibold focus:ring-2 focus:ring-[#064e3b]/20 focus:border-[#064e3b] focus:outline-none hover:border-slate-300 transition-colors duration-200 ease-out flex items-center justify-between min-w-[170px]"
-                >
-                  <span className="truncate">
-                    {selectedStatus.length === 0 
-                      ? "Semua Status Sistem" 
-                      : selectedStatus.length === 1 
-                        ? selectedStatus[0] 
-                        : `${selectedStatus.length} Status Terpilih`}
-                  </span>
-                  <ChevronDown size={14} className="ml-2 text-slate-400" />
-                </button>
+                {(() => {
+                  const isAllStatusesSelected = uniqueStatuses.length > 0 && selectedStatus.length === uniqueStatuses.length;
+                  return (
+                    <>
+                      <button 
+                        onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                        className="bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs text-slate-700 font-semibold focus:ring-2 focus:ring-[#064e3b]/20 focus:border-[#064e3b] focus:outline-none hover:border-slate-300 transition-colors duration-200 ease-out flex items-center justify-between min-w-[170px]"
+                      >
+                        <span className="truncate">
+                          {isAllStatusesSelected
+                            ? "Semua Status" 
+                            : selectedStatus.length === 0 
+                              ? "Pilih Status" 
+                              : selectedStatus.length === 1 
+                                ? selectedStatus[0] 
+                                : `${selectedStatus.length} Status Terpilih`}
+                        </span>
+                        <ChevronDown size={14} className="ml-2 text-slate-400" />
+                      </button>
 
-                {isStatusDropdownOpen && (
-                  <div className="absolute z-50 mt-2 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-2">
-                    <div className="max-h-60 overflow-auto">
-                      {uniqueStatuses.map(s => {
-                        const isSelected = selectedStatus.includes(s);
-                        return (
-                          <label key={s} className="flex items-center px-4 py-2 hover:bg-slate-50 cursor-pointer text-xs transition-colors duration-200">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => {
-                                if (isSelected) {
-                                  setSelectedStatus(prev => prev.filter(item => item !== s));
-                                } else {
-                                  setSelectedStatus(prev => [...prev, s]);
-                                }
-                              }}
-                              className="mr-3 rounded border-slate-300 text-[#064e3b] focus:ring-[#064e3b] h-4 w-4 cursor-pointer"
-                            />
-                            <span className="text-slate-700 font-medium">{s}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                      {isStatusDropdownOpen && (
+                        <div className="absolute z-50 mt-2 w-full min-w-[185px] bg-white border border-slate-200 rounded-xl shadow-lg py-2">
+                          <div className="max-h-60 overflow-auto">
+                            {/* Option: Pilih Semua Status */}
+                            <label className="flex items-center px-4 py-2 hover:bg-slate-50 cursor-pointer text-xs font-bold text-slate-800 transition-colors duration-200 border-b border-slate-100 pb-2 mb-1">
+                              <input
+                                type="checkbox"
+                                checked={isAllStatusesSelected}
+                                ref={el => {
+                                  if (el) {
+                                    el.indeterminate = selectedStatus.length > 0 && selectedStatus.length < uniqueStatuses.length;
+                                  }
+                                }}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedStatus([...uniqueStatuses]);
+                                  } else {
+                                    setSelectedStatus([]);
+                                  }
+                                }}
+                                className="mr-3 rounded border-slate-300 text-[#064e3b] focus:ring-[#064e3b] h-4 w-4 cursor-pointer"
+                              />
+                              <span>Pilih Semua Status</span>
+                            </label>
+
+                            {uniqueStatuses.map(s => {
+                              const isSelected = selectedStatus.includes(s);
+                              return (
+                                <label key={s} className="flex items-center px-4 py-2 hover:bg-slate-50 cursor-pointer text-xs transition-colors duration-200">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => {
+                                      if (isSelected) {
+                                        setSelectedStatus(prev => prev.filter(item => item !== s));
+                                      } else {
+                                        setSelectedStatus(prev => [...prev, s]);
+                                      }
+                                    }}
+                                    className="mr-3 rounded border-slate-300 text-[#064e3b] focus:ring-[#064e3b] h-4 w-4 cursor-pointer"
+                                  />
+                                  <span className="text-slate-700 font-medium">{s}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Filter Month */}
