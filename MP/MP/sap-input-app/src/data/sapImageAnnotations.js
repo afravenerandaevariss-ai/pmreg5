@@ -539,8 +539,8 @@ export const sapImageAnnotations = {
   ],
   "/images/iw39/step_5.png": [
     {
-      box: { x: 40.5, y: 7.7, w: 1.4, h: 4.1 },
-      label: { text: "Klik tombol Spreadsheet / Export Excel", side: 'above' }
+      box: { x: 2.1, y: 13.8, w: 10.8, h: 2.8 },
+      label: { text: "Klik Spreadsheet", side: 'right' }
     },
   ],
   "/images/zesthlc003pa/step_1.png": [
