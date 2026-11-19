@@ -1199,6 +1199,25 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         const debitSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes('debit') || s.toLowerCase().includes('salrd'));
         const creditSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes('credit') || s.toLowerCase().includes('slarc'));
 
+        // Shared helper to get value from row by column names or column index
+        const getColVal = (row, patterns, fallbackIdx) => {
+          for (const p of patterns) {
+            if (row[p] !== undefined && row[p] !== '') return row[p];
+          }
+          const keys = Object.keys(row);
+          for (const p of patterns) {
+            const cleanP = p.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const foundKey = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanP);
+            if (foundKey && row[foundKey] !== undefined && row[foundKey] !== '') return row[foundKey];
+          }
+          if (fallbackIdx !== undefined) {
+            if (Array.isArray(row) && row[fallbackIdx] !== undefined) return row[fallbackIdx];
+            const emptyKey = fallbackIdx === 0 ? '__EMPTY' : `__EMPTY_${fallbackIdx}`;
+            if (row[emptyKey] !== undefined && row[emptyKey] !== '') return row[emptyKey];
+          }
+          return '';
+        };
+
         // 1. Process SALRD / Debit transactions
         if (uploadType === 'salrd' || uploadType === 'all') {
           setUploadProgress('Memproses transaksi SALRD (Debit Solar)...');
@@ -1213,12 +1232,13 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             let debitReversals = 0;
 
             for (const r of rows) {
-              const rawCe = String(r['Cost Element'] || r['CostElement'] || '').trim();
+              const rawCe = String(getColVal(r, ['Cost Element', 'CostElement', 'Kostenart'], 5) || '').trim();
               const ce = rawCe.replace(/^0+/, '');
-              const rawUom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
-              const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
+              const rawUom = String(getColVal(r, ['Posted unit of meas.', 'Posted unit of meas', 'Unit of Measure', 'UoM', 'UOM', 'Unit', 'ME', 'Satuan'], 11) || '').trim().toUpperCase();
+              const name = String(getColVal(r, ['Name', 'CO Object Name', 'Text', 'Keterangan', 'Deskripsi'], 12) || '').trim();
 
-              const isStandardFuelUom = ['L', 'LTR', 'LITER'].includes(rawUom);
+              const cleanUom = rawUom.replace(/\./g, '').trim();
+              const isStandardFuelUom = ['L', 'LTR', 'LITER'].includes(cleanUom) || cleanUom.startsWith('L');
               const isFuelCostElement = ce === '51100057';
 
               if (!isFuelCostElement) {
@@ -1228,18 +1248,19 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 continue;
               }
 
-              // Task 1: Strict filter: CE 51100057 MUST have UoM exactly L (or alias LTR/LITER). No text-based fallback.
+              // Strict filter: CE 51100057 MUST have UoM L / LTR / LITER
               if (!isStandardFuelUom) {
                 excludedNonFuel++;
                 continue;
               }
 
-              const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim().toUpperCase();
-              if (!cc) continue;
+              const rawCc = String(getColVal(r, ['Cost Center', 'CostCenter', 'Pusat Biaya'], 0) || '').trim().toUpperCase();
+              const cc = rawCc.split(/\s+/)[0];
+              if (!cc || cc.startsWith('TOTAL') || cc.startsWith('GRAND') || cc.startsWith('PLANT') || cc === 'COST CENTER') continue;
 
-              const rawDate = r['Posting Date'] || r['Document Date'] || r['Date'];
+              const rawDate = getColVal(r, ['Posting Date', 'Document Date', 'Date', 'Tanggal', 'Buch.Datum'], 8);
               const dateStr = parseDateVal(rawDate);
-              const period = String(r['Period'] || '').trim();
+              const period = String(getColVal(r, ['Period', 'Periode', 'Per.'], 7) || '').trim();
               const year = dateStr ? dateStr.substring(0, 4) : '2026';
               const periodNum = parseInt(period, 10);
               const hasValidPeriod = !isNaN(periodNum) && periodNum >= 1 && periodNum <= 12;
@@ -1247,11 +1268,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 ? `${year}-${String(periodNum).padStart(2, '0')}`
                 : (dateStr ? dateStr.substring(0, 7) : (targetMonth || '2026-09'));
 
-              const drCr = String(r['Dr/Cr indicator'] || r['Dr/Cr'] || r['Dr/C'] || '').trim().toUpperCase();
+              const drCr = String(getColVal(r, ['Dr/Cr indicator', 'Dr/Cr', 'Dr/C', 'Soll/Haben'], 17) || '').trim().toUpperCase();
               const isReversal = drCr === 'C' || drCr === 'H';
 
-              let liters = parseSapNumber(r['Total quantity'] || r['Qty'] || 0);
-              let rupiah = parseSapNumber(r['Value in Obj. Crcy'] || r['Val.in rep.cur.'] || r['Cost'] || 0);
+              let liters = parseSapNumber(getColVal(r, ['Total quantity', 'Total Quantity', 'Quantity', 'Menge', 'Qty', 'Jumlah'], 10));
+              let rupiah = parseSapNumber(getColVal(r, ['Value in Obj. Crcy', 'Val.in rep.cur.', 'Value in Trans. Crcy', 'Cost', 'Nilai', 'Wert'], 9));
 
               if (isReversal) {
                 debitReversals++;
@@ -1262,8 +1283,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 rupiah = Math.abs(rupiah);
               }
 
-              const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
-              const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim().toUpperCase();
+              const doc = String(getColVal(r, ['Document Number', 'Doc Number', 'Document', 'No. Dokumen', 'No Dokumen', 'Belg.Nr.'], 3) || '').trim();
+              const plant = String(getColVal(r, ['Plant'], 4) || cc.substring(0, 4) || '').trim().toUpperCase();
 
               debitRowsCount++;
               newDaily.push({
@@ -1295,25 +1316,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             console.log(`[SLARC Ingestion] Sheet "${targetCreditSheet}" total rows: ${rows.length}`);
             const seenCreditUploadKeys = new Set();
             let creditDupsSkipped = 0;
-
-            // Helper to get value from row by column names or column index
-            const getColVal = (row, patterns, fallbackIdx) => {
-              for (const p of patterns) {
-                if (row[p] !== undefined && row[p] !== '') return row[p];
-              }
-              const keys = Object.keys(row);
-              for (const p of patterns) {
-                const cleanP = p.toLowerCase().replace(/[^a-z0-9]/g, '');
-                const foundKey = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanP);
-                if (foundKey && row[foundKey] !== undefined && row[foundKey] !== '') return row[foundKey];
-              }
-              if (fallbackIdx !== undefined) {
-                if (Array.isArray(row) && row[fallbackIdx] !== undefined) return row[fallbackIdx];
-                const emptyKey = fallbackIdx === 0 ? '__EMPTY' : `__EMPTY_${fallbackIdx}`;
-                if (row[emptyKey] !== undefined && row[emptyKey] !== '') return row[emptyKey];
-              }
-              return '';
-            };
 
             for (const r of rows) {
               // 1. Column A: Cost Center
