@@ -596,28 +596,33 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
   useEffect(() => { loadData(false); }, [loadData]);
 
-  // Automatically lazy-load monthly daily records when a date range is active
+  // Automatically lazy-load monthly daily records when a month or date range is active
   useEffect(() => {
-    if (!fuelStartDate && !fuelEndDate) return;
-    const sMonth = fuelStartDate ? fuelStartDate.substring(0, 7) : `${fuelYear}-09`;
-    const eMonth = fuelEndDate ? fuelEndDate.substring(0, 7) : sMonth;
-
     const monthsToLoad = new Set();
-    const sYr = parseInt(sMonth.substring(0, 4));
-    const sM = parseInt(sMonth.substring(5, 7));
-    const eYr = parseInt(eMonth.substring(0, 4));
-    const eM = parseInt(eMonth.substring(5, 7));
+    if (fuelStartDate || fuelEndDate) {
+      const sMonth = fuelStartDate ? fuelStartDate.substring(0, 7) : `${fuelYear}-09`;
+      const eMonth = fuelEndDate ? fuelEndDate.substring(0, 7) : sMonth;
+      const sYr = parseInt(sMonth.substring(0, 4));
+      const sM = parseInt(sMonth.substring(5, 7));
+      const eYr = parseInt(eMonth.substring(0, 4));
+      const eM = parseInt(eMonth.substring(5, 7));
 
-    for (let y = sYr; y <= eYr; y++) {
-      const startMo = y === sYr ? sM : 1;
-      const endMo = y === eYr ? eM : 12;
-      for (let m = startMo; m <= endMo; m++) {
-        monthsToLoad.add(`${y}-${String(m).padStart(2, '0')}`);
+      for (let y = sYr; y <= eYr; y++) {
+        const startMo = y === sYr ? sM : 1;
+        const endMo = y === eYr ? eM : 12;
+        for (let m = startMo; m <= endMo; m++) {
+          monthsToLoad.add(`${y}-${String(m).padStart(2, '0')}`);
+        }
       }
+    } else if (fuelMonths && fuelMonths.length > 0 && !fuelMonths.includes('ALL')) {
+      fuelMonths.forEach(m => {
+        monthsToLoad.add(m.length === 2 ? `${fuelYear}-${m}` : m);
+      });
     }
 
     monthsToLoad.forEach(async (ym) => {
-      if (!fuelLoadedMonthsRef.current.has(ym)) {
+      const hasDaily = (fuelData.daily || []).some(d => d.m === ym);
+      if (!hasDaily && !fuelLoadedMonthsRef.current.has(ym)) {
         fuelLoadedMonthsRef.current.add(ym);
         try {
           const { data: mDaily } = await fetchFuelDailyForMonth(ym);
@@ -636,7 +641,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         }
       }
     });
-  }, [fuelStartDate, fuelEndDate, fuelYear]);
+  }, [fuelStartDate, fuelEndDate, fuelYear, fuelMonths]);
 
 
   // Strictly lock selectedPlant to user's plant for non-admins
@@ -1290,24 +1295,54 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
           if (targetCreditSheet && workbook.Sheets[targetCreditSheet]) {
             const rows = XLSX.utils.sheet_to_json(workbook.Sheets[targetCreditSheet], { defval: '' });
-            console.log(`[SLARC Ingestion] Sheet "${targetCreditSheet}" total rows before deduplication: ${rows.length}`);
+            console.log(`[SLARC Ingestion] Sheet "${targetCreditSheet}" total rows: ${rows.length}`);
             const seenCreditUploadKeys = new Set();
             let creditDupsSkipped = 0;
 
+            // Helper to get value from row by column names or column index
+            const getColVal = (row, patterns, fallbackIdx) => {
+              for (const p of patterns) {
+                if (row[p] !== undefined && row[p] !== '') return row[p];
+              }
+              const keys = Object.keys(row);
+              for (const p of patterns) {
+                const cleanP = p.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const foundKey = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanP);
+                if (foundKey && row[foundKey] !== undefined && row[foundKey] !== '') return row[foundKey];
+              }
+              if (fallbackIdx !== undefined) {
+                if (Array.isArray(row) && row[fallbackIdx] !== undefined) return row[fallbackIdx];
+                const emptyKey = fallbackIdx === 0 ? '__EMPTY' : `__EMPTY_${fallbackIdx}`;
+                if (row[emptyKey] !== undefined && row[emptyKey] !== '') return row[emptyKey];
+              }
+              return '';
+            };
+
             for (const r of rows) {
-              const rawCe = String(r['Cost Element'] || r['CostElement'] || '').trim();
+              // 1. Column A: Cost Center
+              const rawCc = String(getColVal(r, ['Cost Center', 'CostCenter', 'Pusat Biaya'], 0) || '').trim().toUpperCase();
+              const cc = rawCc.split(/\s+/)[0];
+              if (!cc || cc.startsWith('TOTAL') || cc.startsWith('GRAND') || cc.startsWith('PLANT') || cc === 'COST CENTER') continue;
+
+              // 2. Column L: Posted unit of meas. & Cost Element
+              const rawCe = String(getColVal(r, ['Cost Element', 'CostElement', 'Kostenart'], 5) || '').trim();
               const ce = rawCe.replace(/^0+/, '');
-              const uom = String(r['Posted unit of meas.'] || r['Unit of Measure'] || r['UoM'] || '').trim().toUpperCase();
-              const isKm = ce === '90043002' || uom === 'KM';
-              const isHm = ce === '90043003' || uom === 'HR' || uom === 'HM';
+              const uom = String(getColVal(r, ['Posted unit of meas.', 'Posted unit of meas', 'Unit of Measure', 'UoM', 'UOM', 'Unit', 'ME', 'Satuan'], 11) || '').trim().toUpperCase();
+              const coObjName = String(getColVal(r, ['CO Object Name'], 1) || '').trim();
+
+              const isKm = ce === '90043002' || uom === 'KM' || uom.includes('KM') || coObjName.toUpperCase().endsWith('/ E-KM');
+              const isHm = ce === '90043003' || uom === 'HR' || uom === 'HM' || uom.includes('HM') || coObjName.toUpperCase().endsWith('/ E-HM');
               if (!isKm && !isHm) continue;
 
-              const cc = String(r['Cost Center'] || r['CostCenter'] || r['Pusat Biaya'] || '').trim().toUpperCase();
-              if (!cc) continue;
+              // 3. Column D: Document Number
+              const doc = String(getColVal(r, ['Document Number', 'Doc Number', 'Document', 'No. Dokumen', 'No Dokumen', 'Belg.Nr.'], 3) || '').trim();
 
-              const rawDate = r['Posting Date'] || r['Document Date'] || r['Date'];
+              // 4. Column I: Posting Date
+              const rawDate = getColVal(r, ['Posting Date', 'Document Date', 'Date', 'Tanggal', 'Buch.Datum'], 8);
               const dateStr = parseDateVal(rawDate);
-              const period = String(r['Period'] || '').trim();
+
+              // 5. Column H: Period
+              const period = String(getColVal(r, ['Period', 'Periode', 'Per.'], 7) || '').trim();
               const year = dateStr ? dateStr.substring(0, 4) : '2026';
               const periodNum = parseInt(period, 10);
               const hasValidPeriod = !isNaN(periodNum) && periodNum >= 1 && periodNum <= 12;
@@ -1315,13 +1350,19 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 ? `${year}-${String(periodNum).padStart(2, '0')}`
                 : (dateStr ? dateStr.substring(0, 7) : (targetMonth || '2026-09'));
 
-              const qty = Math.abs(parseSapNumber(r['Total quantity'] || r['Qty'] || 0) || 0);
-              const doc = String(r['Document Number'] || r['Doc Number'] || '').trim();
-              const name = String(r['Name'] || r['CO Object Name'] || r['Text'] || '').trim();
-              const cleanName = name.split('|')[0].trim().toLowerCase();
-              const plant = String(r['Plant'] || cc.substring(0, 4) || '').trim().toUpperCase();
-              // Deduplicate double-posted or paired SAP allocation documents (same cc, date, uom, qty, activity)
-              const dedupKey = `${cc}_${dateStr || monthStr}_${isKm ? 'KM' : 'HM'}_${qty}_${cleanName}`;
+              // 6. Column K: Total quantity -> ONLY COLOM K NILAI - JADI + DAN NILAI + JADI -
+              const rawQty = parseSapNumber(getColVal(r, ['Total quantity', 'Total Quantity', 'Quantity', 'Menge', 'Qty', 'Jumlah'], 10));
+              const qty = rawQty === 0 ? 0 : -rawQty;
+
+              // 7. Column M: Name / Narration
+              const name = String(getColVal(r, ['Name', 'CO Object Name', 'Text', 'Keterangan', 'Deskripsi'], 12) || coObjName || '').trim();
+              const plant = String(getColVal(r, ['Plant'], 4) || cc.substring(0, 4) || '').trim().toUpperCase();
+
+              // Deduplicate only truly duplicate rows (preserve every distinct Document Number)
+              const dedupKey = doc
+                ? `${cc}_${doc}_${dateStr || monthStr}_${qty}_${isKm ? 'KM' : 'HM'}`
+                : `${cc}_${dateStr || monthStr}_${isKm ? 'KM' : 'HM'}_${qty}_${name.split('|')[0].trim().toLowerCase()}_${creditRowsCount}`;
+
               if (seenCreditUploadKeys.has(dedupKey)) {
                 creditDupsSkipped++;
                 continue;
@@ -1342,7 +1383,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 p: plant
               });
             }
-            console.log(`[SLARC Ingestion] Accepted unique SLARC rows: ${creditRowsCount}, Deduplicated paired allocations: ${creditDupsSkipped}`);
+            console.log(`[SLARC Ingestion] Accepted unique SLARC rows: ${creditRowsCount}, Skipped duplicates: ${creditDupsSkipped}`);
           }
         }
 
@@ -1392,9 +1433,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                 }
               } else if (ce === '90043002' || rawUom === 'KM' || ce === '90043003' || rawUom === 'HR' || rawUom === 'HM') {
                 const isKm = ce === '90043002' || rawUom === 'KM';
-                const cleanQty = Math.abs(qty);
-                const cleanName = name.split('|')[0].trim().toLowerCase();
-                const dedupKey = `${rawCc}_${dateStr || monthStr}_${isKm ? 'KM' : 'HM'}_${cleanQty}_${cleanName}`;
+                const cleanQty = qty === 0 ? 0 : -qty;
+                const dedupKey = doc
+                  ? `${rawCc}_${doc}_${dateStr || monthStr}_${cleanQty}_${isKm ? 'KM' : 'HM'}`
+                  : `${rawCc}_${dateStr || monthStr}_${isKm ? 'KM' : 'HM'}_${cleanQty}_${name.split('|')[0].trim().toLowerCase()}_${creditRowsCount}`;
                 if (!seenCreditFallbackKeys.has(dedupKey)) {
                   seenCreditFallbackKeys.add(dedupKey);
                   creditRowsCount++;
@@ -1555,11 +1597,12 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             }
             // Auto update credit if there are credit daily transactions
             if (txsC.length > 0) {
-              // Deduplicate double-posted or paired SAP allocation documents (same date, uom, qty, activity)
               const seenCreditKeys = new Set();
               const dedupedTxsC = [];
               for (const d of txsC) {
-                const k = `${d.d || ''}_${d.u || ''}_${Math.abs(parseFloat(d.q) || 0)}_${String(d.n || '').split('|')[0].trim().toLowerCase()}`;
+                const k = d.doc
+                  ? `${d.doc}_${d.d || ''}_${d.u || ''}_${parseFloat(d.q) || 0}`
+                  : `${d.d || ''}_${d.u || ''}_${parseFloat(d.q) || 0}_${String(d.n || '').split('|')[0].trim().toLowerCase()}`;
                 if (!seenCreditKeys.has(k)) {
                   seenCreditKeys.add(k);
                   dedupedTxsC.push(d);
@@ -5505,7 +5548,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                                   targetMonthsToFetch = [row.month];
                                 }
 
-                                const missingMonths = targetMonthsToFetch.filter(m => !fuelLoadedMonthsRef.current.has(m));
+                                const missingMonths = targetMonthsToFetch.filter(m => !(fuelData.daily || []).some(d => d.m === m));
                                 if (missingMonths.length > 0) {
                                   for (const m of missingMonths) {
                                     fuelLoadedMonthsRef.current.add(m);
@@ -5633,7 +5676,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       const cleanRefVal = (val) => {
         const s = String(val || '').trim();
         if (!s || s === '-' || s === '1') return '';
-        return s;
+        return s.replace(/\|/g, ' · ');
       };
 
       // Raw ZEST logs lookup
@@ -5651,48 +5694,85 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         : (selectedFuelVeh.objectType && ['TRACTOR', 'EXCAVATOR', 'GRADER', 'WLOADER', 'HEAVY'].some(h => (selectedFuelVeh.objectType || '').toUpperCase().includes(h)))
         ? 'HM'
         : 'KM';
-      // Build daily reconciliation list (SLARC + ZEST aligned by date)
+
+      // Build daily reconciliation list (SLARC + ZEST): Show EVERY transaction individually with Document Number
       const slarcDailyList = dailyCreditForVeh.length > 0 ? dailyCreditForVeh : (selectedFuelVeh.matchedSlarcDaily || []);
+      const reconciliationRows = [];
+      const matchedZestIndices = new Set();
 
-      // Map combined dates
-      const combinedDateMap = new Map();
-      slarcDailyList.forEach(d => {
-        const dateKey = d.d;
-        if (!dateKey) return;
-        const slarcRef = cleanRefVal(d.n);
-        if (!combinedDateMap.has(dateKey)) {
-          combinedDateMap.set(dateKey, { date: dateKey, slarcQty: 0, zestQty: 0, doc: d.doc, ref: slarcRef, u: d.u });
-        }
-        combinedDateMap.get(dateKey).slarcQty += (d.q || 0);
-      });
-      zestDailyList.forEach(l => {
-        const dateKey = l.date;
-        if (!dateKey) return;
-        const zestRef = cleanRefVal(l.reference) || cleanRefVal(l.remarks) || cleanRefVal(JOB_CODE_DESC[l.job_code]);
-        if (!combinedDateMap.has(dateKey)) {
-          combinedDateMap.set(dateKey, { date: dateKey, slarcQty: 0, zestQty: 0, doc: l.document_number, ref: zestRef, u: l.uom });
-        }
-        const item = combinedDateMap.get(dateKey);
-        item.zestQty += (parseFloat(l.hm_km) || 0);
-        if (zestRef) item.ref = zestRef;
-        if (!item.doc || item.doc === '-') item.doc = l.document_number;
-      });
+      if (slarcDailyList.length > 0) {
+        slarcDailyList.forEach(d => {
+          let zestVal = 0;
+          // Try to match a ZEST log on the same date with matching quantity
+          for (let zi = 0; zi < zestDailyList.length; zi++) {
+            if (matchedZestIndices.has(zi)) continue;
+            const zl = zestDailyList[zi];
+            if (zl.date === d.d) {
+              const zKm = parseFloat(zl.hm_km) || 0;
+              if (Math.abs(zKm - (d.q || 0)) < 0.01) {
+                zestVal = zKm;
+                matchedZestIndices.add(zi);
+                break;
+              }
+            }
+          }
+          // If no exact qty match, match by date
+          if (zestVal === 0) {
+            for (let zi = 0; zi < zestDailyList.length; zi++) {
+              if (matchedZestIndices.has(zi)) continue;
+              const zl = zestDailyList[zi];
+              if (zl.date === d.d) {
+                zestVal = parseFloat(zl.hm_km) || 0;
+                matchedZestIndices.add(zi);
+                break;
+              }
+            }
+          }
 
-      // Final pass on reconciliation items to resolve clean description
-      combinedDateMap.forEach(item => {
-        if (!item.ref || item.ref === '-' || item.ref === '1') {
-          item.ref = cleanRefVal(selectedFuelVeh.referencePrimary) || cleanRefVal(selectedFuelVeh.slarcRefPrimary) || 'Realisasi Operasional';
-        }
-      });
+          const slarcRef = cleanRefVal(d.n) || cleanRefVal(selectedFuelVeh.referencePrimary) || cleanRefVal(selectedFuelVeh.slarcRefPrimary) || 'Realisasi Operasional';
 
-      const reconciliationRows = Array.from(combinedDateMap.values()).sort((a, b) => b.date.localeCompare(a.date));
-      const rawModalTab = fuelModalTab || (isDevUser ? 'reconcile' : 'debit');
-      const effectiveModalTab = (!isDevUser && rawModalTab === 'zest') ? 'debit' : rawModalTab;
-      const displayActivityRows = isDevUser 
-        ? reconciliationRows 
-        : (reconciliationRows.filter(r => (r.slarcQty || 0) > 0).length > 0 
-            ? reconciliationRows.filter(r => (r.slarcQty || 0) > 0) 
-            : reconciliationRows);
+          reconciliationRows.push({
+            date: d.d || d.m || selectedFuelVeh.month || '-',
+            doc: d.doc || '-',
+            ref: slarcRef,
+            slarcQty: Math.round((d.q || 0) * 100) / 100,
+            zestQty: Math.round(zestVal * 100) / 100,
+            u: d.u || uomLabel
+          });
+        });
+
+        // Append any unmatched ZEST logs
+        zestDailyList.forEach((zl, zi) => {
+          if (matchedZestIndices.has(zi)) return;
+          const zKm = parseFloat(zl.hm_km) || 0;
+          if (zKm <= 0) return;
+          reconciliationRows.push({
+            date: zl.date || selectedFuelVeh.month || '-',
+            doc: zl.document_number || '-',
+            ref: cleanRefVal(zl.reference) || cleanRefVal(zl.remarks) || cleanRefVal(JOB_CODE_DESC[zl.job_code]) || '-',
+            slarcQty: 0,
+            zestQty: Math.round(zKm * 100) / 100,
+            u: zl.uom || uomLabel
+          });
+        });
+      } else if (zestDailyList.length > 0) {
+        zestDailyList.forEach(zl => {
+          const zKm = parseFloat(zl.hm_km) || 0;
+          reconciliationRows.push({
+            date: zl.date || selectedFuelVeh.month || '-',
+            doc: zl.document_number || '-',
+            ref: cleanRefVal(zl.reference) || cleanRefVal(zl.remarks) || cleanRefVal(JOB_CODE_DESC[zl.job_code]) || '-',
+            slarcQty: 0,
+            zestQty: Math.round(zKm * 100) / 100,
+            u: zl.uom || uomLabel
+          });
+        });
+      }
+
+      // Sort rows by date descending, then document number
+      reconciliationRows.sort((a, b) => (b.date || '').localeCompare(a.date || '') || String(b.doc || '').localeCompare(String(a.doc || '')));
+
+      // Fallback only if no line items exist at all
       if (reconciliationRows.length === 0 && (slarcTotal > 0 || zestTotal > 0)) {
         reconciliationRows.push({
           date: selectedFuelVeh.month || 'Periode Ini',
@@ -5703,6 +5783,10 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           u: uomLabel
         });
       }
+
+      const rawModalTab = fuelModalTab || (isDevUser ? 'reconcile' : 'debit');
+      const effectiveModalTab = (!isDevUser && rawModalTab === 'zest') ? 'debit' : rawModalTab;
+      const displayActivityRows = reconciliationRows;
 
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 no-print animate-in fade-in duration-200">
@@ -5971,7 +6055,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                               <td className="px-3 py-1.5 text-center font-mono text-[10px] text-slate-600">{r.doc || '-'}</td>
                               <td className="px-3 py-1.5 text-center text-slate-800 font-semibold truncate max-w-xs">{r.ref || '-'}</td>
                               <td className="px-3 py-1.5 text-center font-mono font-bold text-blue-900 bg-blue-50/30">
-                                {r.slarcQty > 0 ? `${r.slarcQty} ${!isDevUser ? uomLabel : ''}` : '-'}
+                                {r.slarcQty !== 0 ? `${r.slarcQty} ${r.u || uomLabel}` : '-'}
                               </td>
                               {isDevUser && (
                                 <>

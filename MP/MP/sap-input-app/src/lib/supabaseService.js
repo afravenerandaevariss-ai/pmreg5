@@ -813,19 +813,21 @@ export function makeFuelTxKey(d) {
   const dPart = String(d.d || '').trim();
   const cPart = String(d.c || '').trim();
   const tPart = String(d.t || '').trim();
+  const docPart = String(d.doc || '').trim();
   const qPart = Math.round((parseFloat(d.q) || 0) * 100) / 100;
   const uPart = String(d.u || '').trim().toUpperCase();
-  // Task 2 Fix: For SLARC credit rows (t='C'), exclude doc number so paired SAP allocation
-  // documents with different doc numbers but same CC+date+qty+activity are deduplicated.
-  if (tPart === 'C') {
-    const nPart = String(d.n || '').split('|')[0].trim().toLowerCase();
-    return `${dPart}_${cPart}_C_${qPart}_${uPart}_${nPart}`;
-  }
-  // For SALRD debit rows: include doc number (each invoice/posting is unique)
-  const docPart = String(d.doc || '').trim();
   const rPart = Math.round(parseFloat(d.r) || 0);
   const nPart = String(d.n || '').trim();
-  return `${dPart}_${cPart}_${tPart}_${docPart}_${qPart}_${rPart}_${uPart}_${nPart}`;
+
+  // If document number exists, each SAP document is a distinct transaction
+  if (docPart) {
+    return `${docPart}_${cPart}_${tPart}_${dPart}_${qPart}_${uPart}`;
+  }
+  if (tPart === 'C') {
+    const cleanN = nPart.split('|')[0].trim().toLowerCase();
+    return `${dPart}_${cPart}_C_${qPart}_${uPart}_${cleanN}`;
+  }
+  return `${dPart}_${cPart}_${tPart}_${qPart}_${rPart}_${uPart}_${nPart}`;
 }
 
 export async function fetchFuelData(forceRefresh = false) {
@@ -892,8 +894,13 @@ export async function fetchFuelDailyForMonth(yearMonth) {
       .select('data')
       .eq('id', numericId)
       .single();
-    if (!error && row && Array.isArray(row.data?.daily) && row.data.daily.length > 0) {
-      return { data: row.data.daily, error: null };
+    if (!error && row && row.data) {
+      if (Array.isArray(row.data) && row.data.length > 0) {
+        return { data: row.data, error: null };
+      }
+      if (Array.isArray(row.data.daily) && row.data.daily.length > 0) {
+        return { data: row.data.daily, error: null };
+      }
     }
     // Fallback: check main fuel storage (id=21) which also contains daily transactions
     const { data: mainRow } = await supabase
@@ -914,7 +921,14 @@ export async function fetchFuelDailyForMonth(yearMonth) {
 
 export async function saveFuelDailyForMonth(yearMonth, dailyRecords) {
   if (!yearMonth || typeof yearMonth !== 'string') return { error: 'Invalid month' };
-  const numericId = 230100 + parseInt(yearMonth.substring(5, 7));
+  const cleanM = yearMonth.includes('-')
+    ? yearMonth.split('-')[1].substring(0, 2)
+    : yearMonth.replace(/[^0-9]/g, '').slice(-2);
+  const monthNum = parseInt(cleanM, 10);
+  if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+    return { error: 'Invalid month format' };
+  }
+  const numericId = 230100 + monthNum;
   if (!supabase) return { error: 'Supabase not configured' };
   try {
     const { error } = await supabase
