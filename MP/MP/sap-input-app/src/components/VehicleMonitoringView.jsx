@@ -1000,10 +1000,8 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
         if (zcoList.length === 0) throw new Error('Tidak ada baris data valid yang ditemukan.');
 
-        // Tentukan default bulan penerapan: jika sedang di tab BBM pakai fuel month, jika di tab ZCO pakai targetMonth
-        const defaultMonth = (activeTab === 'fuel-evaluation' && fuelMonths[0] && fuelMonths[0] !== 'ALL')
-          ? `${fuelYear}-${fuelMonths[0]}`
-          : targetMonth || new Date().toISOString().substring(0, 7);
+        // Tentukan default bulan penerapan ZCO: pakai targetMonth atau bulan saat ini
+        const defaultMonth = targetMonth || new Date().toISOString().substring(0, 7);
 
         const defaultPlant = (!isAdmin && currentUser?.plant && currentUser.plant !== 'ALL')
           ? currentUser.plant
@@ -1080,11 +1078,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         plant: zcoUploadPlant
       });
       setTargetMonth(zcoUploadMonth);
-      if (zcoUploadMonth.includes('-')) {
-        const [y, m] = zcoUploadMonth.split('-');
-        setFuelYear(y);
-        setFuelMonths([m]);
-      }
       if (zcoUploadPlant !== 'ALL') {
         setZcoFilterPlant(zcoUploadPlant);
       }
@@ -2431,56 +2424,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return map;
   }, [zcoData]);
 
-  // VLOOKUP & SUM Activity from ZCO_CCTR_01 by Cost Center (vlookup from Equipment via PM Master Data) and Month(s)
-  const getZcoActivityForVehicle = useCallback((costCenter, eqNum, targetMonthsList = []) => {
-    let targetCC = '';
-    // Priority 1: VLOOKUP Cost Center from Equipment using PM Master Data
-    if (eqNum && eqNum !== '-') {
-      const mm = lookupMasterPM(eqNum, costCenter);
-      if (mm?.costCenter) {
-        targetCC = String(mm.costCenter).trim().split(/\s+/)[0].toUpperCase();
-      }
-    }
-    // Priority 2: Use provided Cost Center
-    if (!targetCC && costCenter) {
-      targetCC = String(costCenter).trim().split(/\s+/)[0].toUpperCase();
-    }
-    if (!targetCC) return 0;
-
-    // Cek apakah ada baris ZCO yang sudah punya field month (data baru dengan tag bulan)
-    const hasMonthTaggedRows = (zcoData || []).some(z => z.month && String(z.month).trim() !== '');
-
-    let totalAct = 0;
-    (zcoData || []).forEach(z => {
-      const rawZCC = z.costCenterCode || z.costCenter || z['Cost Center'] || z.cc || '';
-      const zCC = String(rawZCC).trim().split(/\s+/)[0].toUpperCase();
-      if (zCC !== targetCC) return;
-
-      const zMonth = z.month || '';
-      const act = parseFloat(z.activityQty || z.activity || 0) || 0;
-
-      if (!targetMonthsList || targetMonthsList.length === 0) {
-        totalAct += act;
-      } else if (!hasMonthTaggedRows || !zMonth) {
-        // Data lama tanpa tag bulan: ikutkan semua (tidak bisa difilter per bulan)
-        totalAct += act;
-      } else {
-        const matches = targetMonthsList.some(tm => {
-          if (!tm) return false;
-          if (zMonth === tm) return true;
-          if (zMonth.endsWith(`-${tm}`)) return true;
-          if (tm.endsWith(`-${zMonth}`)) return true;
-          return false;
-        });
-        if (matches) {
-          totalAct += act;
-        }
-      }
-    });
-
-    return Math.round(totalAct * 100) / 100;
-  }, [zcoData, lookupMasterPM]);
-
   // ── Pre-Index ZESTHLP16PA Logs by No. Equipment & Date ─────────────────────
   const zestLogsByEquipment = useMemo(() => {
     const map = new Map();
@@ -2766,47 +2709,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         }
       });
 
-      // Melengkapi armada dari data ZCO_CCTR_01 jika ada aktivitas di periode range
-      const existingRangeCCs = new Set(Array.from(vehMap.keys()));
-      (zcoData || []).forEach(z => {
-        const rawZCC = z.costCenterCode || z.costCenter || z['Cost Center'] || z.cc || '';
-        const zCC = String(rawZCC).trim().split(/\s+/)[0].toUpperCase();
-        if (!zCC || existingRangeCCs.has(zCC)) return;
-
-        const zMonth = z.month || '';
-        const rangeMonths = [];
-        if (fuelStartDate) rangeMonths.push(fuelStartDate.substring(0, 7));
-        if (fuelEndDate && !rangeMonths.includes(fuelEndDate.substring(0, 7))) {
-          rangeMonths.push(fuelEndDate.substring(0, 7));
-        }
-        if (rangeMonths.length > 0 && zMonth && !rangeMonths.includes(zMonth)) return;
-
-        const zAct = parseFloat(z.activityQty || z.activity || 0) || 0;
-        const zCost = parseFloat(z.totalCost || 0) || 0;
-        if (zAct <= 0 && zCost <= 0) return;
-
-        const master = lookupMasterPM('', zCC);
-        const p = master?.plant || zCC.substring(0, 4);
-        if (activePlant !== 'ALL' && p !== activePlant) return;
-
-        existingRangeCCs.add(zCC);
-        vehMap.set(zCC, {
-          costCenter: zCC,
-          equipment: master?.equipment || '-',
-          description: master?.description || z.rawCostCenter || `Kendaraan ${zCC}`,
-          plant: p,
-          plantDesc: PLANT_INFO[p]?.desc || p,
-          wilayah: PLANT_INFO[p]?.wilayah || 'Regional 5',
-          objectType: master?.objectType || (zCC.includes('CAR') ? 'CAR' : zCC.includes('TRU') ? 'DTRUCK' : 'VEH'),
-          month: `${fuelStartDate || ''} s/d ${fuelEndDate || ''}`,
-          debitLiters: 0,
-          debitRp: 0,
-          creditKm: 0,
-          creditHm: 0,
-          txCount: 0
-        });
-      });
-
       let list = Array.from(vehMap.values());
       if (activePlant !== 'ALL') {
         list = list.filter(v => v.plant === activePlant);
@@ -2825,45 +2727,31 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             : `Kendaraan ${ccKey}`
         );
         const resolvedPlant = masterMatch?.plant || v.plant || (ccKey ? ccKey.substring(0, 4) : '');
-        const resolvedCostCenter = (masterMatch?.costCenter && rawEq ? String(masterMatch.costCenter).trim().toUpperCase() : '') || ccKey || String(masterMatch?.costCenter || '').trim().toUpperCase();
-        const resolvedObjectType = masterMatch?.objectType || v.objectType || (resolvedCostCenter.includes('CAR') ? 'CAR' : resolvedCostCenter.includes('TRU') ? 'DTRUCK' : 'VEH');
-        const refData = resolveSmartReference(resolvedEquipment, resolvedCostCenter || v.costCenter, fuelStartDate || v.month, true, v);
-
-        // Tarikan nilai activity kendaraan diambil dari file ZCO_CCTR_01 (vlookup cost center dari equipment base master data)
-        const rangeMonths = [];
-        if (fuelStartDate) rangeMonths.push(fuelStartDate.substring(0, 7));
-        if (fuelEndDate && !rangeMonths.includes(fuelEndDate.substring(0, 7))) {
-          rangeMonths.push(fuelEndDate.substring(0, 7));
-        }
-        const zcoAct = getZcoActivityForVehicle(resolvedCostCenter, resolvedEquipment, rangeMonths);
-
-        const code = getVehicleTypeCode(resolvedCostCenter, resolvedObjectType);
-        const rule = VEHICLE_EFFICIENCY_RULES[code] || VEHICLE_EFFICIENCY_RULES.CAR;
-        const isKmL = rule.type === 'KM/L';
+        const resolvedObjectType = masterMatch?.objectType || v.objectType || (ccKey.includes('CAR') ? 'CAR' : ccKey.includes('TRU') ? 'DTRUCK' : 'VEH');
+        const refData = resolveSmartReference(resolvedEquipment, v.costCenter, fuelStartDate || v.month, true, v);
 
         const debitL = Math.round(v.debitLiters * 100) / 100;
         const debitR = Math.round(v.debitRp);
-        const creditK = isKmL ? zcoAct : 0;
-        const creditH = !isKmL ? zcoAct : 0;
+        const creditK = Math.round(v.creditKm * 100) / 100;
+        const creditH = Math.round(v.creditHm * 100) / 100;
 
         // Apply Task 1 BBM Efficiency Evaluation Matrix (MID(5,3) with 10% tolerance & Standby handling)
         const refText = `${refData.primary || ''} ${refData.all || ''} ${v.slarcRefPrimary || ''} ${v.description || ''}`;
-        const eff = evaluateFuelEfficiency(resolvedCostCenter, debitL, creditK, creditH, resolvedObjectType, refText);
-        const activityTotal = creditK || creditH || 0;
+        const eff = evaluateFuelEfficiency(ccKey, debitL, creditK, creditH, resolvedObjectType, refText);
+        const slarcTotal = creditK || creditH || 0;
         const zestTotal = refData.zestKmHmTotal;
-        const diff = Math.round((activityTotal - zestTotal) * 100) / 100;
+        const diff = Math.round((slarcTotal - zestTotal) * 100) / 100;
         let reconcileStatus = 'NONE';
-        if (activityTotal > 0 && zestTotal > 0) {
+        if (slarcTotal > 0 && zestTotal > 0) {
           reconcileStatus = Math.abs(diff) < 0.01 ? 'MATCH' : 'DIFF';
-        } else if (activityTotal > 0) {
-          reconcileStatus = 'ZCO_ONLY';
+        } else if (slarcTotal > 0) {
+          reconcileStatus = 'SLARC_ONLY';
         } else if (zestTotal > 0) {
           reconcileStatus = 'ZEST_ONLY';
         }
 
         return {
           ...v,
-          costCenter: resolvedCostCenter || v.costCenter,
           equipment: resolvedEquipment,
           description: resolvedDescription,
           plant: resolvedPlant,
@@ -2873,7 +2761,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           debitRp: debitR,
           creditKm: creditK,
           creditHm: creditH,
-          zcoActivity: activityTotal,
           kmPerLiter: eff.uom === 'KM/L' ? eff.ratioVal : 0,
           literPerHm: eff.uom === 'L/HM' ? eff.ratioVal : 0,
           costPerUnit: creditK > 0 ? Math.round(debitR / creditK) : (creditH > 0 ? Math.round(debitR / creditH) : 0),
@@ -2899,7 +2786,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       const isAllMonths = fuelMonths.includes('ALL') || fuelMonths.length === 0;
       const targetMonths = isAllMonths ? [] : fuelMonths.map(m => `${fuelYear}-${m}`);
 
-      let list = [...(fuelData?.summaries || [])];
+      let list = fuelData?.summaries || [];
       if (isAllMonths) {
         list = list.filter(s => s.month?.startsWith(fuelYear));
       } else {
@@ -2909,42 +2796,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       if (activePlant !== 'ALL') {
         list = list.filter(s => s.plant === activePlant);
       }
-
-      // Melengkapi daftar kendaraan dari data ZCO_CCTR_01 agar seluruh armada aktif dari ZCO tampil
-      const existingCCs = new Set(list.map(s => String(s.costCenter || '').trim().toUpperCase()));
-      (zcoData || []).forEach(z => {
-        const rawZCC = z.costCenterCode || z.costCenter || z['Cost Center'] || z.cc || '';
-        const zCC = String(rawZCC).trim().split(/\s+/)[0].toUpperCase();
-        if (!zCC || existingCCs.has(zCC)) return;
-
-        const zMonth = z.month || '';
-        if (targetMonths.length > 0 && zMonth && !targetMonths.includes(zMonth)) return;
-
-        const zAct = parseFloat(z.activityQty || z.activity || 0) || 0;
-        const zCost = parseFloat(z.totalCost || 0) || 0;
-        if (zAct <= 0 && zCost <= 0) return;
-
-        const master = lookupMasterPM('', zCC);
-        const p = master?.plant || zCC.substring(0, 4);
-        if (activePlant !== 'ALL' && p !== activePlant) return;
-
-        existingCCs.add(zCC);
-        list.push({
-          costCenter: zCC,
-          equipment: master?.equipment || '-',
-          description: master?.description || z.rawCostCenter || `Kendaraan ${zCC}`,
-          plant: p,
-          plantDesc: PLANT_INFO[p]?.desc || p,
-          wilayah: PLANT_INFO[p]?.wilayah || 'Regional 5',
-          objectType: master?.objectType || (zCC.includes('CAR') ? 'CAR' : zCC.includes('TRU') ? 'DTRUCK' : 'VEH'),
-          month: isAllMonths ? `${fuelYear} (Semua Bulan)` : (targetMonths[0] || `${fuelYear}-${fuelMonths[0]}`),
-          debitLiters: 0,
-          debitRp: 0,
-          creditKm: 0,
-          creditHm: 0,
-          txCount: 0
-        });
-      });
 
       if (isAllMonths || fuelMonths.length > 1) {
         const aggregatedMap = new Map();
@@ -2977,47 +2828,37 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         const masterMatch = lookupMasterPM(rawEq, ccKey);
 
         const resolvedEquipment = masterMatch?.equipment || rawEq || '-';
-        const resolvedCostCenter = (masterMatch?.costCenter && rawEq ? String(masterMatch.costCenter).trim().toUpperCase() : '') || ccKey || String(masterMatch?.costCenter || '').trim().toUpperCase();
         const resolvedDescription = masterMatch?.description || (
           s.description && !s.description.includes('Sedang Perbaikan') && !s.description.includes('Au58:') && !s.description.includes('Solar =') && !s.description.toLowerCase().startsWith('dinas ke')
             ? s.description
-            : `Kendaraan ${resolvedCostCenter}`
+            : `Kendaraan ${ccKey}`
         );
-        const resolvedPlant = masterMatch?.plant || s.plant || (resolvedCostCenter ? resolvedCostCenter.substring(0, 4) : '');
-        const resolvedObjectType = masterMatch?.objectType || s.objectType || (resolvedCostCenter.includes('CAR') ? 'CAR' : resolvedCostCenter.includes('TRU') ? 'DTRUCK' : 'VEH');
-        const refData = resolveSmartReference(resolvedEquipment, resolvedCostCenter || s.costCenter, s.month, false, s);
-
-        // Tarikan nilai activity kendaraan diambil dari file ZCO_CCTR_01
-        const targetMonthsForZco = isAllMonths ? [] : targetMonths;
-        const zcoAct = getZcoActivityForVehicle(resolvedCostCenter, resolvedEquipment, targetMonthsForZco);
-
-        const code = getVehicleTypeCode(resolvedCostCenter, resolvedObjectType);
-        const rule = VEHICLE_EFFICIENCY_RULES[code] || VEHICLE_EFFICIENCY_RULES.CAR;
-        const isKmL = rule.type === 'KM/L';
+        const resolvedPlant = masterMatch?.plant || s.plant || (ccKey ? ccKey.substring(0, 4) : '');
+        const resolvedObjectType = masterMatch?.objectType || s.objectType || (ccKey.includes('CAR') ? 'CAR' : ccKey.includes('TRU') ? 'DTRUCK' : 'VEH');
+        const refData = resolveSmartReference(resolvedEquipment, s.costCenter, s.month, false, s);
 
         const debitL = Math.round((s.debitLiters || 0) * 100) / 100;
         const debitR = Math.round(s.debitRp || 0);
-        const creditK = isKmL ? zcoAct : 0;
-        const creditH = !isKmL ? zcoAct : 0;
+        const creditK = Math.round((s.creditKm || 0) * 100) / 100;
+        const creditH = Math.round((s.creditHm || 0) * 100) / 100;
 
         // Apply Task 1 BBM Efficiency Evaluation Matrix (MID(5,3) with 10% tolerance & Standby handling)
         const refText = `${refData.primary || ''} ${refData.all || ''} ${s.slarcRefPrimary || ''} ${s.description || ''}`;
-        const eff = evaluateFuelEfficiency(resolvedCostCenter, debitL, creditK, creditH, resolvedObjectType, refText);
-        const activityTotal = creditK || creditH || 0;
+        const eff = evaluateFuelEfficiency(ccKey, debitL, creditK, creditH, resolvedObjectType, refText);
+        const slarcTotal = creditK || creditH || 0;
         const zestTotal = refData.zestKmHmTotal;
-        const diff = Math.round((activityTotal - zestTotal) * 100) / 100;
+        const diff = Math.round((slarcTotal - zestTotal) * 100) / 100;
         let reconcileStatus = 'NONE';
-        if (activityTotal > 0 && zestTotal > 0) {
+        if (slarcTotal > 0 && zestTotal > 0) {
           reconcileStatus = Math.abs(diff) < 0.01 ? 'MATCH' : 'DIFF';
-        } else if (activityTotal > 0) {
-          reconcileStatus = 'ZCO_ONLY';
+        } else if (slarcTotal > 0) {
+          reconcileStatus = 'SLARC_ONLY';
         } else if (zestTotal > 0) {
           reconcileStatus = 'ZEST_ONLY';
         }
 
         return {
           ...s,
-          costCenter: resolvedCostCenter || s.costCenter,
           equipment: resolvedEquipment,
           description: resolvedDescription,
           plant: resolvedPlant,
@@ -3027,7 +2868,6 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           debitRp: debitR,
           creditKm: creditK,
           creditHm: creditH,
-          zcoActivity: activityTotal,
           kmPerLiter: eff.uom === 'KM/L' ? eff.ratioVal : 0,
           literPerHm: eff.uom === 'L/HM' ? eff.ratioVal : 0,
           costPerUnit: creditK > 0 ? Math.round(debitR / creditK) : (creditH > 0 ? Math.round(debitR / creditH) : 0),
@@ -3051,7 +2891,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
 
     return result;
-  }, [fuelData, fuelYear, fuelMonths, fuelStartDate, fuelEndDate, fuelPlant, zestLogsByEquipment, slarcDailyByCostCenter, logs, costCenterToEquipmentMap, lookupMasterPM, isAdmin, currentUser, masterVehiclesByCode, zcoMapByCC, zcoData, getZcoActivityForVehicle]);
+  }, [fuelData, fuelYear, fuelMonths, fuelStartDate, fuelEndDate, fuelPlant, zestLogsByEquipment, slarcDailyByCostCenter, logs, costCenterToEquipmentMap, lookupMasterPM, isAdmin, currentUser, masterVehiclesByCode, zcoMapByCC]);
 
   // Dynamic status counts for filter badges & dropdown
   const fuelStatusCounts = useMemo(() => {
