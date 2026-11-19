@@ -450,6 +450,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const [showCancelled, setShowCancelled]   = useState(false);
   const [zcoWilayah, setZcoWilayah]         = useState('ALL');
   const [zcoFilterStatus, setZcoFilterStatus] = useState('ALL');
+  const [zcoFilterPlant, setZcoFilterPlant]   = useState('ALL');
+  const [showZcoUploadModal, setShowZcoUploadModal] = useState(false);
+  const [pendingZcoUpload, setPendingZcoUpload]     = useState(null);
+  const [zcoUploadMonth, setZcoUploadMonth]         = useState('');
+  const [zcoUploadPlant, setZcoUploadPlant]         = useState('ALL');
   const [expandedPlant, setExpandedPlant]   = useState(null);
   const [expandedVehicleId, setExpandedVehicleId] = useState(null);
   const [showDangerZone, setShowDangerZone] = useState(false);
@@ -995,26 +1000,93 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
         if (zcoList.length === 0) throw new Error('Tidak ada baris data valid yang ditemukan.');
 
-        const { error: saveErr } = await saveZCOData(zcoList);
-        if (saveErr) {
-          const errMsg = saveErr.message || (typeof saveErr === 'string' ? saveErr : JSON.stringify(saveErr));
-          throw new Error(errMsg);
-        }
+        // Tentukan default bulan penerapan: jika sedang di tab BBM pakai fuel month, jika di tab ZCO pakai targetMonth
+        const defaultMonth = (activeTab === 'fuel-evaluation' && fuelMonths[0] && fuelMonths[0] !== 'ALL')
+          ? `${fuelYear}-${fuelMonths[0]}`
+          : targetMonth || new Date().toISOString().substring(0, 7);
 
-        setZcoData(zcoList);
-        setZcoUploadInfo({
-          processed: zcoList.length,
+        const defaultPlant = (!isAdmin && currentUser?.plant && currentUser.plant !== 'ALL')
+          ? currentUser.plant
+          : (zcoFilterPlant !== 'ALL' ? zcoFilterPlant : 'ALL');
+
+        setPendingZcoUpload({
           file: file.name,
+          rows: zcoList,
+          totalCost: zcoList.reduce((sum, r) => sum + (r.totalCost || 0), 0),
+          totalAct: zcoList.reduce((sum, r) => sum + (r.activityQty || 0), 0),
         });
+        setZcoUploadMonth(defaultMonth);
+        setZcoUploadPlant(defaultPlant);
+        setShowZcoUploadModal(true);
       } catch (err) {
         console.error(err);
-        setError('Error memproses file ZCO: ' + (err.message || 'Gagal menyimpan ke server database'));
+        setError('Error memproses file ZCO: ' + (err.message || 'File tidak valid'));
       } finally {
         setLoading(false);
         e.target.value = '';
       }
     };
     reader.readAsArrayBuffer(file);
+  };
+
+  const handleConfirmZCOUpload = async () => {
+    if (!pendingZcoUpload || !zcoUploadMonth) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const rawRows = pendingZcoUpload.rows || [];
+      const rowsToApply = rawRows
+        .filter(r => {
+          if (zcoUploadPlant === 'ALL') return true;
+          const cc = String(r.costCenterCode || '').toUpperCase();
+          const raw = String(r.rawCostCenter || '').toUpperCase();
+          return cc.startsWith(zcoUploadPlant) || raw.includes(zcoUploadPlant);
+        })
+        .map(r => ({
+          ...r,
+          month: zcoUploadMonth,
+          plant: zcoUploadPlant === 'ALL' ? (r.costCenterCode.substring(0, 4)) : zcoUploadPlant
+        }));
+
+      if (rowsToApply.length === 0) {
+        throw new Error(`Tidak ada baris data yang cocok untuk unit ${zcoUploadPlant}.`);
+      }
+
+      // Merge with existing zcoData: update target month (and unit if filtered)
+      const existing = zcoData || [];
+      const filteredExisting = existing.filter(z => {
+        const zMonth = z.month || '2026-07';
+        if (zMonth !== zcoUploadMonth) return true;
+        if (zcoUploadPlant !== 'ALL') {
+          const zPlant = z.plant || z.costCenterCode?.substring(0, 4) || '';
+          return zPlant !== zcoUploadPlant;
+        }
+        return false;
+      });
+
+      const mergedList = [...filteredExisting, ...rowsToApply];
+
+      const { error: saveErr } = await saveZCOData(mergedList);
+      if (saveErr) {
+        const errMsg = saveErr.message || (typeof saveErr === 'string' ? saveErr : JSON.stringify(saveErr));
+        throw new Error(errMsg);
+      }
+
+      setZcoData(mergedList);
+      setZcoUploadInfo({
+        processed: rowsToApply.length,
+        file: pendingZcoUpload.file,
+        month: zcoUploadMonth,
+        plant: zcoUploadPlant
+      });
+      setShowZcoUploadModal(false);
+      setPendingZcoUpload(null);
+    } catch (err) {
+      console.error(err);
+      setError('Error menerapkan data ZCO: ' + (err.message || 'Gagal menyimpan ke server'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClearZCOData = async () => {
@@ -2343,11 +2415,47 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   const zcoMapByCC = useMemo(() => {
     const map = new Map();
     (zcoData || []).forEach(z => {
-      const cc = String(z.costCenter || z['Cost Center'] || z.cc || '').trim().toUpperCase();
+      const raw = z.costCenterCode || z.costCenter || z['Cost Center'] || z.cc || '';
+      const cc = String(raw).trim().split(/\s+/)[0].toUpperCase();
       if (cc) map.set(cc, z);
     });
     return map;
   }, [zcoData]);
+
+  // VLOOKUP & SUM Activity from ZCO_CCTR_01 by Cost Center (or via Equipment from PM Master Data) and Month(s)
+  const getZcoActivityForVehicle = useCallback((costCenter, eqNum, targetMonthsList = []) => {
+    const cleanCC = String(costCenter || '').trim().split(/\s+/)[0].toUpperCase();
+    let targetCC = cleanCC;
+    if (!targetCC && eqNum && eqNum !== '-') {
+      const mm = lookupMasterPM(eqNum, '');
+      if (mm?.costCenter) {
+        targetCC = String(mm.costCenter).trim().split(/\s+/)[0].toUpperCase();
+      }
+    }
+    if (!targetCC) return 0;
+
+    let totalAct = 0;
+    (zcoData || []).forEach(z => {
+      const rawZCC = z.costCenterCode || z.costCenter || z['Cost Center'] || z.cc || '';
+      const zCC = String(rawZCC).trim().split(/\s+/)[0].toUpperCase();
+      if (zCC !== targetCC) return;
+
+      const zMonth = z.month || '';
+      const act = parseFloat(z.activityQty || z.activity || 0) || 0;
+
+      if (!targetMonthsList || targetMonthsList.length === 0) {
+        totalAct += act;
+      } else {
+        if (zMonth && targetMonthsList.includes(zMonth)) {
+          totalAct += act;
+        } else if (!zMonth) {
+          totalAct += act;
+        }
+      }
+    });
+
+    return Math.round(totalAct * 100) / 100;
+  }, [zcoData, lookupMasterPM]);
 
   // ── Pre-Index ZESTHLP16PA Logs by No. Equipment & Date ─────────────────────
   const zestLogsByEquipment = useMemo(() => {
@@ -2652,31 +2760,45 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             : `Kendaraan ${ccKey}`
         );
         const resolvedPlant = masterMatch?.plant || v.plant || (ccKey ? ccKey.substring(0, 4) : '');
-        const resolvedObjectType = masterMatch?.objectType || v.objectType || (ccKey.includes('CAR') ? 'CAR' : ccKey.includes('TRU') ? 'DTRUCK' : 'VEH');
-        const refData = resolveSmartReference(resolvedEquipment, v.costCenter, fuelStartDate || v.month, true, v);
+        const resolvedCostCenter = ccKey || String(masterMatch?.costCenter || '').trim().toUpperCase();
+        const resolvedObjectType = masterMatch?.objectType || v.objectType || (resolvedCostCenter.includes('CAR') ? 'CAR' : resolvedCostCenter.includes('TRU') ? 'DTRUCK' : 'VEH');
+        const refData = resolveSmartReference(resolvedEquipment, resolvedCostCenter || v.costCenter, fuelStartDate || v.month, true, v);
+
+        // Tarikan nilai activity kendaraan diambil dari file ZCO_CCTR_01 (vlookup cost center dari equipment base master data)
+        const rangeMonths = [];
+        if (fuelStartDate) rangeMonths.push(fuelStartDate.substring(0, 7));
+        if (fuelEndDate && !rangeMonths.includes(fuelEndDate.substring(0, 7))) {
+          rangeMonths.push(fuelEndDate.substring(0, 7));
+        }
+        const zcoAct = getZcoActivityForVehicle(resolvedCostCenter, resolvedEquipment, rangeMonths);
+
+        const code = getVehicleTypeCode(resolvedCostCenter, resolvedObjectType);
+        const rule = VEHICLE_EFFICIENCY_RULES[code] || VEHICLE_EFFICIENCY_RULES.CAR;
+        const isKmL = rule.type === 'KM/L';
 
         const debitL = Math.round(v.debitLiters * 100) / 100;
         const debitR = Math.round(v.debitRp);
-        const creditK = Math.round(v.creditKm * 100) / 100;
-        const creditH = Math.round(v.creditHm * 100) / 100;
+        const creditK = isKmL ? zcoAct : 0;
+        const creditH = !isKmL ? zcoAct : 0;
 
         // Apply Task 1 BBM Efficiency Evaluation Matrix (MID(5,3) with 10% tolerance & Standby handling)
         const refText = `${refData.primary || ''} ${refData.all || ''} ${v.slarcRefPrimary || ''} ${v.description || ''}`;
-        const eff = evaluateFuelEfficiency(ccKey, debitL, creditK, creditH, resolvedObjectType, refText);
-        const slarcTotal = creditK || creditH || 0;
+        const eff = evaluateFuelEfficiency(resolvedCostCenter, debitL, creditK, creditH, resolvedObjectType, refText);
+        const activityTotal = creditK || creditH || 0;
         const zestTotal = refData.zestKmHmTotal;
-        const diff = Math.round((slarcTotal - zestTotal) * 100) / 100;
+        const diff = Math.round((activityTotal - zestTotal) * 100) / 100;
         let reconcileStatus = 'NONE';
-        if (slarcTotal > 0 && zestTotal > 0) {
+        if (activityTotal > 0 && zestTotal > 0) {
           reconcileStatus = Math.abs(diff) < 0.01 ? 'MATCH' : 'DIFF';
-        } else if (slarcTotal > 0) {
-          reconcileStatus = 'SLARC_ONLY';
+        } else if (activityTotal > 0) {
+          reconcileStatus = 'ZCO_ONLY';
         } else if (zestTotal > 0) {
           reconcileStatus = 'ZEST_ONLY';
         }
 
         return {
           ...v,
+          costCenter: resolvedCostCenter || v.costCenter,
           equipment: resolvedEquipment,
           description: resolvedDescription,
           plant: resolvedPlant,
@@ -2686,6 +2808,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           debitRp: debitR,
           creditKm: creditK,
           creditHm: creditH,
+          zcoActivity: activityTotal,
           kmPerLiter: eff.uom === 'KM/L' ? eff.ratioVal : 0,
           literPerHm: eff.uom === 'L/HM' ? eff.ratioVal : 0,
           costPerUnit: creditK > 0 ? Math.round(debitR / creditK) : (creditH > 0 ? Math.round(debitR / creditH) : 0),
@@ -2711,7 +2834,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       const isAllMonths = fuelMonths.includes('ALL') || fuelMonths.length === 0;
       const targetMonths = isAllMonths ? [] : fuelMonths.map(m => `${fuelYear}-${m}`);
 
-      let list = fuelData?.summaries || [];
+      let list = [...(fuelData?.summaries || [])];
       if (isAllMonths) {
         list = list.filter(s => s.month?.startsWith(fuelYear));
       } else {
@@ -2721,6 +2844,42 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       if (activePlant !== 'ALL') {
         list = list.filter(s => s.plant === activePlant);
       }
+
+      // Melengkapi daftar kendaraan dari data ZCO_CCTR_01 agar seluruh armada aktif dari ZCO tampil
+      const existingCCs = new Set(list.map(s => String(s.costCenter || '').trim().toUpperCase()));
+      (zcoData || []).forEach(z => {
+        const rawZCC = z.costCenterCode || z.costCenter || z['Cost Center'] || z.cc || '';
+        const zCC = String(rawZCC).trim().split(/\s+/)[0].toUpperCase();
+        if (!zCC || existingCCs.has(zCC)) return;
+
+        const zMonth = z.month || '';
+        if (targetMonths.length > 0 && zMonth && !targetMonths.includes(zMonth)) return;
+
+        const zAct = parseFloat(z.activityQty || z.activity || 0) || 0;
+        const zCost = parseFloat(z.totalCost || 0) || 0;
+        if (zAct <= 0 && zCost <= 0) return;
+
+        const master = lookupMasterPM('', zCC);
+        const p = master?.plant || zCC.substring(0, 4);
+        if (activePlant !== 'ALL' && p !== activePlant) return;
+
+        existingCCs.add(zCC);
+        list.push({
+          costCenter: zCC,
+          equipment: master?.equipment || '-',
+          description: master?.description || z.rawCostCenter || `Kendaraan ${zCC}`,
+          plant: p,
+          plantDesc: PLANT_INFO[p]?.desc || p,
+          wilayah: PLANT_INFO[p]?.wilayah || 'Regional 5',
+          objectType: master?.objectType || (zCC.includes('CAR') ? 'CAR' : zCC.includes('TRU') ? 'DTRUCK' : 'VEH'),
+          month: isAllMonths ? `${fuelYear} (Semua Bulan)` : (targetMonths[0] || `${fuelYear}-${fuelMonths[0]}`),
+          debitLiters: 0,
+          debitRp: 0,
+          creditKm: 0,
+          creditHm: 0,
+          txCount: 0
+        });
+      });
 
       if (isAllMonths || fuelMonths.length > 1) {
         const aggregatedMap = new Map();
@@ -2753,37 +2912,47 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         const masterMatch = lookupMasterPM(rawEq, ccKey);
 
         const resolvedEquipment = masterMatch?.equipment || rawEq || '-';
+        const resolvedCostCenter = ccKey || String(masterMatch?.costCenter || '').trim().toUpperCase();
         const resolvedDescription = masterMatch?.description || (
           s.description && !s.description.includes('Sedang Perbaikan') && !s.description.includes('Au58:') && !s.description.includes('Solar =') && !s.description.toLowerCase().startsWith('dinas ke')
             ? s.description
-            : `Kendaraan ${ccKey}`
+            : `Kendaraan ${resolvedCostCenter}`
         );
-        const resolvedPlant = masterMatch?.plant || s.plant || (ccKey ? ccKey.substring(0, 4) : '');
-        const resolvedObjectType = masterMatch?.objectType || s.objectType || (ccKey.includes('CAR') ? 'CAR' : ccKey.includes('TRU') ? 'DTRUCK' : 'VEH');
-        const refData = resolveSmartReference(resolvedEquipment, s.costCenter, s.month, false, s);
+        const resolvedPlant = masterMatch?.plant || s.plant || (resolvedCostCenter ? resolvedCostCenter.substring(0, 4) : '');
+        const resolvedObjectType = masterMatch?.objectType || s.objectType || (resolvedCostCenter.includes('CAR') ? 'CAR' : resolvedCostCenter.includes('TRU') ? 'DTRUCK' : 'VEH');
+        const refData = resolveSmartReference(resolvedEquipment, resolvedCostCenter || s.costCenter, s.month, false, s);
+
+        // Tarikan nilai activity kendaraan diambil dari file ZCO_CCTR_01
+        const targetMonthsForZco = isAllMonths ? [] : (s.month && !s.month.includes('Semua') ? [s.month.substring(0, 7)] : targetMonths);
+        const zcoAct = getZcoActivityForVehicle(resolvedCostCenter, resolvedEquipment, targetMonthsForZco);
+
+        const code = getVehicleTypeCode(resolvedCostCenter, resolvedObjectType);
+        const rule = VEHICLE_EFFICIENCY_RULES[code] || VEHICLE_EFFICIENCY_RULES.CAR;
+        const isKmL = rule.type === 'KM/L';
 
         const debitL = Math.round((s.debitLiters || 0) * 100) / 100;
         const debitR = Math.round(s.debitRp || 0);
-        const creditK = Math.round((s.creditKm || 0) * 100) / 100;
-        const creditH = Math.round((s.creditHm || 0) * 100) / 100;
+        const creditK = isKmL ? zcoAct : 0;
+        const creditH = !isKmL ? zcoAct : 0;
 
         // Apply Task 1 BBM Efficiency Evaluation Matrix (MID(5,3) with 10% tolerance & Standby handling)
         const refText = `${refData.primary || ''} ${refData.all || ''} ${s.slarcRefPrimary || ''} ${s.description || ''}`;
-        const eff = evaluateFuelEfficiency(ccKey, debitL, creditK, creditH, resolvedObjectType, refText);
-        const slarcTotal = creditK || creditH || 0;
+        const eff = evaluateFuelEfficiency(resolvedCostCenter, debitL, creditK, creditH, resolvedObjectType, refText);
+        const activityTotal = creditK || creditH || 0;
         const zestTotal = refData.zestKmHmTotal;
-        const diff = Math.round((slarcTotal - zestTotal) * 100) / 100;
+        const diff = Math.round((activityTotal - zestTotal) * 100) / 100;
         let reconcileStatus = 'NONE';
-        if (slarcTotal > 0 && zestTotal > 0) {
+        if (activityTotal > 0 && zestTotal > 0) {
           reconcileStatus = Math.abs(diff) < 0.01 ? 'MATCH' : 'DIFF';
-        } else if (slarcTotal > 0) {
-          reconcileStatus = 'SLARC_ONLY';
+        } else if (activityTotal > 0) {
+          reconcileStatus = 'ZCO_ONLY';
         } else if (zestTotal > 0) {
           reconcileStatus = 'ZEST_ONLY';
         }
 
         return {
           ...s,
+          costCenter: resolvedCostCenter || s.costCenter,
           equipment: resolvedEquipment,
           description: resolvedDescription,
           plant: resolvedPlant,
@@ -2793,6 +2962,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
           debitRp: debitR,
           creditKm: creditK,
           creditHm: creditH,
+          zcoActivity: activityTotal,
           kmPerLiter: eff.uom === 'KM/L' ? eff.ratioVal : 0,
           literPerHm: eff.uom === 'L/HM' ? eff.ratioVal : 0,
           costPerUnit: creditK > 0 ? Math.round(debitR / creditK) : (creditH > 0 ? Math.round(debitR / creditH) : 0),
@@ -2816,7 +2986,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
 
     return result;
-  }, [fuelData, fuelYear, fuelMonths, fuelStartDate, fuelEndDate, fuelPlant, zestLogsByEquipment, slarcDailyByCostCenter, logs, costCenterToEquipmentMap, lookupMasterPM, isAdmin, currentUser, masterVehiclesByCode, zcoMapByCC]);
+  }, [fuelData, fuelYear, fuelMonths, fuelStartDate, fuelEndDate, fuelPlant, zestLogsByEquipment, slarcDailyByCostCenter, logs, costCenterToEquipmentMap, lookupMasterPM, isAdmin, currentUser, masterVehiclesByCode, zcoMapByCC, zcoData, getZcoActivityForVehicle]);
 
   // Dynamic status counts for filter badges & dropdown
   const fuelStatusCounts = useMemo(() => {
@@ -2975,7 +3145,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       'Indikator & Tindak Lanjut': r.statusText,
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'ZCO Reconciliation');
-    XLSX.writeFile(wb, `ZCO_Reconciliation_${targetMonth}.xlsx`);
+    XLSX.writeFile(wb, `ZCO_Reconciliation_${targetMonth}${zcoFilterPlant !== 'ALL' ? `_${zcoFilterPlant}` : ''}.xlsx`);
   };
 
   const handleExportDetail = () => {
@@ -3032,8 +3202,18 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
   }, [filteredLogs, logPage]);
   const totalPages = Math.ceil(filteredLogs.length / LOG_PAGE_SIZE);
 
+  const currentMonthZcoData = useMemo(() => {
+    if (!zcoData || zcoData.length === 0) return [];
+    const hasMonthRecords = zcoData.some(z => Boolean(z.month));
+    if (hasMonthRecords) {
+      const filtered = zcoData.filter(z => (z.month || '2026-07') === targetMonth);
+      return filtered;
+    }
+    return zcoData;
+  }, [zcoData, targetMonth]);
+
   const zcoReconciliationData = useMemo(() => {
-    return zcoData.map(row => {
+    return currentMonthZcoData.map(row => {
       const ccCode = row.costCenterCode;
       
       // Find all vehicles in masterEquipments that belong to this cost center code
@@ -3151,13 +3331,17 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         _searchStr
       };
     });
-  }, [zcoData, masterEquipments, activeMonthLogs]);
+  }, [currentMonthZcoData, masterEquipments, activeMonthLogs]);
 
   const filteredZCOData = useMemo(() => {
     let result = zcoReconciliationData;
 
     if (currentUser && !isAdmin && currentUser.plant) {
       result = result.filter(r => r.plantCode === currentUser.plant || r.plantCode === '-');
+    }
+
+    if (zcoFilterPlant !== 'ALL') {
+      result = result.filter(r => r.plantCode === zcoFilterPlant);
     }
 
     if (zcoWilayah !== 'ALL') {
@@ -3181,7 +3365,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
 
     return result;
-  }, [zcoReconciliationData, zcoWilayah, searchZco, zcoFilterStatus, currentUser, isAdmin]);
+  }, [zcoReconciliationData, zcoFilterPlant, zcoWilayah, searchZco, zcoFilterStatus, currentUser, isAdmin]);
 
   const totalCekRows = useMemo(() => {
     let list = zcoReconciliationData;
@@ -3460,7 +3644,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             <div className="text-sm">
               <p className="font-bold text-xs">Upload ZCO Berhasil: {zcoUploadInfo.file}</p>
               <p className="text-emerald-700 mt-0.5 text-[11px]">
-                Berhasil mengimpor {zcoUploadInfo.processed} baris data Cost Center untuk pemantauan verifikasi biaya.
+                Berhasil menerapkan {zcoUploadInfo.processed} baris data Cost Center untuk periode <span className="font-bold underline">{zcoUploadInfo.month || targetMonth}</span> {zcoUploadInfo.plant && zcoUploadInfo.plant !== 'ALL' ? `(Unit: ${zcoUploadInfo.plant})` : '(Seluruh Regional)'}.
               </p>
             </div>
             <button onClick={() => setZcoUploadInfo(null)} className="ml-auto text-emerald-400 hover:text-emerald-600"><XCircle size={16} /></button>
@@ -3572,6 +3756,30 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
                   {autoWorkingDays} Hari
                 </div>
               </div>
+              {activeTab === 'zco-reconciliation' && (
+                <div className="flex flex-col">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-1">
+                    {isAdmin ? 'Filter Kebun / Unit' : 'Unit / Kebun Anda'}
+                  </label>
+                  {isAdmin ? (
+                    <select
+                      value={zcoFilterPlant}
+                      onChange={e => { setZcoFilterPlant(e.target.value); setZcoPage(1); }}
+                      className="px-3 py-2 border border-slate-300 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white font-semibold text-slate-700 h-[34px]"
+                    >
+                      <option value="ALL">Semua Kebun / Unit</option>
+                      {allPlantsList.map(p => (
+                        <option key={p.code} value={p.code}>{p.code} - {p.desc} ({p.wilayah})</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-2xl h-[34px]">
+                      <span className="font-mono text-[11px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded">{currentUser?.plant || selectedPlant}</span>
+                      <span className="text-xs font-semibold text-slate-700 truncate">{PLANT_INFO[currentUser?.plant || selectedPlant]?.desc || (currentUser?.plant || selectedPlant)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
               {activeTab !== 'zco-reconciliation' && (
                 <div className="flex flex-col">
                   <label className="text-[10px] font-bold text-slate-400 uppercase mb-1">Filter Wilayah</label>
@@ -4386,7 +4594,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             </div>
             <select
               value={zcoWilayah}
-              onChange={e => setZcoWilayah(e.target.value)}
+              onChange={e => { setZcoWilayah(e.target.value); setZcoPage(1); }}
               className="px-3 py-2 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white"
             >
               <option value="ALL">Semua Wilayah</option>
@@ -4394,9 +4602,23 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
               <option value="Kaltim">Kaltim</option>
               <option value="Kalselteng">Kalselteng</option>
             </select>
+            {isAdmin ? (
+              <select
+                value={zcoFilterPlant}
+                onChange={e => { setZcoFilterPlant(e.target.value); setZcoPage(1); }}
+                className="px-3 py-2 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white font-medium text-slate-700 max-w-[210px]"
+              >
+                <option value="ALL">Semua Kebun / Unit</option>
+                {allPlantsList
+                  .filter(p => zcoWilayah === 'ALL' || String(p.wilayah).toLowerCase().replace(/[^a-z0-9]/g, '').includes(String(zcoWilayah).toLowerCase().replace(/[^a-z0-9]/g, '')))
+                  .map(p => (
+                    <option key={p.code} value={p.code}>{p.code} - {p.desc}</option>
+                  ))}
+              </select>
+            ) : null}
             <select
               value={zcoFilterStatus}
-              onChange={e => setZcoFilterStatus(e.target.value)}
+              onChange={e => { setZcoFilterStatus(e.target.value); setZcoPage(1); }}
               className="px-3 py-2 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#064e3b]/30 focus:border-[#064e3b] bg-white font-semibold text-slate-700"
             >
               <option value="ALL">Semua Status</option>
@@ -6068,6 +6290,134 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       );
     })()}
 
+        {/* ── Modal Konfirmasi & Penerapan File ZCO_CCTR_01 ── */}
+        {showZcoUploadModal && pendingZcoUpload && (() => {
+          const rawRows = pendingZcoUpload.rows || [];
+          const matchedUploadRows = rawRows.filter(r => {
+            if (zcoUploadPlant === 'ALL') return true;
+            const cc = String(r.costCenterCode || '').toUpperCase();
+            const raw = String(r.rawCostCenter || '').toUpperCase();
+            return cc.startsWith(zcoUploadPlant) || raw.includes(zcoUploadPlant);
+          });
+          const totalCostUpload = matchedUploadRows.reduce((sum, r) => sum + (r.totalCost || 0), 0);
+          const totalActUpload = matchedUploadRows.reduce((sum, r) => sum + (r.activityQty || 0), 0);
+
+          return (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 no-print">
+              <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+                {/* Header */}
+                <div className="p-5 bg-gradient-to-r from-emerald-800 to-teal-800 text-white flex justify-between items-center">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-emerald-700/60 border border-emerald-500/30">
+                      <FileSpreadsheet size={20} className="text-emerald-200" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-sm tracking-wide">Penerapan File SAP ZCO_CCTR_01</h3>
+                      <p className="text-[11px] text-emerald-200/90 mt-0.5">Konfigurasi bulan penerapan &amp; filter unit kebun</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setShowZcoUploadModal(false); setPendingZcoUpload(null); }}
+                    className="text-emerald-200 hover:text-white p-1 rounded-lg hover:bg-emerald-900/40 transition cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Form Controls */}
+                <div className="p-5 space-y-4 text-xs">
+                  {/* File Info Card */}
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">File Terbaca</span>
+                      <span className="font-bold text-slate-800 text-xs truncate max-w-[280px] block">{pendingZcoUpload.file}</span>
+                    </div>
+                    <span className="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full font-mono text-[11px] font-extrabold">
+                      {rawRows.length} Baris
+                    </span>
+                  </div>
+
+                  {/* 1. Pilih Bulan Penerapan */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider block">
+                      1. Pilih Bulan Penerapan (Target Periode) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="month"
+                      value={zcoUploadMonth}
+                      onChange={e => setZcoUploadMonth(e.target.value)}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600 shadow-2xs"
+                    />
+                    <p className="text-[10.5px] text-slate-500 leading-relaxed">
+                      Nilai activity &amp; biaya dari file ZCO ini akan diterapkan pada bulan yang dipilih untuk verifikasi biaya dan evaluasi rasio BBM armada.
+                    </p>
+                  </div>
+
+                  {/* 2. Filter Kebun / Unit */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider block">
+                      2. Filter Cakupan Unit / Kebun <span className="text-red-500">*</span>
+                    </label>
+                    {isAdmin ? (
+                      <select
+                        value={zcoUploadPlant}
+                        onChange={e => setZcoUploadPlant(e.target.value)}
+                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600 shadow-2xs"
+                      >
+                        <option value="ALL">Semua Kebun / Unit (Regional - Seluruh Cost Center)</option>
+                        {allPlantsList.map(p => (
+                          <option key={p.code} value={p.code}>{p.code} - {p.desc} ({p.wilayah})</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800">
+                        {currentUser?.plant || selectedPlant} (Unit Anda)
+                      </div>
+                    )}
+                    <p className="text-[10.5px] text-slate-500 leading-relaxed">
+                      {zcoUploadPlant === 'ALL'
+                        ? 'Seluruh Cost Center dari file akan diimpor ke periode ini.'
+                        : `Hanya Cost Center milik unit ${zcoUploadPlant} yang akan diimpor; data unit lain tetap dipertahankan.`}
+                    </p>
+                  </div>
+
+                  {/* Summary Metric Preview */}
+                  <div className="p-3.5 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl grid grid-cols-2 gap-3 text-center">
+                    <div>
+                      <span className="text-[10px] font-extrabold text-emerald-800 uppercase block">Total Cost Center Cocok</span>
+                      <span className="text-base font-black text-emerald-950 font-mono mt-0.5 block">{matchedUploadRows.length} Unit</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-extrabold text-emerald-800 uppercase block">Total Activity SAP</span>
+                      <span className="text-base font-black text-[#064e3b] font-mono mt-0.5 block">
+                        {totalActUpload.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Buttons */}
+                <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => { setShowZcoUploadModal(false); setPendingZcoUpload(null); }}
+                    className="px-4 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmZCOUpload}
+                    disabled={matchedUploadRows.length === 0 || !zcoUploadMonth || loading}
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Check size={14} /> Terapkan ke Periode {zcoUploadMonth}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         <WhatsAppSenderModal 
           isOpen={showWAModal} 
