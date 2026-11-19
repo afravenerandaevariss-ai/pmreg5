@@ -1079,6 +1079,15 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         month: zcoUploadMonth,
         plant: zcoUploadPlant
       });
+      setTargetMonth(zcoUploadMonth);
+      if (zcoUploadMonth.includes('-')) {
+        const [y, m] = zcoUploadMonth.split('-');
+        setFuelYear(y);
+        setFuelMonths([m]);
+      }
+      if (zcoUploadPlant !== 'ALL') {
+        setZcoFilterPlant(zcoUploadPlant);
+      }
       setShowZcoUploadModal(false);
       setPendingZcoUpload(null);
     } catch (err) {
@@ -2422,15 +2431,19 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     return map;
   }, [zcoData]);
 
-  // VLOOKUP & SUM Activity from ZCO_CCTR_01 by Cost Center (or via Equipment from PM Master Data) and Month(s)
+  // VLOOKUP & SUM Activity from ZCO_CCTR_01 by Cost Center (vlookup from Equipment via PM Master Data) and Month(s)
   const getZcoActivityForVehicle = useCallback((costCenter, eqNum, targetMonthsList = []) => {
-    const cleanCC = String(costCenter || '').trim().split(/\s+/)[0].toUpperCase();
-    let targetCC = cleanCC;
-    if (!targetCC && eqNum && eqNum !== '-') {
-      const mm = lookupMasterPM(eqNum, '');
+    let targetCC = '';
+    // Priority 1: VLOOKUP Cost Center from Equipment using PM Master Data
+    if (eqNum && eqNum !== '-') {
+      const mm = lookupMasterPM(eqNum, costCenter);
       if (mm?.costCenter) {
         targetCC = String(mm.costCenter).trim().split(/\s+/)[0].toUpperCase();
       }
+    }
+    // Priority 2: Use provided Cost Center
+    if (!targetCC && costCenter) {
+      targetCC = String(costCenter).trim().split(/\s+/)[0].toUpperCase();
     }
     if (!targetCC) return 0;
 
@@ -2446,9 +2459,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       if (!targetMonthsList || targetMonthsList.length === 0) {
         totalAct += act;
       } else {
-        if (zMonth && targetMonthsList.includes(zMonth)) {
-          totalAct += act;
-        } else if (!zMonth) {
+        const matches = targetMonthsList.some(tm => {
+          if (!tm) return false;
+          if (zMonth === tm) return true;
+          if (zMonth.endsWith(`-${tm}`)) return true;
+          if (tm.endsWith(`-${zMonth}`)) return true;
+          return false;
+        });
+        if (matches || !zMonth) {
           totalAct += act;
         }
       }
@@ -2742,6 +2760,47 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         }
       });
 
+      // Melengkapi armada dari data ZCO_CCTR_01 jika ada aktivitas di periode range
+      const existingRangeCCs = new Set(Array.from(vehMap.keys()));
+      (zcoData || []).forEach(z => {
+        const rawZCC = z.costCenterCode || z.costCenter || z['Cost Center'] || z.cc || '';
+        const zCC = String(rawZCC).trim().split(/\s+/)[0].toUpperCase();
+        if (!zCC || existingRangeCCs.has(zCC)) return;
+
+        const zMonth = z.month || '';
+        const rangeMonths = [];
+        if (fuelStartDate) rangeMonths.push(fuelStartDate.substring(0, 7));
+        if (fuelEndDate && !rangeMonths.includes(fuelEndDate.substring(0, 7))) {
+          rangeMonths.push(fuelEndDate.substring(0, 7));
+        }
+        if (rangeMonths.length > 0 && zMonth && !rangeMonths.includes(zMonth)) return;
+
+        const zAct = parseFloat(z.activityQty || z.activity || 0) || 0;
+        const zCost = parseFloat(z.totalCost || 0) || 0;
+        if (zAct <= 0 && zCost <= 0) return;
+
+        const master = lookupMasterPM('', zCC);
+        const p = master?.plant || zCC.substring(0, 4);
+        if (activePlant !== 'ALL' && p !== activePlant) return;
+
+        existingRangeCCs.add(zCC);
+        vehMap.set(zCC, {
+          costCenter: zCC,
+          equipment: master?.equipment || '-',
+          description: master?.description || z.rawCostCenter || `Kendaraan ${zCC}`,
+          plant: p,
+          plantDesc: PLANT_INFO[p]?.desc || p,
+          wilayah: PLANT_INFO[p]?.wilayah || 'Regional 5',
+          objectType: master?.objectType || (zCC.includes('CAR') ? 'CAR' : zCC.includes('TRU') ? 'DTRUCK' : 'VEH'),
+          month: `${fuelStartDate || ''} s/d ${fuelEndDate || ''}`,
+          debitLiters: 0,
+          debitRp: 0,
+          creditKm: 0,
+          creditHm: 0,
+          txCount: 0
+        });
+      });
+
       let list = Array.from(vehMap.values());
       if (activePlant !== 'ALL') {
         list = list.filter(v => v.plant === activePlant);
@@ -2760,7 +2819,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
             : `Kendaraan ${ccKey}`
         );
         const resolvedPlant = masterMatch?.plant || v.plant || (ccKey ? ccKey.substring(0, 4) : '');
-        const resolvedCostCenter = ccKey || String(masterMatch?.costCenter || '').trim().toUpperCase();
+        const resolvedCostCenter = (masterMatch?.costCenter && rawEq ? String(masterMatch.costCenter).trim().toUpperCase() : '') || ccKey || String(masterMatch?.costCenter || '').trim().toUpperCase();
         const resolvedObjectType = masterMatch?.objectType || v.objectType || (resolvedCostCenter.includes('CAR') ? 'CAR' : resolvedCostCenter.includes('TRU') ? 'DTRUCK' : 'VEH');
         const refData = resolveSmartReference(resolvedEquipment, resolvedCostCenter || v.costCenter, fuelStartDate || v.month, true, v);
 
@@ -2912,7 +2971,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         const masterMatch = lookupMasterPM(rawEq, ccKey);
 
         const resolvedEquipment = masterMatch?.equipment || rawEq || '-';
-        const resolvedCostCenter = ccKey || String(masterMatch?.costCenter || '').trim().toUpperCase();
+        const resolvedCostCenter = (masterMatch?.costCenter && rawEq ? String(masterMatch.costCenter).trim().toUpperCase() : '') || ccKey || String(masterMatch?.costCenter || '').trim().toUpperCase();
         const resolvedDescription = masterMatch?.description || (
           s.description && !s.description.includes('Sedang Perbaikan') && !s.description.includes('Au58:') && !s.description.includes('Solar =') && !s.description.toLowerCase().startsWith('dinas ke')
             ? s.description
