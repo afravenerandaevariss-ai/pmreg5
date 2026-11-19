@@ -2459,14 +2459,14 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
       if (!targetMonthsList || targetMonthsList.length === 0) {
         totalAct += act;
       } else {
-        const matches = targetMonthsList.some(tm => {
+        const matches = zMonth && targetMonthsList.some(tm => {
           if (!tm) return false;
           if (zMonth === tm) return true;
           if (zMonth.endsWith(`-${tm}`)) return true;
           if (tm.endsWith(`-${zMonth}`)) return true;
           return false;
         });
-        if (matches || !zMonth) {
+        if (matches) {
           totalAct += act;
         }
       }
@@ -2982,7 +2982,7 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
         const refData = resolveSmartReference(resolvedEquipment, resolvedCostCenter || s.costCenter, s.month, false, s);
 
         // Tarikan nilai activity kendaraan diambil dari file ZCO_CCTR_01
-        const targetMonthsForZco = isAllMonths ? [] : (s.month && !s.month.includes('Semua') ? [s.month.substring(0, 7)] : targetMonths);
+        const targetMonthsForZco = isAllMonths ? [] : targetMonths;
         const zcoAct = getZcoActivityForVehicle(resolvedCostCenter, resolvedEquipment, targetMonthsForZco);
 
         const code = getVehicleTypeCode(resolvedCostCenter, resolvedObjectType);
