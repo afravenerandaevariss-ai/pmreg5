@@ -2447,6 +2447,9 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
     }
     if (!targetCC) return 0;
 
+    // Cek apakah ada baris ZCO yang sudah punya field month (data baru dengan tag bulan)
+    const hasMonthTaggedRows = (zcoData || []).some(z => z.month && String(z.month).trim() !== '');
+
     let totalAct = 0;
     (zcoData || []).forEach(z => {
       const rawZCC = z.costCenterCode || z.costCenter || z['Cost Center'] || z.cc || '';
@@ -2458,8 +2461,11 @@ export default function VehicleMonitoringView({ currentUser, screenshotMode }) {
 
       if (!targetMonthsList || targetMonthsList.length === 0) {
         totalAct += act;
+      } else if (!hasMonthTaggedRows || !zMonth) {
+        // Data lama tanpa tag bulan: ikutkan semua (tidak bisa difilter per bulan)
+        totalAct += act;
       } else {
-        const matches = zMonth && targetMonthsList.some(tm => {
+        const matches = targetMonthsList.some(tm => {
           if (!tm) return false;
           if (zMonth === tm) return true;
           if (zMonth.endsWith(`-${tm}`)) return true;
