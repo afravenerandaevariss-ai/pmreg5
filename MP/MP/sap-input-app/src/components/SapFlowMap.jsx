@@ -1,20 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   AlertCircle, Calendar, FileSpreadsheet, Image as ImageIcon, ZoomIn,
-  ShieldCheck, ArrowRight, ChevronLeft, ChevronRight, Play, Pause, MousePointerClick
+  ShieldCheck, ArrowRight, ChevronLeft, ChevronRight, Play, Pause, MousePointerClick,
+  Briefcase, TrendingUp
 } from 'lucide-react';
 import { FLOW_WORKFLOWS, TONE } from '../data/sapFlowWorkflows';
 
 const BANNER_ICON = {
   alert: AlertCircle,
   calendar: Calendar,
-  sheet: FileSpreadsheet
+  sheet: FileSpreadsheet,
+  investment: Briefcase
 };
 
 const BANNER_TONE = {
   rose: { chip: 'text-rose-800 bg-rose-50 border-rose-200', icon: 'text-rose-600' },
   emerald: { chip: 'text-emerald-800 bg-emerald-50 border-emerald-200', icon: 'text-emerald-700' },
-  teal: { chip: 'text-teal-800 bg-teal-50 border-teal-200', icon: 'text-teal-700' }
+  teal: { chip: 'text-teal-800 bg-teal-50 border-teal-200', icon: 'text-teal-700' },
+  amber: { chip: 'text-amber-800 bg-amber-50 border-amber-200', icon: 'text-amber-700' },
+  blue: { chip: 'text-blue-800 bg-blue-50 border-blue-200', icon: 'text-blue-700' }
 };
 
 /**
@@ -106,7 +110,7 @@ export default function SapFlowMap({
 
         <div
           ref={railRef}
-          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 relative z-10"
+          className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 ${total >= 7 ? 'xl:grid-cols-7' : 'xl:grid-cols-6'} gap-3 relative z-10`}
         >
           {stations.map((s, idx) => {
             const st = TONE[s.tone] || TONE.emerald;

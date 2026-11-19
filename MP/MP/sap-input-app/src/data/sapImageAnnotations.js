@@ -431,78 +431,68 @@ export const sapImageAnnotations = {
   ],
   "/images/pm04/step_1.png": [
     {
-      box: { x: 4.1, y: 38.2, w: 52.4, h: 9.7 },
-      label: { text: "Isi Order Type PM04 & Priority", side: 'right' }
-    },
-    {
-      box: { x: 3.5, y: 51.3, w: 51.5, h: 5.6 },
-      label: { text: "Masukan Nomor Equipment Mesin Sasaran", side: 'right' }
-    },
-    {
-      box: { x: 4.4, y: 60.4, w: 29.7, h: 6.6 },
-      label: { text: "Masukan Planning Plant Unit", side: 'right' }
+      box: { x: 3.5, y: 36.5, w: 53.0, h: 48.0 },
+      label: { text: "Input Order Type PM04, Priority Medium, Equipment & Plant 5F22", side: 'right' }
     },
   ],
   "/images/pm04/step_2.png": [
     {
-      box: { x: 37.4, y: 19.9, w: 49.3, h: 4.8 },
-      label: { text: "Isi Keterangan Kegiatan Investasi", side: 'above' }
+      box: { x: 37.0, y: 19.0, w: 50.0, h: 5.5 },
+      label: { text: "Uraian Pekerjaan: Penggantian Ducting Fiber Cyclone", side: 'above' }
     },
     {
-      box: { x: 58.7, y: 45.4, w: 30.6, h: 4.4 },
-      label: { text: "Pilih PMActType = INV (Investment)", side: 'right' }
+      box: { x: 2.8, y: 48.0, w: 35.0, h: 14.0 },
+      label: { text: "Basic Dates: 01.01.2027 (Anggaran Tender Dini 2027)", side: 'right' }
     },
     {
-      box: { x: 35.7, y: 86.8, w: 16.2, h: 3.8 },
+      box: { x: 35.0, y: 81.5, w: 22.0, h: 5.0 },
       label: { text: "Control Key First Operation = EXT (External)", side: 'above' }
     },
   ],
   "/images/pm04/step_3.png": [
     {
-      box: { x: 8.5, y: 19.9, w: 4.2, h: 3.2 },
-      label: { text: "Durasi Pekerjaan = 0 H", side: 'right' }
-    },
-    {
-      box: { x: 71.3, y: 19.8, w: 5.3, h: 3.3 },
-      label: { text: "Pilih Res/PurcRq = Immediately", side: 'left' }
+      box: { x: 1.5, y: 60.5, w: 32.0, h: 8.5 },
+      label: { text: "Pilih Tab Operations ➔ General (Control Key EXT)", side: 'right' }
     },
   ],
   "/images/pm04/step_4.png": [
     {
-      box: { x: 21.0, y: 38.4, w: 45.3, h: 3.9 },
-      label: { text: "Input Short Text, Qty (1 AU), dan Nilai Gross Price (IDR)", side: 'above' }
+      box: { x: 20.0, y: 45.0, w: 60.0, h: 6.0 },
+      label: { text: "Services Line 10: Qty 1 AU, Gross Price Rp 918.918.919, Cost Element 51101999", side: 'above' }
     },
   ],
   "/images/pm04/step_5.png": [
     {
-      box: { x: 2.0, y: 30.4, w: 21.6, h: 2.4 },
-      label: { text: "Isi Requisitioner (PAPEL) & Parameter Pengadaan", side: 'right' }
+      box: { x: 2.5, y: 61.0, w: 42.0, h: 6.0 },
+      label: { text: "Purchasing Group N07 / P051", side: 'right' }
+    },
+    {
+      box: { x: 2.5, y: 74.0, w: 45.0, h: 6.0 },
+      label: { text: "Requisitioner = Palpi", side: 'right' }
+    },
+  ],
+  "/images/pm04/step_5b.png": [
+    {
+      box: { x: 2.0, y: 94.0, w: 96.0, h: 4.0 },
+      label: { text: "No. 42: S999 JASA INVESTASI (Val. Class ZS99 / G/L 51101999 Beban Investasi)", side: 'above' }
     },
   ],
   "/images/pm04/step_6.png": [
     {
-      box: { x: 3.1, y: 59.5, w: 79.5, h: 8.4 },
-      label: { text: "Wajib Alokasi WBS Element & Project Definition", side: 'above' }
-    },
-    {
-      box: { x: 39.2, y: 5.5, w: 4.8, h: 5.0 },
-      label: { text: "Klik Simpan (Save) Dokumen Order PM04", side: 'right' }
+      box: { x: 4.5, y: 78.0, w: 42.0, h: 6.5 },
+      label: { text: "Res./Purc. req. = Immediately (PR Otomatis Terbit)", side: 'above' }
     },
   ],
   "/images/pm04/step_7.png": [
     {
-      box: { x: 4.6, y: 16.2, w: 2.7, h: 2.8 },
-      label: { text: "Klik Bendera Hijau untuk Release (REL)", side: 'right' }
-    },
-    {
-      box: { x: 1.7, y: 23.7, w: 37.1, h: 3.9 },
-      label: { text: "Status Berubah REL NMAT PRC SETC", side: 'right' }
+      box: { x: 3.5, y: 55.0, w: 89.0, h: 9.0 },
+      label: { text: "WBS Element PC-27-5F22-05-23-01 & Project Definition PC-27-5F22", side: 'above' }
     },
   ],
-  "/images/pm04/step_8.png": [
+  "/images/pm04/step_error_budget.png": [
     {
-      box: { x: 4.9, y: 77.4, w: 51.1, h: 17.5 },
-      label: { text: "Nomor Purchase Requisition (PR) Otomatis Terbit", side: 'above' }
+      box: { x: 12.0, y: 78.0, w: 75.0, h: 18.0 },
+      label: { text: "Error in commitment check: Belum rilis budget oleh tim anggaran", side: 'above' }
     },
   ],
   "/images/iw32/step_1.png": [

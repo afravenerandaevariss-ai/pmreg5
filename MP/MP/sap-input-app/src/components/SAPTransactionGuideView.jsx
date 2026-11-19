@@ -107,6 +107,13 @@ const TROUBLESHOOT_TOPICS = [
     subtitle: 'Klinik Troubleshooting (Kasus 5)',
     keywords: 'status bar pesan error merah kuning warning hijau information abort',
   },
+  {
+    id: 'ts-commitment-check',
+    badge: 'PM04 / CJ20N',
+    title: 'Solusi "Error in commitment check (see costing log)" saat Simpan PM04',
+    subtitle: 'Klinik Troubleshooting (Kasus 6)',
+    keywords: 'error in commitment check costing log belum rilis budget anggaran tender dini wbs element pm04 s999',
+  },
 ];
 
 export default function SAPTransactionGuideView() {
@@ -887,86 +894,95 @@ export default function SAPTransactionGuideView() {
       role: 'Asisten Teknik / Masinis Kepala / Planner Investasi / Finance',
       difficulty: 'Tinggi',
       purpose: 'Membuat dokumen Work Order khusus proyek investasi pabrik dan kebun (Capex), renovasi besar, rekondisi mesin, atau penggantian aset yang memerlukan alokasi WBS Element Proyek serta penerbitan otomatis Purchase Requisition (PR) untuk pengadaan jasa vendor/rekanan eksternal.',
-      ptpnStandard: 'Order Type: PM04 (Investment Order). PM Activity Type: INV (Investment). First Operation Control Key: EXT (External Service). Alokasi biaya diselesaikan (settlement) ke WBS Element Proyek Investasi (AuC / Asset under Construction), bukan ke Cost Center Opex rutin. Sistem SAP otomatis menerbitkan nomor Purchase Requisition (PR) saat status order berubah menjadi REL (Released).',
+      ptpnStandard: 'Order Type: PM04 (Investment Order). PM Activity Type: INV (Investment). First Operation Control Key: EXT (External Service). Status Awal: PCOM (Permit/Planning Complete). Alokasi biaya diselesaikan (settlement) ke WBS Element Proyek Investasi (AuC / Asset under Construction), bukan ke Cost Center Opex rutin. Sistem SAP otomatis menerbitkan nomor Purchase Requisition (PR) saat status order berubah menjadi REL (Released). Khusus tender dini, tanggal basic start diisi 01.01 tahun anggaran berikutnya.',
       fields: [
         { name: 'Order Type', type: 'Required', example: 'PM04', desc: 'Tipe order khusus investasi/kapitalisasi aset pabrik dan kebun (Capex).' },
         { name: 'Priority', type: 'Required', example: 'Medium / High', desc: 'Prioritas pelaksanaan proyek investasi mesin/fasilitas.' },
-        { name: 'Equipment', type: 'Required', example: '1000197313 (Fiber Cyclone No. 1)', desc: 'Nomor master equipment mesin sasaran investasi/penggantian.' },
-        { name: 'Planning Plant', type: 'Required', example: '5F15 (PKS Pelaihari) / 5F01', desc: 'Kode unit kerja/PKS tempat proyek investasi dilaksanakan.' },
+        { name: 'Equipment', type: 'Required', example: '1000174188 (SCREW PRESS NO. 1)', desc: 'Nomor master equipment mesin sasaran investasi/penggantian.' },
+        { name: 'Planning Plant', type: 'Required', example: '5F22 (PKS Long Pinang)', desc: 'Kode unit kerja/PKS tempat proyek investasi dilaksanakan.' },
         { name: 'Order Description', type: 'Required', example: 'Penggantian Ducting Fiber Cyclone', desc: 'Uraian lengkap nama kegiatan pekerjaan investasi aset.' },
-        { name: 'Planner Group', type: 'Required', example: '500 / 5F15 (Planner Teknik)', desc: 'Regu perencana pemeliharaan teknis unit.' },
-        { name: 'Main Work Center', type: 'Required', example: 'TEK-WSH / 5F15 (Teknisi Workshop)', desc: 'Work Center penanggung jawab teknis pelaksanaan di unit.' },
+        { name: 'Planner Group', type: 'Required', example: '500 / 5F22 (Planner Teknik)', desc: 'Regu perencana pemeliharaan teknis unit.' },
+        { name: 'Main Work Center', type: 'Required', example: 'TEK-WSH / 5F22 (Teknisi Workshop)', desc: 'Work Center penanggung jawab teknis pelaksanaan di unit.' },
         { name: 'PM Activity Type', type: 'Required', example: 'INV (Investment)', desc: 'Jenis aktivitas pemeliharaan khusus investasi modal (Capex).' },
-        { name: 'Control Key (First Opr)', type: 'Required', example: 'EXT (PTPN External Labor Maint)', desc: 'Kunci kontrol operasi eksternal agar SAP mengaktifkan subtab Services & pengadaan rekanan.' },
-        { name: 'Duration (Dur)', type: 'Required', example: '0 H', desc: 'Durasi jam kerja internal pada baris operasi (0 H untuk jasa eksternal).' },
-        { name: 'Res./Purc. req.', type: 'Required', example: 'Immediately', desc: 'Parameter aktivasi agar Purchase Requisition (PR) langsung terbit otomatis saat order berstatus REL.' },
-        { name: 'Services (Short Text, Qty, Price)', type: 'Required', example: 'Penggantian Ducting Fiber Cyclone, 1 AU, Rp 1.000.000', desc: 'Rincian deskripsi jasa rekanan, kuantitas satuan aktivitas (AU), dan estimasi gross price.' },
-        { name: 'Cost Element', type: 'Required', example: '51101999', desc: 'Akun biaya kapitalisasi / pembebanan jasa investasi proyek.' },
-        { name: 'Requisitioner', type: 'Required', example: 'PAPEL (Pabrik Pelaihari)', desc: 'Kode bagian/pemohon pengadaan jasa investasi pada tab External.' },
-        { name: 'Material Group & Purch. Group', type: 'Required', example: 'S999 (Jasa Pemeliharaan) / P08', desc: 'Grup material jasa dan kode bagian pengadaan/procurement.' },
-        { name: 'WBS Element', type: 'Required', example: 'PC-26-5F15-05-27-03', desc: 'Nomor elemen WBS proyek investasi tempat seluruh biaya dikapitalisasi.' },
-        { name: 'Project Definition', type: 'Required', example: 'PC-26-5F15', desc: 'Kode induk proyek investasi yang menaungi WBS Element.' },
-        { name: 'Related T-Codes', type: 'Info', example: 'IW31 (Create) | IW32 (Release/Change) | IW33 (Display) | KO02 (Settlement) | CJ20N (WBS)', desc: 'Rangkaian transaksi SAP terintegrasi untuk siklus hidup WO Investasi PM04.' }
+        { name: 'Control Key (First Opr)', type: 'Required', example: 'EXT (PTPN External Labor Maint)', desc: 'Wajib EXT agar SAP mengaktifkan subtab Services untuk pengadaan jasa rekanan.' },
+        { name: 'Dates (Bsc start / fin.)', type: 'Required', example: '01.01.2027', desc: 'Tanggal wajib diisi 01.01 tahun anggaran target jika menggunakan alokasi pagu anggaran tender dini (misal 2027).' },
+        { name: 'Status Indikator', type: 'Info', example: 'PCOM & Has Open Main Work', desc: 'Status perencanaan lengkap dan tanda pekerjaan utama terbuka.' },
+        { name: 'Services (Short Text, Qty, Gross Price)', type: 'Required', example: 'Penggantian Ducting Fiber Cyclone, 1 AU, Rp 918.918.919', desc: 'Rincian deskripsi jasa rekanan, kuantitas satuan aktivitas (AU), dan Gross Price persis sesuai dokumen PPAB.' },
+        { name: 'Cost Element', type: 'Required', example: '51101999', desc: 'Akun beban investasi / kapitalisasi jasa pemeliharaan rekanan.' },
+        { name: 'Material Group', type: 'Required', example: 'S999 (JASA INVESTASI)', desc: 'Wajib S999 (Val. Class ZS99 / GL 51101999) sesuai tabel MATERIAL GROUP JASA PALMCO. Jangan gunakan S001-S047 (Opex rutin).' },
+        { name: 'Purch. Group', type: 'Required', example: 'N07 / P051', desc: 'Kode bagian pengadaan/procurement unit pelaksana lelang.' },
+        { name: 'Requisitioner', type: 'Required', example: 'Palpi', desc: 'Kode bagian/pemohon pengadaan jasa investasi pada tab External.' },
+        { name: 'Res./Purc. req.', type: 'Required', example: 'Immediately', desc: 'Parameter aktivasi di subtab Act. Data agar Purchase Requisition (PR) langsung terbit otomatis saat order berstatus REL.' },
+        { name: 'WBS Element', type: 'Required', example: 'PC-27-5F22-05-23-01', desc: 'Nomor elemen WBS proyek investasi (contoh: Pngdan & pmsngan baru digester no1) tempat seluruh biaya dikapitalisasi.' },
+        { name: 'Project Definition', type: 'Required', example: 'PC-27-5F22 (PKS LONGPINANG)', desc: 'Kode induk proyek investasi yang menaungi WBS Element.' },
+        { name: 'Error Commitment Check', type: 'Troubleshoot', example: 'Error in commitment check (see costing log)', desc: 'Peringatan saat simpan: tanda belum rilis budget oleh tim anggaran kantor pusat/regional (khusus proses tender dini).' }
       ],
       stepsData: [
         {
           num: 1,
           title: 'Initial Screen IW31: Penentuan Order Type PM04 & Target Equipment',
-          desc: 'Akses T-Code IW31 di command field SAP GUI. Masukkan Order Type = PM04 (Investment Order), Priority = Medium, nomor Equipment mesin sasaran (misal: 1000197313 - FIBER CYCLONE NO. 1), dan Planning Plant (misal: 5F15 - PKS Pelaihari). Tekan tombol Enter untuk masuk ke formulir pembuatan Work Order.',
+          desc: 'Akses T-Code IW31 di command field SAP GUI. Masukkan Order Type = PM04 (Investment Order), Priority = Medium, nomor Equipment sasaran (contoh: 1000174188 - SCREW PRESS NO. 1), dan Planning Plant (contoh: 5F22 - PKS Long Pinang). Tekan tombol Enter untuk masuk ke formulir pembuatan Work Order.',
           image: '/images/pm04/step_1.png',
-          imgCaption: 'Layar Awal IW31: Input Order Type PM04, Equipment, dan Planning Plant'
+          imgCaption: 'Layar Awal IW31: Input Order Type PM04, Priority Medium, Equipment 1000174188, dan Planning Plant 5F22'
         },
         {
           num: 2,
-          title: 'Central Header: Uraian Kegiatan Investasi & Activity Type INV',
-          desc: 'Ketikkan judul pekerjaan pada kolom Order Description (misal: "Penggantian Ducting Fiber Cyclone"). Isi Planner Group (500) dan Main Work Center (TEK-WSH). Pada bagian Person responsible, pilih PM Activity Type = INV (Investment). Pada First operation di bagian bawah, pastikan Control Key diisi "EXT" (PTPN External Labor Maintenance).',
+          title: 'Central Header: Uraian Investasi, Tanggal Anggaran 2027 & Status PCOM',
+          desc: 'Ketikkan judul pekerjaan pada kolom Order Description (contoh: "Penggantian Ducting Fiber Cyclone"). Centang checkbox "Has Open Main Work". Jika menggunakan anggaran tahun depan (tender dini), atur tanggal Basic Start dan Finish ke "01.01.2027". Pada First operation di bagian bawah, pastikan WkCtr/Plnt terisi TEK-WSH / 5F22 dan Control Key wajib "EXT" (PTPN External Labor Maintenance). Status sistem tercatat PCOM.',
           image: '/images/pm04/step_2.png',
-          imgCaption: 'Tab HeaderData: Judul Pekerjaan, PMActType INV, dan Control Key EXT'
+          imgCaption: 'Tab HeaderData: Judul Pekerjaan, Tanggal 01.01.2027 (Anggaran 2027), Control Key EXT, Status PCOM'
         },
         {
           num: 3,
-          title: 'Tab Operations: Pengaturan Durasi & Reservasi PR Immediately',
-          desc: 'Klik tab Operations. Pada baris operasi 0010, tentukan durasi pekerjaan (Dur = 0 H). Geser scrollbar horizontal ke arah kanan hingga menemukan kolom Res/PurcRq, lalu pilih opsi "Immediately" agar sistem SAP langsung menerbitkan dokumen Purchase Requisition (PR) secara otomatis saat order dirilis.',
+          title: 'Tab Operations: Pemeriksaan Baris Operasi 0010 General',
+          desc: 'Klik tab Operations kemudian klik subtab General. Pastikan baris operasi Act 0010 menggunakan Work Ctr TEK-WSH, Plant 5F22, Control Key EXT, dan Operation Short Text terisi jelas sesuai paket pekerjaan investasi.',
           image: '/images/pm04/step_3.png',
-          imgCaption: 'Tab Operations: Durasi Kerja 0H & Penentuan Res/Purc. Req Immediately'
+          imgCaption: 'Tab Operations ➔ General: Konfirmasi Operasi 0010 dengan Control Key EXT'
         },
         {
           num: 4,
-          title: 'General Operation: Input Rincian Jasa Pemborongan & Estimasi Nilai (Services)',
-          desc: 'Sorot baris operasi 0010 dan klik subtab General di bawahnya, kemudian pilih tab Services. Masukkan rincian pekerjaan: Line 10, Short Text ("Penggantian Ducting Fiber Cyclone"), Quantity = 1, Unit = AU (Activity Unit), Gross Price = nilai estimasi anggaran (misal: Rp 1.000.000 IDR), dan Cost Element = 51101999 (Kapitalisasi Jasa Investasi).',
+          title: 'General Operation (Services): Input Rincian Item Jasa & Gross Price Sesuai PPAB',
+          desc: 'Klik tombol/subtab Services pada bagian bawah. Masukkan rincian pekerjaan: Line 10, Short Text ("Penggantian Ducting Fiber Cyclone"), Quantity = 1, Unit = AU (Activity Unit), Gross Price = nilai anggaran sesuai dokumen PPAB (contoh: Rp 918.918.919), dan Cost Element = 51101999 (Beban Investasi).',
           image: '/images/pm04/step_4.png',
-          imgCaption: 'Subtab Services: Rincian Item Jasa, Volume (AU), Nilai Anggaran (Gross Price) & Cost Element'
+          imgCaption: 'Subtab Services: Line 10, Qty 1 AU, Gross Price Rp 918.918.919, Cost Element 51101999'
         },
         {
           num: 5,
-          title: 'Tab External: Penunjukan Requisitioner & Purchasing Group',
-          desc: 'Beralih ke subtab External pada General Operation Data. Masukkan kode Requisitioner (misal: PAPEL untuk Bagian Pengolahan Pabrik Pelaihari). Pastikan Material Group terisi S999 (Jasa Pemeliharaan/Investasi) dan Purchasing Group terisi kode pengadaan unit (misal: P08 / P051) untuk keperluan proses tender vendor.',
+          title: 'Tab External: Penetapan Material Group S999 & Requisitioner',
+          desc: 'Beralih ke subtab External. Perhatikan bagian Material Group: apabila pekerjaan adalah Investasi, WAJIB menggunakan kode "S999" (JASA INVESTASI). Masukkan Purchasing Group (contoh: N07 / P051) dan Requisitioner (contoh: Palpi) untuk identitas pemohon lelang.',
           image: '/images/pm04/step_5.png',
-          imgCaption: 'Subtab External: Penunjukan Pemohon (Requisitioner PAPEL) & Purchasing Group'
+          imgCaption: 'Subtab External: Material Group S999, Purch. Group N07 / P051, Requisitioner Palpi'
         },
         {
           num: 6,
-          title: 'Tab Additional Data: Alokasi WBS Element Proyek & Simpan Order',
-          desc: 'Kembali ke Header Data dan klik tab Additional Data. Pada bagian Organization, wajib menginput WBS Element (misal: PC-26-5F15-05-27-03) dan Project Definition (PC-26-5F15). Seluruh pembebanan biaya investasi akan diselesaikan ke WBS Element ini. Klik tombol Simpan (ikon Disket). Sistem menerbitkan nomor Order PM04 resmi (status awal: CRTD MANC NTUP).',
-          image: '/images/pm04/step_6.png',
-          imgCaption: 'Tab Additional Data: Pengikatan WBS Element Proyek & Simpan Dokumen (Save)'
+          title: 'Tabel Standar Material Group Jasa PALMCO (S001 s/d S999)',
+          desc: 'Rujukan resmi klasifikasi material group jasa (Tabel T023/T023T/T030 & S_ALR_87012333): Posisi No. 42 menunjukkan kode "S999" adalah JASA INVESTASI dengan Val. Class ZS99 dan G/L Account 51101999 (Beban Investasi). Jangan tertukar dengan S001–S047 yang dialokasikan untuk pemeliharaan rutin (Opex).',
+          image: '/images/pm04/step_5b.png',
+          imgCaption: 'Tabel Resmi Material Group Jasa PALMCO: S999 Khusus Jasa Investasi (G/L 51101999)'
         },
         {
           num: 7,
-          title: 'Otorisasi & Rilis Order Investasi (IW32)',
-          desc: 'Buka T-Code IW32, masukkan nomor Work Order yang baru dibuat (misal: 230000018873). Klik tombol Bendera Hijau (Release - F8 / Ctrl+F1) untuk merilis order. Simpan dokumen (Ctrl+S). Status sistem pada header order akan berubah menjadi "REL NMAT PRC SETC" (Released, Settlement Rule Created).',
-          image: '/images/pm04/step_7.png',
-          imgCaption: 'Layar IW32: Rilis Work Order (Bendera Hijau) hingga Berstatus REL'
+          title: 'Tab Act. Data: Pengaturan Res./Purc. Req. = Immediately (PR Otomatis)',
+          desc: 'Buka subtab Act. Data pada General Operation Data. Pada blok Purchasing, pastikan kolom Res./Purc. req. dipilih "Immediately". Parameter ini menjamin bahwa nomor Purchase Requisition (PR) resmi SAP langsung di-generate otomatis saat order dirilis, tanpa perlu membuat PR manual di ME51N.',
+          image: '/images/pm04/step_6.png',
+          imgCaption: 'Subtab Act. Data: Bagian Purchasing diatur Res./Purc. req. = Immediately'
         },
         {
           num: 8,
-          title: 'Verifikasi Penerbitan Nomor Purchase Requisition (PR) Otomatis',
-          desc: 'Masuk kembali ke menu order di IW32 atau IW33, buka tab Operations ➔ subtab General ➔ subtab Act. Data. Periksa blok Purchasing: kolom Requisition secara otomatis telah terisi nomor Purchase Requisition resmi SAP (misal: 1200051225 item 10). Nomor PR ini langsung diteruskan ke Bagian Pengadaan (Procurement) untuk penerbitan Purchase Order (PO) kontrak rekanan.',
-          image: '/images/pm04/step_8.png',
-          imgCaption: 'Subtab Act. Data: Nomor Purchase Requisition (PR) Otomatis Terbit oleh Sistem SAP'
+          title: 'Tab Additional Data: Alokasi WBS Element Proyek Sesuai PPAB',
+          desc: 'Kembali ke Header Data dan klik tab Additional Data. Pada blok Organization, wajib memasukkan WBS Element (contoh: PC-27-5F22-05-23-01 - Pngdan & pmsngan baru digester no1) dan Project Definition (contoh: PC-27-5F22 - PKS LONGPINANG) sesuai dokumen PPAB. Seluruh biaya investasi akan diselesaikan ke WBS Element ini (Aset Dalam Pengerjaan / AuC).',
+          image: '/images/pm04/step_7.png',
+          imgCaption: 'Tab Additional Data: Pengikatan WBS Element Proyek & Project Definition Sesuai PPAB'
+        },
+        {
+          num: 9,
+          title: 'Solusi Peringatan: "Error in commitment check (see costing log)"',
+          desc: 'Saat menyimpan order PM04, jika muncul jendela popup bertuliskan "Error in commitment check (see costing log)", artinya plafon budget belum dirilis oleh tim anggaran (khususnya untuk proses tender dini tahun berikutnya). Ini BUKAN error data teknisi. Lakukan koordinasi dengan tim anggaran kantor direksi/regional untuk merilis budget WBS di CJ20N. Setelah budget dirilis, buka kembali IW32 dan rilis order (Status REL).',
+          image: '/images/pm04/step_error_budget.png',
+          imgCaption: 'Peringatan Commitment Check: Tanda Budget Belum Dirilis oleh Tim Anggaran (Tender Dini)'
         }
       ],
-      tips: 'KUNCI SUKSES WORK ORDER INVESTASI (PM04):\n1. T-Code Terkait: IW31 (Buat Order PM04), IW32 (Rilis & TECO), IW33 (Monitoring Display), KO02/CJ20N (Validasi Settlement WBS Element).\n2. Wajib mengisi WBS Element proyek pada tab Additional Data agar biaya tidak salah membebani Cost Center rutin.\n3. Wajib menggunakan Control Key EXT dengan rincian Services (Line, Short Text, Qty, AU, Gross Price, Cost Element 51101999).\n4. Nomor Purchase Requisition (PR) otomatis diterbitkan oleh SAP pada tab Operations -> Act. Data saat order berstatus REL (Immediately), tanpa perlu membuat PR manual di ME51N.'
+      tips: 'KUNCI SUKSES WORK ORDER INVESTASI (PM04):\n1. T-Code Terkait: IW31 (Buat Order PM04), IW32 (Rilis & TECO), IW33 (Monitoring Display), KO02/CJ20N (Validasi Settlement WBS Element).\n2. Tanggal Tender Dini: Jika menggunakan anggaran tahun depan (misal 2027), isi Basic Start & Finish tanggal 01.01.2027.\n3. Material Group Investasi: Wajib memakai S999 (JASA INVESTASI) dengan Cost Element 51101999, jangan pakai S001-S047 (Opex rutin).\n4. Res./Purc. Req.: Wajib pilih "Immediately" di tab Act. Data agar nomor PR otomatis terbit saat order berstatus REL.\n5. Error Commitment Check: Jika muncul popup "Error in commitment check", hubungi tim anggaran untuk rilis budget pada WBS Element terkait.'
     },
 
     iw32: {
@@ -2303,6 +2319,7 @@ export default function SAPTransactionGuideView() {
                   {[
                     { label: '⚡ Corrective Maintenance (PM01)', key: 'corrective', desc: 'Breakdown & Perbaikan Mesin' },
                     { label: '📅 Preventive Maintenance (PM02)', key: 'preventive', desc: 'Perawatan Berkala Siklus HM' },
+                    { label: '🏗️ Investment Order (PM04)', key: 'investment', desc: 'Proyek Overhaul, Investasi Capex & WBS' },
                     { label: '🚛 Logbook Traksi Regional 5', key: 'logbook', desc: 'Rekap Jam Jalan Kendaraan' }
                   ].map(item => (
                     <button
@@ -2676,6 +2693,15 @@ export default function SAPTransactionGuideView() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => { setActiveWorkflow('investment'); setSelectedFlowStep(1); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-700 ${
+                    activeWorkflow === 'investment' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-transparent text-emerald-950 hover:bg-emerald-50'
+                  }`}
+                >
+                  🏗️ Investment (PM04)
+                </button>
+                <button
+                  type="button"
                   onClick={() => { setActiveWorkflow('logbook'); setSelectedFlowStep(1); }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-700 ${
                     activeWorkflow === 'logbook' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-transparent text-emerald-950 hover:bg-emerald-50'
@@ -2724,7 +2750,7 @@ export default function SAPTransactionGuideView() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-amber-800 font-bold bg-white px-3 py-1.5 rounded-xl border border-amber-200 shadow-2xs">
-                  5 Kasus Siap Solusi
+                  6 Kasus Siap Solusi
                 </span>
               </div>
             </div>
@@ -2991,6 +3017,69 @@ session.findById("wnd[0]").sendVKey 0`}
                   <p className="text-xs text-slate-700 leading-relaxed">
                     Transaksi terblokir (misal: "Cost Center invalid", "Budget exceeded"). Perbaiki field bertanda merah sebelum bisa lanjut.
                   </p>
+                </div>
+              </div>
+            </div>
+
+            {/* KASUS 6: SOLUSI ERROR COMMITMENT CHECK PM04 */}
+            <div id="ts-commitment-check" className="p-6 bg-white rounded-2xl border border-slate-200 space-y-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 border border-amber-200 flex items-center justify-center font-bold text-sm">
+                    6
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Solusi "Error in commitment check (see costing log)" saat Simpan PM04</h3>
+                    <p className="text-xs text-slate-500">Penyebab: Plafon anggaran belum dirilis oleh tim anggaran kantor pusat/regional (khususnya tender dini tahun anggaran berikutnya).</p>
+                  </div>
+                </div>
+                <span className="font-mono text-xs font-bold text-amber-800 bg-amber-100 px-3 py-1 rounded-lg border border-amber-200">
+                  PM04 / CJ20N
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center p-4 rounded-xl bg-amber-50/40 border border-amber-200">
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold text-rose-800 bg-rose-100 px-2 py-0.5 rounded border border-rose-200">Identifikasi Masalah</span>
+                  <h4 className="text-xs font-bold text-slate-900">Muncul Popup Error Commitment Check saat Save</h4>
+                  <p className="text-xs text-slate-700 leading-relaxed">
+                    Saat klik tombol Simpan pada PM04, muncul popup bertuliskan <strong>"Error in commitment check (see costing log)"</strong>. Ini <strong>BUKAN kesalahan data teknisi</strong> atau kerusakan sistem SAP. Pesan ini muncul karena dokumen WBS Element proyek diikatkan pada tahun anggaran mendatang (misal 2027) yang plafon dananya <strong>belum di-release secara resmi oleh Tim Anggaran</strong>.
+                  </p>
+                  <div className="p-3 bg-white rounded-lg border border-amber-200 text-xs text-slate-700 space-y-1">
+                    <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                      <ShieldCheck size={14} className="text-amber-700" /> Langkah Solusi Lapangan:
+                    </div>
+                    <div>1. Catat nomor WBS Element (misal: <code>PC-27-5F22-05-23-01</code>) dan nomor order draft.</div>
+                    <div>2. Hubungi <strong>Tim Anggaran / Finance Regional</strong> untuk melakukan rilis pagu budget WBS di transaksi <code>CJ20N</code>.</div>
+                    <div>3. Setelah budget aktif, buka kembali Work Order di <code>IW32</code>, klik ikon Bendera Hijau (Release), lalu simpan (Ctrl+S). Status order sukses menjadi <strong>REL</strong> dan nomor PR resmi otomatis terbit.</div>
+                  </div>
+                </div>
+                <div className="w-full">
+                  <SAPAnnotatedImage
+                    image="/images/pm04/step_error_budget.png"
+                    alt="Error in commitment check"
+                    caption="Peringatan Commitment Check: Plafon Budget WBS Belum Dirilis oleh Tim Anggaran"
+                    onZoom={openZoomModal}
+                  />
+                </div>
+              </div>
+
+              {/* Rujukan Material Group S999 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">Rujukan Material Group</span>
+                  <h4 className="text-xs font-bold text-slate-900">Wajib Gunakan S999 (JASA INVESTASI)</h4>
+                  <p className="text-xs text-slate-700 leading-relaxed">
+                    Pastikan pada tab External baris operasi, kolom Material Group terisi <strong>S999</strong> (JASA INVESTASI / Val. Class ZS99 / G/L Account 51101999). Hindari penggunaan kode S001 s/d S047 yang dikhususkan untuk beban operasional rutin (Opex).
+                  </p>
+                </div>
+                <div className="w-full">
+                  <SAPAnnotatedImage
+                    image="/images/pm04/step_5b.png"
+                    alt="Tabel Material Group Jasa PALMCO"
+                    caption="Daftar Resmi Material Group Jasa: S999 Khusus Investasi (Beban Investasi 51101999)"
+                    onZoom={openZoomModal}
+                  />
                 </div>
               </div>
             </div>
