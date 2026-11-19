@@ -689,10 +689,31 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+const normalizeTab = (rawTab) => {
+  if (!rawTab) return 'dashboard';
+  const lower = String(rawTab).toLowerCase().trim();
+  if (lower === 'guide' || lower === 'sop' || lower === 'panduan' || lower === 'sap-guide') return 'sap-guide';
+  if (lower === 'wo' || lower === 'workorder') return 'work-order';
+  if (lower === 'ba') return 'berita-acara';
+  if (lower === 'kb' || lower === 'docs') return 'knowledge-base';
+  const validTabs = ['dashboard', 'monitoring', 'verifikasi', 'vehicle', 'berita-acara', 'sap-guide', 'work-order', 'knowledge-base', 'settings', 'master', 'table', 'inbox'];
+  return validTabs.includes(lower) ? lower : 'dashboard';
+};
+
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get('tab') || 'dashboard';
+    return normalizeTab(params.get('tab'));
   });
+
+  // Keep activeTab in sync with browser forward/back buttons & URL parameters
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      setActiveTab(normalizeTab(params.get('tab')));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
@@ -1543,7 +1564,7 @@ function App() {
                 window.history.pushState({}, '', '?tab=sap-guide');
                 setIsMobileMenuOpen(false);
               }} 
-              className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${activeTab === 'sap-guide' ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
+              className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-colors border-l-2 ${(activeTab === 'sap-guide' || activeTab === 'guide') ? 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
               title="Panduan T-Code SAP PM"
             >
               <BookOpen size={18} className={isSidebarOpen || isMobileMenuOpen ? "mr-4" : "mx-auto group-hover:mr-4 group-hover:mx-0"} />
@@ -1726,9 +1747,9 @@ function App() {
         </header>
 
         {/* Scrollable Content */}
-        <main className={`flex-1 overflow-y-auto ${activeTab === 'sap-guide' ? 'p-0' : 'p-3 sm:p-6 lg:p-8'} print:overflow-visible print:block print:p-0`}>
+        <main className={`flex-1 overflow-y-auto ${(activeTab === 'sap-guide' || activeTab === 'guide') ? 'p-0' : 'p-3 sm:p-6 lg:p-8'} print:overflow-visible print:block print:p-0`}>
           
-          {activeTab !== 'dashboard' && activeTab !== 'monitoring' && activeTab !== 'verifikasi' && activeTab !== 'berita-acara' && activeTab !== 'sap-guide' && activeTab !== 'work-order' && activeTab !== 'inbox' && activeTab !== 'knowledge-base' && (
+          {activeTab !== 'dashboard' && activeTab !== 'monitoring' && activeTab !== 'verifikasi' && activeTab !== 'berita-acara' && activeTab !== 'sap-guide' && activeTab !== 'guide' && activeTab !== 'work-order' && activeTab !== 'inbox' && activeTab !== 'knowledge-base' && (
             <div className="flex justify-between items-end mb-8">
               <h2 className="text-[26px] font-light text-slate-800 tracking-tight">
                 {activeTab === 'table' && 'Tabel & Ekspor SAP'}
@@ -1812,7 +1833,7 @@ function App() {
           )}
 
           {/* TAB: SAP GUIDE */}
-          {activeTab === 'sap-guide' && (
+          {(activeTab === 'sap-guide' || activeTab === 'guide') && (
             <div className="min-h-full">
               <SAPTransactionGuideView />
             </div>
@@ -1833,7 +1854,7 @@ function App() {
           )}
 
           {error && (
-            <div className={`bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-3 mb-6 shadow-sm ${activeTab === 'sap-guide' ? 'mx-4 my-4 sm:mx-6 lg:mx-8' : ''}`}>
+            <div className={`bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-3 mb-6 shadow-sm ${(activeTab === 'sap-guide' || activeTab === 'guide') ? 'mx-4 my-4 sm:mx-6 lg:mx-8' : ''}`}>
               <AlertCircle size={20} />
               <p>{error}</p>
             </div>

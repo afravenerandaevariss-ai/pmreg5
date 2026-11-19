@@ -113,12 +113,9 @@ export function parseSapNumber(raw) {
   let s = String(raw).trim();
   if (!s || s === '-') return 0;
   let isNeg = false;
-  if (s.endsWith('-')) {
+  if (s.includes('-')) {
     isNeg = true;
-    s = s.slice(0, -1).trim();
-  } else if (s.startsWith('-')) {
-    isNeg = true;
-    s = s.substring(1).trim();
+    s = s.replace(/-/g, '').trim();
   }
   if (s.includes('.') && s.includes(',')) {
     s = s.replace(/\./g, '').replace(/,/g, '.');
